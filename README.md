@@ -1,6 +1,12 @@
-# Rust Stereo Visual-Inertial Odometry (RS-VIO)
+# RS-VIO: Rust Stereo Visual-Inertial Odometry
 
-This project is a stereo visual-inertial odometry (VIO) system, written fully in Rust. It utilizes patch-based stereo feature tracking, sliding window bundle adjustment with apex-solver (Levenberg-Marquardt optimization), PnP-based motion tracking, and Rerun for 3D visualization. This first release (v0.1) only supports pure stereo odometry, IMU integration is planned for the next release.
+[![crates.io](https://img.shields.io/crates/v/rs-vio.svg)](https://crates.io/crates/rs-vio)
+[![docs.rs](https://docs.rs/rs-vio/badge.svg)](https://docs.rs/rs-vio)
+[![CI](https://github.com/your-org/rs-vio/workflows/Rust%20CI/badge.svg)](https://github.com/your-org/rs-vio/actions)
+[![codecov](https://codecov.io/gh/your-org/rs-vio/branch/main/graph/badge.svg)](https://codecov.io/gh/your-org/rs-vio)
+[![dependency status](https://deps.rs/crate/rs-vio/0.1.0/status.svg)](https://deps.rs/crate/rs-vio/0.1.0)
+
+A high-performance stereo visual-inertial odometry (VIO) system written in Rust. Features patch-based stereo feature tracking, sliding window bundle adjustment, and real-time 3D visualization.
 
 [![Demo video](https://img.youtube.com/vi/3lqf6Et3RmQ/0.jpg)](https://www.youtube.com/watch?v=3lqf6Et3RmQ)
 
@@ -37,6 +43,29 @@ cargo run --release --bin run_4seasons config/4seasons.yaml {path_to_4seasons_fo
 
 Check the run scripts in /scripts/ for more information. Configuration files are available in the `config/` directory.
 
+## Installation
+
+### From crates.io
+```bash
+cargo install rs-vio
+```
+
+### From source
+```bash
+git clone https://github.com/your-org/rs-vio.git
+cd rs-vio
+cargo build --release
+```
+
+### Docker
+```bash
+# Build the image
+docker build -t rs-vio .
+
+# Run with dataset
+docker run -v /path/to/dataset:/data rs-vio --config /data/config.yaml /data/dataset/
+```
+
 ## Variable naming conventions
 
 We use the following naming conventions for coordinate frame transformations:
@@ -46,6 +75,147 @@ We use the following naming conventions for coordinate frame transformations:
 - `q_B_A: UnitQuaternion`: Unit quaternion representing the rotation from A to B
 
 Using this convention, we can easily chain transformations, e.g. `T_C_A = T_C_B * T_B_A`.
+
+## Development
+
+### Prerequisites
+- Rust 1.75+
+- System dependencies: `pkg-config`, `libssl-dev` (Ubuntu/Debian)
+
+### Building
+```bash
+# Debug build
+cargo build
+
+# Release build
+cargo build --release
+
+# Run tests
+cargo test
+
+# Run benchmarks
+cargo bench
+
+# Generate documentation
+cargo doc --open
+```
+
+### Development Workflow
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/your-feature`
+3. Make changes and add tests
+4. Run the full test suite: `cargo test && cargo clippy && cargo audit`
+5. Update documentation if needed
+6. Commit with conventional commits
+7. Create a pull request
+
+### Code Quality
+This project uses several tools to maintain code quality:
+
+- **Formatting**: `cargo fmt`
+- **Linting**: `cargo clippy`
+- **Testing**: `cargo test`
+- **Security**: `cargo audit`
+- **Coverage**: `cargo tarpaulin`
+- **Benchmarking**: `cargo bench`
+
+### Logging
+RS-VIO uses structured logging with configurable levels:
+
+```bash
+# Set log level
+RUST_LOG=rs_vio=debug cargo run
+
+# JSON logging
+RUST_LOG=rs_vio=info cargo run
+```
+
+## Deployment
+
+### Container Deployment
+```yaml
+# docker-compose.yml
+version: '3.8'
+services:
+  rs-vio:
+    image: rs-vio:latest
+    volumes:
+      - ./config:/app/config:ro
+      - ./data:/app/data:ro
+    environment:
+      - RUST_LOG=rs_vio=info
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+```
+
+### Kubernetes
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rs-vio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rs-vio
+  template:
+    metadata:
+      labels:
+        app: rs-vio
+    spec:
+      containers:
+      - name: rs-vio
+        image: rs-vio:latest
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+        env:
+        - name: RUST_LOG
+          value: "rs_vio=info"
+```
+
+### CI/CD Pipeline
+The project uses GitHub Actions for automated testing and deployment:
+
+- **Pull Requests**: Run tests, linting, and security checks
+- **Main Branch**: Additional documentation and coverage reporting
+- **Releases**: Automated publishing to crates.io and GitHub releases
+
+### Release Process
+1. Update version: `./scripts/bump-version.sh patch`
+2. Update CHANGELOG.md with release notes
+3. Create PR and merge to main
+4. Create git tag: `git tag v1.0.0`
+5. Push tag to trigger release workflow
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for security considerations and best practices.
+
+## Contributing
+
+Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## License
+
+Licensed under either of:
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
+- MIT License ([LICENSE-MIT](LICENSE-MIT))
+
+at your option.
 
 
 

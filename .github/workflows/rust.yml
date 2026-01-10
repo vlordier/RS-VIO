@@ -31,3 +31,12 @@ jobs:
       run: cargo audit
     - name: Generate coverage
       run: cargo tarpaulin --ignore-tests --out Html
+    - name: Build documentation
+      run: cargo doc --no-deps
+      if: github.ref == 'refs/heads/main'
+    - name: Publish documentation
+      run: |
+        curl -X PUT -H "Authorization: Bearer ${{ secrets.DOCS_RS_TOKEN }}" \
+             -H "Content-Type: application/json" \
+             https://docs.rs/crate/rs-vio/0.1.0/build
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
