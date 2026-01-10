@@ -1,5 +1,10 @@
 use serde::{Deserialize, Serialize};
 
+/// Main configuration structure for the VIO system.
+///
+/// This struct holds all configuration parameters loaded from YAML files,
+/// including camera intrinsics, keyframe management settings, feature detection
+/// parameters, and optimization settings.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub camera: CameraConfig,
@@ -10,7 +15,10 @@ pub struct Config {
     pub optimization: OptimizationConfig,
 }
 
-
+/// Camera configuration including intrinsics, distortion, and extrinsics.
+///
+/// Contains parameters for both left and right cameras in a stereo setup,
+/// including image dimensions, calibration parameters, and transforms.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CameraConfig {
     #[serde(rename = "image_width")]
@@ -52,12 +60,10 @@ pub struct FeatureDetectionConfig {
     #[serde(rename = "max_features_per_grid")]
     pub max_features_per_grid: u32,
     #[serde(rename = "optical_flow_max_iterations")]
-    pub optical_flow_max_iterations: u32,   
+    pub optical_flow_max_iterations: u32,
     #[serde(rename = "optical_flow_convergence_threshold")]
     pub optical_flow_convergence_threshold: f64,
-  
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OptimizationConfig {
@@ -66,7 +72,6 @@ pub struct OptimizationConfig {
     #[serde(rename = "pnp_max_iterations")]
     pub pnp_max_iterations: u32,
 }
-
 
 impl Config {
     pub fn load(path: &str) -> anyhow::Result<Self> {
@@ -84,6 +89,4 @@ impl Config {
         let config: Config = serde_yaml::from_str(&content)?;
         Ok(config)
     }
-
 }
-

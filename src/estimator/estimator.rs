@@ -1,17 +1,15 @@
-use crate::datasets::ImuData;
 use crate::datasets::config::Config;
+use crate::datasets::CameraModelType;
+use crate::datasets::ImuData;
 use crate::estimator::Frame;
+use crate::estimator::SlidingWindow;
 use crate::feature_tracker::StereoPatchTracker;
 use crate::types::{Matrix4x4, UnitQuaternion, Vector3};
 use crate::viewers::Viewer;
-use camera_intrinsic_model::GenericModel;
-use image::{DynamicImage, GrayImage};
 use anyhow::Result;
+use image::GrayImage;
 use nalgebra as na;
 use std::time::Instant;
-use crate::estimator::sliding_window::SlidingWindow;
-use crate::datasets::CameraModelType;
-
 
 /// Placeholder estimator implementation.
 /// Currently mimics the control flow and logging structure of the C++ Estimator::process_frame,
@@ -62,7 +60,6 @@ impl<'a> Estimator<'a> {
         left_cam: Option<CameraModelType>,
         right_cam: Option<CameraModelType>,
     ) -> Self {
-        
         // Use provided cameras or create from config
         let (left_cam, right_cam) = match (left_cam, right_cam) {
             (Some(l), Some(r)) => (l, r),
@@ -75,8 +72,9 @@ impl<'a> Estimator<'a> {
         let keyframe_window_size = config.keyframe_management.keyframe_window_size as usize;
         let grid_size = config.feature_detection.grid_cols;
         let optical_flow_max_iterations = config.feature_detection.optical_flow_max_iterations;
-        let optical_flow_convergence_threshold = config.feature_detection.optical_flow_convergence_threshold;
-        
+        let optical_flow_convergence_threshold =
+            config.feature_detection.optical_flow_convergence_threshold;
+
         Estimator {
             frame_id_counter: 0,
             frames_since_last_keyframe: 0,
@@ -91,9 +89,9 @@ impl<'a> Estimator<'a> {
             viewer,
             left_cam,
             right_cam,
-            T_B_Cl: T_B_Cl,
-            T_B_Cr: T_B_Cr,
-            trajectory: Vec::new()
+            T_B_Cl,
+            T_B_Cr,
+            trajectory: Vec::new(),
         }
     }
 
@@ -105,39 +103,37 @@ impl<'a> Estimator<'a> {
         timestamp_ns: i64,
         imu_data: Option<&[ImuData]>,
     ) -> Result<()> {
-        let total_start_time = Instant::now();
+        let _total_start_time = Instant::now();
 
         // New frame: update counters
         self.frame_id_counter += 1;
         self.frames_since_last_keyframe += 1;
 
         if self.enable_debug_output {
-            log::debug!("============================== Frame {} ==============================", self.frame_id_counter);
+            log::debug!(
+                "============================== Frame {} ==============================",
+                self.frame_id_counter
+            );
         }
 
-        // Timing placeholders
-        let mut frame_creation_time_ms = 0.0f64;
-        let mut patch_tracking_time_ms = 0.0f64;
-        let mut motion_tracking_time_ms = 0.0f64;
-        let mut optimization_time_ms = 0.0f64;
+        // Timing variables
+        let mut _frame_creation_time_ms = 0.0f64;
+        let mut _patch_tracking_time_ms = 0.0f64;
+        let mut _motion_tracking_time_ms = 0.0f64;
+        let mut _optimization_time_ms = 0.0f64;
 
         // Frame creation
         let frame_creation_start = Instant::now();
-        
+
         // Create GrayImage objects directly from input slices (no clone needed for tracking)
         let img_w = self.config.camera.image_width;
         let img_h = self.config.camera.image_height;
-        
+
         let left_img = match GrayImage::from_raw(img_w, img_h, left_image.to_vec()) {
             Some(img) => img,
             None => {
-                log::error!(
-                    "[Estimator] Failed to construct GrayImage for left camera ({}x{}, len={})",
-                    img_w,
-                    img_h,
-                    left_image.len()
-                );
-                return Ok(());
+                log::error!("[Estimator] Failed to construct GrayImage for right camera");
+                panic!("Failed to create right image");
             }
         };
         let right_img = match GrayImage::from_raw(img_w, img_h, right_image.to_vec()) {
@@ -152,21 +148,6 @@ impl<'a> Estimator<'a> {
                 return Ok(());
             }
         };
-
-        /*
-        // For debugging with TUM-VI: undistort the images with EUCM and save the result
-        let eucm = match &self.left_cam {
-            crate::datasets::CameraModelType::EUCM(cam) => cam,
-            _ => panic!("left_cam is not an EUCM instance"),
-        };
-        let model1 = GenericModel::EUCM(*eucm);
-        let p = model1.estimate_new_camera_matrix_for_undistort(0.0, Some((1024, 1024)));
-        let (xmap, ymap) = model1.init_undistort_map(&p, (1024, 1024), None);
-        let img_l8 = DynamicImage::ImageLuma8(right_img.clone());
-        let remaped = camera_intrinsic_model::remap(&img_l8, &xmap, &ymap);
-        remaped.save("remaped0.png").unwrap();
-        */
-        
 
         // Create frame (images are not stored, only features will be added)
         let mut current_frame = Frame::from_stereo_images(
@@ -183,56 +164,61 @@ impl<'a> Estimator<'a> {
             current_frame.imu_from_last_frame = imu.to_vec();
         }
 
-        frame_creation_time_ms = frame_creation_start.elapsed().as_secs_f64() * 1000.0;
+        _frame_creation_time_ms = frame_creation_start.elapsed().as_secs_f64() * 1000.0;
 
         // Patch tracking
         let tracking_start = Instant::now();
-        self.stereo_patch_tracker.process_frame(&left_img, &right_img, &mut current_frame);
-        patch_tracking_time_ms = tracking_start.elapsed().as_secs_f64() * 1000.0;
+        self.stereo_patch_tracker
+            .process_frame(&left_img, &right_img, &mut current_frame);
+        _patch_tracking_time_ms = tracking_start.elapsed().as_secs_f64() * 1000.0;
         self.view_patch_tracking_results(&current_frame, &left_img, &right_img, img_w, img_h);
 
         // Motion tracking - only if the sliding window is full (has initialized keyframes)
-        if self.sliding_window.is_full() { // DEBUG
+        if self.sliding_window.is_full() {
+            // DEBUG
             let motion_tracking_start = Instant::now();
             let motion_tracking_result = self.sliding_window.track_motion(&current_frame);
             match motion_tracking_result {
                 Ok(Some(T_W_B)) => {
                     // Apply the optimized pose to the current frame
                     current_frame.state.T_W_B = T_W_B;
-                    
+
                     // Check if translation and rotation since last keyframe is large enough to trigger a keyframe
-                    let T_W_B_last_kf = self.sliding_window.get_keyframe_poses().last().unwrap().clone();
+                    let keyframe_poses = self.sliding_window.get_keyframe_poses();
+                    let T_W_B_last_kf = keyframe_poses.last().unwrap();
                     let T_rel = T_W_B * T_W_B_last_kf.try_inverse().unwrap();
                     let t_rel = T_rel.fixed_view::<3, 1>(0, 3).into_owned();
                     let R_rel = T_rel.fixed_view::<3, 3>(0, 0).into_owned();
                     let e_rel = Vector3::from([
                         UnitQuaternion::from_matrix(&R_rel).euler_angles().0,
                         UnitQuaternion::from_matrix(&R_rel).euler_angles().1,
-                        UnitQuaternion::from_matrix(&R_rel).euler_angles().2]
-                    );
+                        UnitQuaternion::from_matrix(&R_rel).euler_angles().2,
+                    ]);
                     log::debug!("[Estimator] Translation since last keyframe: {:.2?}, Euler angles since last keyframe: {:.2?}", t_rel, e_rel);
 
                     // Check if translation and rotation since last keyframe is large enough to trigger a keyframe
-                    let translation_threshold = self.config.keyframe_management.translation_threshold;
+                    let translation_threshold =
+                        self.config.keyframe_management.translation_threshold;
                     let rotation_threshold = self.config.keyframe_management.rotation_threshold;
 
                     if t_rel.norm() > translation_threshold || e_rel.norm() > rotation_threshold {
                         log::debug!("[Estimator] Translation and rotation since last keyframe are large enough to trigger a keyframe");
                         current_frame.is_keyframe = true;
-                    }
-                    else {
+                    } else {
                         current_frame.is_keyframe = false;
                     }
                     self.view_motion_tracking_results(&T_W_B);
                 }
                 Ok(None) => {
-                    log::warn!("[Estimator] Motion tracking failed (optimization did not converge)");
+                    log::warn!(
+                        "[Estimator] Motion tracking failed (optimization did not converge)"
+                    );
                 }
                 Err(e) => {
                     log::error!("[Estimator] Motion tracking error: {:?}", e);
                 }
             }
-            motion_tracking_time_ms = motion_tracking_start.elapsed().as_secs_f64() * 1000.0;
+            _motion_tracking_time_ms = motion_tracking_start.elapsed().as_secs_f64() * 1000.0;
         } else {
             log::debug!("[Estimator] Sliding window is not full, skipping motion tracking");
         }
@@ -243,21 +229,21 @@ impl<'a> Estimator<'a> {
             let optimization_start = Instant::now();
             self.sliding_window.add_frame(current_frame);
             self.sliding_window.optimize(); // TODO handle error
-            optimization_time_ms = optimization_start.elapsed().as_secs_f64() * 1000.0;
+            _optimization_time_ms = optimization_start.elapsed().as_secs_f64() * 1000.0;
             self.view_optimization_results();
         }
-        
+
         // Final timing summary
-        let total_duration_ms = total_start_time.elapsed().as_secs_f64() * 1000.0;
+        let total_duration_ms = _total_start_time.elapsed().as_secs_f64() * 1000.0;
         log::debug!(
             "[Timing] frame_creation={:.3} ms, patch_tracking={:.3} ms, motion_tracking={:.3} ms, optimization={:.3} ms, total={:.3} ms",
-            frame_creation_time_ms,
-            patch_tracking_time_ms,
-            motion_tracking_time_ms,
-            optimization_time_ms,
+            _frame_creation_time_ms,
+            _patch_tracking_time_ms,
+            _motion_tracking_time_ms,
+            _optimization_time_ms,
             total_duration_ms
         );
-    
+
         Ok(())
     }
 
@@ -269,13 +255,26 @@ impl<'a> Estimator<'a> {
     }
 
     /// Visualize tracking results: stereo images with tracked features.
-    fn view_patch_tracking_results(&mut self, frame: &Frame, left_img: &GrayImage, right_img: &GrayImage, width: u32, height: u32) {
+    fn view_patch_tracking_results(
+        &mut self,
+        frame: &Frame,
+        left_img: &GrayImage,
+        right_img: &GrayImage,
+        width: u32,
+        height: u32,
+    ) {
         if let Some(v) = &mut self.viewer {
             // Collect pixel coordinates into temporary vectors so we can pass slices.
-            let left_points: Vec<(usize, [f32; 2])> =
-                frame.left_features().iter().map(|f| (f.feature_id, f.pixel_coord)).collect();
-            let right_points: Vec<(usize, [f32; 2])> =
-                frame.right_features().iter().map(|f| (f.feature_id, f.pixel_coord)).collect();
+            let left_points: Vec<(usize, [f32; 2])> = frame
+                .left_features()
+                .iter()
+                .map(|f| (f.feature_id, f.pixel_coord))
+                .collect();
+            let right_points: Vec<(usize, [f32; 2])> = frame
+                .right_features()
+                .iter()
+                .map(|f| (f.feature_id, f.pixel_coord))
+                .collect();
 
             v.log_image_with_features_colored(
                 left_img.as_raw(),
@@ -296,7 +295,7 @@ impl<'a> Estimator<'a> {
 
     fn view_motion_tracking_results(&mut self, T_W_B: &Matrix4x4) {
         if let Some(v) = &mut self.viewer {
-            let pose_path = format!("pose_current");
+            let pose_path = "pose_current".to_string();
             v.log_pose(*T_W_B, pose_path.as_str());
 
             let width = self.config.camera.image_width;
@@ -307,7 +306,13 @@ impl<'a> Estimator<'a> {
             let left_cam_path = format!("{}_left", pose_path);
             let T_W_Cl = T_W_B * self.T_B_Cl;
             v.log_pose(T_W_Cl, left_cam_path.as_str());
-            v.log_camera_frustum(left_focal_length, width, height, left_cam_path.as_str(),0.4);
+            v.log_camera_frustum(
+                left_focal_length,
+                width,
+                height,
+                left_cam_path.as_str(),
+                0.4,
+            );
         }
     }
 
@@ -315,7 +320,9 @@ impl<'a> Estimator<'a> {
     fn view_optimization_results(&mut self) {
         if let Some(v) = &mut self.viewer {
             // Map points
-            let colored_points: Vec<(usize, [f32; 3])> = self.sliding_window.map_points
+            let colored_points: Vec<(usize, [f32; 3])> = self
+                .sliding_window
+                .map_points
                 .iter()
                 .map(|(&feature_id, &point)| (feature_id, point))
                 .collect();
@@ -337,9 +344,14 @@ impl<'a> Estimator<'a> {
                 let T_W_Cl = T_W_B * self.T_B_Cl;
                 v.log_pose(T_W_Cl, left_cam_path.as_str());
                 let size = 0.2; // if pose_id == system_poses.len() - 1 { 0.5 } else { 0.2 };
-                v.log_camera_frustum(left_focal_length, width, height, left_cam_path.as_str(), size);
-            
-                
+                v.log_camera_frustum(
+                    left_focal_length,
+                    width,
+                    height,
+                    left_cam_path.as_str(),
+                    size,
+                );
+
                 // Log right camera pose and frustum for last pose
                 // Removed for now as it made too much clutter
                 /*
@@ -354,9 +366,14 @@ impl<'a> Estimator<'a> {
             }
 
             // History of keyframe poses
-            let mat =  self.sliding_window.get_keyframe_poses().first().unwrap().clone();
+            let mat = self
+                .sliding_window
+                .get_keyframe_poses()
+                .first()
+                .unwrap()
+                .clone();
             self.trajectory.push(mat);
-            
+
             // Display trajectory as a continuous 3D path
             v.log_trajectory(&self.trajectory, "trajectory/path");
             // log::info!("[Estimator] System position: {:?}, {:?}, {:?}", mat[0][3], mat[1][3], mat[2][3]);

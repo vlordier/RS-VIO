@@ -1,9 +1,9 @@
 pub mod estimator;
 pub mod frame;
-pub mod state;
 pub mod sliding_window;
+pub mod state;
 
-pub use estimator::{Estimator};
+pub use estimator::Estimator;
 pub use frame::Frame;
-pub use state::State;
 pub use sliding_window::SlidingWindow;
+pub use state::State;
