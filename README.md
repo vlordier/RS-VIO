@@ -130,6 +130,12 @@ make lint-shell        # Shell script linting (requires shellcheck)
 # Security
 make audit             # Dependency security audit
 
+# Test data and local execution
+make generate-test-data # Create synthetic test datasets
+make run-euroc          # Build + run EuRoC with synthetic data
+make run-tum            # Build + run TUM-VI with synthetic data
+make run-4seasons       # Build + run 4Seasons with synthetic data
+
 # Docker
 make docker-build      # Build image
 make docker-smoke-test # Test image
@@ -141,6 +147,29 @@ make all
 cargo bench
 cargo doc --open
 ```
+
+### Local Testing with Synthetic Data
+
+For rapid local development without downloading large datasets, use the synthetic test data generator:
+
+```bash
+# Generate synthetic test data (creates 10-frame sequences)
+make generate-test-data
+
+# Run each binary with synthetic test data
+make run-euroc
+make run-tum
+make run-4seasons
+
+# Or run all three in sequence
+make run-euroc && make run-tum && make run-4seasons
+
+# Manual test data generation
+bash scripts/download_datasets.sh /tmp/my-test-data all
+./target/release/run_euroc config/euroc_vio.yaml /tmp/my-test-data/euroc/MH_01_easy
+```
+
+The synthetic data includes minimal 1x1 PNG images and properly formatted CSV metadata files compatible with each dataset's loader. This enables quick iteration and CI testing without bandwidth or storage requirements.
 
 ### Development Workflow
 1. Fork the repository
