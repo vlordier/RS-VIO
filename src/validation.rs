@@ -98,10 +98,12 @@ pub fn validate_transformation_matrix(t: &na::Matrix4<f64>) -> Result<(), Valida
 
     // Check bottom row is [0, 0, 0, 1]
     let bottom_row = t.row(3);
-        if (bottom_row.get(0).map_or(true, |&v| v.abs() > EPSILON_F64))
-            || (bottom_row.get(1).map_or(true, |&v| v.abs() > EPSILON_F64))
-            || (bottom_row.get(2).map_or(true, |&v| v.abs() > EPSILON_F64))
-            || (bottom_row.get(3).map_or(true, |&v| (v - 1.0).abs() > EPSILON_F64))
+    if (bottom_row.get(0).map_or(true, |&v| v.abs() > EPSILON_F64))
+        || (bottom_row.get(1).map_or(true, |&v| v.abs() > EPSILON_F64))
+        || (bottom_row.get(2).map_or(true, |&v| v.abs() > EPSILON_F64))
+        || (bottom_row
+            .get(3)
+            .map_or(true, |&v| (v - 1.0).abs() > EPSILON_F64))
     {
         return Err(ValidationError::Singular);
     }
@@ -209,20 +211,11 @@ mod tests {
         assert_eq!(safe_divide(10.0, 0.0), Err(ValidationError::Singular));
 
         // NaN inputs
-        assert_eq!(
-            safe_divide(f64::NAN, 2.0),
-            Err(ValidationError::NonFinite)
-        );
-        assert_eq!(
-            safe_divide(10.0, f64::NAN),
-            Err(ValidationError::NonFinite)
-        );
+        assert_eq!(safe_divide(f64::NAN, 2.0), Err(ValidationError::NonFinite));
+        assert_eq!(safe_divide(10.0, f64::NAN), Err(ValidationError::NonFinite));
 
         // Division resulting in infinity
-        assert_eq!(
-            safe_divide(1e308, 1e-308),
-            Err(ValidationError::Singular)
-        );
+        assert_eq!(safe_divide(1e308, 1e-308), Err(ValidationError::Singular));
     }
 
     #[test]

@@ -16,7 +16,7 @@ pub struct RerunViewer {
     initialized: bool,
     frame_id: i64,
     timestamp_ns: i64,
-    #[allow(dead_code)]  // Reserved for future timestamp normalization
+    #[allow(dead_code)] // Reserved for future timestamp normalization
     first_timestamp_ns: Option<i64>,
 }
 

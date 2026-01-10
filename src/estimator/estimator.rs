@@ -121,7 +121,7 @@ impl<'a> Estimator<'a> {
                 self.frame_id_counter
             );
         }
-        
+
         // Check deadline after initial setup
         if Instant::now() > deadline {
             log::error!("[Estimator] Frame processing exceeded deadline during initialization");
@@ -145,7 +145,9 @@ impl<'a> Estimator<'a> {
             Some(img) => img,
             None => {
                 log::error!("[Estimator] Failed to construct GrayImage for left camera");
-                return Err(anyhow::anyhow!("Failed to create left image: size mismatch"));
+                return Err(anyhow::anyhow!(
+                    "Failed to create left image: size mismatch"
+                ));
             }
         };
         let right_img = match GrayImage::from_raw(img_w, img_h, right_image.to_vec()) {
@@ -157,7 +159,9 @@ impl<'a> Estimator<'a> {
                     img_h,
                     right_image.len()
                 );
-                return Err(anyhow::anyhow!("Failed to create right image: size mismatch"));
+                return Err(anyhow::anyhow!(
+                    "Failed to create right image: size mismatch"
+                ));
             }
         };
 
@@ -184,11 +188,13 @@ impl<'a> Estimator<'a> {
             .process_frame(&left_img, &right_img, &mut current_frame);
         _patch_tracking_time_ms = tracking_start.elapsed().as_secs_f64() * 1000.0;
         self.view_patch_tracking_results(&current_frame, &left_img, &right_img, img_w, img_h);
-        
+
         // Check deadline after patch tracking
         if Instant::now() > deadline {
             log::warn!("[Estimator] Frame processing exceeded deadline after patch tracking");
-            return Err(anyhow::anyhow!("Frame processing timeout after patch tracking"));
+            return Err(anyhow::anyhow!(
+                "Frame processing timeout after patch tracking"
+            ));
         }
 
         // Motion tracking - only if the sliding window is full (has initialized keyframes)

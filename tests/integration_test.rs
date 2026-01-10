@@ -57,8 +57,8 @@ optimization:
 
         // Process frame
         estimator
-          .process_frame(&left_image, &right_image, timestamp_ns, None)
-          .unwrap_or_else(|e| panic!("Frame {} failed: {}", frame_id, e));
+            .process_frame(&left_image, &right_image, timestamp_ns, None)
+            .unwrap_or_else(|e| panic!("Frame {} failed: {}", frame_id, e));
     }
 
     // Verify that some frames were processed

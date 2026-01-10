@@ -43,6 +43,8 @@ cargo run --release --bin run_4seasons config/4seasons.yaml {path_to_4seasons_fo
 
 Check the run scripts in /scripts/ for more information. Configuration files are available in the `config/` directory.
 
+To fetch representative sample sequences locally, use `scripts/download_datasets.sh <target-dir> [euroc|tum|4seasons|all]`.
+
 ## Installation
 
 ### From crates.io
@@ -62,9 +64,28 @@ cargo build --release
 # Build the image
 docker build -t rs-vio .
 
-# Run with dataset
-docker run -v /path/to/dataset:/data rs-vio --config /data/config.yaml /data/dataset/
+# Run EuRoC (default entrypoint run_euroc)
+docker run --rm \
+  -v /path/to/euroc:/data:ro \
+  rs-vio:latest \
+  config/euroc_vio.yaml /data/MH_01_easy
+
+# Run 4Seasons (override entrypoint)
+docker run --rm \
+  -v /path/to/4seasons:/data:ro \
+  --entrypoint /usr/local/bin/run_4seasons \
+  rs-vio:latest \
+  config/4seasons.yaml /data/recording_2021-01-07_13-03-56
+
+# Run TUM-VI (override entrypoint)
+docker run --rm \
+  -v /path/to/tum-vi:/data:ro \
+  --entrypoint /usr/local/bin/run_tum \
+  rs-vio:latest \
+  config/tum_vi.yaml /data/MH_01_easy
 ```
+
+> Containers expect dataset/config volumes mounted at `/data` and are read-only in the examples above; adjust paths as needed.
 
 ## Variable naming conventions
 
@@ -81,6 +102,7 @@ Using this convention, we can easily chain transformations, e.g. `T_C_A = T_C_B 
 ### Prerequisites
 - Rust 1.75+
 - System dependencies: `pkg-config`, `libssl-dev` (Ubuntu/Debian)
+- Shell scripts: `shellcheck` for linting (e.g., `brew install shellcheck` or `apt-get install shellcheck`).
 
 ### Building
 ```bash
@@ -98,6 +120,12 @@ cargo bench
 
 # Generate documentation
 cargo doc --open
+```
+
+### Shell scripts
+```bash
+# Lint all repository shell scripts
+./scripts/lint_shell.sh
 ```
 
 ### Development Workflow

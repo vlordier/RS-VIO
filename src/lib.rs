@@ -77,8 +77,8 @@ pub mod estimator;
 pub mod feature_tracker;
 pub mod optimization;
 pub mod types;
-pub mod viewers;
 pub mod validation;
+pub mod viewers;
 
 // Re-export commonly used types for convenience
 pub use datasets::config::Config;

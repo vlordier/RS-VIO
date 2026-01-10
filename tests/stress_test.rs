@@ -50,14 +50,18 @@ fn stress_process_frames_stays_within_bounds() {
             for x in 0..img_w {
                 let idx = y * img_w + x;
                 left[idx] = if (x / 8 + y / 8) % 2 == 0 { 255 } else { 0 };
-                right[idx] = if ((x + 2) / 8 + y / 8) % 2 == 0 { 255 } else { 0 };
+                right[idx] = if ((x + 2) / 8 + y / 8) % 2 == 0 {
+                    255
+                } else {
+                    0
+                };
             }
         }
 
         let ts = (frame_id as i64) * 10_000_000; // 10ms increments
         estimator
             .process_frame(&left, &right, ts, None)
-          .unwrap_or_else(|e| panic!("Frame {} failed: {}", frame_id, e));
+            .unwrap_or_else(|e| panic!("Frame {} failed: {}", frame_id, e));
     }
 
     // Ensure bounded map size and progress.

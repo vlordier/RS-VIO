@@ -3,7 +3,7 @@
 # Version management script for RS-VIO
 # Usage: ./scripts/bump-version.sh <patch|minor|major>
 
-set -e
+set -euo pipefail
 
 if [ $# -ne 1 ]; then
     echo "Usage: $0 <patch|minor|major>"

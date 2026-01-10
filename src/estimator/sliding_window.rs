@@ -28,10 +28,10 @@ pub struct SlidingWindow {
     /// Map points stored by feature ID: HashMap<feature_id, [x, y, z]>
     /// Bounded to prevent unbounded memory growth in long-running systems
     pub map_points: HashMap<usize, [f32; 3]>,
-    
+
     /// Maximum number of map points to maintain (for embedded systems)
     max_map_points: usize,
-    
+
     /// Track observation count for each map point (for LRU eviction)
     map_point_observations: HashMap<usize, usize>,
 }
@@ -46,7 +46,7 @@ impl SlidingWindow {
         // For embedded systems, limit map points to prevent unbounded growth
         // Typical VIO systems maintain 500-2000 active landmarks
         const DEFAULT_MAX_MAP_POINTS: usize = 2000;
-        
+
         Self {
             max_frames,
             keyframes: VecDeque::with_capacity(max_frames),
@@ -83,33 +83,32 @@ impl SlidingWindow {
     pub fn map_points_len(&self) -> usize {
         self.map_points.len()
     }
-    
+
     /// Evict least recently observed map points when capacity is reached
     fn evict_old_map_points(&mut self) {
         if self.map_points.len() < self.max_map_points {
             return;
         }
-        
-            // Remove until we are back under the cap. Remove at least 10% of the cap
-            // to avoid excessive churn but ensure hard bounding.
-            while self.map_points.len() > self.max_map_points {
-                let mut points_by_observations: Vec<(usize, usize)> = self
-                    .map_point_observations
-                    .iter()
-                    .map(|(&id, &count)| (id, count))
-                    .collect();
 
-                points_by_observations.sort_by_key(|&(_, count)| count);
+        // Remove until we are back under the cap. Remove at least 10% of the cap
+        // to avoid excessive churn but ensure hard bounding.
+        while self.map_points.len() > self.max_map_points {
+            let mut points_by_observations: Vec<(usize, usize)> = self
+                .map_point_observations
+                .iter()
+                .map(|(&id, &count)| (id, count))
+                .collect();
 
-                let overage = self.map_points.len() - self.max_map_points;
-                let batch = overage.max(self.max_map_points / 10).max(1);
+            points_by_observations.sort_by_key(|&(_, count)| count);
 
-                for &(id, _) in points_by_observations.iter().take(batch) {
-                    self.map_points.remove(&id);
-                    self.map_point_observations.remove(&id);
-                }
+            let overage = self.map_points.len() - self.max_map_points;
+            let batch = overage.max(self.max_map_points / 10).max(1);
+
+            for &(id, _) in points_by_observations.iter().take(batch) {
+                self.map_points.remove(&id);
+                self.map_point_observations.remove(&id);
             }
-        
+        }
     }
 
     /// Add a keyframe to the sliding window.
@@ -237,7 +236,7 @@ impl SlidingWindow {
         // Initialize problem and solver
         let mut problem = Problem::new();
         let mut solver = LevenbergMarquardt::with_config(self.build_solver_config());
-        
+
         // Pre-allocate with estimated capacity to avoid reallocations during optimization
         let estimated_landmarks = self.map_points.len().max(100);
         let estimated_keyframes = self.keyframes.len();
@@ -245,9 +244,12 @@ impl SlidingWindow {
         // solver.add_observer(TerminalObserver::new());
 
         // Initialize maps for tracking and counting observations
-        let mut map_feature_to_landmark: HashMap<usize, String> = HashMap::with_capacity(estimated_landmarks);
-        let mut landmark_observation_count_left: HashMap<String, usize> = HashMap::with_capacity(estimated_landmarks);
-        let mut landmark_observation_count_right: HashMap<String, usize> = HashMap::with_capacity(estimated_landmarks);
+        let mut map_feature_to_landmark: HashMap<usize, String> =
+            HashMap::with_capacity(estimated_landmarks);
+        let mut landmark_observation_count_left: HashMap<String, usize> =
+            HashMap::with_capacity(estimated_landmarks);
+        let mut landmark_observation_count_right: HashMap<String, usize> =
+            HashMap::with_capacity(estimated_landmarks);
 
         // Fetch transforms between cameras and body
         let T_Cl_B = self
@@ -257,12 +259,12 @@ impl SlidingWindow {
             .state
             .T_B_Cl
             .try_inverse()
-                .ok_or_else(|| {
-                    std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        "T_B_Cl camera transform is not invertible - check calibration",
-                    )
-                })?;
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "T_B_Cl camera transform is not invertible - check calibration",
+                )
+            })?;
         let T_Cr_B = self
             .keyframes
             .front()
@@ -270,12 +272,12 @@ impl SlidingWindow {
             .state
             .T_B_Cr
             .try_inverse()
-                .ok_or_else(|| {
-                    std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        "T_B_Cr camera transform is not invertible - check calibration",
-                    )
-                })?;
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "T_B_Cr camera transform is not invertible - check calibration",
+                )
+            })?;
 
         // Count observations for each landmark across all frames, separately for left and right cameras
         for frame in self.keyframes.iter() {
@@ -319,7 +321,10 @@ impl SlidingWindow {
             let T_B_W = match frame.state.T_W_B.try_inverse() {
                 Some(inv) => inv,
                 None => {
-                    log::error!("[SlidingWindow] T_W_B matrix is singular for frame {}", id_frame);
+                    log::error!(
+                        "[SlidingWindow] T_W_B matrix is singular for frame {}",
+                        id_frame
+                    );
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::Other,
                         "T_W_B matrix inversion failed",
@@ -380,7 +385,7 @@ impl SlidingWindow {
                                     frame.state.T_W_B.fixed_view::<3, 3>(0, 0).into_owned(),
                                     frame.state.T_W_B.fixed_view::<3, 1>(0, 3).into_owned(),
                                 );
-                                
+
                                 // Try to invert T_C_B, use default if it fails
                                 match T_C_B.try_inverse() {
                                     Some(T_B_C) => {
@@ -429,10 +434,9 @@ impl SlidingWindow {
                         };
 
                         // Add residual block with Huber loss
-                        let huber_loss = HuberLoss::new(2.0)
-                               .map_err(|e| {
-                                  std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string())
-                               })?;
+                        let huber_loss = HuberLoss::new(2.0).map_err(|e| {
+                            std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string())
+                        })?;
                         problem.add_residual_block(
                             &var_names,
                             Box::new(factor),
@@ -636,23 +640,23 @@ impl SlidingWindow {
         // Update map_points and keyframe poses with optimized values
         self.map_points.clear();
         self.map_point_observations.clear();
-        
+
         opt_result.parameters.iter().for_each(|(var_name, value)| {
             // Update map points
             if let Some(feature_id_str) = var_name.strip_prefix("LM_") {
                 if let Ok(feature_id) = feature_id_str.parse::<usize>() {
                     let vec = value.to_vector();
-                    
+
                     // Validate point before inserting
                     let point = [vec[0] as f32, vec[1] as f32, vec[2] as f32];
-                    
+
                     // Check for obviously wrong locations (negative depths, NaN, etc.)
                     if point.iter().all(|&v| v.is_finite()) && vec[2] > 0.1 {
                         // Check capacity before inserting
                         if self.map_points.len() >= self.max_map_points {
                             self.evict_old_map_points();
                         }
-                        
+
                         self.map_points.insert(feature_id, point);
                         // Initialize observation count (will be updated during tracking)
                         *self.map_point_observations.entry(feature_id).or_insert(0) += 1;
@@ -780,10 +784,9 @@ impl SlidingWindow {
                             na::Vector3::new(point[0] as f64, point[1] as f64, point[2] as f64),
                         );
                         // Add residual block with Huber loss
-                        let huber_loss = HuberLoss::new(2.0)
-                               .map_err(|e| {
-                                  std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string())
-                               })?;
+                        let huber_loss = HuberLoss::new(2.0).map_err(|e| {
+                            std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string())
+                        })?;
                         problem.add_residual_block(
                             &[&kf_var],
                             Box::new(factor),

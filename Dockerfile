@@ -1,54 +1,54 @@
-# RS-VIO Docker Image
+# RS-VIO Docker Image (runtime binaries: run_euroc, run_4seasons, run_tum)
 
-# Use Rust official image for building
-FROM rust:1.75-slim as builder
+FROM rustlang/rust:nightly-slim AS builder
 
 # Install system dependencies for compilation
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set working directory
-WORKDIR /app
-
-# Copy dependency files
-COPY Cargo.toml Cargo.lock ./
-
-# Create dummy src to cache dependencies
-RUN mkdir src && echo "fn main() {}" > src/main.rs
-RUN cargo build --release --target x86_64-unknown-linux-gnu
-RUN rm -rf src
-
-# Copy source code
-COPY src ./src
-
-# Build the application
-RUN cargo build --release --target x86_64-unknown-linux-gnu
-
-# Runtime stage
-FROM debian:bookworm-slim
-
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user
-RUN useradd -r -s /bin/false rs-vio
-
-# Copy binary from builder
-COPY --from=builder /app/target/x86_64-unknown-linux-gnu/release/rs-vio /usr/local/bin/
-
-# Set ownership and permissions
-RUN chown rs-vio:rs-vio /usr/local/bin/rs-vio && \
-    chmod 755 /usr/local/bin/rs-vio
-
-# Switch to non-root user
-USER rs-vio
-
-# Set working directory
 WORKDIR /app
 
-# Default command
-CMD ["rs-vio"]
+# Cache dependencies
+COPY Cargo.toml Cargo.lock ./
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN cargo fetch --locked
+RUN rm -rf src
+
+# Copy full workspace
+COPY src ./src
+COPY config ./config
+COPY scripts ./scripts
+
+# Build the runtime binaries (no default features for embedded-friendly runtime)
+RUN cargo build --locked --release \
+    --bin run_euroc \
+    --bin run_4seasons \
+    --bin run_tum
+
+FROM debian:trixie-slim AS runtime
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -r -s /bin/false rs-vio
+
+WORKDIR /app
+
+# Copy binaries and configs
+COPY --from=builder /app/target/release/run_euroc /usr/local/bin/
+COPY --from=builder /app/target/release/run_4seasons /usr/local/bin/
+COPY --from=builder /app/target/release/run_tum /usr/local/bin/
+COPY --from=builder /app/config ./config
+COPY --from=builder /app/scripts ./scripts
+
+RUN chown -R rs-vio:rs-vio /usr/local/bin/run_* /app && \
+    chmod 755 /usr/local/bin/run_*
+
+USER rs-vio
+
+# Default to Euroc runner; override with CMD/entrypoint as needed
+ENTRYPOINT ["/usr/local/bin/run_euroc"]

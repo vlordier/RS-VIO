@@ -226,7 +226,7 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
 fn build_image_pyramid(greyscale_image: &GrayImage, levels: u32) -> Vec<GrayImage> {
     const FILTER_TYPE: imageops::FilterType = imageops::FilterType::Triangle;
     let (w0, h0) = greyscale_image.dimensions();
-    
+
     // Use sequential iteration for deterministic execution in real-time systems
     // Parallel iteration with Rayon introduces non-deterministic scheduling
     (0..levels)
