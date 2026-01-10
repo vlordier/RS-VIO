@@ -105,27 +105,41 @@ Using this convention, we can easily chain transformations, e.g. `T_C_A = T_C_B 
 - Shell scripts: `shellcheck` for linting (e.g., `brew install shellcheck` or `apt-get install shellcheck`).
 
 ### Building
+
+Use `make` for common tasks:
 ```bash
+# Show all available targets
+make help
+
 # Debug build
-cargo build
+make build
 
 # Release build
-cargo build --release
+make release
 
 # Run tests
-cargo test
+make test              # Debug mode
+make test-release      # Release mode (recommended)
 
-# Run benchmarks
+# Lint and check
+make fmt               # Auto-format code
+make fmt-check         # Check formatting
+make clippy            # Linting
+make lint-shell        # Shell script linting (requires shellcheck)
+
+# Security
+make audit             # Dependency security audit
+
+# Docker
+make docker-build      # Build image
+make docker-smoke-test # Test image
+
+# Full CI (format, audit, lint, test, clippy)
+make all
+
+# Benchmarks & docs
 cargo bench
-
-# Generate documentation
 cargo doc --open
-```
-
-### Shell scripts
-```bash
-# Lint all repository shell scripts
-./scripts/lint_shell.sh
 ```
 
 ### Development Workflow
