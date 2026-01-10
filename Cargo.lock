@@ -9473,6 +9473,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "apex-solver",
+ "arbitrary",
  "camera-intrinsic-model",
  "clap",
  "criterion",

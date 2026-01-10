@@ -164,3 +164,94 @@ pub fn create_camera_models_from_config(config: &Config) -> (CameraModelType, Ca
 
     (left_cam, right_cam)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::datasets::config::Config;
+    use serde_yaml;
+
+    fn create_test_config() -> Config {
+        let yaml = r#"
+camera:
+  image_width: 640
+  image_height: 480
+  left_intrinsics: [500.0, 500.0, 320.0, 240.0]
+  left_distortion: [0.0, 0.0, 0.0, 0.0]
+  right_intrinsics: [500.0, 500.0, 320.0, 240.0]
+  right_distortion: [0.0, 0.0, 0.0, 0.0]
+  left_model: pinhole-radtan
+  T_B_Cl: [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+  T_B_Cr: [1.0, 0.0, 0.0, 0.1, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+keyframe_management:
+  keyframe_window_size: 5
+  translation_threshold: 0.1
+  rotation_threshold: 0.1
+feature_detection:
+  grid_cols: 10
+  optical_flow_max_iterations: 30
+  optical_flow_convergence_threshold: 0.01
+optimization:
+  max_iterations: 10
+  tolerance: 1e-6
+"#;
+        serde_yaml::from_str(yaml).unwrap()
+    }
+
+    #[test]
+    fn test_camera_model_creation_open_cv() {
+        let config = create_test_config();
+        let (left_cam, right_cam) = create_camera_models_from_config(&config);
+
+        match left_cam {
+            CameraModelType::OpenCV5(_) => (),
+            _ => panic!("Expected OpenCV5 model"),
+        }
+        match right_cam {
+            CameraModelType::OpenCV5(_) => (),
+            _ => panic!("Expected OpenCV5 model"),
+        }
+    }
+
+    #[test]
+    fn test_camera_model_creation_eucm() {
+        let mut config = create_test_config();
+        config.camera.left_model = Some("EUCM".to_string());
+        config.camera.right_model = Some("EUCM".to_string());
+
+        let (left_cam, right_cam) = create_camera_models_from_config(&config);
+
+        match left_cam {
+            CameraModelType::EUCM(_) => (),
+            _ => panic!("Expected EUCM model"),
+        }
+        match right_cam {
+            CameraModelType::EUCM(_) => (),
+            _ => panic!("Expected EUCM model"),
+        }
+    }
+
+    #[test]
+    fn test_frame_context() {
+        let mut ctx = FrameContext::new(true);
+        assert!(ctx.step_mode);
+        assert!(!ctx.auto_play);
+        assert_eq!(ctx.current_idx, 0);
+        assert_eq!(ctx.processed_frames, 0);
+
+        ctx.current_idx = 1;
+        ctx.processed_frames = 1;
+        assert_eq!(ctx.current_idx, 1);
+    }
+
+    #[test]
+    fn test_imu_data_structure() {
+        let imu = ImuData {
+            timestamp: 1000000000,
+            gyro: [0.1, 0.2, 0.3],
+            accel: [1.0, 2.0, 3.0],
+        };
+        assert_eq!(imu.timestamp, 1000000000);
+        assert_eq!(imu.gyro, [0.1, 0.2, 0.3]);
+    }
+}
