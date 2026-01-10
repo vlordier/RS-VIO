@@ -244,6 +244,7 @@ impl FourSeasonsPlayer {
         Ok(pixel_data)
     }
 
+    #[allow(dead_code)]
     fn load_imu_data(
         _dataset_path: &str,
         _image_data: &[ImageData],

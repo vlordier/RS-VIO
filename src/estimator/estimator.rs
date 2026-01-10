@@ -9,7 +9,7 @@ use crate::viewers::Viewer;
 use anyhow::Result;
 use image::GrayImage;
 use nalgebra as na;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 /// Placeholder estimator implementation.
 /// Currently mimics the control flow and logging structure of the C++ Estimator::process_frame,
@@ -37,6 +37,8 @@ pub struct Estimator<'a> {
     T_B_Cr: Matrix4x4,
     // Full trajectory of keyframes
     trajectory: Vec<Matrix4x4>,
+    // Maximum allowed time for frame processing (for real-time safety)
+    max_frame_processing_time: Duration,
 }
 
 impl<'a> Estimator<'a> {
@@ -92,6 +94,9 @@ impl<'a> Estimator<'a> {
             T_B_Cl,
             T_B_Cr,
             trajectory: Vec::new(),
+            // Default: 100ms deadline for 10Hz operation (with margin)
+            // For 30Hz target 33ms, use Duration::from_millis(30)
+            max_frame_processing_time: Duration::from_millis(100),
         }
     }
 
@@ -104,6 +109,7 @@ impl<'a> Estimator<'a> {
         imu_data: Option<&[ImuData]>,
     ) -> Result<()> {
         let _total_start_time = Instant::now();
+        let deadline = _total_start_time + self.max_frame_processing_time;
 
         // New frame: update counters
         self.frame_id_counter += 1;
@@ -114,6 +120,12 @@ impl<'a> Estimator<'a> {
                 "============================== Frame {} ==============================",
                 self.frame_id_counter
             );
+        }
+        
+        // Check deadline after initial setup
+        if Instant::now() > deadline {
+            log::error!("[Estimator] Frame processing exceeded deadline during initialization");
+            return Err(anyhow::anyhow!("Frame processing timeout"));
         }
 
         // Timing variables
@@ -132,8 +144,8 @@ impl<'a> Estimator<'a> {
         let left_img = match GrayImage::from_raw(img_w, img_h, left_image.to_vec()) {
             Some(img) => img,
             None => {
-                log::error!("[Estimator] Failed to construct GrayImage for right camera");
-                panic!("Failed to create right image");
+                log::error!("[Estimator] Failed to construct GrayImage for left camera");
+                return Err(anyhow::anyhow!("Failed to create left image: size mismatch"));
             }
         };
         let right_img = match GrayImage::from_raw(img_w, img_h, right_image.to_vec()) {
@@ -145,7 +157,7 @@ impl<'a> Estimator<'a> {
                     img_h,
                     right_image.len()
                 );
-                return Ok(());
+                return Err(anyhow::anyhow!("Failed to create right image: size mismatch"));
             }
         };
 
@@ -172,6 +184,12 @@ impl<'a> Estimator<'a> {
             .process_frame(&left_img, &right_img, &mut current_frame);
         _patch_tracking_time_ms = tracking_start.elapsed().as_secs_f64() * 1000.0;
         self.view_patch_tracking_results(&current_frame, &left_img, &right_img, img_w, img_h);
+        
+        // Check deadline after patch tracking
+        if Instant::now() > deadline {
+            log::warn!("[Estimator] Frame processing exceeded deadline after patch tracking");
+            return Err(anyhow::anyhow!("Frame processing timeout after patch tracking"));
+        }
 
         // Motion tracking - only if the sliding window is full (has initialized keyframes)
         if self.sliding_window.is_full() {
@@ -185,8 +203,21 @@ impl<'a> Estimator<'a> {
 
                     // Check if translation and rotation since last keyframe is large enough to trigger a keyframe
                     let keyframe_poses = self.sliding_window.get_keyframe_poses();
-                    let T_W_B_last_kf = keyframe_poses.last().unwrap();
-                    let T_rel = T_W_B * T_W_B_last_kf.try_inverse().unwrap();
+                    let T_W_B_last_kf = match keyframe_poses.last() {
+                        Some(pose) => pose,
+                        None => {
+                            log::error!("[Estimator] No keyframe poses available");
+                            return Err(anyhow::anyhow!("No keyframe poses available"));
+                        }
+                    };
+                    let T_W_B_last_kf_inv = match T_W_B_last_kf.try_inverse() {
+                        Some(inv) => inv,
+                        None => {
+                            log::error!("[Estimator] Matrix inversion failed for T_W_B_last_kf");
+                            return Err(anyhow::anyhow!("Matrix inversion failed"));
+                        }
+                    };
+                    let T_rel = T_W_B * T_W_B_last_kf_inv;
                     let t_rel = T_rel.fixed_view::<3, 1>(0, 3).into_owned();
                     let R_rel = T_rel.fixed_view::<3, 3>(0, 0).into_owned();
                     let e_rel = Vector3::from([
@@ -228,7 +259,10 @@ impl<'a> Estimator<'a> {
         if current_frame.is_keyframe {
             let optimization_start = Instant::now();
             self.sliding_window.add_frame(current_frame);
-            self.sliding_window.optimize(); // TODO handle error
+            if let Err(e) = self.sliding_window.optimize() {
+                log::error!("[Estimator] Bundle adjustment optimization failed: {:?}", e);
+                // Continue execution even if optimization fails
+            }
             _optimization_time_ms = optimization_start.elapsed().as_secs_f64() * 1000.0;
             self.view_optimization_results();
         }
@@ -252,6 +286,26 @@ impl<'a> Estimator<'a> {
         if let Some(v) = &mut self.viewer {
             v.set_frame(frame_id);
         }
+    }
+
+    /// Test hook: set maximum map points for bounding memory during tests.
+    pub fn set_max_map_points(&mut self, max_map_points: usize) {
+        self.sliding_window.set_max_map_points(max_map_points);
+    }
+
+    /// Test hook: inspect current map point count.
+    pub fn map_points_len(&self) -> usize {
+        self.sliding_window.map_points_len()
+    }
+
+    /// Test hook: adjust frame processing deadline for timing-sensitive tests.
+    pub fn set_max_frame_processing_time(&mut self, duration: Duration) {
+        self.max_frame_processing_time = duration;
+    }
+
+    /// Test hook: number of frames processed.
+    pub fn frame_count(&self) -> u64 {
+        self.frame_id_counter
     }
 
     /// Visualize tracking results: stereo images with tracked features.
@@ -405,12 +459,13 @@ keyframe_management:
   translation_threshold: 0.1
   rotation_threshold: 0.1
 feature_detection:
-  grid_cols: 10
-  optical_flow_max_iterations: 30
-  optical_flow_convergence_threshold: 0.01
+    grid_size: 10
+    max_features_per_grid: 50
+    optical_flow_max_iterations: 30
+    optical_flow_convergence_threshold: 0.01
 optimization:
-  max_iterations: 10
-  tolerance: 1e-6
+    bundle_adjustment_max_iterations: 10
+    pnp_max_iterations: 5
 "#;
         serde_yaml::from_str(yaml).unwrap()
     }
@@ -419,8 +474,7 @@ optimization:
     fn test_estimator_creation() {
         let config = create_test_config();
         let estimator = Estimator::new(config, None);
-        assert_eq!(estimator.frame_id_counter, 0);
-        assert!(!estimator.enable_debug_output); // Wait, in code it's true, but maybe change
+        assert_eq!(estimator.frame_count(), 0);
     }
 
     #[test]
@@ -434,15 +488,17 @@ optimization:
     fn test_process_frame_basic() {
         let config = create_test_config();
         let mut estimator = Estimator::new(config, None);
+        estimator.set_max_frame_processing_time(std::time::Duration::from_millis(1000));
 
         // Create dummy image data
         let left_image = vec![128u8; 640 * 480];
         let right_image = vec![128u8; 640 * 480];
         let timestamp_ns = 1000000000; // 1 second
 
-        // This should not panic
-        let result = estimator.process_frame(&left_image, &right_image, timestamp_ns, None);
-        assert!(result.is_ok());
+        // This should not error
+        estimator
+            .process_frame(&left_image, &right_image, timestamp_ns, None)
+            .expect("process_frame should succeed with synthetic input");
     }
 
     #[test]

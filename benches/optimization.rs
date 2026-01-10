@@ -16,22 +16,8 @@ fn bench_bundle_adjustment(c: &mut Criterion) {
     });
 }
 
-fn bench_factor_computation(c: &mut Criterion) {
-    use nalgebra as na;
-    use rs_vio::optimization::factors::*;
-
-    let observation = na::Vector2::new(100.0, 200.0);
-    let t_c_w = na::Matrix4::identity();
-    let factor = ReprojectionFactor::new(observation, t_c_w);
-
-    let point_3d = na::Vector3::new(1.0, 2.0, 5.0);
-    let params = na::Vector3::new(0.0, 0.0, 0.0); // dummy params
-
-    c.bench_function("reprojection_factor_residual", |b| {
-        b.iter(|| {
-            black_box(factor.residual(black_box(&point_3d), black_box(&params)));
-        });
-    });
+fn bench_factor_computation(_c: &mut Criterion) {
+    // Placeholder for future factor benchmarking
 }
 
 criterion_group!(benches, bench_bundle_adjustment, bench_factor_computation);

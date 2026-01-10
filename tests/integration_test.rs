@@ -1,5 +1,4 @@
 use rs_vio::*;
-use std::sync::Arc;
 
 #[test]
 fn test_vio_pipeline_integration() {
@@ -20,18 +19,21 @@ keyframe_management:
   translation_threshold: 0.1
   rotation_threshold: 0.1
 feature_detection:
-  grid_cols: 10
+  grid_size: 10
+  max_features_per_grid: 50
   optical_flow_max_iterations: 30
   optical_flow_convergence_threshold: 0.01
 optimization:
-  max_iterations: 10
-  tolerance: 1e-6
+  bundle_adjustment_max_iterations: 10
+  pnp_max_iterations: 8
 "#;
 
     let config: datasets::config::Config = serde_yaml::from_str(yaml_config).unwrap();
 
     // Create estimator
     let mut estimator = estimator::Estimator::new(config, None);
+    estimator.set_max_frame_processing_time(std::time::Duration::from_millis(1000));
+    estimator.set_max_map_points(200);
 
     // Simulate processing multiple frames
     for frame_id in 0..5 {
@@ -54,16 +56,13 @@ optimization:
         }
 
         // Process frame
-        let result = estimator.process_frame(&left_image, &right_image, timestamp_ns, None);
-        assert!(
-            result.is_ok(),
-            "Frame processing failed for frame {}",
-            frame_id
-        );
+        estimator
+          .process_frame(&left_image, &right_image, timestamp_ns, None)
+          .unwrap_or_else(|e| panic!("Frame {} failed: {}", frame_id, e));
     }
 
     // Verify that some frames were processed
-    assert!(estimator.frame_id_counter > 0);
+    assert!(estimator.frame_count() > 0);
 }
 
 #[test]
@@ -85,12 +84,13 @@ keyframe_management:
   translation_threshold: 0.2
   rotation_threshold: 0.2
 feature_detection:
-  grid_cols: 15
+  grid_size: 15
+  max_features_per_grid: 60
   optical_flow_max_iterations: 50
   optical_flow_convergence_threshold: 0.001
 optimization:
-  max_iterations: 20
-  tolerance: 1e-8
+  bundle_adjustment_max_iterations: 20
+  pnp_max_iterations: 15
 "#;
 
     let config: datasets::config::Config = serde_yaml::from_str(config_str).unwrap();
@@ -100,7 +100,8 @@ optimization:
     assert_eq!(config.camera.image_height, 720);
     assert_eq!(config.keyframe_management.keyframe_window_size, 10);
     assert_eq!(config.feature_detection.grid_cols, 15);
-    assert_eq!(config.optimization.max_iterations, 20);
+    assert_eq!(config.optimization.bundle_adjustment_max_iterations, 20);
+    assert_eq!(config.optimization.pnp_max_iterations, 15);
 }
 
 #[test]

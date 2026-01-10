@@ -39,15 +39,43 @@ camera-intrinsic-model = "0.7.2"
 apex-solver = { git = "https://github.com/amin-abouee/apex-solver", branch = "main" } # TODO change when official release includes the Schur complement methods
 faer = "0.23.2"
 
+[features]
+# Feature flag for using f32 instead of f64 precision
+use_f32 = []
+
 [dev-dependencies]
 criterion = "0.5"
 pprof = { version = "0.13", features = ["flamegraph"] }
 arbitrary = "1.3"
-
-[[bin]]
-name = "fuzz_target"
-path = "fuzz/fuzz_targets/fuzz_target.rs"
+proptest = "1.4"
 
 [lints.rust]
 unsafe_code = "forbid"
 warnings = "deny"
+non_snake_case = "allow"  # Allow for transformation matrices (T_A_B convention)
+
+[lints.clippy]
+# Real-time safety lints
+unnecessary_unwrap = "deny"
+expect_used = "warn"
+unwrap_used = "warn"
+panic = "deny"
+# Performance lints for embedded systems
+large_stack_arrays = "warn"
+large_types_passed_by_value = "warn"
+# Correctness lints
+float_cmp = "warn"
+# indexing_slicing = "warn"  # Too strict for nalgebra usage, matrices are bounds-checked
+
+[profile.release]
+# Optimize for embedded/real-time performance
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"  # Reduce binary size and eliminate unwinding overhead
+strip = true
+
+[profile.release-with-debug]
+inherits = "release"
+debug = true
+strip = false

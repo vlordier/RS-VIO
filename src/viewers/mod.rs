@@ -14,13 +14,26 @@ static FEATURE_COLOR_MAP: Mutex<Option<HashMap<usize, [u8; 3]>>> = Mutex::new(No
 /// Get or assign a color for a given feature ID
 /// Colors are deterministically assigned based on the feature ID using a hash function
 pub fn get_feature_color(feature_id: usize) -> [u8; 3] {
-    let mut map = FEATURE_COLOR_MAP.lock().unwrap();
+    let mut map = match FEATURE_COLOR_MAP.lock() {
+        Ok(m) => m,
+        Err(poisoned) => {
+            log::warn!("[Viewer] Mutex was poisoned, recovering");
+            poisoned.into_inner()
+        }
+    };
 
     if map.is_none() {
         *map = Some(HashMap::new());
     }
 
-    let map = map.as_mut().unwrap();
+    let map = match map.as_mut() {
+        Some(m) => m,
+        None => {
+            // This should never happen due to the check above, but handle it safely
+            log::error!("[Viewer] Color map is unexpectedly None");
+            return [128, 128, 128]; // Return gray as fallback
+        }
+    };
 
     // Check if color already assigned
     if let Some(&color) = map.get(&feature_id) {

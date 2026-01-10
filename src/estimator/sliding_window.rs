@@ -26,7 +26,14 @@ pub struct SlidingWindow {
     keyframes: VecDeque<Frame>,
 
     /// Map points stored by feature ID: HashMap<feature_id, [x, y, z]>
+    /// Bounded to prevent unbounded memory growth in long-running systems
     pub map_points: HashMap<usize, [f32; 3]>,
+    
+    /// Maximum number of map points to maintain (for embedded systems)
+    max_map_points: usize,
+    
+    /// Track observation count for each map point (for LRU eviction)
+    map_point_observations: HashMap<usize, usize>,
 }
 
 impl SlidingWindow {
@@ -36,16 +43,73 @@ impl SlidingWindow {
     /// # Arguments
     /// * `max_frames` - Maximum number of keyframes to keep in the window (default: 16)
     pub fn new(max_frames: usize) -> Self {
+        // For embedded systems, limit map points to prevent unbounded growth
+        // Typical VIO systems maintain 500-2000 active landmarks
+        const DEFAULT_MAX_MAP_POINTS: usize = 2000;
+        
         Self {
             max_frames,
             keyframes: VecDeque::with_capacity(max_frames),
-            map_points: HashMap::new(),
+            map_points: HashMap::with_capacity(DEFAULT_MAX_MAP_POINTS),
+            max_map_points: DEFAULT_MAX_MAP_POINTS,
+            map_point_observations: HashMap::with_capacity(DEFAULT_MAX_MAP_POINTS),
         }
     }
 
     /// Create a new sliding window with the default size of 16 frames.
     pub fn default() -> Self {
         Self::new(8)
+    }
+
+    /// Configure maximum map points (used by tests and tuning).
+    pub fn set_max_map_points(&mut self, max_map_points: usize) {
+        self.max_map_points = max_map_points.max(1);
+
+        // Ensure backing storage can hold the new limit without realloc during tests.
+        if self.map_points.capacity() < self.max_map_points {
+            self.map_points
+                .reserve(self.max_map_points - self.map_points.capacity());
+            self.map_point_observations
+                .reserve(self.max_map_points - self.map_point_observations.capacity());
+        }
+
+        // If current size exceeds new cap, evict immediately.
+        if self.map_points.len() > self.max_map_points {
+            self.evict_old_map_points();
+        }
+    }
+
+    /// Current number of stored map points (for observability in tests).
+    pub fn map_points_len(&self) -> usize {
+        self.map_points.len()
+    }
+    
+    /// Evict least recently observed map points when capacity is reached
+    fn evict_old_map_points(&mut self) {
+        if self.map_points.len() < self.max_map_points {
+            return;
+        }
+        
+            // Remove until we are back under the cap. Remove at least 10% of the cap
+            // to avoid excessive churn but ensure hard bounding.
+            while self.map_points.len() > self.max_map_points {
+                let mut points_by_observations: Vec<(usize, usize)> = self
+                    .map_point_observations
+                    .iter()
+                    .map(|(&id, &count)| (id, count))
+                    .collect();
+
+                points_by_observations.sort_by_key(|&(_, count)| count);
+
+                let overage = self.map_points.len() - self.max_map_points;
+                let batch = overage.max(self.max_map_points / 10).max(1);
+
+                for &(id, _) in points_by_observations.iter().take(batch) {
+                    self.map_points.remove(&id);
+                    self.map_point_observations.remove(&id);
+                }
+            }
+        
     }
 
     /// Add a keyframe to the sliding window.
@@ -173,13 +237,17 @@ impl SlidingWindow {
         // Initialize problem and solver
         let mut problem = Problem::new();
         let mut solver = LevenbergMarquardt::with_config(self.build_solver_config());
-        let mut initial_values = HashMap::new();
+        
+        // Pre-allocate with estimated capacity to avoid reallocations during optimization
+        let estimated_landmarks = self.map_points.len().max(100);
+        let estimated_keyframes = self.keyframes.len();
+        let mut initial_values = HashMap::with_capacity(estimated_landmarks + estimated_keyframes);
         // solver.add_observer(TerminalObserver::new());
 
         // Initialize maps for tracking and counting observations
-        let mut map_feature_to_landmark: HashMap<usize, String> = HashMap::new();
-        let mut landmark_observation_count_left: HashMap<String, usize> = HashMap::new();
-        let mut landmark_observation_count_right: HashMap<String, usize> = HashMap::new();
+        let mut map_feature_to_landmark: HashMap<usize, String> = HashMap::with_capacity(estimated_landmarks);
+        let mut landmark_observation_count_left: HashMap<String, usize> = HashMap::with_capacity(estimated_landmarks);
+        let mut landmark_observation_count_right: HashMap<String, usize> = HashMap::with_capacity(estimated_landmarks);
 
         // Fetch transforms between cameras and body
         let T_Cl_B = self
@@ -189,7 +257,12 @@ impl SlidingWindow {
             .state
             .T_B_Cl
             .try_inverse()
-            .expect("T_B_Cl should be invertible");
+                .ok_or_else(|| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "T_B_Cl camera transform is not invertible - check calibration",
+                    )
+                })?;
         let T_Cr_B = self
             .keyframes
             .front()
@@ -197,7 +270,12 @@ impl SlidingWindow {
             .state
             .T_B_Cr
             .try_inverse()
-            .expect("T_B_Cr should be invertible");
+                .ok_or_else(|| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "T_B_Cr camera transform is not invertible - check calibration",
+                    )
+                })?;
 
         // Count observations for each landmark across all frames, separately for left and right cameras
         for frame in self.keyframes.iter() {
@@ -238,11 +316,16 @@ impl SlidingWindow {
         for (id_frame, frame) in self.keyframes.iter().enumerate() {
             // Add KF poses
             let kf_var = format!("KF_{}", id_frame);
-            let T_B_W = frame
-                .state
-                .T_W_B
-                .try_inverse()
-                .expect("T_W_B should be invertible");
+            let T_B_W = match frame.state.T_W_B.try_inverse() {
+                Some(inv) => inv,
+                None => {
+                    log::error!("[SlidingWindow] T_W_B matrix is singular for frame {}", id_frame);
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        "T_W_B matrix inversion failed",
+                    ));
+                }
+            };
             let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
             let R_B_W = Matrix3x3::from(T_B_W.fixed_view::<3, 3>(0, 0));
             let q_B_W = UnitQuaternion::from_matrix(&R_B_W);
@@ -287,7 +370,7 @@ impl SlidingWindow {
                                 ])
                             } else {
                                 // Default initialization if not in map_points
-                                // TODO Triangulate insrtead of assigning depth 4.0 (quick and dirty way to get going)
+                                // TODO Triangulate instead of assigning depth 4.0 (quick and dirty way to get going)
                                 let p_C = Vector3::new(
                                     feat.undistorted_coord[0] as f64,
                                     feat.undistorted_coord[1] as f64,
@@ -297,14 +380,23 @@ impl SlidingWindow {
                                     frame.state.T_W_B.fixed_view::<3, 3>(0, 0).into_owned(),
                                     frame.state.T_W_B.fixed_view::<3, 1>(0, 3).into_owned(),
                                 );
-                                let T_B_C =
-                                    T_C_B.try_inverse().expect("T_C_B should be invertible");
-                                let (R_B_C, t_B_C) = (
-                                    T_B_C.fixed_view::<3, 3>(0, 0).into_owned(),
-                                    T_B_C.fixed_view::<3, 1>(0, 3).into_owned(),
-                                );
-                                let p_W = R_W_B * (R_B_C * p_C + t_B_C) + t_W_B;
-                                DVector::from_vec(vec![p_W.x, p_W.y, p_W.z])
+                                
+                                // Try to invert T_C_B, use default if it fails
+                                match T_C_B.try_inverse() {
+                                    Some(T_B_C) => {
+                                        let (R_B_C, t_B_C) = (
+                                            T_B_C.fixed_view::<3, 3>(0, 0).into_owned(),
+                                            T_B_C.fixed_view::<3, 1>(0, 3).into_owned(),
+                                        );
+                                        let p_W = R_W_B * (R_B_C * p_C + t_B_C) + t_W_B;
+                                        DVector::from_vec(vec![p_W.x, p_W.y, p_W.z])
+                                    }
+                                    None => {
+                                        log::warn!("[SlidingWindow] T_C_B matrix is singular, using default initialization for feature {}", feature_id);
+                                        // Return a safe default position in front of camera
+                                        DVector::from_vec(vec![0.0, 0.0, 2.0])
+                                    }
+                                }
                             };
                             (ManifoldType::RN, data)
                         });
@@ -319,11 +411,13 @@ impl SlidingWindow {
                         // Fix pose for first frame
                         if id_frame == 0 {
                             // Factor expects T_B_W (Body-from-World), but frame.state.T_W_B is World-from-Body
-                            let T_B_W = frame
-                                .state
-                                .T_W_B
-                                .try_inverse()
-                                .expect("T_W_B should be invertible");
+                            let T_B_W = match frame.state.T_W_B.try_inverse() {
+                                Some(inv) => inv,
+                                None => {
+                                    log::warn!("[SlidingWindow] T_W_B matrix is singular for first frame, skipping factor");
+                                    continue;
+                                }
+                            };
                             factor = factor.with_fixed_pose(T_B_W);
                         }
 
@@ -335,7 +429,10 @@ impl SlidingWindow {
                         };
 
                         // Add residual block with Huber loss
-                        let huber_loss = HuberLoss::new(2.0).unwrap();
+                        let huber_loss = HuberLoss::new(2.0)
+                               .map_err(|e| {
+                                  std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string())
+                               })?;
                         problem.add_residual_block(
                             &var_names,
                             Box::new(factor),
@@ -538,14 +635,33 @@ impl SlidingWindow {
 
         // Update map_points and keyframe poses with optimized values
         self.map_points.clear();
+        self.map_point_observations.clear();
+        
         opt_result.parameters.iter().for_each(|(var_name, value)| {
             // Update map points
             if let Some(feature_id_str) = var_name.strip_prefix("LM_") {
                 if let Ok(feature_id) = feature_id_str.parse::<usize>() {
                     let vec = value.to_vector();
-                    // TODO check if points are estimated at obviously wrong locations (negative depths, etc.)
-                    self.map_points
-                        .insert(feature_id, [vec[0] as f32, vec[1] as f32, vec[2] as f32]);
+                    
+                    // Validate point before inserting
+                    let point = [vec[0] as f32, vec[1] as f32, vec[2] as f32];
+                    
+                    // Check for obviously wrong locations (negative depths, NaN, etc.)
+                    if point.iter().all(|&v| v.is_finite()) && vec[2] > 0.1 {
+                        // Check capacity before inserting
+                        if self.map_points.len() >= self.max_map_points {
+                            self.evict_old_map_points();
+                        }
+                        
+                        self.map_points.insert(feature_id, point);
+                        // Initialize observation count (will be updated during tracking)
+                        *self.map_point_observations.entry(feature_id).or_insert(0) += 1;
+                    } else {
+                        log::warn!(
+                            "[SlidingWindow] Rejecting invalid map point {}: [{:.2}, {:.2}, {:.2}]",
+                            feature_id, point[0], point[1], point[2]
+                        );
+                    }
                 }
             }
             // Update keyframe poses
@@ -553,11 +669,14 @@ impl SlidingWindow {
                 if let Ok(frame_id) = frame_id_str.parse::<i32>() {
                     let mat = apex_solver::manifold::se3::SE3::from(value.to_vector()).matrix();
                     // println!("KF_{} optimized pose: {:?}", frame_id, mat);
-                    self.keyframes
-                        .get_mut(frame_id as usize)
-                        .unwrap()
-                        .state
-                        .T_W_B = mat.try_inverse().expect("T_W_B should be invertible");
+                    if let Some(frame) = self.keyframes.get_mut(frame_id as usize) {
+                        match mat.try_inverse() {
+                            Some(inv) => frame.state.T_W_B = inv,
+                            None => {
+                                log::warn!("[SlidingWindow] Optimized T_B_W matrix is singular for KF_{}, keeping previous pose", frame_id);
+                            }
+                        }
+                    }
                 }
             }
         });
@@ -582,14 +701,26 @@ impl SlidingWindow {
         // Add variable for the new frame
         // Only the new frame is optimized and it's initialized from the last keyframe
         let kf_var = format!("F");
-        let T_B_W = self
-            .keyframes
-            .back()
-            .unwrap()
-            .state
-            .T_W_B
-            .try_inverse()
-            .expect("T_W_B should be invertible");
+        let last_frame = match self.keyframes.back() {
+            Some(f) => f,
+            None => {
+                log::error!("[SlidingWindow] No keyframes available for motion tracking");
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "No keyframes available",
+                ));
+            }
+        };
+        let T_B_W = match last_frame.state.T_W_B.try_inverse() {
+            Some(inv) => inv,
+            None => {
+                log::error!("[SlidingWindow] T_W_B matrix is singular in motion tracking");
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "T_W_B matrix inversion failed",
+                ));
+            }
+        };
         let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
         let R_B_W = Matrix3x3::from(T_B_W.fixed_view::<3, 3>(0, 0));
         let q_B_W = UnitQuaternion::from_matrix(&R_B_W);
@@ -600,22 +731,36 @@ impl SlidingWindow {
 
         // Add factors: for both the left and right cameras, each point that was already in the map is used to optimize the new frame
         // Fetch transforms between cameras and body
-        let T_Cl_B = self
-            .keyframes
-            .front()
-            .unwrap()
-            .state
-            .T_B_Cl
-            .try_inverse()
-            .expect("T_B_Cl should be invertible");
-        let T_Cr_B = self
-            .keyframes
-            .front()
-            .unwrap()
-            .state
-            .T_B_Cr
-            .try_inverse()
-            .expect("T_B_Cr should be invertible");
+        let first_frame = match self.keyframes.front() {
+            Some(f) => f,
+            None => {
+                log::error!("[SlidingWindow] No keyframes available for camera transforms");
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "No keyframes available",
+                ));
+            }
+        };
+        let T_Cl_B = match first_frame.state.T_B_Cl.try_inverse() {
+            Some(inv) => inv,
+            None => {
+                log::error!("[SlidingWindow] T_B_Cl matrix is singular");
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "T_B_Cl matrix inversion failed",
+                ));
+            }
+        };
+        let T_Cr_B = match first_frame.state.T_B_Cr.try_inverse() {
+            Some(inv) => inv,
+            None => {
+                log::error!("[SlidingWindow] T_B_Cr matrix is singular");
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "T_B_Cr matrix inversion failed",
+                ));
+            }
+        };
         let camera_features = [
             (&frame.left_features, T_Cl_B),
             (&frame.right_features, T_Cr_B),
@@ -635,7 +780,10 @@ impl SlidingWindow {
                             na::Vector3::new(point[0] as f64, point[1] as f64, point[2] as f64),
                         );
                         // Add residual block with Huber loss
-                        let huber_loss = HuberLoss::new(2.0).unwrap();
+                        let huber_loss = HuberLoss::new(2.0)
+                               .map_err(|e| {
+                                  std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string())
+                               })?;
                         problem.add_residual_block(
                             &[&kf_var],
                             Box::new(factor),
@@ -669,9 +817,13 @@ impl SlidingWindow {
             // Extract optimized pose T_B_W and convert to T_W_B
             if let Some(value) = opt_result.parameters.get(&kf_var) {
                 let T_B_W_opt = apex_solver::manifold::se3::SE3::from(value.to_vector()).matrix();
-                let T_W_B_opt = T_B_W_opt
-                    .try_inverse()
-                    .expect("Optimized T_B_W should be invertible");
+                let T_W_B_opt = match T_B_W_opt.try_inverse() {
+                    Some(inv) => inv,
+                    None => {
+                        log::error!("[SlidingWindow] Optimized T_B_W matrix is singular");
+                        return Ok(None);
+                    }
+                };
                 log::debug!(
                     "[SlidingWindow] Motion tracking successful. Initial cost: {:.3}, final cost: {:.3}",
                     opt_result.initial_cost,
@@ -688,6 +840,32 @@ impl SlidingWindow {
                 opt_result.status
             );
             Ok(None)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn evicts_when_over_capacity() {
+        let mut window = SlidingWindow::new(4);
+        window.set_max_map_points(10);
+
+        // Insert 20 points with ascending observation counts so eviction keeps the most observed.
+        for id in 0..20 {
+            window.map_points.insert(id, [0.0, 0.0, 0.0]);
+            window.map_point_observations.insert(id, id as usize); // higher id = more observations
+        }
+
+        // Trigger eviction explicitly.
+        window.evict_old_map_points();
+
+        assert!(window.map_points_len() <= 10);
+        // Highest observed points (ids 10..19) should remain after eviction.
+        for id in 10..20 {
+            assert!(window.map_points.contains_key(&id));
         }
     }
 }

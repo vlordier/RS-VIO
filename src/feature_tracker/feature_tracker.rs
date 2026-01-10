@@ -1,7 +1,7 @@
 use image::{imageops, GrayImage};
 use imageproc::corners::Corner;
 use nalgebra as na;
-use rayon::prelude::*;
+// Rayon removed - using sequential iteration for deterministic real-time execution
 use std::collections::HashMap;
 use std::ops::AddAssign;
 
@@ -226,8 +226,10 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
 fn build_image_pyramid(greyscale_image: &GrayImage, levels: u32) -> Vec<GrayImage> {
     const FILTER_TYPE: imageops::FilterType = imageops::FilterType::Triangle;
     let (w0, h0) = greyscale_image.dimensions();
+    
+    // Use sequential iteration for deterministic execution in real-time systems
+    // Parallel iteration with Rayon introduces non-deterministic scheduling
     (0..levels)
-        .into_par_iter()
         .map(|i| {
             let scale_down: u32 = 1 << i;
             let (new_w, new_h) = (w0 / scale_down, h0 / scale_down);
@@ -273,8 +275,10 @@ fn track_points<const LEVELS: u32>(
     optical_flow_max_iterations: usize,
     optical_flow_convergence_threshold: f32,
 ) -> HashMap<usize, na::Affine2<f32>> {
+    // Use sequential iteration for deterministic execution in real-time systems
+    // Parallel iteration introduces non-deterministic ordering and timing
     let transform_maps1: HashMap<usize, na::Affine2<f32>> = transform_maps0
-        .par_iter()
+        .iter()
         .filter_map(|(k, v)| {
             if let Some(new_v) = track_one_point::<LEVELS>(
                 image_pyramid0,

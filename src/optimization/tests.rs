@@ -31,7 +31,7 @@ mod tests {
             .with_parameter_tolerance(1e-9)
             .with_jacobi_scaling(false);
 
-        let mut solver = LevenbergMarquardt::with_config(config);
+        let _solver = LevenbergMarquardt::with_config(config);
         let mut initial_values = HashMap::new();
 
         let lm_var = format!("LM_{}", 0);

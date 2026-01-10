@@ -188,12 +188,13 @@ keyframe_management:
   translation_threshold: 0.1
   rotation_threshold: 0.1
 feature_detection:
-  grid_cols: 10
-  optical_flow_max_iterations: 30
-  optical_flow_convergence_threshold: 0.01
+    grid_size: 10
+    max_features_per_grid: 50
+    optical_flow_max_iterations: 30
+    optical_flow_convergence_threshold: 0.01
 optimization:
-  max_iterations: 10
-  tolerance: 1e-6
+    bundle_adjustment_max_iterations: 10
+    pnp_max_iterations: 5
 "#;
         serde_yaml::from_str(yaml).unwrap()
     }

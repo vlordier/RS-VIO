@@ -154,7 +154,9 @@ pub fn detect_key_points(
 
             while points_added < num_points_in_cell && threshold >= 10 {
                 let mut fast_corners = corners_fast9(&image_view, threshold);
-                fast_corners.sort_by(|a, b| a.score.partial_cmp(&b.score).unwrap());
+                    fast_corners.sort_by(|a, b| {
+                        a.score.partial_cmp(&b.score).unwrap_or(std::cmp::Ordering::Equal)
+                    });
 
                 for mut point in fast_corners {
                     if points_added >= num_points_in_cell {
