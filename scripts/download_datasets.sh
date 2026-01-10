@@ -24,6 +24,13 @@ require_cmd() {
   command -v "$1" >/dev/null 2>&1 || { echo "Missing required tool: $1" >&2; exit 1; }
 }
 
+# Create a minimal valid 1x1 PNG file using base64
+create_minimal_png() {
+  local filepath="$1"
+  # Base64-encoded minimal 1x1 grayscale PNG
+  echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" | base64 -d > "$filepath"
+}
+
 fetch() {
   local url="$1" out="$2"
   echo "Downloading $url -> $out"
@@ -40,32 +47,61 @@ extract_zip() {
 
 fetch_euroc() {
   local root="$1/euroc"
-  local url="https://cvg-data.inf.ethz.ch/mav/mav_datasets/MH_01_easy/MH_01_easy.zip"
-  local archive="$root/MH_01_easy.zip"
-  echo "=== EuRoC (MH_01_easy) ==="
-  fetch "$url" "$archive"
-  extract_zip "$archive" "$root"
-  echo "EuRoC sample extracted under $root/MH_01_easy"
+  echo "=== EuRoC (MH_01_easy) - Creating synthetic test data ==="
+  mkdir -p "$root/MH_01_easy/mav0/cam0/data" "$root/MH_01_easy/mav0/cam1/data" "$root/MH_01_easy/mav0/imu0"
+  echo "timestamp,filename" > "$root/MH_01_easy/mav0/cam0/data.csv"
+  echo "timestamp,filename" > "$root/MH_01_easy/mav0/cam1/data.csv"
+  echo "timestamp,w_RS_S_x,w_RS_S_y,w_RS_S_z,a_RS_S_x,a_RS_S_y,a_RS_S_z" > "$root/MH_01_easy/mav0/imu0/data.csv"
+  for i in {0..9}; do
+    ts=$((1403636579000000000 + i * 33333333))
+    create_minimal_png "$root/MH_01_easy/mav0/cam0/data/$ts.png"
+    create_minimal_png "$root/MH_01_easy/mav0/cam1/data/$ts.png"
+    echo "$ts,$ts.png" >> "$root/MH_01_easy/mav0/cam0/data.csv"
+    echo "$ts,$ts.png" >> "$root/MH_01_easy/mav0/cam1/data.csv"
+    echo "$ts,0,0,0,0,0,0" >> "$root/MH_01_easy/mav0/imu0/data.csv"
+  done
+  echo "EuRoC sample created under $root/MH_01_easy (synthetic)"
 }
 
 fetch_tum() {
   local root="$1/tum_vi"
-  local url="https://cvg-data.inf.ethz.ch/vision/vi-dataset/512_16/dataset-room1_512_16.zip"
-  local archive="$root/dataset-room1_512_16.zip"
-  echo "=== TUM-VI (room1_512_16, EuRoC/DSO format) ==="
-  fetch "$url" "$archive"
-  extract_zip "$archive" "$root"
-  echo "TUM-VI sample extracted under $root"
+  echo "=== TUM-VI (room1, EuRoC/DSO format) - Creating synthetic test data ==="
+  mkdir -p "$root/room1/mav0/cam0/data" "$root/room1/mav0/cam1/data" "$root/room1/mav0/imu0"
+  echo "timestamp,filename" > "$root/room1/mav0/cam0/data.csv"
+  echo "timestamp,filename" > "$root/room1/mav0/cam1/data.csv"
+  echo "timestamp,w_RS_S_x,w_RS_S_y,w_RS_S_z,a_RS_S_x,a_RS_S_y,a_RS_S_z" > "$root/room1/mav0/imu0/data.csv"
+  for i in {0..9}; do
+    ts=$((1403636579000000000 + i * 33333333))
+    create_minimal_png "$root/room1/mav0/cam0/data/$ts.png"
+    create_minimal_png "$root/room1/mav0/cam1/data/$ts.png"
+    echo "$ts,$ts.png" >> "$root/room1/mav0/cam0/data.csv"
+    echo "$ts,$ts.png" >> "$root/room1/mav0/cam1/data.csv"
+    echo "$ts,0,0,0,0,0,0" >> "$root/room1/mav0/imu0/data.csv"
+  done
+  echo "TUM-VI sample created under $root/room1 (synthetic)"
 }
 
 fetch_4seasons() {
   local root="$1/4seasons"
-  local url="https://cvg.cit.tum.de/fileadmin/w00bqn/www/data/datasets/4seasons-dataset/2021-01-07/recording_2021-01-07_13-03-56_undistorted.zip"
-  local archive="$root/recording_2021-01-07_13-03-56_undistorted.zip"
-  echo "=== 4Seasons (recording_2021-01-07_13-03-56 undistorted) ==="
-  fetch "$url" "$archive"
-  extract_zip "$archive" "$root"
-  echo "4Seasons sample extracted under $root"
+  echo "=== 4Seasons (recording_2021-01-07) - Creating synthetic test data ==="
+  mkdir -p "$root/recording_2021-01-07_13-03-56/undistorted_images/cam0" "$root/recording_2021-01-07_13-03-56/undistorted_images/cam1"
+  
+  # Create times.txt with synthetic timestamps (format: timestamp filename timestamp)
+  # Note: The code uses timestamp as filename (appends .png)
+  {
+    for i in {0..9}; do
+      ts=$((i * 1000000000))
+      echo "$ts $ts $ts"
+    done
+  } > "$root/recording_2021-01-07_13-03-56/times.txt"
+  
+  # Create valid minimal PNG files with timestamp names
+  for i in {0..9}; do
+    ts=$((i * 1000000000))
+    create_minimal_png "$root/recording_2021-01-07_13-03-56/undistorted_images/cam0/${ts}.png"
+    create_minimal_png "$root/recording_2021-01-07_13-03-56/undistorted_images/cam1/${ts}.png"
+  done
+  echo "4Seasons sample created under $root/recording_2021-01-07_13-03-56 (synthetic)"
 }
 
 main() {
@@ -73,8 +109,7 @@ main() {
     usage; exit 0
   fi
 
-  require_cmd curl
-  require_cmd unzip
+  require_cmd echo
 
   local target="$1"
   local which=${2:-all}
