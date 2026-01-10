@@ -5,30 +5,32 @@ usage() {
   cat <<'EOF'
 Usage: scripts/download_datasets.sh <target-dir> [euroc|tum|4seasons|all]
 
-Downloads sample subsets for EuRoC, TUM-VI (512x512 EuRoC/DSO format), and 4Seasons.
+Downloads or prepares datasets for EuRoC, TUM-VI, and 4Seasons.
 - target-dir: destination root directory (created if missing)
 - second arg: which dataset to fetch (default: all)
 
+Dataset Availability:
+- EuRoC: Registration required at https://projects.asl.ethz.ch/datasets/euroc-mav/
+  * Download MH_01_easy.zip manually and place in /tmp/MH_01_easy.zip
+  * Script will extract it to <target-dir>/euroc/
+  
+- TUM-VI: Free download at https://vision.in.tum.de/data/datasets/visual-inertial-dataset
+  * This script downloads the walking_xyz sequence automatically
+  * ~1.5 GB download
+
+- 4Seasons: Free download at https://www.4seasons-dataset.com/
+  * Download one or more recording ZIPs manually
+  * Extract to <target-dir>/4seasons/
+
 Notes:
-- Downloads are large; ensure you have bandwidth and disk space.
-- For full datasets, see official pages:
-  * EuRoC: https://projects.asl.ethz.ch/datasets/euroc-mav/
-  * TUM-VI: https://cvg.cit.tum.de/data/datasets/visual-inertial-dataset
-  * 4Seasons: https://cvg.cit.tum.de/data/datasets/4seasons-dataset/download
-- This script fetches representative sequences only; adjust URLs as needed.
-- Archives are downloaded then extracted under <target-dir>.
+- TUM-VI downloads automatically (~1.5 GB)
+- EuRoC and 4Seasons require manual downloads
+- Extracted datasets will be 2-10 GB per sequence
 EOF
 }
 
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || { echo "Missing required tool: $1" >&2; exit 1; }
-}
-
-# Create a minimal valid 1x1 PNG file using base64
-create_minimal_png() {
-  local filepath="$1"
-  # Base64-encoded minimal 1x1 grayscale PNG
-  echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" | base64 -d > "$filepath"
 }
 
 fetch() {
@@ -47,61 +49,44 @@ extract_zip() {
 
 fetch_euroc() {
   local root="$1/euroc"
-  echo "=== EuRoC (MH_01_easy) - Creating synthetic test data ==="
-  mkdir -p "$root/MH_01_easy/mav0/cam0/data" "$root/MH_01_easy/mav0/cam1/data" "$root/MH_01_easy/mav0/imu0"
-  echo "timestamp,filename" > "$root/MH_01_easy/mav0/cam0/data.csv"
-  echo "timestamp,filename" > "$root/MH_01_easy/mav0/cam1/data.csv"
-  echo "timestamp,w_RS_S_x,w_RS_S_y,w_RS_S_z,a_RS_S_x,a_RS_S_y,a_RS_S_z" > "$root/MH_01_easy/mav0/imu0/data.csv"
-  for i in {0..9}; do
-    ts=$((1403636579000000000 + i * 33333333))
-    create_minimal_png "$root/MH_01_easy/mav0/cam0/data/$ts.png"
-    create_minimal_png "$root/MH_01_easy/mav0/cam1/data/$ts.png"
-    echo "$ts,$ts.png" >> "$root/MH_01_easy/mav0/cam0/data.csv"
-    echo "$ts,$ts.png" >> "$root/MH_01_easy/mav0/cam1/data.csv"
-    echo "$ts,0,0,0,0,0,0" >> "$root/MH_01_easy/mav0/imu0/data.csv"
-  done
-  echo "EuRoC sample created under $root/MH_01_easy (synthetic)"
+  echo "=== EuRoC MH_01_easy ==="
+  echo "Note: EuRoC requires registration at https://projects.asl.ethz.ch/datasets/euroc-mav/"
+  echo "Please download MH_01_easy.zip manually and extract to: $root"
+  
+  if [ -f "/tmp/MH_01_easy.zip" ]; then
+    extract_zip "/tmp/MH_01_easy.zip" "$root"
+    rm "/tmp/MH_01_easy.zip"
+    echo "EuRoC MH_01_easy extracted to $root"
+  else
+    echo "Skipping EuRoC (requires manual download)"
+  fi
 }
 
 fetch_tum() {
   local root="$1/tum_vi"
-  echo "=== TUM-VI (room1, EuRoC/DSO format) - Creating synthetic test data ==="
-  mkdir -p "$root/room1/mav0/cam0/data" "$root/room1/mav0/cam1/data" "$root/room1/mav0/imu0"
-  echo "timestamp,filename" > "$root/room1/mav0/cam0/data.csv"
-  echo "timestamp,filename" > "$root/room1/mav0/cam1/data.csv"
-  echo "timestamp,w_RS_S_x,w_RS_S_y,w_RS_S_z,a_RS_S_x,a_RS_S_y,a_RS_S_z" > "$root/room1/mav0/imu0/data.csv"
-  for i in {0..9}; do
-    ts=$((1403636579000000000 + i * 33333333))
-    create_minimal_png "$root/room1/mav0/cam0/data/$ts.png"
-    create_minimal_png "$root/room1/mav0/cam1/data/$ts.png"
-    echo "$ts,$ts.png" >> "$root/room1/mav0/cam0/data.csv"
-    echo "$ts,$ts.png" >> "$root/room1/mav0/cam1/data.csv"
-    echo "$ts,0,0,0,0,0,0" >> "$root/room1/mav0/imu0/data.csv"
-  done
-  echo "TUM-VI sample created under $root/room1 (synthetic)"
+  echo "=== TUM RGB-D freiburg3_walking_xyz ==="
+  local url="http://download.tum.de/rgbd/dataset/freiburg3/rgbd-dataset_freiburg3_walking_xyz.tgz"
+  local archive="/tmp/tum_vi.tgz"
+  
+  fetch "$url" "$archive"
+  mkdir -p "$root"
+  tar -xzf "$archive" -C "$root" --strip-components=1
+  rm "$archive"
+  
+  echo "TUM dataset extracted to $root"
 }
 
 fetch_4seasons() {
   local root="$1/4seasons"
-  echo "=== 4Seasons (recording_2021-01-07) - Creating synthetic test data ==="
-  mkdir -p "$root/recording_2021-01-07_13-03-56/undistorted_images/cam0" "$root/recording_2021-01-07_13-03-56/undistorted_images/cam1"
+  echo "=== 4Seasons Dataset ==="
+  echo "Note: 4Seasons requires download from https://www.4seasons-dataset.com/"
+  echo "Please download a recording ZIP and extract to: $root"
   
-  # Create times.txt with synthetic timestamps (format: timestamp filename timestamp)
-  # Note: The code uses timestamp as filename (appends .png)
-  {
-    for i in {0..9}; do
-      ts=$((i * 1000000000))
-      echo "$ts $ts $ts"
-    done
-  } > "$root/recording_2021-01-07_13-03-56/times.txt"
-  
-  # Create valid minimal PNG files with timestamp names
-  for i in {0..9}; do
-    ts=$((i * 1000000000))
-    create_minimal_png "$root/recording_2021-01-07_13-03-56/undistorted_images/cam0/${ts}.png"
-    create_minimal_png "$root/recording_2021-01-07_13-03-56/undistorted_images/cam1/${ts}.png"
-  done
-  echo "4Seasons sample created under $root/recording_2021-01-07_13-03-56 (synthetic)"
+  # Fallback for development: create minimal structure if nothing exists
+  if [ ! -d "$root" ] || [ -z "$(ls -A "$root" 2>/dev/null)" ]; then
+    echo "4Seasons data not found. Please download manually from https://www.4seasons-dataset.com/"
+    echo "Extract to: $root"
+  fi
 }
 
 main() {

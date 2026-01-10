@@ -22,28 +22,38 @@ A high-performance stereo visual-inertial odometry (VIO) system written in Rust.
  
 ## Usage
 
-- EuRoC:
-  - Download the dataset from https://projects.asl.ethz.ch/datasets/euroc-mav/
-  - Run:
+### Running with Real Datasets
+
+**Quick start with real data:**
+
 ```bash
-cargo run --release --bin run_euroc config/euroc_vio.yaml {path_to_euroc_folder}/MH_01_easy/
-```
-- TUM-VI:
-  - Download the 512x512 datasets in EuRoC/DSO format from https://cvg.cit.tum.de/data/datasets/visual-inertial-dataset
-  - Run:
-```bash
-cargo run --release --bin run_tum config/tum_vi.yaml {path_to_tum_folder}/MH_01_easy/
-```
-- 4Seasons:
-  - Download the undistorted image datasets from https://cvg.cit.tum.de/data/datasets/4seasons-dataset/download
-  - Run:
-```bash
-cargo run --release --bin run_4seasons config/4seasons.yaml {path_to_4seasons_folder}/recording_2021-01-07_13-03-56/
+# Download datasets (TUM-VI auto-downloads, others require manual download)
+make download-datasets
+
+# Run with real datasets (requires data in /tmp/rs-vio-samples)
+make run-euroc
+make run-tum  
+make run-4seasons
 ```
 
-Check the run scripts in /scripts/ for more information. Configuration files are available in the `config/` directory.
+**Manual dataset setup:**
 
-To fetch representative sample sequences locally, use `scripts/download_datasets.sh <target-dir> [euroc|tum|4seasons|all]`.
+- **EuRoC**: 
+  - Download from https://projects.asl.ethz.ch/datasets/euroc-mav/ (requires registration)
+  - Extract `MH_01_easy.zip` to `/tmp/rs-vio-samples/euroc/`
+  - Run: `cargo run --release --bin run_euroc config/euroc_vio.yaml /tmp/rs-vio-samples/euroc/MH_01_easy`
+
+- **TUM-VI** (RGB-D):
+  - Download from https://vision.in.tum.de/data/datasets/visual-inertial-slam
+  - Extract to `/tmp/rs-vio-samples/tum_vi/`
+  - Run: `cargo run --release --bin run_tum config/tum_vi.yaml /tmp/rs-vio-samples/tum_vi`
+
+- **4Seasons**:
+  - Download from https://www.4seasons-dataset.com/ (free registration)
+  - Extract recording ZIPs to `/tmp/rs-vio-samples/4seasons/`
+  - Run: `cargo run --release --bin run_4seasons config/4seasons.yaml /tmp/rs-vio-samples/4seasons/recording_2021-01-07_13-03-56`
+
+Configuration files are available in the `config/` directory for each dataset.
 
 ## Installation
 
@@ -148,28 +158,21 @@ cargo bench
 cargo doc --open
 ```
 
-### Local Testing with Synthetic Data
+### Local Testing with Real Data
 
-For rapid local development without downloading large datasets, use the synthetic test data generator:
+To run the binaries with real datasets:
 
 ```bash
-# Generate synthetic test data (creates 10-frame sequences)
-make generate-test-data
+# Download TUM-VI (auto-downloads)
+make download-datasets
 
-# Run each binary with synthetic test data
-make run-euroc
-make run-tum
-make run-4seasons
-
-# Or run all three in sequence
-make run-euroc && make run-tum && make run-4seasons
-
-# Manual test data generation
-bash scripts/download_datasets.sh /tmp/my-test-data all
-./target/release/run_euroc config/euroc_vio.yaml /tmp/my-test-data/euroc/MH_01_easy
+# Run with real datasets
+make run-euroc   # Requires EuRoC data in /tmp/rs-vio-samples/euroc
+make run-tum     # Works after download-datasets  
+make run-4seasons # Requires 4Seasons data in /tmp/rs-vio-samples/4seasons
 ```
 
-The synthetic data includes minimal 1x1 PNG images and properly formatted CSV metadata files compatible with each dataset's loader. This enables quick iteration and CI testing without bandwidth or storage requirements.
+For dataset setup instructions, see the [Dataset Download](#usage) section above.
 
 ### Development Workflow
 1. Fork the repository

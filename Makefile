@@ -11,17 +11,16 @@ help:
 	@echo "  make fmt-check          - Check formatting without changes"
 	@echo "  make audit              - Security audit"
 	@echo "  make lint-shell         - Lint all shell scripts (requires shellcheck)"
-	@echo "  make download-datasets  - Download sample datasets to /tmp/rs-vio-samples"
-	@echo "  make generate-test-data - Generate synthetic test data in /tmp/rs-vio-test-data"
-	@echo "  make run-euroc          - Build release and run EuRoC binary with test data"
-	@echo "  make run-tum            - Build release and run TUM-VI binary with test data"
-	@echo "  make run-4seasons       - Build release and run 4Seasons binary with test data"
+	@echo "  make download-datasets  - Download real datasets to /tmp/rs-vio-samples"
+	@echo "  make run-euroc          - Build release and run EuRoC with real data"
+	@echo "  make run-tum            - Build release and run TUM-VI with real data"
+	@echo "  make run-4seasons       - Build release and run 4Seasons with real data"
 	@echo "  make docker-build       - Build Docker image (rs-vio:latest)"
 	@echo "  make docker-smoke-test  - Smoke test Docker image"
 	@echo "  make clean              - Clean build artifacts"
 	@echo "  make all                - Build, test, lint, audit (full CI)"
 	@echo ""
-	@echo "Example: make test-release"
+	@echo "Example: make download-datasets && make run-euroc"
 
 build:
 	cargo build
@@ -60,19 +59,34 @@ generate-test-data:
 	bash scripts/download_datasets.sh /tmp/rs-vio-test-data all
 	@echo "✓ Test data ready for local testing"
 
-run-euroc: release generate-test-data
-	@echo "Running EuRoC estimator with synthetic test data..."
-	timeout 10 ./target/release/run_euroc config/euroc_vio.yaml /tmp/rs-vio-test-data/euroc/MH_01_easy || true
+run-euroc: release
+	@if [ -d "/tmp/rs-vio-samples/euroc/MH_01_easy" ]; then \
+		echo "Running EuRoC estimator with real dataset..."; \
+		timeout 60 ./target/release/run_euroc config/euroc_vio.yaml /tmp/rs-vio-samples/euroc/MH_01_easy || true; \
+	else \
+		echo "EuRoC dataset not found. Download first with: make download-datasets"; \
+		exit 1; \
+	fi
 	@echo "✓ EuRoC run completed"
 
-run-tum: release generate-test-data
-	@echo "Running TUM-VI estimator with synthetic test data..."
-	timeout 10 ./target/release/run_tum config/tum_vi.yaml /tmp/rs-vio-test-data/tum_vi/room1 || true
+run-tum: release
+	@if [ -d "/tmp/rs-vio-samples/tum_vi" ]; then \
+		echo "Running TUM-VI estimator with real dataset..."; \
+		timeout 60 ./target/release/run_tum config/tum_vi.yaml /tmp/rs-vio-samples/tum_vi || true; \
+	else \
+		echo "TUM-VI dataset not found. Download first with: make download-datasets"; \
+		exit 1; \
+	fi
 	@echo "✓ TUM-VI run completed"
 
-run-4seasons: release generate-test-data
-	@echo "Running 4Seasons estimator with synthetic test data..."
-	timeout 10 ./target/release/run_4seasons config/4seasons.yaml /tmp/rs-vio-test-data/4seasons/recording_2021-01-07_13-03-56 || true
+run-4seasons: release
+	@if [ -d "/tmp/rs-vio-samples/4seasons" ]; then \
+		echo "Running 4Seasons estimator with real dataset..."; \
+		timeout 60 ./target/release/run_4seasons config/4seasons.yaml /tmp/rs-vio-samples/4seasons/* || true; \
+	else \
+		echo "4Seasons dataset not found. Download first with: make download-datasets"; \
+		exit 1; \
+	fi
 	@echo "✓ 4Seasons run completed"
 
 docker-build:
