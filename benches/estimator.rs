@@ -1,7 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rs_vio::datasets::config::Config;
 use rs_vio::estimator::Estimator;
-use serde_yaml;
 
 fn create_bench_estimator() -> Estimator<'static> {
     let yaml = r#"

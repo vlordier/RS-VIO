@@ -1,3 +1,5 @@
+#![allow(clippy::module_inception)]
+
 pub mod estimator;
 pub mod frame;
 pub mod sliding_window;

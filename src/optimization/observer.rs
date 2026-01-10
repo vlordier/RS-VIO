@@ -22,6 +22,12 @@ pub struct TerminalObserver {
     iteration_metrics: RefCell<IterationMetrics>,
 }
 
+impl Default for TerminalObserver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TerminalObserver {
     /// Create a new terminal observer.
     pub fn new() -> Self {

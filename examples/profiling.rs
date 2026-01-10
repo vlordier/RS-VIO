@@ -1,6 +1,5 @@
 use rs_vio::datasets::config::Config;
 use rs_vio::estimator::Estimator;
-use serde_yaml;
 use std::time::Instant;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

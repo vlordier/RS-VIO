@@ -56,11 +56,11 @@ use std::fmt;
 /// Display implementation for Array4x4Display
 impl fmt::Display for Array4x4Display {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Array4x4:\n")?;
+        writeln!(f, "Array4x4:")?;
         for row in self.0.iter() {
-            write!(
+            writeln!(
                 f,
-                "  [{:8.4}, {:8.4}, {:8.4}, {:8.4}]\n",
+                "  [{:8.4}, {:8.4}, {:8.4}, {:8.4}]",
                 row[0], row[1], row[2], row[3]
             )?;
         }
@@ -71,9 +71,9 @@ impl fmt::Display for Array4x4Display {
 /// Display implementation for Array3x3Display
 impl fmt::Display for Array3x3Display {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Array3x3:\n")?;
+        writeln!(f, "Array3x3:")?;
         for row in self.0.iter() {
-            write!(f, "  [{:8.4}, {:8.4}, {:8.4}]\n", row[0], row[1], row[2])?;
+            writeln!(f, "  [{:8.4}, {:8.4}, {:8.4}]", row[0], row[1], row[2])?;
         }
         Ok(())
     }

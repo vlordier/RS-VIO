@@ -426,17 +426,13 @@ impl<'a> Estimator<'a> {
             }
 
             // History of keyframe poses
-            let mat = self
-                .sliding_window
-                .get_keyframe_poses()
-                .first()
-                .unwrap()
-                .clone();
-            self.trajectory.push(mat);
+            if let Some(&mat) = self.sliding_window.get_keyframe_poses().first() {
+                self.trajectory.push(mat);
 
-            // Display trajectory as a continuous 3D path
-            v.log_trajectory(&self.trajectory, "trajectory/path");
-            // log::info!("[Estimator] System position: {:?}, {:?}, {:?}", mat[0][3], mat[1][3], mat[2][3]);
+                // Display trajectory as a continuous 3D path
+                v.log_trajectory(&self.trajectory, "trajectory/path");
+                // log::info!("[Estimator] System position: {:?}, {:?}, {:?}", mat[0][3], mat[1][3], mat[2][3]);
+            }
         }
     }
 }

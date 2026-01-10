@@ -1,3 +1,5 @@
+#![allow(clippy::module_inception)]
+
 pub mod feature_tracker;
 pub mod image_utilities;
 pub mod patch;

@@ -561,10 +561,10 @@ mod tests {
                     noisy_translation.x,
                     noisy_translation.y,
                     noisy_translation.z, // then wijk
-                    noisy_rotation.w.clone(),
-                    noisy_rotation.i.clone(),
-                    noisy_rotation.j.clone(),
-                    noisy_rotation.k.clone(),
+                    noisy_rotation.w,
+                    noisy_rotation.i,
+                    noisy_rotation.j,
+                    noisy_rotation.k,
                 ]);
                 initial_values.insert(cam_var.clone(), (ManifoldType::SE3, cam_data));
                 pose_vars.push((pose_id, cam_var));
@@ -583,7 +583,7 @@ mod tests {
             let mut T_B_W = na::Matrix4::identity();
             T_B_W
                 .fixed_view_mut::<3, 3>(0, 0)
-                .copy_from(&R_B_W.to_rotation_matrix().matrix());
+                .copy_from(R_B_W.to_rotation_matrix().matrix());
             T_B_W
                 .fixed_view_mut::<3, 1>(0, 3)
                 .copy_from(&t_B_W.to_owned());

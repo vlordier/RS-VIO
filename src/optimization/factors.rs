@@ -9,8 +9,9 @@ use nalgebra as na;
 /// It optimizes only the 3D point position, with camera pose held fixed.
 ///
 /// - Variables: 3D point in world/camera frame (3 params: x, y, z)
-/// - Fixed parameters: Camera pose (T_world_to_camera, 4x4 matrix),
-///                     Observation (2D normalized/undistorted)
+/// - Fixed parameters:
+///   - Camera pose (T_world_to_camera, 4x4 matrix)
+///   - Observation (2D normalized/undistorted)
 ///
 /// The residual is 2D: [u, v] in normalized coordinates
 ///
@@ -364,10 +365,7 @@ impl Factor for BundleAdjustmentFactor {
                 "System pose must have 7 parameters (tx, ty, tz, qw, qx, qy, qz)"
             );
             let T_B_W = se3::SE3::from(params[1].clone());
-            (
-                T_B_W.rotation_so3().rotation_matrix().into(),
-                T_B_W.translation().into(),
-            )
+            (T_B_W.rotation_so3().rotation_matrix(), T_B_W.translation())
         };
 
         // Pre-compute camera transform components (reused in jacobian)
@@ -408,7 +406,7 @@ impl Factor for BundleAdjustmentFactor {
             let jac_proj_R_C_B = jac_proj * R_C_B; // 2x3
 
             // ∂r/∂p_W = jac_proj * R_C_B * R_B_W
-            let jac_r_wrt_p_W = jac_proj_R_C_B * &R_B_W; // 2x3
+            let jac_r_wrt_p_W = jac_proj_R_C_B * R_B_W; // 2x3
 
             if self.fixed_pose.is_some() {
                 // Only optimize 3D point
@@ -510,8 +508,8 @@ impl Factor for PnPFactor {
             "System pose must have 7 parameters (tx, ty, tz, qw, qx, qy, qz)"
         );
         let T_B_W = se3::SE3::from(params[0].clone());
-        let R_B_W: na::Matrix3<f64> = T_B_W.rotation_so3().rotation_matrix().into();
-        let t_B_W: na::Vector3<f64> = T_B_W.translation().into();
+        let R_B_W: na::Matrix3<f64> = T_B_W.rotation_so3().rotation_matrix();
+        let t_B_W: na::Vector3<f64> = T_B_W.translation();
 
         // Pre-compute camera transform components (reused in jacobian)
         let R_C_B = self.T_C_B.fixed_view::<3, 3>(0, 0);
@@ -535,7 +533,7 @@ impl Factor for PnPFactor {
             let jac_proj_R_C_B = jac_proj * R_C_B; // 2x3
 
             // ∂r/∂p_W = jac_proj * R_C_B * R_B_W
-            let jac_r_wrt_p_W = jac_proj_R_C_B * &R_B_W; // 2x3
+            let jac_r_wrt_p_W = jac_proj_R_C_B * R_B_W; // 2x3
 
             // TODO fix notation of AI-generated comments to match paper
             // Optimize both 3D point and pose: [∂r/∂p_W (2x3) | ∂r/∂T_B_W (2x6)]

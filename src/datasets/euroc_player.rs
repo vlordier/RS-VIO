@@ -305,7 +305,7 @@ impl EurocPlayer {
         };
 
         // Process frame
-        let imu_slice = imu_data.as_ref().map(|v| v.as_slice());
+        let imu_slice = imu_data.as_deref();
         estimator.process_frame(
             &left_image,
             &right_image,
@@ -334,7 +334,7 @@ impl EurocPlayer {
     }
 
     fn save_statistics(result: &PlayerResult, dataset_path: &str) {
-        let stats_file = Path::new(dataset_path).join(format!("statistics.txt"));
+        let stats_file = Path::new(dataset_path).join("statistics.txt");
 
         if let Ok(mut file) = std::fs::File::create(&stats_file) {
             use std::io::Write;

@@ -57,6 +57,7 @@ impl SlidingWindow {
     }
 
     /// Create a new sliding window with the default size of 16 frames.
+    #[allow(clippy::should_implement_trait)]
     pub fn default() -> Self {
         Self::new(8)
     }
@@ -199,10 +200,7 @@ impl SlidingWindow {
     fn check_sliding_window_size_for_optimization(&self) -> Result<bool, std::io::Error> {
         if self.keyframes.is_empty() {
             log::warn!("[SlidingWindow] Cannot optimize: window is empty");
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Window is empty",
-            ));
+            return Err(std::io::Error::other("Window is empty"));
         }
 
         if self.keyframes.len() < self.max_frames {
@@ -211,10 +209,7 @@ impl SlidingWindow {
                 self.max_frames,
                 self.keyframes.len()
             );
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Need more keyframes",
-            ));
+            return Err(std::io::Error::other("Need more keyframes"));
         }
 
         log::debug!(
@@ -222,7 +217,7 @@ impl SlidingWindow {
             self.keyframes.len()
         );
 
-        return Ok(true);
+        Ok(true)
     }
 
     pub fn optimize(&mut self) -> Result<bool, std::io::Error> {
@@ -252,32 +247,21 @@ impl SlidingWindow {
             HashMap::with_capacity(estimated_landmarks);
 
         // Fetch transforms between cameras and body
-        let T_Cl_B = self
-            .keyframes
-            .front()
-            .unwrap()
-            .state
-            .T_B_Cl
-            .try_inverse()
-            .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "T_B_Cl camera transform is not invertible - check calibration",
-                )
-            })?;
-        let T_Cr_B = self
-            .keyframes
-            .front()
-            .unwrap()
-            .state
-            .T_B_Cr
-            .try_inverse()
-            .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "T_B_Cr camera transform is not invertible - check calibration",
-                )
-            })?;
+        let front_keyframe = self.keyframes.front().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "No keyframes in window")
+        })?;
+        let T_Cl_B = front_keyframe.state.T_B_Cl.try_inverse().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "T_B_Cl camera transform is not invertible - check calibration",
+            )
+        })?;
+        let T_Cr_B = front_keyframe.state.T_B_Cr.try_inverse().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "T_B_Cr camera transform is not invertible - check calibration",
+            )
+        })?;
 
         // Count observations for each landmark across all frames, separately for left and right cameras
         for frame in self.keyframes.iter() {
@@ -325,10 +309,7 @@ impl SlidingWindow {
                         "[SlidingWindow] T_W_B matrix is singular for frame {}",
                         id_frame
                     );
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        "T_W_B matrix inversion failed",
-                    ));
+                    return Err(std::io::Error::other("T_W_B matrix inversion failed"));
                 }
             };
             let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
@@ -379,7 +360,7 @@ impl SlidingWindow {
                                 let p_C = Vector3::new(
                                     feat.undistorted_coord[0] as f64,
                                     feat.undistorted_coord[1] as f64,
-                                    2.0 as f64,
+                                    2.0_f64,
                                 );
                                 let (R_W_B, t_W_B) = (
                                     frame.state.T_W_B.fixed_view::<3, 3>(0, 0).into_owned(),
@@ -704,25 +685,19 @@ impl SlidingWindow {
 
         // Add variable for the new frame
         // Only the new frame is optimized and it's initialized from the last keyframe
-        let kf_var = format!("F");
+        let kf_var = "F".to_string();
         let last_frame = match self.keyframes.back() {
             Some(f) => f,
             None => {
                 log::error!("[SlidingWindow] No keyframes available for motion tracking");
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "No keyframes available",
-                ));
+                return Err(std::io::Error::other("No keyframes available"));
             }
         };
         let T_B_W = match last_frame.state.T_W_B.try_inverse() {
             Some(inv) => inv,
             None => {
                 log::error!("[SlidingWindow] T_W_B matrix is singular in motion tracking");
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "T_W_B matrix inversion failed",
-                ));
+                return Err(std::io::Error::other("T_W_B matrix inversion failed"));
             }
         };
         let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
@@ -739,30 +714,21 @@ impl SlidingWindow {
             Some(f) => f,
             None => {
                 log::error!("[SlidingWindow] No keyframes available for camera transforms");
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "No keyframes available",
-                ));
+                return Err(std::io::Error::other("No keyframes available"));
             }
         };
         let T_Cl_B = match first_frame.state.T_B_Cl.try_inverse() {
             Some(inv) => inv,
             None => {
                 log::error!("[SlidingWindow] T_B_Cl matrix is singular");
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "T_B_Cl matrix inversion failed",
-                ));
+                return Err(std::io::Error::other("T_B_Cl matrix inversion failed"));
             }
         };
         let T_Cr_B = match first_frame.state.T_B_Cr.try_inverse() {
             Some(inv) => inv,
             None => {
                 log::error!("[SlidingWindow] T_B_Cr matrix is singular");
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "T_B_Cr matrix inversion failed",
-                ));
+                return Err(std::io::Error::other("T_B_Cr matrix inversion failed"));
             }
         };
         let camera_features = [
@@ -859,7 +825,7 @@ mod tests {
         // Insert 20 points with ascending observation counts so eviction keeps the most observed.
         for id in 0..20 {
             window.map_points.insert(id, [0.0, 0.0, 0.0]);
-            window.map_point_observations.insert(id, id as usize); // higher id = more observations
+            window.map_point_observations.insert(id, id); // higher id = more observations
         }
 
         // Trigger eviction explicitly.

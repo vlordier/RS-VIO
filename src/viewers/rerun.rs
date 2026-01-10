@@ -20,7 +20,18 @@ pub struct RerunViewer {
     first_timestamp_ns: Option<i64>,
 }
 
+impl Default for RerunViewer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RerunViewer {
+    #[allow(clippy::should_implement_trait)]
+    pub fn default() -> Self {
+        Self::new()
+    }
+
     pub fn new() -> Self {
         RerunViewer {
             rec: None,
