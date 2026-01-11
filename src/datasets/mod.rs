@@ -62,7 +62,9 @@ use crate::datasets::config::Config;
 use camera_intrinsic_model::generic_model::CameraModel;
 use camera_intrinsic_model::models::opencv5::OpenCVModel5;
 use camera_intrinsic_model::models::EUCM;
-use nalgebra034; // TODO find a way to avoid this dependency (currently used for camera models)
+// nalgebra 0.34 required by camera-intrinsic-model, while main codebase uses 0.33
+// TODO: Consider upgrading main codebase to 0.34 or using a unified approach
+use nalgebra034;
 
 // Image data structure
 #[derive(Debug, Clone)]

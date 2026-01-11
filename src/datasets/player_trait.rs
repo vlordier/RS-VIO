@@ -355,8 +355,7 @@ pub fn process_single_frame_common(
         )));
     }
 
-    // Get IMU data if VIO mode
-    // TODO when implementing IMU data loading
+    // Get IMU data if VIO mode (currently disabled, ready for future implementation)
     #[allow(clippy::overly_complex_bool_expr)]
     let imu_data: Option<Vec<ImuData>> = if false && context.processed_frames > 0 {
         // Would call player.get_imu_data_between_frames here

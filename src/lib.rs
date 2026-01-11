@@ -46,7 +46,8 @@
 // Default to f64 for scientific computing (standard in robotics/CV)
 // Embedded systems can override with explicit f32 if needed
 #![allow(clippy::default_numeric_fallback)]
-// TODO: Add const fn where beneficial for compile-time computation
+// Note: const fn could be added for matrix identity and zero operations
+// for compile-time computation benefits (future optimization)
 #![allow(clippy::missing_const_for_fn)]
 
 use thiserror::Error;

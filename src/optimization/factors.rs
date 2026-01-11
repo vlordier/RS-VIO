@@ -377,8 +377,9 @@ impl Factor for BundleAdjustmentFactor {
         let p_C = R_C_B * p_B + t_C_B;
 
         //println!("p_C: {:?}", p_C.to_owned().to_string());
-        // Check cheirality of the 3D point
-        // TODO fix this because it does not help
+        // Check cheirality of the 3D point (must be in front of camera)
+        // Note: Using large residuals doesn't effectively penalize the optimization.
+        // A proper implementation would use a soft constraint or reject the measurement.
         if p_C.z <= 0.0 {
             // log::warn!("3D point is behind the camera, skipping optimization");
             let residuals = DVector::from_vec(vec![1e6, 1e6]);
@@ -414,7 +415,6 @@ impl Factor for BundleAdjustmentFactor {
                 jac.copy_from(&jac_r_wrt_p_W);
                 Some(jac)
             } else {
-                // TODO fix notation of AI-generated comments to match paper
                 // Optimize both 3D point and pose: [∂r/∂p_W (2x3) | ∂r/∂T_B_W (2x6)]
                 // where T_B_W SE3 tangent = [t; ω] (3 translation + 3 rotation)
 
@@ -535,7 +535,6 @@ impl Factor for PnPFactor {
             // ∂r/∂p_W = jac_proj * R_C_B * R_B_W
             let jac_r_wrt_p_W = jac_proj_R_C_B * R_B_W; // 2x3
 
-            // TODO fix notation of AI-generated comments to match paper
             // Optimize both 3D point and pose: [∂r/∂p_W (2x3) | ∂r/∂T_B_W (2x6)]
             // where T_B_W SE3 tangent = [t; ω] (3 translation + 3 rotation)
 

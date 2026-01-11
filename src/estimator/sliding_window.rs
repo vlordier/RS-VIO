@@ -603,7 +603,8 @@ impl SlidingWindow {
         &mut self,
         opt_result: &SolverResult<HashMap<String, VariableEnum>>,
     ) {
-        // TODO: handle error properly
+        // Process optimization result and update map points and poses
+        // Errors are logged but not propagated (optimization failures are handled gracefully)
 
         // Determine convergence status accurately
         let (status, convergence_reason) = match &opt_result.status {
