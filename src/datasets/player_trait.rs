@@ -338,6 +338,7 @@ pub fn process_single_frame_common(
     dataset_path: &str,
     load_left_image: impl Fn(&str, &str, u32) -> Result<Vec<u8>>,
     load_right_image: impl Fn(&str, &str, u32) -> Result<Vec<u8>>,
+    get_imu_data: impl Fn(i64, i64) -> Vec<ImuData>,
 ) -> Result<f64> {
     let frame_start = std::time::Instant::now();
 
@@ -355,11 +356,12 @@ pub fn process_single_frame_common(
         )));
     }
 
-    // Get IMU data if VIO mode (currently disabled, ready for future implementation)
-    #[allow(clippy::overly_complex_bool_expr)]
-    let imu_data: Option<Vec<ImuData>> = if false && context.processed_frames > 0 {
-        // Would call player.get_imu_data_between_frames here
-        None
+    // Get IMU data for VIO mode (skip first frame since no previous timestamp)
+    let imu_data: Option<Vec<ImuData>> = if context.processed_frames > 0 {
+        Some(get_imu_data(
+            context.previous_frame_timestamp,
+            image_data[context.current_idx].timestamp,
+        ))
     } else {
         None
     };

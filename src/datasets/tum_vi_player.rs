@@ -210,6 +210,7 @@ impl DatasetPlayer for TUMVIPlayer {
             dataset_path,
             |ds_path, filename, cam_id| self.load_image(ds_path, filename, cam_id),
             |ds_path, filename, cam_id| self.load_image(ds_path, filename, cam_id),
+            |prev_ts, curr_ts| self.get_imu_data_between_frames(prev_ts, curr_ts),
         )
     }
 

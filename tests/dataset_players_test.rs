@@ -448,4 +448,85 @@ mod imu_retrieval_tests {
         assert!(result_4seasons.is_empty());
         assert!(result_tumvi.is_empty());
     }
+
+    #[test]
+    fn test_euroc_imu_data_timestamp_filtering() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let dataset_path = temp_dir.path().to_str().unwrap();
+
+        // Create IMU data with specific timestamps
+        let imu_content = "#timestamp [ns],omega_x [rad/s],omega_y [rad/s],omega_z [rad/s],alpha_x [m/s^2],alpha_y [m/s^2],alpha_z [m/s^2]\n1000000000,0.001,0.002,0.003,9.8,9.81,9.82\n2000000000,0.004,0.005,0.006,9.79,9.80,9.81\n3000000000,0.007,0.008,0.009,9.78,9.79,9.80\n";
+        let imu_path = temp_dir.path().join("mav0/imu0/data.csv");
+        fs::create_dir_all(imu_path.parent().unwrap()).unwrap();
+        fs::write(&imu_path, imu_content).unwrap();
+
+        let player = EurocPlayer::new();
+        player.load_imu_data(dataset_path, &[], 0, 0).unwrap();
+
+        // Query: no data before first frame
+        let result = player.get_imu_data_between_frames(0, 500000000);
+        assert!(result.is_empty());
+
+        // Query: should get t=1000000000 (exclusive start, inclusive end)
+        let result = player.get_imu_data_between_frames(500000000, 1000000000);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].timestamp, 1000000000);
+
+        // Query: should get t=2000000000 (t=1000000000 is excluded because > is exclusive)
+        let result = player.get_imu_data_between_frames(1000000000, 2500000000);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].timestamp, 2000000000);
+
+        // Query: should get all three
+        let result = player.get_imu_data_between_frames(0, 4000000000);
+        assert_eq!(result.len(), 3);
+
+        // Verify IMU values are parsed correctly
+        let result = player.get_imu_data_between_frames(0, 4000000000);
+        assert_eq!(result[0].gyro, [0.001, 0.002, 0.003]);
+        assert_eq!(result[0].accel, [9.8, 9.81, 9.82]);
+        assert_eq!(result[1].gyro, [0.004, 0.005, 0.006]);
+        assert_eq!(result[2].gyro, [0.007, 0.008, 0.009]);
+    }
+
+    #[test]
+    fn test_fourseasons_imu_data_timestamp_filtering() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let dataset_path = temp_dir.path().to_str().unwrap();
+
+        // Create 4Seasons IMU data (whitespace separated)
+        let imu_content = "1000000000 0.001 0.002 0.003 9.8 9.81 9.82\n2000000000 0.004 0.005 0.006 9.79 9.80 9.81\n";
+        let imu_path = temp_dir.path().join("imu.txt");
+        fs::write(&imu_path, imu_content).unwrap();
+
+        let player = FourSeasonsPlayer::new();
+        player.load_imu_data(dataset_path, &[], 0, 0).unwrap();
+
+        // Query between timestamps
+        let result = player.get_imu_data_between_frames(1000000000, 2000000000);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].timestamp, 2000000000);
+        assert_eq!(result[0].gyro, [0.004, 0.005, 0.006]);
+    }
+
+    #[test]
+    fn test_tumvi_imu_data_timestamp_filtering() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let dataset_path = temp_dir.path().to_str().unwrap();
+
+        // Create TUM-VI IMU data
+        let imu_content = "#timestamp [ns],omega_x [rad/s],omega_y [rad/s],omega_z [rad/s],alpha_x [m/s^2],alpha_y [m/s^2],alpha_z [m/s^2]\n1000000000,0.001,0.002,0.003,9.8,9.81,9.82\n2500000000,0.010,0.020,0.030,9.7,9.71,9.72\n";
+        let imu_path = temp_dir.path().join("mav0/imu0/data.csv");
+        fs::create_dir_all(imu_path.parent().unwrap()).unwrap();
+        fs::write(&imu_path, imu_content).unwrap();
+
+        let player = TUMVIPlayer::new();
+        player.load_imu_data(dataset_path, &[], 0, 0).unwrap();
+
+        // Query between timestamps
+        let result = player.get_imu_data_between_frames(1000000000, 3000000000);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].timestamp, 2500000000);
+        assert_eq!(result[0].gyro, [0.010, 0.020, 0.030]);
+    }
 }
