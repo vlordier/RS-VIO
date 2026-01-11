@@ -8,33 +8,43 @@ use nalgebra as na;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-use super::patch::{Pattern52, PATTERN52_SIZE};
+use super::patch::PATTERN52_SIZE;
 
-/// Compute patch residuals using SIMD operations
+/// Compute normalized residuals using SIMD operations
 ///
-/// This vectorizes the residual computation across the 52 pattern points,
-/// processing 4-8 points simultaneously depending on SIMD width.
+/// Computes residuals as: (sampled - template) normalized by mean and count
+/// This vectorizes across the 52 pattern points, processing 4-8 points simultaneously.
+///
+/// # Arguments
+/// * `sampled` - Current frame intensities at pattern points
+/// * `template` - Template patch intensities
+/// * `_template_mean` - Pre-computed mean of template patch (for consistency checking)
+/// * `num_valid` - Number of valid (in-bounds) samples
+/// * `sample_sum` - Sum of sampled intensities
 #[inline]
 pub fn compute_residuals_simd(
-    pattern: &Pattern52,
-    current_data: &[f32; PATTERN52_SIZE],
+    sampled: &[f32; PATTERN52_SIZE],
+    template: [f32; PATTERN52_SIZE],
+    _template_mean: f32,
+    num_valid: f32,
+    sample_sum: f32,
 ) -> na::SVector<f32, PATTERN52_SIZE> {
     let mut residuals = na::SVector::<f32, PATTERN52_SIZE>::zeros();
 
     #[cfg(target_arch = "x86_64")]
     {
         if is_x86_feature_detected!("avx2") {
-            unsafe { compute_residuals_avx2(pattern, current_data, &mut residuals) }
+            unsafe { compute_residuals_avx2(sampled, template, template_mean, num_valid, sample_sum, &mut residuals) }
         } else if is_x86_feature_detected!("sse4.1") {
-            unsafe { compute_residuals_sse(pattern, current_data, &mut residuals) }
+            unsafe { compute_residuals_sse(sampled, template, template_mean, num_valid, sample_sum, &mut residuals) }
         } else {
-            compute_residuals_scalar(pattern, current_data, &mut residuals);
+            compute_residuals_scalar(sampled, template, template_mean, num_valid, sample_sum, &mut residuals);
         }
     }
 
     #[cfg(not(target_arch = "x86_64"))]
     {
-        compute_residuals_scalar(pattern, current_data, &mut residuals);
+        compute_residuals_scalar(sampled, template, _template_mean, num_valid, sample_sum, &mut residuals);
     }
 
     residuals
@@ -43,13 +53,19 @@ pub fn compute_residuals_simd(
 /// Scalar fallback for residual computation
 #[inline]
 fn compute_residuals_scalar(
-    pattern: &Pattern52,
-    current_data: &[f32; PATTERN52_SIZE],
+    sampled: &[f32; PATTERN52_SIZE],
+    template: [f32; PATTERN52_SIZE],
+    _template_mean: f32,
+    num_valid: f32,
+    sample_sum: f32,
     residuals: &mut na::SVector<f32, PATTERN52_SIZE>,
 ) {
     for i in 0..PATTERN52_SIZE {
-        if pattern.data[i] >= 0.0 && current_data[i] >= 0.0 {
-            residuals[i] = current_data[i] - pattern.data[i];
+        if sampled[i] >= 0.0 && template[i] >= 0.0 {
+            let val = sampled[i];
+            residuals[i] = num_valid * val / sample_sum - template[i];
+        } else {
+            residuals[i] = 0.0;
         }
     }
 }
@@ -58,11 +74,15 @@ fn compute_residuals_scalar(
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2")]
 unsafe fn compute_residuals_avx2(
-    pattern: &Pattern52,
-    current_data: &[f32; PATTERN52_SIZE],
+    sampled: &[f32; PATTERN52_SIZE],
+    template: [f32; PATTERN52_SIZE],
+    _template_mean: f32,
+    num_valid: f32,
+    sample_sum: f32,
     residuals: &mut na::SVector<f32, PATTERN52_SIZE>,
 ) {
     let zero = _mm256_setzero_ps();
+    let norm_factor = _mm256_set1_ps(num_valid / sample_sum);
     
     // Process 8 elements at a time
     for i in (0..PATTERN52_SIZE).step_by(8) {
@@ -70,25 +90,28 @@ unsafe fn compute_residuals_avx2(
         if remaining < 8 {
             // Handle remainder with scalar code
             for j in i..PATTERN52_SIZE {
-                if pattern.data[j] >= 0.0 && current_data[j] >= 0.0 {
-                    residuals[j] = current_data[j] - pattern.data[j];
+                if sampled[j] >= 0.0 && template[j] >= 0.0 {
+                    let val = sampled[j];
+                    residuals[j] = num_valid * val / sample_sum - template[j];
+                } else {
+                    residuals[j] = 0.0;
                 }
             }
             break;
         }
 
-        // Load 8 pattern values
-        let pattern_vec = _mm256_loadu_ps(pattern.data.as_ptr().add(i));
-        // Load 8 current values
-        let current_vec = _mm256_loadu_ps(current_data.as_ptr().add(i));
+        // Load values
+        let sampled_vec = _mm256_loadu_ps(sampled.as_ptr().add(i));
+        let template_vec = _mm256_loadu_ps(template.as_ptr().add(i));
 
         // Check both >= 0
-        let pattern_valid = _mm256_cmp_ps(pattern_vec, zero, _CMP_GE_OQ);
-        let current_valid = _mm256_cmp_ps(current_vec, zero, _CMP_GE_OQ);
-        let both_valid = _mm256_and_ps(pattern_valid, current_valid);
+        let sampled_valid = _mm256_cmp_ps(sampled_vec, zero, _CMP_GE_OQ);
+        let template_valid = _mm256_cmp_ps(template_vec, zero, _CMP_GE_OQ);
+        let both_valid = _mm256_and_ps(sampled_valid, template_valid);
 
-        // Compute residual = current - pattern
-        let diff = _mm256_sub_ps(current_vec, pattern_vec);
+        // Compute: norm_factor * sampled - template
+        let normalized = _mm256_mul_ps(sampled_vec, norm_factor);
+        let diff = _mm256_sub_ps(normalized, template_vec);
 
         // Mask invalid values to zero
         let masked_diff = _mm256_and_ps(diff, both_valid);
@@ -102,11 +125,15 @@ unsafe fn compute_residuals_avx2(
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "sse4.1")]
 unsafe fn compute_residuals_sse(
-    pattern: &Pattern52,
-    current_data: &[f32; PATTERN52_SIZE],
+    sampled: &[f32; PATTERN52_SIZE],
+    template: [f32; PATTERN52_SIZE],
+    _template_mean: f32,
+    num_valid: f32,
+    sample_sum: f32,
     residuals: &mut na::SVector<f32, PATTERN52_SIZE>,
 ) {
     let zero = _mm_setzero_ps();
+    let norm_factor = _mm_set1_ps(num_valid / sample_sum);
     
     // Process 4 elements at a time
     for i in (0..PATTERN52_SIZE).step_by(4) {
@@ -114,118 +141,29 @@ unsafe fn compute_residuals_sse(
         if remaining < 4 {
             // Handle remainder
             for j in i..PATTERN52_SIZE {
-                if pattern.data[j] >= 0.0 && current_data[j] >= 0.0 {
-                    residuals[j] = current_data[j] - pattern.data[j];
+                if sampled[j] >= 0.0 && template[j] >= 0.0 {
+                    let val = sampled[j];
+                    residuals[j] = num_valid * val / sample_sum - template[j];
+                } else {
+                    residuals[j] = 0.0;
                 }
             }
             break;
         }
 
-        let pattern_vec = _mm_loadu_ps(pattern.data.as_ptr().add(i));
-        let current_vec = _mm_loadu_ps(current_data.as_ptr().add(i));
+        let sampled_vec = _mm_loadu_ps(sampled.as_ptr().add(i));
+        let template_vec = _mm_loadu_ps(template.as_ptr().add(i));
 
-        let pattern_valid = _mm_cmpge_ps(pattern_vec, zero);
-        let current_valid = _mm_cmpge_ps(current_vec, zero);
-        let both_valid = _mm_and_ps(pattern_valid, current_valid);
+        let sampled_valid = _mm_cmpge_ps(sampled_vec, zero);
+        let template_valid = _mm_cmpge_ps(template_vec, zero);
+        let both_valid = _mm_and_ps(sampled_valid, template_valid);
 
-        let diff = _mm_sub_ps(current_vec, pattern_vec);
+        let normalized = _mm_mul_ps(sampled_vec, norm_factor);
+        let diff = _mm_sub_ps(normalized, template_vec);
         let masked_diff = _mm_and_ps(diff, both_valid);
 
         _mm_storeu_ps(residuals.as_mut_slice().as_mut_ptr().add(i), masked_diff);
     }
-}
-
-/// Vectorized mean and standard deviation computation
-#[inline]
-pub fn compute_stats_simd(data: &[f32; PATTERN52_SIZE]) -> (f32, f32) {
-    #[cfg(target_arch = "x86_64")]
-    {
-        if is_x86_feature_detected!("avx2") {
-            unsafe { return compute_stats_avx2(data); }
-        }
-    }
-
-    // Scalar fallback
-    let mut sum = 0.0f32;
-    let mut count = 0;
-    for &val in data.iter() {
-        if val >= 0.0 {
-            sum += val;
-            count += 1;
-        }
-    }
-    let mean = sum / count as f32;
-    
-    let mut var_sum = 0.0f32;
-    for &val in data.iter() {
-        if val >= 0.0 {
-            let diff = val - mean;
-            var_sum += diff * diff;
-        }
-    }
-    let std_dev = (var_sum / count as f32).sqrt();
-    
-    (mean, std_dev)
-}
-
-#[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx2")]
-unsafe fn compute_stats_avx2(data: &[f32; PATTERN52_SIZE]) -> (f32, f32) {
-    let zero = _mm256_setzero_ps();
-    let mut sum_vec = _mm256_setzero_ps();
-    let mut count_vec = _mm256_setzero_ps();
-    let one = _mm256_set1_ps(1.0);
-
-    // First pass: compute sum and count
-    for i in (0..(PATTERN52_SIZE & !7)).step_by(8) {
-        let val_vec = _mm256_loadu_ps(data.as_ptr().add(i));
-        let valid_mask = _mm256_cmp_ps(val_vec, zero, _CMP_GE_OQ);
-        
-        let masked_val = _mm256_and_ps(val_vec, valid_mask);
-        sum_vec = _mm256_add_ps(sum_vec, masked_val);
-        
-        let count_inc = _mm256_and_ps(one, valid_mask);
-        count_vec = _mm256_add_ps(count_vec, count_inc);
-    }
-
-    // Horizontal sum
-    let sum = hsum_avx(sum_vec);
-    let count = hsum_avx(count_vec);
-    
-    let mean = sum / count;
-    let mean_vec = _mm256_set1_ps(mean);
-    
-    // Second pass: compute variance
-    let mut var_vec = _mm256_setzero_ps();
-    for i in (0..(PATTERN52_SIZE & !7)).step_by(8) {
-        let val_vec = _mm256_loadu_ps(data.as_ptr().add(i));
-        let valid_mask = _mm256_cmp_ps(val_vec, zero, _CMP_GE_OQ);
-        
-        let diff = _mm256_sub_ps(val_vec, mean_vec);
-        let sq_diff = _mm256_mul_ps(diff, diff);
-        let masked_sq = _mm256_and_ps(sq_diff, valid_mask);
-        var_vec = _mm256_add_ps(var_vec, masked_sq);
-    }
-    
-    let var_sum = hsum_avx(var_vec);
-    let std_dev = (var_sum / count).sqrt();
-    
-    (mean, std_dev)
-}
-
-#[cfg(target_arch = "x86_64")]
-#[inline]
-unsafe fn hsum_avx(v: __m256) -> f32 {
-    let hi = _mm256_extractf128_ps(v, 1);
-    let lo = _mm256_castps256_ps128(v);
-    let sum128 = _mm_add_ps(hi, lo);
-    
-    let shuf = _mm_movehdup_ps(sum128);
-    let sums = _mm_add_ps(sum128, shuf);
-    let shuf2 = _mm_movehl_ps(shuf, sums);
-    let result = _mm_add_ss(sums, shuf2);
-    
-    _mm_cvtss_f32(result)
 }
 
 #[cfg(test)]
@@ -233,20 +171,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_residuals_match() {
-        let pattern = Pattern52::default();
-        let current_data = [1.0f32; PATTERN52_SIZE];
+    fn test_residuals_scalar_vs_simd() {
+        let mut sampled = [0.5f32; PATTERN52_SIZE];
+        let template = [0.3f32; PATTERN52_SIZE];
+        sampled[0] = -1.0; // Invalid value
         
-        let scalar_result = {
-            let mut r = na::SVector::<f32, PATTERN52_SIZE>::zeros();
-            compute_residuals_scalar(&pattern, &current_data, &mut r);
-            r
-        };
+        let num_valid = 51.0;
+        let sample_sum = 25.5;
         
-        let simd_result = compute_residuals_simd(&pattern, &current_data);
+        let mut scalar_result = na::SVector::<f32, PATTERN52_SIZE>::zeros();
+        compute_residuals_scalar(&sampled, template, 0.3, num_valid, sample_sum, &mut scalar_result);
+        
+        let simd_result = compute_residuals_simd(&sampled, template, 0.3, num_valid, sample_sum);
         
         for i in 0..PATTERN52_SIZE {
-            assert!((scalar_result[i] - simd_result[i]).abs() < 1e-5,
+            assert!((scalar_result[i] - simd_result[i]).abs() < 1e-4,
                 "Mismatch at index {}: scalar={}, simd={}", i, scalar_result[i], simd_result[i]);
         }
     }

@@ -4,10 +4,11 @@ use nalgebra as na;
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::ops::AddAssign;
+use std::time::Instant;
 
 use crate::datasets::config::FeatureDetectionConfig;
 
-use super::{image_utilities, patch};
+use super::{image_utilities, patch, frame_skip};
 
 use log::info;
 
@@ -104,6 +105,10 @@ pub struct StereoPatchTracker<const N: u32> {
     grid_size: u32,
     optical_flow_max_iterations: usize,
     optical_flow_convergence_threshold: f32,
+    /// Adaptive frame skipper for real-time constraints
+    frame_skipper: frame_skip::AdaptiveFrameSkipper,
+    /// Last frame processing time for benchmarking
+    last_frame_time: Option<Instant>,
 }
 
 impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
@@ -133,6 +138,8 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             grid_size,
             optical_flow_max_iterations: optical_flow_max_iterations as usize,
             optical_flow_convergence_threshold: optical_flow_convergence_threshold as f32,
+            frame_skipper: frame_skip::AdaptiveFrameSkipper::new(30.0, 5, 2.0),
+            last_frame_time: None,
         }
     }
 
@@ -153,6 +160,7 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
     /// 3. Detects new features in untracked regions
     /// 4. Performs left-right stereo matching
     /// 5. Updates the provided Frame with tracked features
+    /// 6. Adaptively skips frames if processing exceeds real-time budget
     ///
     /// # Arguments
     /// * `greyscale_image0` - Left camera grayscale image
@@ -162,12 +170,32 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
     /// # Complexity
     /// - **Time**: O(n_features * pattern_size) ≈ 10-30ms for 640×480
     /// - **Space**: O(pyramid_levels * image_width * image_height)
+    ///
+    /// # Real-time Behavior
+    /// Implements adaptive frame skipping to maintain ~30 FPS when processing falls behind.
+    /// Tracks average processing time and skips frames when necessary, but respects
+    /// maximum skip limits and motion thresholds to avoid losing critical frames.
     pub fn process_frame(
         &mut self,
         greyscale_image0: &GrayImage,
         greyscale_image1: &GrayImage,
         frame: &mut crate::estimator::Frame,
     ) {
+        let frame_start = Instant::now();
+        
+        // Adaptive frame skipping: check if we should process this frame
+        // Estimate motion from recent feature positions (simple heuristic)
+        let estimated_motion = self.estimate_frame_motion();
+        if !self.frame_skipper.should_process(estimated_motion) {
+            // Skip this frame but keep pyramids for potential next frame processing
+            if let Some(last_time) = self.last_frame_time {
+                let delta = frame_start.duration_since(last_time);
+                self.frame_skipper.record_frame_time(delta);
+            }
+            log::debug!("[FeatureTracker] Frame skipped for real-time constraints");
+            return;
+        }
+        
         // build current image pyramid
         let current_image_pyramid0: Vec<GrayImage> = build_image_pyramid(greyscale_image0, LEVELS);
         let current_image_pyramid1: Vec<GrayImage> = build_image_pyramid(greyscale_image1, LEVELS);
@@ -248,6 +276,33 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             let f = Feature::new(id, [x, y]);
             frame.add_right_feature(f);
         }
+        
+        // Record processing time for adaptive frame skipping
+        let frame_duration = frame_start.elapsed();
+        self.frame_skipper.record_frame_time(frame_duration);
+        self.last_frame_time = Some(frame_start);
+    }
+    
+    /// Estimate frame-to-frame motion as heuristic for frame skipping
+    fn estimate_frame_motion(&self) -> Option<f32> {
+        if self.tracked_points_map_cam0.is_empty() {
+            return None;
+        }
+        
+        // Simple motion estimate: average distance from center
+        let image_center_x = 320.0f32; // Typical for 640×480 images
+        let image_center_y = 240.0f32;
+        
+        let motion_sum: f32 = self.tracked_points_map_cam0
+            .values()
+            .map(|pt| {
+                let dx = pt.matrix().m13 - image_center_x;
+                let dy = pt.matrix().m23 - image_center_y;
+                (dx * dx + dy * dy).sqrt()
+            })
+            .sum();
+        
+        Some(motion_sum / self.tracked_points_map_cam0.len() as f32)
     }
     pub fn get_track_points(&self) -> [HashMap<usize, (f32, f32)>; 2] {
         let tracked_pts0 = self

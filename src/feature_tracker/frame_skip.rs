@@ -87,6 +87,11 @@ impl AdaptiveFrameSkipper {
         self.recent_idx = (self.recent_idx + 1) % self.recent_times.len();
         self.last_processed_time = Some(Instant::now());
     }
+    
+    /// Record frame processing time (alias for record_processing_time)
+    pub fn record_frame_time(&mut self, duration: Duration) {
+        self.record_processing_time(duration);
+    }
 
     /// Get average processing time from recent frames
     fn average_processing_time(&self) -> Duration {
