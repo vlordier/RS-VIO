@@ -147,6 +147,7 @@ pub mod datasets;
 pub mod error_handling;
 pub mod estimator;
 pub mod feature_tracker;
+pub mod imu;
 pub mod optimization;
 pub mod types;
 pub mod validation;

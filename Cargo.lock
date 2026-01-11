@@ -9356,6 +9356,7 @@ dependencies = [
  "rerun",
  "serde",
  "serde_yaml",
+ "tempfile",
  "thiserror 1.0.69",
  "tracing",
  "tracing-subscriber",

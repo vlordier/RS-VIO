@@ -4,7 +4,13 @@ use crate::datasets::ImuData;
 use crate::estimator::Frame;
 use crate::estimator::SlidingWindow;
 use crate::feature_tracker::StereoPatchTracker;
-use crate::types::{Matrix4x4, UnitQuaternion, Vector3};
+use crate::imu::ExtrinsicCalibrator;
+use crate::imu::ImuConfig;
+use crate::imu::ImuMotionPredictor;
+use crate::imu::ImuPreintegrator;
+use crate::imu::PreintegratedImu;
+use crate::imu::VelocityEstimator;
+use crate::types::{Float, Matrix4x4, UnitQuaternion, Vector3};
 use crate::viewers::Viewer;
 use crate::{Result, VIOError};
 use image::GrayImage;
@@ -39,6 +45,20 @@ pub struct Estimator {
     trajectory: Vec<Matrix4x4>,
     // Maximum allowed time for frame processing (for real-time safety)
     max_frame_processing_time: Duration,
+    // IMU preintegrator for between keyframes
+    imu_preintegrator: ImuPreintegrator,
+    // IMU motion predictor for feature tracking
+    imu_motion_predictor: ImuMotionPredictor,
+    // Velocity estimator from accelerometer
+    velocity_estimator: VelocityEstimator,
+    // Online extrinsic calibrator (IMU to camera)
+    extrinsic_calibrator: ExtrinsicCalibrator,
+    // Current preintegrated IMU measurements
+    current_imu_preintegration: Option<PreintegratedImu>,
+    // Timestamp of last frame for IMU integration
+    last_imu_timestamp: Option<i64>,
+    // Number of IMU measurements processed
+    imu_measurement_count: usize,
 }
 
 impl Estimator {
@@ -71,6 +91,9 @@ impl Estimator {
         let T_B_Cr = na::Matrix4::from_row_slice(&config.camera.T_B_Cr);
         let keyframe_window_size = config.keyframe_management.keyframe_window_size as usize;
         let processing_timeout_ms = config.keyframe_management.processing_timeout_ms;
+
+        // Initialize IMU components
+        let imu_config = ImuConfig::default();
         Estimator {
             frame_id_counter: 0,
             frames_since_last_keyframe: 0,
@@ -87,6 +110,14 @@ impl Estimator {
             // Default: 100ms deadline for 10Hz operation (with margin)
             // For 30Hz target 33ms, use Duration::from_millis(30)
             max_frame_processing_time: Duration::from_millis(processing_timeout_ms),
+            // IMU components
+            imu_preintegrator: ImuPreintegrator::new(imu_config.clone()),
+            imu_motion_predictor: ImuMotionPredictor::new(imu_config.clone()),
+            velocity_estimator: VelocityEstimator::new(imu_config.clone()),
+            extrinsic_calibrator: ExtrinsicCalibrator::new(T_B_Cl),
+            current_imu_preintegration: None,
+            last_imu_timestamp: None,
+            imu_measurement_count: 0,
         }
     }
 
@@ -167,9 +198,66 @@ impl Estimator {
             self.T_B_Cr,
         );
 
-        // Attach IMU measurements if available.
+        // Process IMU measurements
         if let Some(imu) = imu_data {
+            // Attach IMU measurements to frame
             current_frame.imu_from_last_frame = imu.to_vec();
+
+            // Propagate IMU preintegrator
+            for imu_sample in imu {
+                if let Some(last_ts) = self.last_imu_timestamp {
+                    let dt = (imu_sample.timestamp - last_ts) as f64 / 1e9;
+                    if dt > 0.0 {
+                        self.imu_preintegrator.propagate(imu_sample, dt);
+                    }
+                }
+                self.last_imu_timestamp = Some(imu_sample.timestamp);
+                self.imu_measurement_count += 1;
+            }
+
+            // Use motion predictor for feature tracking
+            let focal_length = self.config.camera.left_intrinsics[0] as f64;
+            for feature in &mut current_frame.left_features {
+                let (du, dv) = self.imu_motion_predictor.predict_feature_displacement(
+                    imu,
+                    (feature.pixel_coord[0] as f64, feature.pixel_coord[1] as f64),
+                    focal_length,
+                );
+                // Apply predicted displacement as initial guess for optical flow
+                feature.pixel_coord[0] = (feature.pixel_coord[0] as f64 + du) as f32;
+                feature.pixel_coord[1] = (feature.pixel_coord[1] as f64 + dv) as f32;
+            }
+
+            // Update velocity estimator
+            let dt = if let Some(last_ts) = self.last_imu_timestamp {
+                (timestamp_ns - last_ts) as f64 / 1e9
+            } else {
+                0.01
+            };
+            self.velocity_estimator.update(imu, dt);
+
+            // Accumulate for extrinsic calibration
+            if self.sliding_window.is_full() {
+                let keyframe_poses = self.sliding_window.get_keyframe_poses();
+                if let Some(T_W_B) = keyframe_poses.last() {
+                    let T_W_B_copy = *T_W_B;
+                    let rotmat = na::Rotation3::from_matrix_unchecked(
+                        T_W_B_copy.fixed_view::<3, 3>(0, 0).into_owned(),
+                    );
+                    let R_W_B = na::UnitQuaternion::from_rotation_matrix(&rotmat);
+                    self.extrinsic_calibrator
+                        .add_measurement(&T_W_B_copy, R_W_B);
+
+                    // Run calibration periodically
+                    if self.imu_measurement_count % 100 == 0 {
+                        let error = self.extrinsic_calibrator.calibrate_iteration();
+                        log::debug!(
+                            "[Estimator] IMU extrinsic calibration error: {:.6} rad",
+                            error
+                        );
+                    }
+                }
+            }
         }
 
         _frame_creation_time_ms = frame_creation_start.elapsed().as_secs_f64() * 1000.0;
@@ -432,9 +520,34 @@ impl Estimator {
         }
     }
 
-    /// Get a reference to the trajectory (for saving to file)
+    /// Get the current trajectory (list of keyframe poses)
     pub fn get_trajectory(&self) -> &Vec<Matrix4x4> {
         &self.trajectory
+    }
+
+    /// Get preintegrated IMU measurements between last two keyframes
+    pub fn get_imu_preintegration(&self) -> Option<&PreintegratedImu> {
+        self.current_imu_preintegration.as_ref()
+    }
+
+    /// Get current velocity estimate
+    pub fn get_velocity(&self) -> Option<Vector3> {
+        if self.velocity_estimator.is_initialized() {
+            let v = self.velocity_estimator.get_velocity();
+            Some(Vector3::new(v.x as Float, v.y as Float, v.z as Float))
+        } else {
+            None
+        }
+    }
+
+    /// Get current IMU-camera extrinsic calibration
+    pub fn get_extrinsic_calibration(&self) -> Matrix4x4 {
+        self.extrinsic_calibrator.get_extrinsics()
+    }
+
+    /// Get number of IMU measurements processed
+    pub fn imu_measurement_count(&self) -> usize {
+        self.imu_measurement_count
     }
 }
 
