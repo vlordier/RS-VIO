@@ -10,11 +10,15 @@
 //!
 //! ## Key Components
 //!
-//! - [`FeatureTracker`] - Trait for pluggable feature tracking algorithms
-//! - [`StereoPatchTracker`] - Stereo tracking implementation
-//! - [`PatchTracker`] - Monocular patch tracker used for utilities
-//! - [`Pattern52`] - 52-point patch for optical flow
-//! - [`Feature`] - Individual feature with pixel and undistorted coordinates
+//! - StereoPatchTracker - Stereo tracking implementation
+//! - PatchTracker - Monocular patch tracker used for utilities
+//! - Pattern52 - 52-point patch for optical flow
+//! - Feature - Individual feature with pixel and undistorted coordinates
+//!
+//! ## Trait
+//!
+//! The module provides a `FeatureTracker` trait for pluggable tracking algorithms.
+//! See `feature_tracker::FeatureTracker` for details.
 //!
 //! ## Algorithm
 //!
