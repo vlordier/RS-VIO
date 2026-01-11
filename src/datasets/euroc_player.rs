@@ -169,59 +169,59 @@ impl EurocPlayer {
 
         if !result.frame_processing_times.is_empty() {
             result.average_processing_time_ms = result.frame_processing_times.iter().sum::<f64>()
-                / result.frame_processing_times.len() as f64;
 
             log::info!(
                 "[EurocPlayer] Average processing time: {:.2} ms ({:.1} fps)",
                 result.average_processing_time_ms,
-                1000.0 / result.average_processing_time_ms
-            );
+        match std::fs::File::create(&trajectory_path) {
+            Ok(mut file) => {
+                use std::io::Write;
+                let trajectory = estimator.get_trajectory();
+                let mut count = 0;
+
+                for pose in trajectory.iter() {
+                    // Extract timestamp from context
+                    let timestamp_s = context.previous_frame_timestamp as f64 / 1e9;
+
+                    // Extract translation
+                    let tx = pose[(0, 3)] as f64;
+                    let ty = pose[(1, 3)] as f64;
+                    let tz = pose[(2, 3)] as f64;
+
+                    // Extract rotation as quaternion
+                    let r = pose.fixed_view::<3, 3>(0, 0);
+                    let rotmat = nalgebra::Rotation3::from_matrix_unchecked(r.into_owned());
+                    let q = nalgebra::UnitQuaternion::from_rotation_matrix(&rotmat);
+
+                    if writeln!(
+                        file,
+                        "{:.9} {:.6} {:.6} {:.6} {:.9} {:.9} {:.9} {:.9}",
+                        timestamp_s, tx, ty, tz, q.i, q.j, q.k, q.w
+                    )
+                    .is_ok()
+                    {
+                        count += 1;
+                    }
+                }
+
+                log::info!(
+                    "[EurocPlayer] Saved trajectory with {} poses to {}",
+                    count,
+                    trajectory_path.display()
+                );
+            },
+            Err(e) => {
+                log::error!(
+                    "[EurocPlayer] Failed to create trajectory file {}: {e}",
+                    trajectory_path.display()
+                );
+            },
         }
-
-        // Display final statistics summary
-        if config.enable_console_statistics && result.success {
-            log::info!("════════════════════════════════════════════════════════════════════");
-            log::info!("                          STATISTICS                                ");
-            log::info!("════════════════════════════════════════════════════════════════════");
-            log::info!("");
-            log::info!("                          TIMING ANALYSIS                           ");
-            log::info!("════════════════════════════════════════════════════════════════════");
-            log::info!(" Total Frames Processed: {}", result.processed_frames);
-            log::info!(
-                " Average Processing Time: {:.2}ms",
-                result.average_processing_time_ms
-            );
-            let fps = 1000.0 / result.average_processing_time_ms;
-            log::info!(" Average Frame Rate: {:.1}fps", fps);
-            log::info!("════════════════════════════════════════════════════════════════════");
-        }
-
-        log::info!("[EurocPlayer] Processing completed! Viewer remains open for inspection.");
-
-        result
     }
 
-    fn load_image_timestamps(dataset_path: &str) -> Result<Vec<ImageData>> {
-        let data_file = Path::new(dataset_path).join("mav0/cam0/data.csv");
-        let image_data = load_csv_image_timestamps(&data_file)?;
-        log::info!("[EurocPlayer] Loaded {} image timestamps", image_data.len());
-        Ok(image_data)
-    }
-
-    fn load_image(dataset_path: &str, filename: &str, cam_id: u32) -> Result<Vec<u8>> {
-        let cam_folder = if cam_id == 0 { "cam0" } else { "cam1" };
-        let full_path = Path::new(dataset_path)
-            .join("mav0")
-            .join(cam_folder)
-            .join("data")
-            .join(filename);
-        load_grayscale_image(&full_path)
-    }
-
-    fn load_imu_data(dataset_path: &str) -> Result<Vec<ImuData>> {
-        let imu_file = Path::new(dataset_path).join("mav0/imu0/data.csv");
-        let (imu_data, _stats) = load_imu_data(&imu_file, ImuFormat::CsvComma, "EurocPlayer")?;
-        Ok(imu_data)
+    fn save_statistics(&self, result: &PlayerResult, stats_path: &Path) {
+        crate::datasets::player_trait::save_statistics_common(result, stats_path);
+>>>>>>> 99a3ba3a (Implement TODO comments: IMU loading, trajectory saving, and initial pose)
     }
 
     /// Create camera models from config using the datasets module helper function
