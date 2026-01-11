@@ -1,36 +1,21 @@
 ---
-name: Safety/Security Issue
-about: Report a safety concern or security vulnerability
-title: "[SECURITY] Description of the issue"
+name: Security Issue
+about: Report security concern
+title: "[SECURITY] Brief description"
 labels: security
-assignees: ''
-
 ---
 
 ## Description
-<!-- Description of the safety or security concern -->
+Security concern description
 
 ## Severity
-- [ ] Critical (immediate safety/security risk)
-- [ ] High (significant concern)
-- [ ] Medium (moderate concern)
-- [ ] Low (minor concern)
+Critical/High/Medium/Low
 
-## Affected Component(s)
-<!-- Which part(s) of RS-VIO are affected? -->
-
-## Steps to Demonstrate
-<!-- How to reproduce or demonstrate the issue -->
+## Affected Component
+What part is affected
 
 ## Potential Impact
-<!-- What could happen if this issue isn't fixed? -->
-
-## Suggested Fix
-<!-- If you have ideas for fixing this -->
-
-## References
-<!-- Links to related issues, CVEs, or discussions -->
+What could happen
 
 ---
-
-**Note**: If this is a security vulnerability, please report it privately to the maintainer instead of using this public issue tracker. See [SECURITY.md](../../SECURITY.md) for details.
+**Note**: Report vulnerabilities privately to maintainers. See SECURITY.md
