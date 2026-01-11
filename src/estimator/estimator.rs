@@ -397,4 +397,9 @@ impl<'a> Estimator<'a> {
             // log::info!("[Estimator] System position: {:?}, {:?}, {:?}", mat[0][3], mat[1][3], mat[2][3]);
         }
     }
+
+    /// Get a reference to the trajectory (for saving to file)
+    pub fn get_trajectory(&self) -> &Vec<Matrix4x4> {
+        &self.trajectory
+    }
 }

@@ -538,5 +538,10 @@ not_a_timestamp 0 0 0 0 0 0\n\
 
         let between = FourSeasonsPlayer::get_imu_data_between_frames(3, 3, &imu_data);
         assert!(between.is_empty());
+=======
+    fn initialize_estimator(&self, _estimator: &mut Estimator, _image_data: &[ImageData]) {
+        // FourSeasons starts at identity pose - estimator already initialized with identity
+        log::debug!("[FourSeasonsPlayer] Estimator initialized with identity pose");
+>>>>>>> 99a3ba3a (Implement TODO comments: IMU loading, trajectory saving, and initial pose)
     }
 }
