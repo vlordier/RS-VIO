@@ -6,7 +6,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)] // Optimization code - panics indicate data corruption
 
 use crate::estimator::Frame;
-use crate::optimization::factors::{BundleAdjustmentFactor, PnPFactor};
+use crate::imu::ImuMotionPrior;
+use crate::optimization::factors::{BundleAdjustmentFactor, ImuPriorFactor, PnPFactor};
 use crate::types::{Matrix3x3, Matrix4x4, Vector3};
 use apex_solver::core::loss_functions::HuberLoss;
 use apex_solver::core::problem::{Problem, VariableEnum};
@@ -352,6 +353,16 @@ impl SlidingWindow {
     }
 
     pub fn optimize(&mut self) -> Result<bool, std::io::Error> {
+        self.optimize_with_imu(None, None, None)
+    }
+
+    /// Optimize window with optional IMU prior on the latest keyframe pose
+    pub fn optimize_with_imu(
+        &mut self,
+        imu_prior: Option<ImuMotionPrior>,
+        imu_weights: Option<(f64, f64)>,
+        imu_huber_delta: Option<f64>,
+    ) -> Result<bool, std::io::Error> {
         self.check_sliding_window_size_for_optimization()?;
 
         // Save current state before optimization for potential rollback
@@ -363,7 +374,54 @@ impl SlidingWindow {
         let mut solver = LevenbergMarquardt::with_config(self.build_solver_config());
         // solver.add_observer(TerminalObserver::new());
 
-        let (problem, initial_values) = self.build_optimization_problem();
+        let (mut problem, initial_values) = self.build_optimization_problem();
+
+        // If IMU prior is available, add a residual on the latest keyframe pose
+        if let Some(prior) = imu_prior {
+            let last_index = self.keyframes.len().saturating_sub(1);
+            if !self.keyframes.is_empty() {
+                let kf_var = format!("KF_{}", last_index);
+                // Predict pose from IMU prior (world-from-body), then invert to body-from-world
+                let (T_W_B_pred, _v_pred) = prior.predict_state();
+                if let Some(T_B_W_pred) = T_W_B_pred.try_inverse() {
+                    let (w_pos, w_rot) = imu_weights.unwrap_or((1.0, 1.0));
+                    let factor = ImuPriorFactor::new(T_B_W_pred, w_pos, w_rot);
+                    // Optional robust loss
+                    let loss = if let Some(delta) = imu_huber_delta {
+                        if delta > 0.0 {
+                            match HuberLoss::new(delta) {
+                                Ok(l) => Some(Box::new(l)
+                                    as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>),
+                                Err(e) => {
+                                    log::warn!(
+                                        "[SlidingWindow] Invalid Huber delta ({}): {}",
+                                        delta,
+                                        e
+                                    );
+                                    None
+                                }
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+                    problem.add_residual_block(&[&kf_var], Box::new(factor), loss);
+                    log::debug!(
+                        "[SlidingWindow] Added IMU prior residual on keyframe {} (pos_weight={:.2}, rot_weight={:.2}, huber_delta={:?})",
+                        last_index,
+                        w_pos,
+                        w_rot,
+                        imu_huber_delta
+                    );
+                } else {
+                    log::warn!(
+                        "[SlidingWindow] IMU prior predicted pose inversion failed; skipping IMU residual"
+                    );
+                }
+            }
+        }
 
         let num_residuals = problem.num_residual_blocks();
         let num_variables = initial_values.len();

@@ -53,3 +53,8 @@ depth:
 optimization:
   pnp_max_iterations: 10
   bundle_adjustment_max_iterations: 20
+  # IMU prior integration (constrains latest keyframe pose to IMU prediction)
+  imu_prior_enable: true
+  imu_prior_weight_pos: 0.5      # Position constraint weight (start conservative)
+  imu_prior_weight_rot: 1.0      # Rotation constraint weight
+  imu_prior_huber_delta: 1.0     # Robust loss threshold (meters for position, radians for rotation)
