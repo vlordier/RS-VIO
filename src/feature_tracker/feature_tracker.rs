@@ -98,6 +98,18 @@ pub struct StereoPatchTracker<const N: u32> {
 }
 
 impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
+    /// Create a new stereo patch tracker
+    ///
+    /// Initializes a stereo feature tracker using patch-based optical flow.
+    /// Features will be detected in left image and matched to right image using
+    /// Lucas-Kanade optical flow on a 52-point pattern.
+    ///
+    /// # Arguments
+    /// * `grid_size` - Spatial grid size for uniform feature distribution (e.g., 15)
+    /// * `optical_flow_max_iterations` - Max LK iterations per feature (typically 30)
+    /// * `optical_flow_convergence_threshold` - Convergence threshold for LK tracking
+    ///
+    /// # Example\n    /// ```rust,no_run\n    /// use rs_vio::feature_tracker::StereoPatchTracker;\n    /// let tracker = StereoPatchTracker::<4>::new(15, 30, 0.005);\n    /// ```
     pub fn new(
         grid_size: u32,
         optical_flow_max_iterations: u32,
@@ -115,6 +127,23 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
         }
     }
 
+    /// Process a stereo frame and update feature tracking
+    ///
+    /// This is the main function for feature tracking. It:
+    /// 1. Builds image pyramids for multi-scale tracking
+    /// 2. Tracks features from previous frame via optical flow
+    /// 3. Detects new features in untracked regions
+    /// 4. Performs left-right stereo matching
+    /// 5. Updates the provided Frame with tracked features
+    ///
+    /// # Arguments
+    /// * `greyscale_image0` - Left camera grayscale image
+    /// * `greyscale_image1` - Right camera grayscale image (stereo pair)
+    /// * `frame` - Frame to populate with detected and tracked features
+    ///
+    /// # Complexity
+    /// - **Time**: O(n_features * pattern_size) ≈ 10-30ms for 640×480
+    /// - **Space**: O(pyramid_levels * image_width * image_height)
     pub fn process_frame(
         &mut self,
         greyscale_image0: &GrayImage,
@@ -413,4 +442,64 @@ pub fn track_point_at_level(
     }
 
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::Luma;
+    use std::collections::HashMap;
+
+    fn gradient_image(width: u32, height: u32) -> GrayImage {
+        GrayImage::from_fn(width, height, |x, y| Luma([(x + y) as u8]))
+    }
+
+    fn checkerboard_image(width: u32, height: u32) -> GrayImage {
+        GrayImage::from_fn(width, height, |x, y| {
+            let val = if (x + y) % 2 == 0 { 0u8 } else { 255u8 };
+            Luma([val])
+        })
+    }
+
+    #[test]
+    fn build_image_pyramid_scales_down() {
+        let img = gradient_image(32, 32);
+        let pyramid = build_image_pyramid(&img, 3);
+        assert_eq!(pyramid.len(), 3);
+        assert_eq!(pyramid[0].dimensions(), (32, 32));
+        assert_eq!(pyramid[1].dimensions(), (16, 16));
+        assert_eq!(pyramid[2].dimensions(), (8, 8));
+    }
+
+    #[test]
+    fn track_point_at_level_converges_on_static_point() {
+        let img = checkerboard_image(64, 64);
+        let pattern = patch::Pattern52::new(&img, 32.0, 32.0);
+
+        let mut transform = na::Affine2::<f32>::identity();
+        transform.matrix_mut_unchecked().m13 = 32.0;
+        transform.matrix_mut_unchecked().m23 = 32.0;
+
+        let ok = track_point_at_level(&img, &pattern, &mut transform, 30, 1e-4);
+        assert!(ok);
+        assert!((transform.matrix().m13 - 32.0).abs() < 1e-3);
+        assert!((transform.matrix().m23 - 32.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn track_points_rejects_textureless_input() {
+        const LEVELS: u32 = 2;
+        let img = GrayImage::from_pixel(64, 64, Luma([128u8]));
+        let pyramid0 = build_image_pyramid(&img, LEVELS);
+        let pyramid1 = build_image_pyramid(&img, LEVELS);
+
+        let mut map0 = HashMap::new();
+        let mut transform = na::Affine2::<f32>::identity();
+        transform.matrix_mut_unchecked().m13 = 32.0;
+        transform.matrix_mut_unchecked().m23 = 32.0;
+        map0.insert(0usize, transform);
+
+        let tracked = track_points::<LEVELS>(&pyramid0, &pyramid1, &map0, 10, 1e-3);
+        assert!(tracked.is_empty());
+    }
 }

@@ -60,6 +60,41 @@ RUSTFLAGS="-Z sanitizer=address" cargo +nightly test --profile ultra-critical
 
 For comprehensive safety documentation and pre-deployment checklists, see [SAFETY.md](SAFETY.md).
 
+## Documentation
+
+Comprehensive documentation is available for all aspects of the project:
+
+### User Documentation
+- **[BENCHMARKING.md](BENCHMARKING.md)** - Performance benchmarking guide with visualization tools
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Development setup and workflow
+- **[SECURITY.md](SECURITY.md)** - Safety-critical deployment guidelines
+
+### Technical Documentation
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - High-level system architecture and design decisions
+- **API Documentation** - Generated from source code comments:
+  ```bash
+  ./scripts/generate-docs.sh --open
+  # Or use cargo directly:
+  cargo doc --lib --no-deps --open
+  ```
+
+### Documentation Quality
+
+**Code Documentation Coverage:**
+- ✅ Module-level documentation (`//!`) for all major modules
+- ✅ Function-level documentation (`///`) for public APIs
+- ✅ Usage examples and algorithm descriptions
+- ✅ Performance complexity notes
+- ✅ Automatic doc generation via CI/CD
+
+**Modules Documented:**
+- [src/feature_tracker](src/feature_tracker) - Feature detection and tracking
+- [src/estimator](src/estimator) - VIO pipeline
+- [src/optimization](src/optimization) - Bundle adjustment
+- [src/datasets](src/datasets) - Dataset loading and configuration
+- [src/viewers](src/viewers) - 3D visualization
+- [benches/](benches/) - Performance benchmarks
+
 ## Usage
 
 ### Running with Real Datasets

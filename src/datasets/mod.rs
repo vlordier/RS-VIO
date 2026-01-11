@@ -1,3 +1,56 @@
+//! # Dataset Module
+//!
+//! Dataset players for standard VIO benchmarks and configuration management.
+//!
+//! ## Overview
+//!
+//! This module provides tools for loading and processing stereo VIO benchmark datasets:
+//! - **EuRoC**: Micro Aerial Vehicle dataset with IMU
+//! - **TUM-VI**: TUM Visual-Inertial dataset
+//! - **4Seasons**: Large-scale long-term dataset with appearance changes
+//!
+//! ## Components
+//!
+//! - [`EurocPlayer`](euroc_player::EurocPlayer) - EuRoC dataset loader
+//! - [`TUMVIPlayer`](tum_vi_player::TUMVIPlayer) - TUM-VI dataset loader
+//! - [`FourSeasonsPlayer`](fourseasons_player::FourSeasonsPlayer) - 4Seasons dataset loader
+//! - [`Config`](config::Config) - VIO system configuration (YAML)
+//!
+//! ## Dataset Formats
+//!
+//! Each dataset provides:
+//! - Stereo image pairs with synchronized timestamps
+//! - Camera intrinsics and extrinsics
+//! - IMU data (gyro, accelerometer) with synchronization
+//! - Ground truth trajectories for evaluation
+//!
+//! ## Configuration Format (YAML)
+//!
+//! ```yaml
+//! camera:
+//!   image_width: 640
+//!   image_height: 480
+//!   left_intrinsics: [fx, fy, cx, cy]
+//!   left_distortion: [k1, k2, p1, p2]
+//!   left_model: pinhole-radtan
+//!
+//! keyframe_management:
+//!   keyframe_window_size: 5
+//!
+//! feature_detection:
+//!   grid_size: 15
+//! ```
+//!
+//! ## Performance Notes
+//!
+//! - **EuRoC**: Fast (~10-11 min sequences)
+//! - **TUM-VI**: Medium (~5-10 min sequences)
+//! - **4Seasons**: Large (~1.5 hour sequences)
+//!
+//! ## See Also
+//! - [config::Config] - Configuration loading
+//! - [estimator::Estimator] - VIO pipeline
+
 pub mod config;
 pub mod euroc_player;
 pub mod fourseasons_player;

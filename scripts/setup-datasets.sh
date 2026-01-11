@@ -224,8 +224,9 @@ setup_4seasons() {
   local stereo_url="https://vision.cs.tum.edu/webshare/g/4seasons-dataset/dataset/$recording_id/${recording_id}_stereo_images_distorted.zip"
   local ref_poses_url="https://vision.cs.tum.edu/webshare/g/4seasons-dataset/dataset/$recording_id/${recording_id}_reference_poses.zip"
   
-  local temp_dir=$(mktemp -d)
-  trap "rm -rf $temp_dir" EXIT
+  local temp_dir
+  temp_dir=$(mktemp -d)
+  trap 'rm -rf "$temp_dir"' EXIT
   
   # Download IMU data
   log_info "Downloading 4Seasons IMU/GNSS data (6.1MB)..."
@@ -277,22 +278,22 @@ setup_4seasons() {
   fi
   
   # Create data.csv files from timestamps (image filenames are unix timestamps)
-  if [ -n "$(ls $recording_dir/mav0/cam0/data/*.png 2>/dev/null | head -1)" ]; then
+  if [ -n "$(find "$recording_dir/mav0/cam0/data" -name '*.png' -type f 2>/dev/null | head -1)" ]; then
     log_info "Creating cam0 data.csv..."
     {
       echo "timestamp,filename"
-      ls "$recording_dir/mav0/cam0/data/"*.png | while read f; do
+      find "$recording_dir/mav0/cam0/data" -name '*.png' -type f -print0 | sort -z | while IFS= read -r -d '' f; do
         timestamp=$(basename "$f" .png)
         echo "$timestamp,$(basename "$f")"
       done | sort -n
     } > "$recording_dir/mav0/cam0/data.csv"
   fi
   
-  if [ -n "$(ls $recording_dir/mav0/cam1/data/*.png 2>/dev/null | head -1)" ]; then
+  if [ -n "$(find "$recording_dir/mav0/cam1/data" -name '*.png' -type f 2>/dev/null | head -1)" ]; then
     log_info "Creating cam1 data.csv..."
     {
       echo "timestamp,filename"
-      ls "$recording_dir/mav0/cam1/data/"*.png | while read f; do
+      find "$recording_dir/mav0/cam1/data" -name '*.png' -type f -print0 | sort -z | while IFS= read -r -d '' f; do
         timestamp=$(basename "$f" .png)
         echo "$timestamp,$(basename "$f")"
       done | sort -n
@@ -406,9 +407,9 @@ main() {
     echo ""
   fi
   
-  if ls "$DATASETS_DIR"/4seasons/recording_*/times.txt 1>/dev/null 2>&1; then
+  if find "$DATASETS_DIR"/4seasons -name 'times.txt' -type f | grep -q .; then
     local recording_dir
-    recording_dir=$(dirname "$(ls -t "$DATASETS_DIR"/4seasons/recording_*/times.txt | head -1)")
+    recording_dir=$(dirname "$(find "$DATASETS_DIR"/4seasons -name 'times.txt' -type f -printf '%T@ %p\n' | sort -rn | head -1 | cut -d' ' -f2-)")
     test_binary "run_4seasons" "4seasons.yaml" "$recording_dir"
     echo ""
   fi

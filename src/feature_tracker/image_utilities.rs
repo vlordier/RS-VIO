@@ -177,3 +177,54 @@ pub fn detect_key_points(
     }
     all_corners
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::Luma;
+
+    #[test]
+    fn image_grad_flat_image_has_zero_gradient() {
+        let img = GrayImage::from_pixel(6, 6, Luma([128u8]));
+
+        let g = image_grad(&img, 2.5, 2.5);
+        assert!((g[0] - 128.0).abs() < 1e-6);
+        assert!(g[1].abs() < 1e-6);
+        assert!(g[2].abs() < 1e-6);
+    }
+
+    #[test]
+    fn inbound_checks_bounds() {
+        let img = GrayImage::from_pixel(10, 10, Luma([0u8]));
+        assert!(inbound(&img, 5.0, 5.0, 1));
+        assert!(!inbound(&img, 0.0, 0.0, 1));
+        assert!(!inbound(&img, 9.0, 9.0, 1));
+    }
+
+    #[test]
+    fn se2_exp_matrix_zero_theta_translates() {
+        let a = na::SVector::<f32, 3>::new(1.0, -2.0, 0.0);
+        let mat = se2_exp_matrix(&a);
+        assert!((mat.m11 - 1.0).abs() < 1e-6);
+        assert!((mat.m22 - 1.0).abs() < 1e-6);
+        assert!((mat.m13 - 1.0).abs() < 1e-6);
+        assert!((mat.m23 + 2.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn detect_key_points_finds_corner() {
+        let mut img = GrayImage::from_pixel(64, 64, Luma([0u8]));
+        // create a larger bright block to ensure FAST-9 finds a corner
+        for x in 20..44 {
+            for y in 20..44 {
+                img.put_pixel(x, y, Luma([255u8]));
+            }
+        }
+
+        let points = detect_key_points(&img, 8, &Vec::new(), 2);
+        assert!(!points.is_empty());
+        assert!(points
+            .iter()
+            .any(|p| p.x >= 10 && p.x <= 22 && p.y >= 10 && p.y <= 22));
+    }
+}

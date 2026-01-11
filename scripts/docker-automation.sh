@@ -9,7 +9,6 @@ IMAGE_NAME="${1:-rs-vio:latest}"
 DATASETS_DIR="${2:-/tmp/rs-vio-samples}"
 COLOR_GREEN='\033[0;32m'
 COLOR_BLUE='\033[0;34m'
-COLOR_YELLOW='\033[1;33m'
 COLOR_RED='\033[0;31m'
 NC='\033[0m'
 
@@ -74,7 +73,6 @@ run_with_dataset() {
   fi
   
   local mount_point="/data"
-  local dataset_name=$(basename "$dataset_path")
   
   if docker run --rm \
     --volume "$dataset_path:$mount_point:ro" \
@@ -120,9 +118,9 @@ run_datasets() {
     log_info "Skipping TUM-VI (not found at $DATASETS_DIR/tum_vi)"
   fi
   
-  if ls "$DATASETS_DIR"/4seasons/recording_*/times.txt 1>/dev/null 2>&1; then
+  if find "$DATASETS_DIR"/4seasons -name 'times.txt' -type f | grep -q .; then
     local recording_dir
-    recording_dir=$(dirname "$(ls -t "$DATASETS_DIR"/4seasons/recording_*/times.txt | head -1)")
+    recording_dir=$(dirname "$(find "$DATASETS_DIR"/4seasons -name 'times.txt' -type f -printf '%T@ %p\n' | sort -rn | head -1 | cut -d' ' -f2-)")
     if run_with_dataset "run_4seasons" "4seasons.yaml" "$recording_dir" 60; then
       ((success_count++))
     else
@@ -134,7 +132,11 @@ run_datasets() {
   fi
   
   log_info "Dataset tests: $success_count passed, $fail_count failed"
-  return $([[ $fail_count -eq 0 ]] && echo 0 || echo 1)
+  if [ "$fail_count" -eq 0 ]; then
+    return 0
+  else
+    return 1
+  fi
 }
 
 # Show image info

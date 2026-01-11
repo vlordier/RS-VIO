@@ -177,18 +177,21 @@ RS-VIO Project Status Report
 
 Build Information:
 EOL
-  
-  echo "Generated: $(date)" >> /tmp/rs-vio-report.txt
-  echo "Project: RS-VIO" >> /tmp/rs-vio-report.txt
-  echo "Location: $PROJECT_ROOT" >> /tmp/rs-vio-report.txt
-  echo "" >> /tmp/rs-vio-report.txt
+  {
+    echo "Generated: $(date)"
+    echo "Project: RS-VIO"
+    echo "Location: $PROJECT_ROOT"
+    echo ""
+  } >> /tmp/rs-vio-report.txt
   
   echo "Git Information:" >> /tmp/rs-vio-report.txt
   cd "$PROJECT_ROOT"
-  echo "Branch: $(git rev-parse --abbrev-ref HEAD)" >> /tmp/rs-vio-report.txt
-  echo "Commits ahead of main: $(git rev-list main..HEAD --count)" >> /tmp/rs-vio-report.txt
-  echo "Latest commit: $(git log -1 --oneline)" >> /tmp/rs-vio-report.txt
-  echo "" >> /tmp/rs-vio-report.txt
+  {
+    echo "Branch: $(git rev-parse --abbrev-ref HEAD)"
+    echo "Commits ahead of main: $(git rev-list main..HEAD --count)"
+    echo "Latest commit: $(git log -1 --oneline)"
+    echo ""
+  } >> /tmp/rs-vio-report.txt
   
   echo "Dataset Runners:" >> /tmp/rs-vio-report.txt
   for binary in run_euroc run_tum run_4seasons; do
@@ -260,9 +263,9 @@ run_all() {
     echo ""
   fi
   
-  if ls "$DATASETS_DIR"/4seasons/recording_*/times.txt 1>/dev/null 2>&1; then
+  if find "$DATASETS_DIR"/4seasons -name 'times.txt' -type f | grep -q .; then
     local recording_dir
-    recording_dir=$(dirname "$(ls -t "$DATASETS_DIR"/4seasons/recording_*/times.txt | head -1)")
+    recording_dir=$(dirname "$(find "$DATASETS_DIR"/4seasons -name 'times.txt' -type f -printf '%T@ %p\n' | sort -rn | head -1 | cut -d' ' -f2-)")
     run_binary_test "run_4seasons" "4seasons.yaml" "$recording_dir"
     echo ""
   fi
@@ -294,19 +297,23 @@ main() {
       setup_datasets
       ;;
     run-euroc)
-      [ -d "$DATASETS_DIR/euroc/MH_01_easy" ] && \
-        run_binary_test "run_euroc" "euroc_vio.yaml" "$DATASETS_DIR/euroc/MH_01_easy" || \
+      if [ -d "$DATASETS_DIR/euroc/MH_01_easy" ]; then
+        run_binary_test "run_euroc" "euroc_vio.yaml" "$DATASETS_DIR/euroc/MH_01_easy"
+      else
         log_error "EuRoC dataset not found. Run: scripts/orchestrate.sh setup-datasets"
+      fi
       ;;
     run-tum)
-      [ -f "$DATASETS_DIR/tum_vi/depth.txt" ] && \
-        run_binary_test "run_tum" "tum_vi.yaml" "$DATASETS_DIR/tum_vi" || \
+      if [ -f "$DATASETS_DIR/tum_vi/depth.txt" ]; then
+        run_binary_test "run_tum" "tum_vi.yaml" "$DATASETS_DIR/tum_vi"
+      else
         log_error "TUM-VI dataset not found. Run: scripts/orchestrate.sh setup-datasets"
+      fi
       ;;
     run-4seasons)
-      if ls "$DATASETS_DIR"/4seasons/recording_*/times.txt 1>/dev/null 2>&1; then
+      if find "$DATASETS_DIR"/4seasons -name 'times.txt' -type f | grep -q .; then
         local recording_dir
-        recording_dir=$(dirname "$(ls -t "$DATASETS_DIR"/4seasons/recording_*/times.txt | head -1)")
+        recording_dir=$(dirname "$(find "$DATASETS_DIR"/4seasons -name 'times.txt' -type f -printf '%T@ %p\n' | sort -rn | head -1 | cut -d' ' -f2-)")
         run_binary_test "run_4seasons" "4seasons.yaml" "$recording_dir"
       else
         log_error "4Seasons dataset not found. Run: scripts/orchestrate.sh setup-datasets"
