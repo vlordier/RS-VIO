@@ -6,15 +6,17 @@ use crate::estimator::sliding_window::SlidingWindow;
 use crate::estimator::Frame;
 use crate::feature_tracker::StereoPatchTracker;
 use crate::imu::ExtrinsicCalibrator;
-use crate::imu::ImuConfig;
+use crate::imu::ImuAidedKeyframeSelector;
 use crate::imu::ImuBiasEstimator;
+use crate::imu::ImuConfig;
 use crate::imu::ImuMotionPredictor;
 use crate::imu::ImuMotionPrior;
 use crate::imu::ImuPreintegrator;
 use crate::imu::PreintegratedImu;
 use crate::imu::VelocityEstimator;
-use crate::types::{Float, Matrix4x4, UnitQuaternion, Vector3};
+use crate::types::{Float, Matrix4x4, Vector3};
 use crate::viewers::Viewer;
+use crate::VIOError;
 use anyhow::Result;
 use image::GrayImage;
 use nalgebra as na;
@@ -56,6 +58,8 @@ pub struct Estimator<'a> {
     velocity_estimator: VelocityEstimator,
     // Online extrinsic calibrator (IMU to camera)
     extrinsic_calibrator: ExtrinsicCalibrator,
+    // IMU-aided keyframe selection
+    keyframe_selector: ImuAidedKeyframeSelector,
     // Current preintegrated IMU measurements
     current_imu_preintegration: Option<PreintegratedImu>,
     // Timestamp of last frame for IMU integration
@@ -139,6 +143,10 @@ impl<'a> Estimator<'a> {
             imu_motion_predictor: ImuMotionPredictor::new(imu_config.clone()),
             velocity_estimator: VelocityEstimator::new(imu_config.clone()),
             extrinsic_calibrator: ExtrinsicCalibrator::new(T_B_Cl),
+            keyframe_selector: ImuAidedKeyframeSelector::new(
+                config.keyframe_management.translation_threshold as f64,
+                config.keyframe_management.rotation_threshold as f64,
+            ),
             current_imu_preintegration: None,
             last_imu_timestamp: None,
             imu_measurement_count: 0,
@@ -240,12 +248,44 @@ impl<'a> Estimator<'a> {
             // Attach IMU measurements to frame
             current_frame.imu_from_last_frame = imu.to_vec();
 
-            // Propagate IMU preintegrator
+            // During initialization, collect IMU samples for bias estimation
+            if self.is_initializing {
+                for imu_sample in imu {
+                    self.bias_estimator.add_sample(imu_sample, true);
+                }
+
+                // Check if bias estimation is complete (need enough samples)
+                if self.bias_estimator.sample_count() >= 100 {
+                    self.is_initializing = false;
+                    log::info!(
+                        "[Estimator] IMU initialization complete. Gyro bias: [{:.4}, {:.4}, {:.4}] rad/s, Accel bias: [{:.4}, {:.4}, {:.4}] m/s²",
+                        self.bias_estimator.gyro_bias[0],
+                        self.bias_estimator.gyro_bias[1],
+                        self.bias_estimator.gyro_bias[2],
+                        self.bias_estimator.accel_bias[0],
+                        self.bias_estimator.accel_bias[1],
+                        self.bias_estimator.accel_bias[2]
+                    );
+                }
+            }
+
+            // Propagate IMU preintegrator with bias-corrected measurements
             for imu_sample in imu {
                 if let Some(last_ts) = self.last_imu_timestamp {
                     let dt = (imu_sample.timestamp - last_ts) as f64 / 1e9;
                     if dt > 0.0 {
-                        self.imu_preintegrator.propagate(imu_sample, dt);
+                        // Apply bias correction if available
+                        if self.bias_estimator.is_initialized {
+                            let gyro_corrected = self.bias_estimator.correct_gyro(imu_sample);
+                            let accel_corrected = self.bias_estimator.correct_accel(imu_sample);
+                            self.imu_preintegrator.propagate_corrected(
+                                gyro_corrected,
+                                accel_corrected,
+                                dt,
+                            );
+                        } else {
+                            self.imu_preintegrator.propagate(imu_sample, dt);
+                        }
                     }
                 }
                 self.last_imu_timestamp = Some(imu_sample.timestamp);
@@ -271,6 +311,20 @@ impl<'a> Estimator<'a> {
             } else {
                 0.01
             };
+
+            // Initialize velocity estimator on first IMU batch
+            if !self.velocity_estimator_initialized && !imu.is_empty() {
+                let initial_orientation = na::UnitQuaternion::identity();
+                self.velocity_estimator
+                    .initialize_from_imu(imu, &initial_orientation);
+                self.velocity_estimator_initialized = true;
+                log::debug!(
+                    "[Estimator] Velocity estimator initialized with {} IMU samples",
+                    imu.len()
+                );
+            }
+
+            // Update velocity estimator
             self.velocity_estimator.update(imu, dt);
 
             // Accumulate for extrinsic calibration
@@ -316,27 +370,73 @@ impl<'a> Estimator<'a> {
                     // Apply the optimized pose to the current frame
                     current_frame.state.T_W_B = T_W_B;
 
-                    // Check if translation and rotation since last keyframe is large enough to trigger a keyframe
-                    #[allow(clippy::unwrap_used)] // Validated by sliding_window - keyframes exist
-                    let T_W_B_last_kf = *self.sliding_window.get_keyframe_poses().last().unwrap();
-                    #[allow(clippy::unwrap_used)] // T_W_B is guaranteed invertible
-                    let T_rel = T_W_B * T_W_B_last_kf.try_inverse().unwrap();
+                    // IMU-aided keyframe selection
+                    let keyframe_poses = self.sliding_window.get_keyframe_poses();
+                    let T_W_B_last_kf = match keyframe_poses.last() {
+                        Some(pose) => pose,
+                        None => {
+                            log::error!("[Estimator] No keyframe poses available");
+                            return Err(VIOError::Optimization(
+                                "No keyframe poses available".to_string(),
+                            ));
+                        },
+                    };
+
+                    // Compute IMU-visual rotation deviation
+                    let R_obs = na::Rotation3::from_matrix_unchecked(
+                        T_W_B.fixed_view::<3, 3>(0, 0).into_owned(),
+                    );
+                    let R_last = na::Rotation3::from_matrix_unchecked(
+                        T_W_B_last_kf.fixed_view::<3, 3>(0, 0).into_owned(),
+                    );
+                    let R_obs_quat = na::UnitQuaternion::from_rotation_matrix(&R_obs);
+                    let R_last_quat = na::UnitQuaternion::from_rotation_matrix(&R_last);
+                    let dq = R_last_quat.inverse() * R_obs_quat;
+                    let imu_visual_deviation = dq.angle();
+
+                    // Use IMU-aided keyframe selector
+                    let (is_imu_keyframe, keyframe_reason) = self
+                        .keyframe_selector
+                        .should_be_keyframe(&T_W_B, timestamp_ns, imu_visual_deviation.abs());
+
+                    // Fallback to visual-only check
+                    let T_W_B_last_kf_inv = match T_W_B_last_kf.try_inverse() {
+                        Some(inv) => inv,
+                        None => {
+                            log::error!("[Estimator] Matrix inversion failed for T_W_B_last_kf");
+                            return Err(VIOError::Optimization(
+                                "Matrix inversion failed".to_string(),
+                            ));
+                        },
+                    };
+                    let T_rel = T_W_B * T_W_B_last_kf_inv;
                     let t_rel = T_rel.fixed_view::<3, 1>(0, 3).into_owned();
                     let R_rel = T_rel.fixed_view::<3, 3>(0, 0).into_owned();
-                    let e_rel = Vector3::from([
-                        UnitQuaternion::from_matrix(&R_rel).euler_angles().0,
-                        UnitQuaternion::from_matrix(&R_rel).euler_angles().1,
-                        UnitQuaternion::from_matrix(&R_rel).euler_angles().2,
-                    ]);
-                    log::debug!("[Estimator] Translation since last keyframe: {:.2?}, Euler angles since last keyframe: {:.2?}", t_rel, e_rel);
+                    let rotmat = na::Rotation3::from_matrix_unchecked(R_rel);
+                    let euler: (f64, f64, f64) = rotmat.euler_angles();
+                    let rotation_norm = (euler.0.abs() + euler.1.abs() + euler.2.abs()).abs();
 
-                    // Check if translation and rotation since last keyframe is large enough to trigger a keyframe
+                    // Keyframe if either visual or IMU criteria met
                     let translation_threshold =
-                        self.config.keyframe_management.translation_threshold;
-                    let rotation_threshold = self.config.keyframe_management.rotation_threshold;
+                        self.config.keyframe_management.translation_threshold as f64;
+                    let rotation_threshold =
+                        self.config.keyframe_management.rotation_threshold as f64;
+                    let visual_keyframe =
+                        t_rel.norm() > translation_threshold || rotation_norm > rotation_threshold;
 
-                    if t_rel.norm() > translation_threshold || e_rel.norm() > rotation_threshold {
-                        log::debug!("[Estimator] Translation and rotation since last keyframe are large enough to trigger a keyframe");
+                    let is_keyframe = is_imu_keyframe || visual_keyframe;
+
+                    if is_keyframe {
+                        let reason = if is_imu_keyframe && !visual_keyframe {
+                            format!("IMU-aided: {}", keyframe_reason)
+                        } else if visual_keyframe {
+                            let t_norm = t_rel.norm();
+                            format!("Visual: trans={:.3}m, rot={:.3}rad", t_norm, rotation_norm)
+                        } else {
+                            keyframe_reason
+                        };
+                        log::debug!("[Estimator] Keyframe triggered: {}", reason);
+
                         current_frame.is_keyframe = true;
                     } else {
                         current_frame.is_keyframe = false;
@@ -592,6 +692,21 @@ impl<'a> Estimator<'a> {
             gravity,
         ))
     }
+
+    /// Reset IMU-aided keyframe selector (e.g., after loop closure)
+    pub fn reset_keyframe_selector(&mut self) {
+        self.keyframe_selector.reset();
+    }
+
+    /// Get IMU measurement rate (for monitoring)
+    pub fn get_imu_rate(&self) -> f64 {
+        if self.imu_measurement_count > 0 && self.frame_id_counter > 0 {
+            self.imu_measurement_count as f64 / self.frame_id_counter as f64
+        } else {
+            0.0
+        }
+    }
+}
 
     /// Get IMU measurement rate (for monitoring)
     pub fn get_imu_rate(&self) -> f64 {
