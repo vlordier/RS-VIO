@@ -12,7 +12,7 @@
 //!
 //! - [`PinholeProjectionFactor`](factors::PinholeProjectionFactor) - Reprojection error factor
 //! - [`BundleAdjustmentFactor`](factors::BundleAdjustmentFactor) - Multi-view optimization factor
-//! - [`OptimizationObserver`](observer::OptimizationObserver) - Progress and diagnostics
+//! - [`TerminalObserver`](crate::optimization::observer::TerminalObserver) - Progress and diagnostics
 //!
 //! ## Optimization Problem
 //!

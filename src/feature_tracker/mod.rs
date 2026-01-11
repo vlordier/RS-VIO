@@ -10,10 +10,10 @@
 //!
 //! ## Key Components
 //!
-//! - [`FeatureTracker`](feature_tracker::FeatureTracker) - Main tracker managing both cameras
-//! - [`StereoPatchTracker`](feature_tracker::StereoPatchTracker) - Stereo tracking implementation
-//! - [`Pattern52`](patch::Pattern52) - 52-point patch for optical flow
-//! - [`Feature`](feature_tracker::Feature) - Individual feature with pixel and undistorted coordinates
+//! - [`StereoPatchTracker`] - Stereo tracking implementation
+//! - [`PatchTracker`] - Monocular patch tracker used for utilities
+//! - [`Pattern52`] - 52-point patch for optical flow
+//! - [`Feature`] - Individual feature with pixel and undistorted coordinates
 //!
 //! ## Algorithm
 //!

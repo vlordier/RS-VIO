@@ -11,10 +11,10 @@
 //!
 //! ## Components
 //!
-//! - [`EurocPlayer`](euroc_player::EurocPlayer) - EuRoC dataset loader
-//! - [`TUMVIPlayer`](tum_vi_player::TUMVIPlayer) - TUM-VI dataset loader
-//! - [`FourSeasonsPlayer`](fourseasons_player::FourSeasonsPlayer) - 4Seasons dataset loader
-//! - [`Config`](config::Config) - VIO system configuration (YAML)
+//! - [`EurocPlayer`](crate::datasets::euroc_player::EurocPlayer) - EuRoC dataset loader
+//! - [`TUMVIPlayer`](crate::datasets::tum_vi_player::TUMVIPlayer) - TUM-VI dataset loader
+//! - [`FourSeasonsPlayer`](crate::datasets::fourseasons_player::FourSeasonsPlayer) - 4Seasons dataset loader
+//! - [`Config`] - VIO system configuration (YAML)
 //!
 //! ## Dataset Formats
 //!
@@ -48,8 +48,8 @@
 //! - **4Seasons**: Large (~1.5 hour sequences)
 //!
 //! ## See Also
-//! - [config::Config] - Configuration loading
-//! - [estimator::Estimator] - VIO pipeline
+//! - [`crate::datasets::config::Config`] - Configuration loading
+//! - [`crate::estimator::Estimator`] - VIO pipeline
 
 pub mod config;
 pub mod euroc_player;

@@ -12,8 +12,8 @@
 //!
 //! ## Components
 //!
-//! - [`Viewer`](viewer::Viewer) - Visualization trait
-//! - [`RerunViewer`](rerun::RerunViewer) - Rerun.io backend
+//! - [`Viewer`] - Visualization trait
+//! - [`RerunViewer`] - Rerun.io backend
 //! - Color mapping for consistent feature visualization
 //!
 //! ## Visualization Backend
@@ -51,8 +51,8 @@
 //! - Can be disabled for production use
 //!
 //! ## See Also
-//! - [estimator::Estimator] - Main VIO pipeline
-//! - [feature_tracker::FeatureTracker] - Feature tracking
+//! - [`crate::estimator::Estimator`] - Main VIO pipeline
+//! - [`crate::feature_tracker::StereoPatchTracker`] - Feature tracking
 
 pub mod rerun;
 pub mod viewer;

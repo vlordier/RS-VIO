@@ -34,10 +34,10 @@
 //!
 //! ## Key Components
 //!
-//! - [`Estimator`](estimator::Estimator) - Main pipeline orchestrator
-//! - [`Frame`](frame::Frame) - Frame representation with features
-//! - [`State`](state::State) - System state (poses and landmarks)
-//! - [`SlidingWindow`](sliding_window::SlidingWindow) - Keyframe management
+//! - [`Estimator`] - Main pipeline orchestrator
+//! - [`Frame`] - Frame representation with features
+//! - [`State`] - System state (poses and landmarks)
+//! - [`SlidingWindow`] - Keyframe management
 //!
 //! ## Frame Types
 //!

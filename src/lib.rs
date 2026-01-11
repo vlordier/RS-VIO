@@ -48,8 +48,6 @@
 #![allow(clippy::default_numeric_fallback)]
 // TODO: Add const fn where beneficial for compile-time computation
 #![allow(clippy::missing_const_for_fn)]
-//! # Ok::<(), Box<dyn std::error::Error>>(())
-//! ```
 
 use thiserror::Error;
 
