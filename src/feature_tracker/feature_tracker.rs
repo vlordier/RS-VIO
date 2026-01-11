@@ -1,7 +1,7 @@
 use image::{imageops, GrayImage};
 use imageproc::corners::Corner;
 use nalgebra as na;
-// Rayon removed - using sequential iteration for deterministic real-time execution
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::ops::AddAssign;
 
@@ -322,10 +322,10 @@ fn track_points<const LEVELS: u32>(
     optical_flow_max_iterations: usize,
     optical_flow_convergence_threshold: f32,
 ) -> HashMap<usize, na::Affine2<f32>> {
-    // Use sequential iteration for deterministic execution in real-time systems
-    // Parallel iteration introduces non-deterministic ordering and timing
-    let transform_maps1: HashMap<usize, na::Affine2<f32>> = transform_maps0
-        .iter()
+    // Use parallel iteration for multi-core performance boost
+    // Each point tracking is independent and can be parallelized
+    let results: Vec<(usize, na::Affine2<f32>)> = transform_maps0
+        .par_iter()
         .filter_map(|(k, v)| {
             if let Some(new_v) = track_one_point::<LEVELS>(
                 image_pyramid0,
@@ -355,7 +355,8 @@ fn track_points<const LEVELS: u32>(
         })
         .collect();
 
-    transform_maps1
+    // Convert Vec to HashMap for compatibility
+    results.into_iter().collect()
 }
 fn track_one_point<const LEVELS: u32>(
     image_pyramid0: &[GrayImage],

@@ -9353,6 +9353,7 @@ dependencies = [
  "nalgebra 0.34.1",
  "proptest",
  "rand 0.8.5",
+ "rayon",
  "rerun",
  "serde",
  "serde_yaml",

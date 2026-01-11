@@ -33,6 +33,7 @@ imageproc = "0.25"
 nalgebra = "0.33.2"
 nalgebra034 = { package = "nalgebra", version = "0.34.1" } # TODO improve this, now this is dirty (needed for camera-intrinsic-model for now)
 camera-intrinsic-model = "0.7.2"
+rayon = "1.10"  # Parallel iteration for multi-core feature tracking
 # Note: Using git dependency for apex-solver to access Schur complement methods
 # Consider pinning to a specific commit when stable release is available
 apex-solver = { git = "https://github.com/amin-abouee/apex-solver", branch = "main" }
@@ -148,3 +149,11 @@ harness = true
 [[bench]]
 name = "pipeline"
 harness = true
+
+[[bench]]
+name = "performance_optimizations"
+harness = false
+
+[[bench]]
+name = "real_world_performance"
+harness = false

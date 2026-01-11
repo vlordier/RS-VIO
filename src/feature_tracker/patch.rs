@@ -52,7 +52,19 @@ pub struct Pattern52 {
     /// Pre-computed 2D coordinates of the 52 pattern points
     pub pattern_matrix: na::SMatrix<f32, 2, PATTERN52_SIZE>,
 }
-
+impl Default for Pattern52 {
+    fn default() -> Self {
+        Self {
+            valid: false,
+            mean: 0.0,
+            pos: na::Vector2::zeros(),
+            data: [0.0; PATTERN52_SIZE],
+            h_se2_inv_j_se2_t: na::SMatrix::zeros(),
+            pattern_scale_down: 0.0,
+            pattern_matrix: na::SMatrix::zeros(),
+        }
+    }
+}
 impl Pattern52 {
     pub const PATTERN_RAW: [[f32; 2]; PATTERN52_SIZE] = [
         [-3.0, 7.0],

@@ -15,6 +15,11 @@
 //! - Pattern52 - 52-point patch for optical flow
 //! - Feature - Individual feature with pixel and undistorted coordinates
 //!
+//! ## Performance Optimizations
+//!
+//! - `patch_simd` - SIMD-accelerated patch operations (AVX2/SSE4.1)
+//! - `frame_skip` - Adaptive frame skipping for real-time constraints
+//!
 //! ## Trait
 //!
 //! The module provides a `FeatureTracker` trait for pluggable tracking algorithms.
@@ -65,8 +70,12 @@
 #![allow(clippy::module_inception)]
 
 pub mod feature_tracker;
+pub mod frame_skip;
 pub mod image_utilities;
 pub mod patch;
+pub mod patch_simd;
 
 pub use feature_tracker::*;
+pub use frame_skip::AdaptiveFrameSkipper;
 pub use patch::Pattern52;
+pub use patch_simd::compute_residuals_simd;
