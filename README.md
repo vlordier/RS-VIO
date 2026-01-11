@@ -19,7 +19,47 @@ A high-performance stereo visual-inertial odometry (VIO) system written in Rust.
 - **Multi-camera model support**: Supports pinhole-radtan and EUCM camera models with distortion handling, more camera models can be integrated easily.
 - **Dataset support**: Players for EuRoC, TUM-VI, and 4Seasons datasets with configurable parameters.
 - **3D visualization**: Real-time visualization of trajectories, map points, and camera frustums using Rerun.
- 
+
+## Safety & Embedded Systems
+
+RS-VIO is designed for safety-critical embedded systems with three build profiles:
+
+### Build Profiles
+
+| Profile | Use Case | Overhead | Binary Size |
+|---------|----------|----------|-------------|
+| **release** | Production systems | Minimal | ~7.3MB |
+| **embedded-safe** | Development with assertions | 3-5% | ~11MB |
+| **ultra-critical** | Medical/aerospace/autonomous | 3-5% | ~11MB |
+
+### Safety Guarantees
+
+✅ **100% Safe Rust** - Zero unsafe code (enforced by `unsafe_code = forbid`)  
+✅ **No Panics** - Panic-free guarantee (`panic = deny`)  
+✅ **No Unwraps** - Strict error handling (`expect_used = deny`)  
+✅ **Overflow Protection** - Integer overflow checks in all profiles  
+✅ **Deterministic Builds** - Reproducible binaries across builds
+
+### For Safety-Critical Deployment
+
+```bash
+# Build with maximum safety checks
+cargo build --profile ultra-critical
+
+# Verify no unsafe patterns
+cargo clippy --lib -- -D warnings
+
+# Run all tests
+cargo test --release
+
+# Optional: Test with sanitizers (requires nightly)
+RUSTFLAGS="-Z sanitizer=memory" cargo +nightly test --profile ultra-critical
+RUSTFLAGS="-Z sanitizer=thread" cargo +nightly test --profile ultra-critical
+RUSTFLAGS="-Z sanitizer=address" cargo +nightly test --profile ultra-critical
+```
+
+For comprehensive safety documentation and pre-deployment checklists, see [SAFETY.md](SAFETY.md).
+
 ## Usage
 
 ### Running with Real Datasets

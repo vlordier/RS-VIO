@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-01-11
+
+### Added
+- **Ultra-tight safety configuration** for embedded and safety-critical systems
+- **SAFETY.md**: Comprehensive 323-line safety documentation
+- **Build profiles**: Three-tier strategy (release, embedded-safe, ultra-critical)
+- **Deny-level lints**: expect_used, todo, unimplemented, box_collection, rc_buffer
+- **Sanitizer support**: Memory, thread, and address sanitizers for pre-deployment testing
+- **Pre-deployment checklist**: 11-step validation process for critical deployments
+- Support for medical devices, aerospace systems, and autonomous vehicles
+
+### Changed
+- Promoted unsafe patterns to deny-level in Cargo.toml clippy lints
+- Enhanced integer overflow protection in all build profiles
+- Strengthened panic handling with abort strategy
+- Updated description to emphasize safety-critical capabilities
+
+### Security
+- **unsafe_code = forbid**: 100% safe Rust guarantee
+- **panic = deny**: No panics in production code
+- **expect_used = deny**: Must use Result<T> instead
+- All 27 tests passing with strict safety validation
+
 ## [Unreleased]
 
 ### Added

@@ -76,6 +76,47 @@ Examples:
 - `docs: update installation instructions`
 - `test: add benchmark for optimization`
 
+## Safety Standards
+
+RS-VIO enforces strict safety standards suitable for embedded systems. All code must comply with:
+
+### Compile-Time Safety (Enforced at Build)
+- ❌ **NO unsafe code** - `unsafe_code = forbid` (zero exceptions)
+- ❌ **NO panics** - `panic = deny` in production code (tests allowed)
+- ❌ **NO expect()** - Use `Result<T>` instead (`expect_used = deny`)
+- ❌ **NO unimplemented!()** - All code must be complete (`unimplemented = deny`)
+- ❌ **NO TODO comments** - Resolve before merge (`todo = deny`)
+- ❌ **NO double allocations** - No `Box<Vec<T>>` (`box_collection = deny`)
+- ❌ **NO reference-counted buffers** - No `Rc<Vec<T>>` in realtime (`rc_buffer = deny`)
+
+### Runtime Safety
+- ✅ **Overflow checks** - Integer operations validated at runtime
+- ✅ **Debug assertions** - Enabled in safe/ultra-critical profiles
+- ✅ **Result-based error handling** - Propagate errors gracefully
+
+### Testing Requirements
+- All new code must have tests
+- Tests must pass: `cargo test --release`
+- All targets must pass clippy: `cargo clippy --all-targets -- -D warnings`
+- For safety-critical code, verify with ultra-critical profile: `cargo build --profile ultra-critical`
+
+### Example: Error Handling
+
+```rust
+// ❌ DO NOT (will fail compilation)
+fn process() -> Result<Data> {
+    let value = some_operation().expect("failed");  // expect_used = deny
+    todo!("implement later");  // todo = deny
+}
+
+// ✅ DO (correct approach)
+fn process() -> Result<Data> {
+    let value = some_operation()?;  // Propagate error
+    // Complete implementation, no TODO
+    Ok(value)
+}
+```
+
 ### Pull Request Process
 
 1. **Create a PR**
