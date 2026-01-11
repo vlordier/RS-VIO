@@ -7,11 +7,12 @@ use crate::estimator::Frame;
 use crate::feature_tracker::StereoPatchTracker;
 use crate::imu::ExtrinsicCalibrator;
 use crate::imu::ImuConfig;
+use crate::imu::ImuBiasEstimator;
 use crate::imu::ImuMotionPredictor;
+use crate::imu::ImuMotionPrior;
 use crate::imu::ImuPreintegrator;
 use crate::imu::PreintegratedImu;
 use crate::imu::VelocityEstimator;
-use crate::imu::initialization::ImuBiasEstimator;
 use crate::types::{Float, Matrix4x4, UnitQuaternion, Vector3};
 use crate::viewers::Viewer;
 use anyhow::Result;
@@ -361,7 +362,32 @@ impl<'a> Estimator<'a> {
         if current_frame.is_keyframe {
             let optimization_start = Instant::now();
             self.sliding_window.add_frame(current_frame);
-            let _ = self.sliding_window.optimize(); // TODO: handle error properly
+            // Provide IMU motion prior to optimizer when available
+            let imu_prior = if self.config.optimization.imu_prior_enable {
+                self.get_imu_motion_prior()
+            } else {
+                None
+            };
+            let imu_weights = if self.config.optimization.imu_prior_enable {
+                Some((
+                    self.config.optimization.imu_prior_weight_pos,
+                    self.config.optimization.imu_prior_weight_rot,
+                ))
+            } else {
+                None
+            };
+            let imu_huber_delta = if self.config.optimization.imu_prior_enable {
+                Some(self.config.optimization.imu_prior_huber_delta)
+            } else {
+                None
+            };
+            if let Err(e) = self
+                .sliding_window
+                .optimize_with_imu(imu_prior, imu_weights, imu_huber_delta)
+            {
+                log::error!("[Estimator] Bundle adjustment optimization failed: {:?}", e);
+                // Continue execution even if optimization fails
+            }
             optimization_time_ms = optimization_start.elapsed().as_secs_f64() * 1000.0;
             self.view_optimization_results();
         }
@@ -537,5 +563,42 @@ impl<'a> Estimator<'a> {
     /// Get number of IMU measurements processed
     pub fn imu_measurement_count(&self) -> usize {
         self.imu_measurement_count
+    }
+
+    /// Get IMU motion prior for optimization
+    ///
+    /// Returns the preintegrated IMU measurements between the last two keyframes,
+    /// useful for adding IMU constraints to bundle adjustment.
+    pub fn get_imu_motion_prior(&self) -> Option<ImuMotionPrior> {
+        let preint = self.imu_preintegrator.get();
+
+        // Get last keyframe pose from sliding window
+        let keyframe_poses = self.sliding_window.get_keyframe_poses();
+        let last_keyframe_pose = keyframe_poses.last()?;
+
+        // Get current velocity
+        let velocity = if self.velocity_estimator.is_initialized() {
+            self.velocity_estimator.get_velocity()
+        } else {
+            self.current_velocity
+        };
+
+        let gravity = na::Vector3::new(0.0, 0.0, -9.81);
+
+        Some(ImuMotionPrior::from_preintegration(
+            preint,
+            *last_keyframe_pose,
+            velocity,
+            gravity,
+        ))
+    }
+
+    /// Get IMU measurement rate (for monitoring)
+    pub fn get_imu_rate(&self) -> f64 {
+        if self.imu_measurement_count > 0 && self.frame_id_counter > 0 {
+            self.imu_measurement_count as f64 / self.frame_id_counter as f64
+        } else {
+            0.0
+        }
     }
 }

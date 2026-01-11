@@ -469,6 +469,78 @@ impl ExtrinsicCalibrator {
     }
 }
 
+/// IMU motion prior for optimization
+///
+/// Provides motion constraints from preintegrated IMU measurements
+/// to guide bundle adjustment optimization.
+#[derive(Debug, Clone)]
+pub struct ImuMotionPrior {
+    /// Preintegrated rotation from i to j
+    pub delta_rotation: na::UnitQuaternion<f64>,
+    /// Preintegrated velocity change from i to j
+    pub delta_velocity: na::Vector3<f64>,
+    /// Preintegrated position change from i to j
+    pub delta_position: na::Vector3<f64>,
+    /// Time interval
+    pub delta_time: f64,
+    /// Initial pose at time i
+    pub initial_pose: na::Matrix4<f64>,
+    /// Initial velocity at time i
+    pub initial_velocity: na::Vector3<f64>,
+    /// Gravity vector in world frame
+    pub gravity: na::Vector3<f64>,
+}
+
+impl ImuMotionPrior {
+    /// Create from preintegrated measurements
+    pub fn from_preintegration(
+        preint: &PreintegratedImu,
+        initial_pose: na::Matrix4<f64>,
+        initial_velocity: na::Vector3<f64>,
+        gravity: na::Vector3<f64>,
+    ) -> Self {
+        Self {
+            delta_rotation: preint.delta_rotation,
+            delta_velocity: preint.delta_velocity,
+            delta_position: preint.delta_position,
+            delta_time: preint.delta_time,
+            initial_pose,
+            initial_velocity,
+            gravity,
+        }
+    }
+
+    /// Compute predicted state at time j
+    ///
+    /// Returns (predicted_pose, predicted_velocity)
+    pub fn predict_state(&self) -> (na::Matrix4<f64>, na::Vector3<f64>) {
+        // Rotation prediction
+        let R_W_Bi = na::Rotation3::from_matrix_unchecked(
+            self.initial_pose.fixed_view::<3, 3>(0, 0).into_owned(),
+        );
+        let R_W_Bj = R_W_Bi * self.delta_rotation.to_rotation_matrix();
+
+        // Velocity prediction
+        let v_W_Bj = self.initial_velocity + self.delta_velocity + self.gravity * self.delta_time;
+
+        // Position prediction
+        let p_W_Bi = self.initial_pose.fixed_view::<3, 1>(0, 3).into_owned();
+        let p_W_Bj = p_W_Bi
+            + self.initial_velocity * self.delta_time
+            + 0.5 * self.gravity * self.delta_time * self.delta_time
+            + self.delta_position;
+
+        // Compose pose matrix
+        let mut T_W_Bj = na::Matrix4::identity();
+        T_W_Bj
+            .fixed_view_mut::<3, 3>(0, 0)
+            .copy_from(&R_W_Bj.into_inner());
+        T_W_Bj.fixed_view_mut::<3, 1>(0, 3).copy_from(&p_W_Bj);
+
+        (T_W_Bj, v_W_Bj)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
