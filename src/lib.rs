@@ -2,6 +2,7 @@ pub mod datasets;
 pub mod estimator;
 pub mod evaluation;
 pub mod feature_tracker;
+pub mod imu;
 pub mod logging;
 pub mod optimization;
 pub mod types;
