@@ -73,6 +73,7 @@
 
 pub mod factors;
 pub mod observer;
+pub mod tight_coupling;
 
 #[cfg(test)]
 mod tests;
