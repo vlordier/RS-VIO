@@ -1,7 +1,8 @@
 use super::get_feature_color;
 use super::Viewer;
+use crate::datasets::config::VisualizationConfig;
 use crate::types::{Array3, Float, Matrix3x3, Matrix4x4, ToArray};
-use anyhow::Result;
+use crate::{Result, VIOError};
 use image::{DynamicImage, ImageBuffer, Luma};
 use rerun::components::Color;
 use rerun::time::Timestamp;
@@ -18,6 +19,9 @@ pub struct RerunViewer {
     timestamp_ns: i64,
     #[allow(dead_code)] // Reserved for future timestamp normalization
     first_timestamp_ns: Option<i64>,
+    stream_name: String,
+    startup_delay_ms: u64,
+    log_axes: bool,
 }
 
 impl Default for RerunViewer {
@@ -33,12 +37,19 @@ impl RerunViewer {
     }
 
     pub fn new() -> Self {
+        Self::new_with_config(&VisualizationConfig::default())
+    }
+
+    pub fn new_with_config(config: &VisualizationConfig) -> Self {
         RerunViewer {
             rec: None,
             initialized: false,
             frame_id: 0,
             timestamp_ns: 0,
             first_timestamp_ns: None,
+            stream_name: config.stream_name.clone(),
+            startup_delay_ms: config.startup_delay_ms,
+            log_axes: config.log_axes,
         }
     }
 
@@ -101,58 +112,48 @@ impl Viewer for RerunViewer {
         // Spawn a new rerun viewer
         // This will start the rerun viewer application if it's not already running
         log::info!("[RerunViewer] Spawning rerun viewer...");
-        let rec = RecordingStreamBuilder::new("sivo_viewer")
+        let rec = RecordingStreamBuilder::new(self.stream_name.as_str())
             .spawn()
             .map_err(|e| {
                 log::error!("[RerunViewer] Failed to spawn viewer: {}", e);
-                e
+                VIOError::Viewer(e.to_string())
             })?;
 
         self.rec = Some(rec);
         self.initialized = true;
 
         // Give the viewer a moment to fully start up
-        std::thread::sleep(std::time::Duration::from_millis(500));
+        std::thread::sleep(std::time::Duration::from_millis(self.startup_delay_ms));
 
         // Set up coordinate system
         if let Some(ref rec) = self.rec {
             rec.set_time_sequence("frame", 0);
-            match rec.log("origin", &rerun::ViewCoordinates::RDF()) {
-                Ok(_) => log::debug!("[RerunViewer] Successfully logged coordinate system"),
-                Err(e) => {
-                    log::warn!("[RerunViewer] Failed to log coordinate system: {}", e);
-                    // Don't fail initialization if this fails
-                },
-            }
-            // Log an origin arrow for the coordinate system at the origin
-            // The colors used are: X - red, Y - green, Z - blue (conventional)
-            let origin = [0.0, 0.0, 0.0];
+            if self.log_axes {
+                match rec.log("origin", &rerun::ViewCoordinates::RDF()) {
+                    Ok(_) => log::debug!("[RerunViewer] Successfully logged coordinate system"),
+                    Err(e) => {
+                        log::warn!("[RerunViewer] Failed to log coordinate system: {}", e);
+                    },
+                }
 
-            // Plot coordinate axes at the origin using rerun::Arrows3D
-            let origins = vec![
-                origin, // x
-                origin, // y
-                origin, // z
-            ];
-            let vectors = vec![
-                [1.0, 0.0, 0.0], // X axis
-                [0.0, 1.0, 0.0], // Y axis
-                [0.0, 0.0, 1.0], // Z axis
-            ];
-            let colors = vec![
-                rerun::Color::from_rgb(255, 0, 0), // X - red
-                rerun::Color::from_rgb(0, 255, 0), // Y - green
-                rerun::Color::from_rgb(0, 0, 255), // Z - blue
-            ];
+                let origin = [0.0, 0.0, 0.0];
+                let origins = vec![origin, origin, origin];
+                let vectors = vec![[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+                let colors = vec![
+                    rerun::Color::from_rgb(255, 0, 0),
+                    rerun::Color::from_rgb(0, 255, 0),
+                    rerun::Color::from_rgb(0, 0, 255),
+                ];
 
-            match rec.log(
-                "origin/axes",
-                &rerun::Arrows3D::from_vectors(vectors)
-                    .with_origins(origins)
-                    .with_colors(colors),
-            ) {
-                Ok(_) => log::debug!("[RerunViewer] Successfully logged axis arrows"),
-                Err(e) => log::warn!("[RerunViewer] Failed to log axis arrows: {}", e),
+                match rec.log(
+                    "origin/axes",
+                    &rerun::Arrows3D::from_vectors(vectors)
+                        .with_origins(origins)
+                        .with_colors(colors),
+                ) {
+                    Ok(_) => log::debug!("[RerunViewer] Successfully logged axis arrows"),
+                    Err(e) => log::warn!("[RerunViewer] Failed to log axis arrows: {}", e),
+                }
             }
         }
         log::info!("[RerunViewer] Viewer initialized successfully");
@@ -172,7 +173,7 @@ impl Viewer for RerunViewer {
             let rotation = Matrix3x3::from(T_W_B.fixed_view::<3, 3>(0, 0));
 
             // Convert rotation matrix to quaternion
-            let quat = matrix_to_quaternion(Matrix3x3::from(rotation).to_array());
+            let quat = matrix_to_quaternion(rotation.to_array());
             let quaternion = rerun::Quaternion::from_xyzw([
                 quat[0] as f32,
                 quat[1] as f32,
@@ -526,8 +527,10 @@ fn matrix_to_quaternion(rot: [[Float; 3]; 3]) -> [Float; 4] {
 }
 
 // Helper function to create a RerunViewer
-pub fn create_viewer() -> Result<Box<dyn Viewer>> {
-    let mut viewer = RerunViewer::new();
+pub fn create_viewer(
+    config: &crate::datasets::config::VisualizationConfig,
+) -> Result<Box<dyn Viewer>> {
+    let mut viewer = RerunViewer::new_with_config(config);
     viewer.initialize()?;
     Ok(Box::new(viewer))
 }

@@ -1,3 +1,4 @@
+use crate::{Result, VIOError};
 use serde::{Deserialize, Serialize};
 
 /// Main configuration structure for the VIO system.
@@ -11,7 +12,10 @@ pub struct Config {
     #[serde(rename = "keyframe_management")]
     pub keyframe_management: KeyframeManagementConfig,
     #[serde(rename = "feature_detection")]
+    #[serde(default)]
     pub feature_detection: FeatureDetectionConfig,
+    #[serde(default)]
+    pub visualization: VisualizationConfig,
     pub optimization: OptimizationConfig,
 }
 
@@ -51,6 +55,8 @@ pub struct KeyframeManagementConfig {
     pub translation_threshold: f64,
     #[serde(rename = "rotation_threshold")]
     pub rotation_threshold: f64,
+    #[serde(default = "default_processing_timeout_ms")]
+    pub processing_timeout_ms: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,6 +71,17 @@ pub struct FeatureDetectionConfig {
     pub optical_flow_convergence_threshold: f64,
 }
 
+impl Default for FeatureDetectionConfig {
+    fn default() -> Self {
+        Self {
+            grid_cols: 30,
+            max_features_per_grid: 200,
+            optical_flow_max_iterations: 30,
+            optical_flow_convergence_threshold: 0.005,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OptimizationConfig {
     #[serde(rename = "bundle_adjustment_max_iterations")]
@@ -74,8 +91,8 @@ pub struct OptimizationConfig {
 }
 
 impl Config {
-    pub fn load(path: &str) -> anyhow::Result<Self> {
-        let content = std::fs::read_to_string(path)?;
+    pub fn load(path: &str) -> Result<Self> {
+        let content = std::fs::read_to_string(path).map_err(VIOError::Io)?;
         // Strip YAML directive if present (e.g., %YAML:1.0)
         let content = if content.trim_start().starts_with("%YAML") {
             content
@@ -86,7 +103,54 @@ impl Config {
         } else {
             content
         };
-        let config: Config = serde_yaml::from_str(&content)?;
+        let config: Config =
+            serde_yaml::from_str(&content).map_err(|e| VIOError::Parse(e.to_string()))?;
         Ok(config)
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VisualizationConfig {
+    #[serde(default = "default_enable_viewer")]
+    pub enable_viewer: bool,
+    #[serde(default = "default_stream_name")]
+    pub stream_name: String,
+    #[serde(default = "default_startup_delay_ms")]
+    pub startup_delay_ms: u64,
+    #[serde(default = "default_log_axes")]
+    pub log_axes: bool,
+    #[serde(default)]
+    pub statistics_path: Option<String>,
+}
+
+impl Default for VisualizationConfig {
+    fn default() -> Self {
+        Self {
+            enable_viewer: true,
+            stream_name: "sivo_viewer".to_string(),
+            startup_delay_ms: 500,
+            log_axes: true,
+            statistics_path: None,
+        }
+    }
+}
+
+fn default_enable_viewer() -> bool {
+    true
+}
+
+fn default_stream_name() -> String {
+    "sivo_viewer".to_string()
+}
+
+fn default_startup_delay_ms() -> u64 {
+    500
+}
+
+fn default_log_axes() -> bool {
+    true
+}
+
+fn default_processing_timeout_ms() -> u64 {
+    100
 }

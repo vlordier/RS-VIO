@@ -5,11 +5,13 @@ use nalgebra as na;
 use std::collections::HashMap;
 use std::ops::AddAssign;
 
+use crate::datasets::config::FeatureDetectionConfig;
+
 use super::{image_utilities, patch};
 
 use log::info;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Feature {
     /// Unique identifier of this feature (within the current frame or globally).
     pub feature_id: usize,
@@ -31,13 +33,23 @@ impl Feature {
     }
 }
 
-#[derive(Default)]
 pub struct PatchTracker<const N: u32> {
     last_keypoint_id: usize,
     tracked_points_map: HashMap<usize, na::Affine2<f32>>,
     previous_image_pyramid: Vec<GrayImage>,
+    grid_cols: u32,
 }
 impl<const LEVELS: u32> PatchTracker<LEVELS> {
+    /// Construct tracker from `FeatureDetectionConfig` for centralized tuning.
+    pub fn from_config(config: &crate::datasets::config::FeatureDetectionConfig) -> Self {
+        Self {
+            last_keypoint_id: 0,
+            tracked_points_map: HashMap::new(),
+            previous_image_pyramid: Vec::new(),
+            grid_cols: config.grid_cols,
+        }
+    }
+
     pub fn process_frame(&mut self, greyscale_image: &GrayImage) {
         // build current image pyramid
         let current_image_pyramid: Vec<GrayImage> = build_image_pyramid(greyscale_image, LEVELS);
@@ -46,21 +58,18 @@ impl<const LEVELS: u32> PatchTracker<LEVELS> {
             info!("old points {}", self.tracked_points_map.len());
             // track prev points
             // Default values for PatchTracker (not used in estimator)
-            const DEFAULT_OPTICAL_FLOW_MAX_ITERATIONS: usize = 30;
-            const DEFAULT_OPTICAL_FLOW_CONVERGENCE_THRESHOLD: f32 = 0.005;
+            let defaults = FeatureDetectionConfig::default();
             self.tracked_points_map = track_points::<LEVELS>(
                 &self.previous_image_pyramid,
                 &current_image_pyramid,
                 &self.tracked_points_map,
-                DEFAULT_OPTICAL_FLOW_MAX_ITERATIONS,
-                DEFAULT_OPTICAL_FLOW_CONVERGENCE_THRESHOLD,
+                defaults.optical_flow_max_iterations as usize,
+                defaults.optical_flow_convergence_threshold as f32,
             );
             info!("tracked old points {}", self.tracked_points_map.len());
         }
         // add new points
-        // Default grid_size for PatchTracker (not used in estimator)
-        const DEFAULT_GRID_SIZE: u32 = 30;
-        let new_points = add_points(&self.tracked_points_map, greyscale_image, DEFAULT_GRID_SIZE);
+        let new_points = add_points(&self.tracked_points_map, greyscale_image, self.grid_cols);
         for point in &new_points {
             let mut v = na::Affine2::<f32>::identity();
 
@@ -125,6 +134,15 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             optical_flow_max_iterations: optical_flow_max_iterations as usize,
             optical_flow_convergence_threshold: optical_flow_convergence_threshold as f32,
         }
+    }
+
+    /// Construct tracker from `FeatureDetectionConfig` for centralized tuning.
+    pub fn from_config(config: &crate::datasets::config::FeatureDetectionConfig) -> Self {
+        Self::new(
+            config.grid_cols,
+            config.optical_flow_max_iterations,
+            config.optical_flow_convergence_threshold,
+        )
     }
 
     /// Process a stereo frame and update feature tracking

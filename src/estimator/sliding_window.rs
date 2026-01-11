@@ -13,6 +13,41 @@ use nalgebra as na;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 
+/// Trait for window management strategies.
+///
+/// This trait enables the Strategy Pattern for keyframe window management,
+/// allowing different strategies (fixed size, adaptive, marginalization-based)
+/// to be used interchangeably.
+///
+/// # Design Pattern
+/// Implements the **Strategy Pattern** to encapsulate window management algorithms
+/// and make them interchangeable without affecting the rest of the system.
+pub trait WindowManager: Send {
+    /// Get the current number of keyframes in the window
+    fn len(&self) -> usize;
+
+    /// Check if the window is empty
+    fn is_empty(&self) -> bool;
+
+    /// Check if the window is full
+    fn is_full(&self) -> bool;
+
+    /// Get a reference to a specific keyframe by index
+    fn get_frame(&self, index: usize) -> Option<&Frame>;
+
+    /// Get all keyframe poses
+    fn get_keyframe_poses(&self) -> Vec<Matrix4x4>;
+
+    /// Clear all keyframes
+    fn clear(&mut self);
+
+    /// Get the number of map points
+    fn map_points_len(&self) -> usize;
+
+    /// Get a name for logging
+    fn name(&self) -> &'static str;
+}
+
 /// Sliding window of keyframes for bundle adjustment optimization.
 ///
 /// Maintains a fixed-size window of keyframes and manages the optimization

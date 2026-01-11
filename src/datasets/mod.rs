@@ -54,6 +54,8 @@
 pub mod config;
 pub mod euroc_player;
 pub mod fourseasons_player;
+pub mod frame_processor_trait;
+pub mod player_trait;
 pub mod tum_vi_player;
 
 use crate::datasets::config::Config;
@@ -78,7 +80,7 @@ pub struct ImuData {
 }
 
 // Frame context for tracking processing state
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FrameContext {
     pub current_idx: usize,
     pub processed_frames: usize,
@@ -118,6 +120,7 @@ pub struct PlayerConfig {
     pub enable_statistics: bool,
     pub enable_console_statistics: bool,
     pub step_mode: bool,
+    pub stats_output_path: Option<String>,
 }
 
 /// Enum to represent different camera model types

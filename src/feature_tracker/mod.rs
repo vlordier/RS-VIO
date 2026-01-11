@@ -10,6 +10,7 @@
 //!
 //! ## Key Components
 //!
+//! - [`FeatureTracker`] - Trait for pluggable feature tracking algorithms
 //! - [`StereoPatchTracker`] - Stereo tracking implementation
 //! - [`PatchTracker`] - Monocular patch tracker used for utilities
 //! - [`Pattern52`] - 52-point patch for optical flow
@@ -41,15 +42,15 @@
 //! ## Usage
 //!
 //! ```rust,ignore
-//! use rs_vio::feature_tracker::StereoPatchTracker;
+//! use rs_vio::feature_tracker::{FeatureTracker, StereoPatchTracker};
 //!
-//! let mut tracker: StereoPatchTracker<3> = StereoPatchTracker::new(640, 480);
-//! // Features are tracked by calling process_frame with stereo images
+//! let tracker = StereoPatchTracker::new();
+//! // Process frames through the FeatureTracker trait
 //! ```
 //!
 //! ## Thread Safety
 //!
-//! `FeatureTracker` is not thread-safe and should be used sequentially for
+//! `FeatureTracker` implementations are not thread-safe and should be used sequentially for
 //! deterministic real-time performance. For parallel processing, create one
 //! tracker per thread.
 //!

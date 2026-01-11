@@ -60,10 +60,62 @@ pub enum VIOError {
     Image(String),
     #[error("Optimization error: {0}")]
     Optimization(String),
+    #[error("Solver error: {0}")]
+    Solver(String),
+    #[error("Parsing error: {0}")]
+    Parse(String),
+    #[error("Viewer error: {0}")]
+    Viewer(String),
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
     #[error("Anyhow error: {0}")]
     Anyhow(#[from] anyhow::Error),
+}
+
+/// Result type for RS-VIO operations, defaulting to VIOError.
+pub type Result<T> = std::result::Result<T, VIOError>;
+
+/// Initialize colored logging for RS-VIO.
+///
+/// Sets up immediate colored output with proper formatting for all binaries.
+/// Call this at the beginning of your application before any logging.
+///
+/// # Examples
+///
+/// ```rust
+/// use rs_vio::init_colored_logging;
+///
+/// init_colored_logging();
+/// log::info!("Application started");
+/// ```
+pub fn init_colored_logging() {
+    use env_logger::Builder;
+    use env_logger::Env;
+    use log::LevelFilter;
+    use std::io::Write;
+
+    Builder::from_env(Env::default().default_filter_or("debug"))
+        // Silence rerun noise unless it's a warning or worse
+        .filter_module("rerun", LevelFilter::Warn)
+        .format_timestamp_millis()
+        .format(|buf, record| {
+            let level = match record.level() {
+                log::Level::Error => "\x1b[31mERROR\x1b[0m",
+                log::Level::Warn => "\x1b[33mWARN\x1b[0m",
+                log::Level::Info => "\x1b[32mINFO\x1b[0m",
+                log::Level::Debug => "\x1b[34mDEBUG\x1b[0m",
+                log::Level::Trace => "\x1b[36mTRACE\x1b[0m",
+            };
+            writeln!(
+                buf,
+                "[{}] [{}] {}",
+                buf.timestamp_millis(),
+                level,
+                record.args()
+            )
+        })
+        .try_init()
+        .ok();
 }
 
 /// Initialize logging for RS-VIO.
@@ -91,6 +143,7 @@ pub fn init_logging() {
 }
 
 pub mod datasets;
+pub mod error_handling;
 pub mod estimator;
 pub mod feature_tracker;
 pub mod optimization;

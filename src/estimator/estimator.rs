@@ -6,7 +6,7 @@ use crate::estimator::SlidingWindow;
 use crate::feature_tracker::StereoPatchTracker;
 use crate::types::{Matrix4x4, UnitQuaternion, Vector3};
 use crate::viewers::Viewer;
-use anyhow::Result;
+use crate::{Result, VIOError};
 use image::GrayImage;
 use nalgebra as na;
 use std::time::{Duration, Instant};
@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 /// Placeholder estimator implementation.
 /// Currently mimics the control flow and logging structure of the C++ Estimator::process_frame,
 /// but uses dummy values for tracking, optimization, and mapping.
-pub struct Estimator<'a> {
+pub struct Estimator {
     frame_id_counter: u64,
     frames_since_last_keyframe: u64,
     /// When true, emit detailed per-frame logs (equivalent to Config::m_enable_debug_output).
@@ -25,8 +25,8 @@ pub struct Estimator<'a> {
     stereo_patch_tracker: StereoPatchTracker<6>,
     /// Sliding window of keyframes for bundle adjustment optimization.
     sliding_window: SlidingWindow,
-    /// Optional viewer used for visualization; outlives the estimator.
-    viewer: Option<&'a mut dyn Viewer>,
+    /// Optional viewer used for visualization; owned by the estimator.
+    viewer: Option<Box<dyn Viewer>>,
     /// Left camera model with intrinsics and distortion.
     left_cam: CameraModelType,
     /// Right camera model with intrinsics and distortion.
@@ -41,24 +41,20 @@ pub struct Estimator<'a> {
     max_frame_processing_time: Duration,
 }
 
-impl<'a> Estimator<'a> {
+impl Estimator {
     #![allow(non_snake_case)]
 
     /// Create a new estimator configured with camera intrinsics and distortion
     /// loaded from the YAML configuration.
-    ///
-    /// The `viewer` reference must outlive the estimator.
-    pub fn new(config: Config, viewer: Option<&'a mut dyn Viewer>) -> Self {
+    pub fn new(config: Config, viewer: Option<Box<dyn Viewer>>) -> Self {
         Self::new_with_cameras(config, viewer, None, None)
     }
 
     /// Create a new estimator with optional camera models.
     /// If camera models are provided, they will be used; otherwise, they will be created from config.
-    ///
-    /// The `viewer` reference must outlive the estimator.
     pub fn new_with_cameras(
         config: Config,
-        viewer: Option<&'a mut dyn Viewer>,
+        viewer: Option<Box<dyn Viewer>>,
         left_cam: Option<CameraModelType>,
         right_cam: Option<CameraModelType>,
     ) -> Self {
@@ -68,25 +64,19 @@ impl<'a> Estimator<'a> {
             _ => crate::datasets::create_camera_models_from_config(&config),
         };
 
+        let feature_config = config.feature_detection.clone();
+
         // Compute the transformation from left to right (T_C1_C0) as in compute_stereo.
         let T_B_Cl = na::Matrix4::from_row_slice(&config.camera.T_B_Cl);
         let T_B_Cr = na::Matrix4::from_row_slice(&config.camera.T_B_Cr);
         let keyframe_window_size = config.keyframe_management.keyframe_window_size as usize;
-        let grid_size = config.feature_detection.grid_cols;
-        let optical_flow_max_iterations = config.feature_detection.optical_flow_max_iterations;
-        let optical_flow_convergence_threshold =
-            config.feature_detection.optical_flow_convergence_threshold;
-
+        let processing_timeout_ms = config.keyframe_management.processing_timeout_ms;
         Estimator {
             frame_id_counter: 0,
             frames_since_last_keyframe: 0,
             enable_debug_output: true,
             config,
-            stereo_patch_tracker: StereoPatchTracker::<6>::new(
-                grid_size,
-                optical_flow_max_iterations,
-                optical_flow_convergence_threshold,
-            ),
+            stereo_patch_tracker: StereoPatchTracker::<6>::from_config(&feature_config),
             sliding_window: SlidingWindow::new(keyframe_window_size),
             viewer,
             left_cam,
@@ -96,7 +86,7 @@ impl<'a> Estimator<'a> {
             trajectory: Vec::new(),
             // Default: 100ms deadline for 10Hz operation (with margin)
             // For 30Hz target 33ms, use Duration::from_millis(30)
-            max_frame_processing_time: Duration::from_millis(100),
+            max_frame_processing_time: Duration::from_millis(processing_timeout_ms),
         }
     }
 
@@ -125,7 +115,9 @@ impl<'a> Estimator<'a> {
         // Check deadline after initial setup
         if Instant::now() > deadline {
             log::error!("[Estimator] Frame processing exceeded deadline during initialization");
-            return Err(anyhow::anyhow!("Frame processing timeout"));
+            return Err(VIOError::Optimization(
+                "Frame processing timeout".to_string(),
+            ));
         }
 
         // Timing variables
@@ -145,8 +137,8 @@ impl<'a> Estimator<'a> {
             Some(img) => img,
             None => {
                 log::error!("[Estimator] Failed to construct GrayImage for left camera");
-                return Err(anyhow::anyhow!(
-                    "Failed to create left image: size mismatch"
+                return Err(VIOError::Image(
+                    "Failed to create left image: size mismatch".to_string(),
                 ));
             },
         };
@@ -159,8 +151,8 @@ impl<'a> Estimator<'a> {
                     img_h,
                     right_image.len()
                 );
-                return Err(anyhow::anyhow!(
-                    "Failed to create right image: size mismatch"
+                return Err(VIOError::Image(
+                    "Failed to create right image: size mismatch".to_string(),
                 ));
             },
         };
@@ -192,8 +184,8 @@ impl<'a> Estimator<'a> {
         // Check deadline after patch tracking
         if Instant::now() > deadline {
             log::warn!("[Estimator] Frame processing exceeded deadline after patch tracking");
-            return Err(anyhow::anyhow!(
-                "Frame processing timeout after patch tracking"
+            return Err(VIOError::Optimization(
+                "Frame processing timeout after patch tracking".to_string(),
             ));
         }
 
@@ -213,14 +205,18 @@ impl<'a> Estimator<'a> {
                         Some(pose) => pose,
                         None => {
                             log::error!("[Estimator] No keyframe poses available");
-                            return Err(anyhow::anyhow!("No keyframe poses available"));
+                            return Err(VIOError::Optimization(
+                                "No keyframe poses available".to_string(),
+                            ));
                         },
                     };
                     let T_W_B_last_kf_inv = match T_W_B_last_kf.try_inverse() {
                         Some(inv) => inv,
                         None => {
                             log::error!("[Estimator] Matrix inversion failed for T_W_B_last_kf");
-                            return Err(anyhow::anyhow!("Matrix inversion failed"));
+                            return Err(VIOError::Optimization(
+                                "Matrix inversion failed".to_string(),
+                            ));
                         },
                     };
                     let T_rel = T_W_B * T_W_B_last_kf_inv;

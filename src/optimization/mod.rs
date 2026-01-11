@@ -10,6 +10,7 @@
 //!
 //! ## Key Components
 //!
+//! - [`Solver`] - Trait for pluggable optimization algorithms
 //! - [`PinholeProjectionFactor`](factors::PinholeProjectionFactor) - Reprojection error factor
 //! - [`BundleAdjustmentFactor`](factors::BundleAdjustmentFactor) - Multi-view optimization factor
 //! - [`TerminalObserver`](crate::optimization::observer::TerminalObserver) - Progress and diagnostics

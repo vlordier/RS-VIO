@@ -1,6 +1,5 @@
-use anyhow::Result;
-
 use crate::types::Matrix4x4;
+use crate::Result;
 
 /// Viewer trait for basic visualization operations
 pub trait Viewer: Send {

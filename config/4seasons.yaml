@@ -1,5 +1,4 @@
-%YAML:1.0
----
+
 
 # Camera Parameters (4Seasons dataset specific)
 # Image dimensions and processing parameters
@@ -34,6 +33,7 @@ keyframe_management:
   keyframe_window_size: 10
   translation_threshold: 0.05
   rotation_threshold: 0.05
+  processing_timeout_ms: 100
 
 # Feature Detection Parameters
 feature_detection:

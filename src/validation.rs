@@ -1,7 +1,8 @@
 //! Numerical validation utilities for real-time safety
 //!
-//! This module provides validation functions to ensure numerical stability
-//! and prevent NaN/Inf propagation in critical VIO computations.
+//! This module provides validation functions and the `Validatable` trait
+//! to ensure numerical stability and prevent NaN/Inf propagation in
+//! critical VIO computations.
 
 use nalgebra as na;
 
@@ -22,6 +23,104 @@ pub enum ValidationError {
     OutOfRange,
     Singular,
     InvalidDepth,
+}
+
+/// Trait for types that can be validated.
+///
+/// This trait provides a unified interface for data validation,
+/// enabling consistent validation across all data types and
+/// composable validation results.
+///
+/// # Design Pattern
+/// Implements the **Strategy Pattern** to encapsulate validation rules
+/// and make them interchangeable.
+///
+/// # Example
+/// ```rust,ignore
+/// impl Validatable for Vector3<f64> {
+///     fn validate(&self) -> Result<(), ValidationError> {
+///         validate_finite_vector(self)?;
+///         // Additional checks...
+///         Ok(())
+///     }
+/// }
+/// ```
+pub trait Validatable {
+    /// Validate this instance
+    ///
+    /// # Returns
+    /// `Ok(())` if valid, `Err(ValidationError)` if invalid
+    fn validate(&self) -> Result<(), ValidationError>;
+}
+
+/// Result of validation with optional details
+#[derive(Debug, Clone)]
+pub struct ValidationResult {
+    is_valid: bool,
+    error: Option<ValidationError>,
+    message: Option<String>,
+}
+
+impl ValidationResult {
+    pub fn ok() -> Self {
+        Self {
+            is_valid: true,
+            error: None,
+            message: None,
+        }
+    }
+
+    pub fn error(error: ValidationError, message: impl Into<String>) -> Self {
+        Self {
+            is_valid: false,
+            error: Some(error),
+            message: Some(message.into()),
+        }
+    }
+
+    pub fn is_valid(&self) -> bool {
+        self.is_valid
+    }
+
+    pub fn error_kind(&self) -> Option<ValidationError> {
+        self.error
+    }
+
+    pub fn message(&self) -> Option<&str> {
+        self.message.as_deref()
+    }
+}
+
+/// Composite validation that runs multiple validators
+#[derive(Default)]
+pub struct CompositeValidator {
+    validators: Vec<Box<dyn Fn() -> ValidationResult + Send>>,
+}
+
+impl CompositeValidator {
+    pub fn new() -> Self {
+        Self {
+            validators: Vec::new(),
+        }
+    }
+
+    pub fn add_validator<F>(mut self, validator: F) -> Self
+    where
+        F: Fn() -> ValidationResult + 'static + Send,
+    {
+        self.validators.push(Box::new(validator));
+        self
+    }
+
+    pub fn validate(&self) -> ValidationResult {
+        for validator in &self.validators {
+            let result = validator();
+            if !result.is_valid() {
+                return result;
+            }
+        }
+        ValidationResult::ok()
+    }
 }
 
 /// Validate that all elements of a vector are finite (not NaN or Inf)
@@ -268,10 +367,7 @@ mod tests {
     #[test]
     fn test_safe_divide_very_small_denominator() {
         // Denominator smaller than epsilon should fail
-        assert_eq!(
-            safe_divide(1.0, 1e-11),
-            Err(ValidationError::Singular)
-        );
+        assert_eq!(safe_divide(1.0, 1e-11), Err(ValidationError::Singular));
     }
 
     #[test]
@@ -335,7 +431,7 @@ mod tests {
         // because validation only checks abs(depth) < MIN_DEPTH
         let behind_camera = na::Vector3::new(0.0, 0.0, -5.0);
         assert!(validate_point_for_projection(&behind_camera).is_ok());
-        
+
         // But a very small absolute depth should fail
         let very_shallow = na::Vector3::new(0.0, 0.0, -1e-7);
         assert_eq!(
