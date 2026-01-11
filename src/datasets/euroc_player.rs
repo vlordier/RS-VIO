@@ -8,6 +8,7 @@ use crate::estimator::Estimator;
 use crate::viewers::{create_viewer, Viewer};
 use anyhow::Result;
 use std::path::Path;
+<<<<<<< HEAD
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -16,6 +17,20 @@ pub struct EurocPlayer;
 impl Default for EurocPlayer {
     fn default() -> Self {
         Self::new()
+=======
+use std::sync::Mutex;
+
+#[derive(Default)]
+pub struct EurocPlayer {
+    imu_cache: Mutex<Vec<ImuData>>,
+}
+
+impl EurocPlayer {
+    pub fn new() -> Self {
+        EurocPlayer {
+            imu_cache: Mutex::new(Vec::new()),
+        }
+>>>>>>> 1e93ebd0 (Implement IMU data caching and retrieval)
     }
 }
 
@@ -167,8 +182,120 @@ impl EurocPlayer {
         result.success = true;
         result.processed_frames = context.processed_frames;
 
+<<<<<<< HEAD
         if !result.frame_processing_times.is_empty() {
             result.average_processing_time_ms = result.frame_processing_times.iter().sum::<f64>()
+=======
+        // Convert to grayscale if needed (EuRoC images are typically grayscale)
+        let gray_img = img.to_luma8();
+
+        // Return raw pixel data as Vec<u8>
+        let pixel_data = gray_img.as_raw().to_vec();
+
+        Ok(pixel_data)
+    }
+
+    fn load_imu_data(
+        &self,
+        dataset_path: &str,
+        _image_data: &[ImageData],
+        _start_frame_idx: usize,
+        _end_frame_idx: usize,
+    ) -> Result<()> {
+        let imu_file = Path::new(dataset_path).join("mav0/imu0/data.csv");
+        let file = File::open(&imu_file).map_err(|e| {
+            VIOError::Config(format!(
+                "Cannot open IMU data file {}: {e}",
+                imu_file.display()
+            ))
+        })?;
+
+        let reader = BufReader::new(file);
+        let mut imu_data_vec = Vec::new();
+
+        for (line_num, line) in reader.lines().enumerate() {
+            let line = line.map_err(|e| {
+                VIOError::Config(format!(
+                    "Failed to read IMU data line {}: {e}",
+                    line_num + 1
+                ))
+            })?;
+
+            // Skip header line
+            if line_num == 0 && line.contains("#timestamp") {
+                continue;
+            }
+
+            // EuRoC IMU CSV format: timestamp,omega_x,omega_y,omega_z,alpha_x,alpha_y,alpha_z
+            let parts: Vec<&str> = line.split(',').collect();
+            if parts.len() < 7 {
+                continue;
+            }
+
+            // Parse timestamp (nanoseconds)
+            let timestamp: i64 = parts[0].trim().parse().unwrap_or(0);
+
+            // Parse gyroscope (rad/s)
+            let gyro_x: f64 = parts[1].trim().parse().unwrap_or(0.0);
+            let gyro_y: f64 = parts[2].trim().parse().unwrap_or(0.0);
+            let gyro_z: f64 = parts[3].trim().parse().unwrap_or(0.0);
+
+            // Parse accelerometer (m/s^2)
+            let accel_x: f64 = parts[4].trim().parse().unwrap_or(0.0);
+            let accel_y: f64 = parts[5].trim().parse().unwrap_or(0.0);
+            let accel_z: f64 = parts[6].trim().parse().unwrap_or(0.0);
+
+            imu_data_vec.push(ImuData {
+                timestamp,
+                gyro: [gyro_x, gyro_y, gyro_z],
+                accel: [accel_x, accel_y, accel_z],
+            });
+        }
+
+        // Store in cache
+        *self.imu_cache.lock().unwrap() = imu_data_vec;
+
+        log::info!(
+            "[EurocPlayer] Loaded {} IMU samples",
+            self.imu_cache.lock().unwrap().len()
+        );
+        Ok(())
+    }
+
+    fn get_imu_data_between_frames(
+        &self,
+        previous_timestamp: i64,
+        current_timestamp: i64,
+    ) -> Vec<ImuData> {
+        let cache = self.imu_cache.lock().unwrap();
+        cache
+            .iter()
+            .filter(|imu| imu.timestamp > previous_timestamp && imu.timestamp <= current_timestamp)
+            .cloned()
+            .collect()
+    }
+
+    fn process_single_frame(
+        &self,
+        estimator: &mut Estimator,
+        context: &mut FrameContext,
+        image_data: &[ImageData],
+        dataset_path: &str,
+    ) -> Result<f64> {
+        crate::datasets::player_trait::process_single_frame_common(
+            estimator,
+            context,
+            image_data,
+            dataset_path,
+            |ds_path, filename, cam_id| self.load_image(ds_path, filename, cam_id),
+            |ds_path, filename, cam_id| self.load_image(ds_path, filename, cam_id),
+        )
+    }
+
+    fn save_trajectories(&self, estimator: &Estimator, context: &FrameContext, dataset_path: &str) {
+        // Save trajectory in TUM format: timestamp x y z qx qy qz qw
+        let trajectory_path = Path::new(dataset_path).join("trajectory.txt");
+>>>>>>> 1e93ebd0 (Implement IMU data caching and retrieval)
 
             log::info!(
                 "[EurocPlayer] Average processing time: {:.2} ms ({:.1} fps)",
