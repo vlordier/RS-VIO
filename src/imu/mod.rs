@@ -1122,4 +1122,187 @@ mod tests {
         assert!(!bias_estimator.is_initialized);
         assert_eq!(bias_estimator.sample_count(), 0);
     }
+
+    #[test]
+    fn test_imu_preintegrator_with_bias_correction() {
+        let config = ImuConfig::default();
+        let mut preintegrator = ImuPreintegrator::new(config);
+
+        // Simulate IMU with known biases
+        let gyro_bias = [0.01, -0.02, 0.005];
+        let accel_bias = [0.05, -0.03, 0.1];
+
+        // Process 10 samples with bias correction
+        for i in 0..10 {
+            let dt = 0.005; // 5ms
+            let _ts = (i * 5000) as i64;
+
+            // Measurements with bias
+            let gyro_raw = [0.1 + gyro_bias[0], 0.05 + gyro_bias[1], 0.02 + gyro_bias[2]];
+            let accel_raw = [
+                0.5 + accel_bias[0],
+                -0.2 + accel_bias[1],
+                -9.81 + accel_bias[2],
+            ];
+
+            // Corrected measurements
+            let gyro_corrected = na::Vector3::new(
+                gyro_raw[0] - gyro_bias[0],
+                gyro_raw[1] - gyro_bias[1],
+                gyro_raw[2] - gyro_bias[2],
+            );
+            let accel_corrected = na::Vector3::new(
+                accel_raw[0] - accel_bias[0],
+                accel_raw[1] - accel_bias[1],
+                accel_raw[2] - accel_bias[2],
+            );
+
+            preintegrator.propagate_corrected(gyro_corrected, accel_corrected, dt);
+        }
+
+        let preint = preintegrator.get();
+        assert!(preint.delta_time > 0.0, "Should have non-zero delta time");
+        assert!(
+            preint.delta_rotation.angle() > 0.0,
+            "Should have rotation from angular velocity"
+        );
+
+        // Preintegrator should accumulate position change
+        // With constant velocity, position change should be significant
+        assert!(
+            preint.delta_position.norm() > 0.001,
+            "Should have position change: {}",
+            preint.delta_position.norm()
+        );
+    }
+
+    #[test]
+    fn test_imu_motion_prior_innovation_comprehensive() {
+        // Test IMU motion prior with various motion scenarios
+        let test_cases = vec![
+            // (delta_rotation_deg, delta_velocity, delta_position, delta_time, description)
+            (
+                0.0,
+                na::Vector3::zeros(),
+                na::Vector3::zeros(),
+                1.0,
+                "stationary",
+            ),
+            (
+                10.0,
+                na::Vector3::new(0.1, 0.0, 0.0),
+                na::Vector3::zeros(),
+                1.0,
+                "pure_translation",
+            ),
+            (
+                0.0,
+                na::Vector3::zeros(),
+                na::Vector3::new(0.05, 0.0, 0.0),
+                1.0,
+                "position_offset",
+            ),
+            (
+                5.0,
+                na::Vector3::new(0.05, 0.02, 0.0),
+                na::Vector3::new(0.02, 0.01, 0.0),
+                0.5,
+                "combined_motion",
+            ),
+        ];
+
+        for (rot_deg, vel, pos, dt, desc) in test_cases {
+            let mut preint = PreintegratedImu::new();
+            let rot_rad = rot_deg * std::f64::consts::PI / 180.0;
+            if rot_rad > 0.0 {
+                preint.delta_rotation = na::UnitQuaternion::new(na::Vector3::z() * rot_rad);
+            }
+            preint.delta_velocity = vel;
+            preint.delta_position = pos;
+            preint.delta_time = dt;
+
+            let initial_pose = na::Matrix4::identity();
+            let initial_velocity = na::Vector3::zeros();
+            let gravity = na::Vector3::new(0.0, 0.0, -9.81);
+
+            let prior = ImuMotionPrior::from_preintegration(
+                &preint,
+                initial_pose,
+                initial_velocity,
+                gravity,
+            );
+            let (pred_pose, _pred_vel) = prior.predict_state();
+
+            // Verify prediction properties
+            if desc == "stationary" {
+                // For stationary case, rotation should be identity
+                assert!(
+                    pred_pose.fixed_view::<3, 3>(0, 0).abs().sum() > 2.9,
+                    "Rotation matrix should be approximately identity for stationary"
+                );
+            }
+
+            // Innovation with matching observation should be small
+            let (_, rot_err, _) = prior.compute_innovation(&initial_pose, &initial_velocity);
+
+            // For stationary case with zero preintegration, rotation error should be zero
+            if desc == "stationary" {
+                assert!(
+                    rot_err.abs() < 1e-10,
+                    "Rotation error should be zero for stationary"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_imu_bias_estimator_reset() {
+        let config = ImuConfig::default();
+        let mut bias_estimator = ImuBiasEstimator::new(config);
+
+        // Add samples to initialize
+        for i in 0..150 {
+            let _ts = (i * 5000) as i64;
+            let imu = ImuData {
+                timestamp: _ts,
+                gyro: [0.01, -0.02, 0.005],
+                accel: [0.05, -0.03, -9.81 + 0.1],
+            };
+            bias_estimator.add_sample(&imu, true);
+        }
+
+        assert!(bias_estimator.is_initialized);
+        assert!(bias_estimator.sample_count() > 100);
+
+        // Verify biases are non-zero after initialization
+        assert!(bias_estimator.gyro_bias.norm() > 0.0);
+        assert!(bias_estimator.accel_bias.norm() > 0.0);
+
+        // Reset
+        bias_estimator.reset();
+
+        // Verify reset state
+        assert!(!bias_estimator.is_initialized);
+        assert_eq!(bias_estimator.sample_count(), 0);
+        assert_eq!(bias_estimator.gyro_bias, na::Vector3::zeros());
+        assert_eq!(bias_estimator.accel_bias, na::Vector3::zeros());
+
+        // After reset, adding new samples should work
+        for i in 0..150 {
+            let _ts = (i * 5000) as i64;
+            let imu = ImuData {
+                timestamp: _ts,
+                gyro: [0.02, -0.03, 0.01], // Different biases
+                accel: [0.1, -0.05, -9.81 + 0.2],
+            };
+            bias_estimator.add_sample(&imu, true);
+        }
+
+        assert!(bias_estimator.is_initialized);
+        // After reset and new samples, biases should be non-zero and different from zeros
+        assert!(
+            bias_estimator.gyro_bias.norm() > 0.0,
+            "Gyro bias should be non-zero after reset and new samples"
+        );
+    }
 }
