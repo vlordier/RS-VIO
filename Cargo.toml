@@ -134,6 +134,10 @@ name = "estimator"
 harness = true
 
 [[bench]]
+name = "imu_bench"
+harness = false
+
+[[bench]]
 name = "optimization"
 harness = true
 
