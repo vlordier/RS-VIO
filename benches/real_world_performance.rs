@@ -1,6 +1,7 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
 use rs_vio::feature_tracker::{PatchTracker, StereoPatchTracker};
 use rs_vio::datasets::config::FeatureDetectionConfig;
+use rs_vio::estimator::Frame;
 use image::{GrayImage, Luma};
 
 /// Create a realistic test image with features
@@ -36,12 +37,16 @@ fn bench_stereo_feature_tracking(c: &mut Criterion) {
     let img_left = create_test_image(640, 480);
     let img_right = create_test_image(640, 480);
     
+    // Create a frame for processing
+    let mut frame = Frame::new(0, 0);
+    
     // Warmup - process first frame to initialize
-    tracker.process_frame(&img_left, &img_right);
+    tracker.process_frame(&img_left, &img_right, &mut frame);
     
     c.bench_function("stereo_feature_tracking_640x480", |b| {
         b.iter(|| {
-            tracker.process_frame(black_box(&img_left), black_box(&img_right));
+            let mut frame = Frame::new(0, 0);
+            tracker.process_frame(black_box(&img_left), black_box(&img_right), black_box(&mut frame));
         })
     });
 }

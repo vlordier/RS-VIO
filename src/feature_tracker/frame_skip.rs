@@ -149,8 +149,10 @@ mod tests {
     fn test_skip_on_overload() {
         let mut skipper = AdaptiveFrameSkipper::new(30.0, 2, 10.0);
         
-        // Simulate slow processing
-        skipper.record_processing_time(Duration::from_millis(50)); // Over budget
+        // Simulate sustained slow processing (fill buffer with slow times)
+        for _ in 0..10 {
+            skipper.record_processing_time(Duration::from_millis(50)); // Over budget
+        }
         
         // Should skip next frame
         assert!(!skipper.should_process(None));
@@ -161,9 +163,12 @@ mod tests {
     fn test_force_on_motion() {
         let mut skipper = AdaptiveFrameSkipper::new(30.0, 2, 10.0);
         
-        skipper.record_processing_time(Duration::from_millis(50));
+        // Fill buffer with slow processing times
+        for _ in 0..10 {
+            skipper.record_processing_time(Duration::from_millis(50));
+        }
         
-        // High motion should force processing
+        // High motion should force processing despite overload
         assert!(skipper.should_process(Some(15.0)));
         assert_eq!(skipper.skip_count, 0);
     }
@@ -172,8 +177,8 @@ mod tests {
     fn test_max_skip_limit() {
         let mut skipper = AdaptiveFrameSkipper::new(30.0, 2, 10.0);
         
-        // Simulate continuous overload
-        for _ in 0..5 {
+        // Simulate sustained overload (fill buffer)
+        for _ in 0..10 {
             skipper.record_processing_time(Duration::from_millis(50));
         }
         
