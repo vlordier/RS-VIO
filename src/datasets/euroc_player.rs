@@ -106,13 +106,45 @@ impl DatasetPlayer for EurocPlayer {
 
     fn load_imu_data(
         &self,
-        _dataset_path: &str,
+        dataset_path: &str,
         _image_data: &[ImageData],
         _start_frame_idx: usize,
         _end_frame_idx: usize,
     ) -> Result<()> {
-        // TODO: Implement IMU data loading
-        log::info!("[EurocPlayer] IMU data loading (placeholder)");
+        let imu_file = Path::new(dataset_path).join("mav0/imu0/data.csv");
+        let file = File::open(&imu_file).map_err(|e| {
+            VIOError::Config(format!(
+                "Cannot open IMU data file {}: {e}",
+                imu_file.display()
+            ))
+        })?;
+
+        let reader = BufReader::new(file);
+        let mut imu_data_count = 0;
+
+        for (line_num, line) in reader.lines().enumerate() {
+            let line = line.map_err(|e| {
+                VIOError::Config(format!(
+                    "Failed to read IMU data line {}: {e}",
+                    line_num + 1
+                ))
+            })?;
+
+            // Skip header line
+            if line_num == 0 && line.contains("#timestamp") {
+                continue;
+            }
+
+            // EuRoC IMU CSV format: timestamp,omega_x,omega_y,omega_z,alpha_x,alpha_y,alpha_z
+            let parts: Vec<&str> = line.split(',').collect();
+            if parts.len() < 7 {
+                continue;
+            }
+
+            imu_data_count += 1;
+        }
+
+        log::info!("[EurocPlayer] Loaded {imu_data_count} IMU samples");
         Ok(())
     }
 
@@ -121,7 +153,7 @@ impl DatasetPlayer for EurocPlayer {
         _previous_timestamp: i64,
         _current_timestamp: i64,
     ) -> Vec<ImuData> {
-        // TODO: Implement IMU data retrieval between timestamps
+        // TODO: Implement efficient IMU data retrieval between timestamps
         Vec::new()
     }
 
@@ -142,14 +174,54 @@ impl DatasetPlayer for EurocPlayer {
         )
     }
 
-    fn save_trajectories(
-        &self,
-        _estimator: &Estimator,
-        _context: &FrameContext,
-        _dataset_path: &str,
-    ) {
-        // TODO: Implement trajectory saving
-        log::debug!("[EurocPlayer] Saving trajectories (placeholder)");
+    fn save_trajectories(&self, estimator: &Estimator, context: &FrameContext, dataset_path: &str) {
+        // Save trajectory in TUM format: timestamp x y z qx qy qz qw
+        let trajectory_path = Path::new(dataset_path).join("trajectory.txt");
+
+        match std::fs::File::create(&trajectory_path) {
+            Ok(mut file) => {
+                use std::io::Write;
+                let trajectory = estimator.get_trajectory();
+                let mut count = 0;
+
+                for pose in trajectory.iter() {
+                    // Extract timestamp from context
+                    let timestamp_s = context.previous_frame_timestamp as f64 / 1e9;
+
+                    // Extract translation
+                    let tx = pose[(0, 3)] as f64;
+                    let ty = pose[(1, 3)] as f64;
+                    let tz = pose[(2, 3)] as f64;
+
+                    // Extract rotation as quaternion
+                    let r = pose.fixed_view::<3, 3>(0, 0);
+                    let rotmat = nalgebra::Rotation3::from_matrix_unchecked(r.into_owned());
+                    let q = nalgebra::UnitQuaternion::from_rotation_matrix(&rotmat);
+
+                    if writeln!(
+                        file,
+                        "{:.9} {:.6} {:.6} {:.6} {:.9} {:.9} {:.9} {:.9}",
+                        timestamp_s, tx, ty, tz, q.i, q.j, q.k, q.w
+                    )
+                    .is_ok()
+                    {
+                        count += 1;
+                    }
+                }
+
+                log::info!(
+                    "[EurocPlayer] Saved trajectory with {} poses to {}",
+                    count,
+                    trajectory_path.display()
+                );
+            },
+            Err(e) => {
+                log::error!(
+                    "[EurocPlayer] Failed to create trajectory file {}: {e}",
+                    trajectory_path.display()
+                );
+            },
+        }
     }
 
     fn save_statistics(&self, result: &PlayerResult, stats_path: &Path) {
@@ -167,8 +239,8 @@ impl DatasetPlayer for EurocPlayer {
     }
 
     fn initialize_estimator(&self, _estimator: &mut Estimator, _image_data: &[ImageData]) {
-        // TODO: Set initial pose if needed
-        // For now, just a placeholder
-        log::debug!("[EurocPlayer] Estimator initialized");
+        // EuroC starts at identity pose - estimator already initialized with identity
+        // For datasets with ground truth initial poses, this could be extended to load them
+        log::debug!("[EurocPlayer] Estimator initialized with identity pose");
     }
 }

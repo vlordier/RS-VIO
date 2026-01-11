@@ -431,6 +431,11 @@ impl Estimator {
             }
         }
     }
+
+    /// Get a reference to the trajectory (for saving to file)
+    pub fn get_trajectory(&self) -> &Vec<Matrix4x4> {
+        &self.trajectory
+    }
 }
 
 #[cfg(test)]
