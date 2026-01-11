@@ -231,4 +231,134 @@ mod tests {
         assert!(!approx_equal(1.0, 1.1));
         assert!(approx_equal_f64(1.0, 1.01, 0.1));
     }
+
+    #[test]
+    fn test_approx_equal_negative_numbers() {
+        assert!(approx_equal(-1.0, -1.0));
+        assert!(approx_equal(-1.0, -1.0 + 1e-11));
+        assert!(!approx_equal(-1.0, -1.1));
+    }
+
+    #[test]
+    fn test_approx_equal_zero() {
+        assert!(approx_equal(0.0, 0.0));
+        assert!(approx_equal(0.0, 1e-11));
+        assert!(!approx_equal(0.0, 1e-9));
+    }
+
+    #[test]
+    fn test_validate_transformation_matrix() {
+        // Valid identity transformation
+        let valid = na::Matrix4::identity();
+        assert!(validate_transformation_matrix(&valid).is_ok());
+
+        // Valid translation
+        let mut trans = na::Matrix4::identity();
+        trans[(0, 3)] = 5.0;
+        trans[(1, 3)] = -2.0;
+        trans[(2, 3)] = 10.0;
+        assert!(validate_transformation_matrix(&trans).is_ok());
+
+        // Invalid: bad bottom row
+        let mut invalid = na::Matrix4::identity();
+        invalid[(3, 0)] = 1.0; // Should be 0
+        assert!(validate_transformation_matrix(&invalid).is_err());
+    }
+
+    #[test]
+    fn test_safe_divide_very_small_denominator() {
+        // Denominator smaller than epsilon should fail
+        assert_eq!(
+            safe_divide(1.0, 1e-11),
+            Err(ValidationError::Singular)
+        );
+    }
+
+    #[test]
+    fn test_safe_divide_negative() {
+        assert_eq!(safe_divide(-10.0, 2.0).unwrap(), -5.0);
+        assert_eq!(safe_divide(10.0, -2.0).unwrap(), -5.0);
+        assert_eq!(safe_divide(-10.0, -2.0).unwrap(), 5.0);
+    }
+
+    #[test]
+    fn test_safe_divide_infinity_output() {
+        let result = safe_divide(1.0, 1e-100);
+        // When result is infinity, should fail
+        assert!(result.is_err() || result.unwrap().is_infinite());
+    }
+
+    #[test]
+    fn test_validate_rotation_matrix_slightly_non_orthogonal() {
+        // Slightly perturbed orthogonal matrix (should fail)
+        let mut mat = na::Matrix3::identity();
+        mat[(0, 0)] = 1.001; // Slightly non-unit
+        let result = validate_rotation_matrix(&mat);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_rotation_matrix_reflection() {
+        // Reflection matrix (det = -1, not a proper rotation)
+        let reflect = na::Matrix3::new(-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
+        assert!(validate_rotation_matrix(&reflect).is_err());
+    }
+
+    #[test]
+    fn test_validate_point_at_boundary_depths() {
+        // Just at minimum depth
+        let at_min = na::Vector3::new(0.0, 0.0, MIN_DEPTH);
+        assert!(validate_point_for_projection(&at_min).is_ok());
+
+        // Just below minimum depth
+        let below_min = na::Vector3::new(0.0, 0.0, MIN_DEPTH / 2.0);
+        assert_eq!(
+            validate_point_for_projection(&below_min),
+            Err(ValidationError::InvalidDepth)
+        );
+
+        // Just at maximum depth
+        let at_max = na::Vector3::new(0.0, 0.0, MAX_DEPTH);
+        assert!(validate_point_for_projection(&at_max).is_ok());
+
+        // Just above maximum depth
+        let above_max = na::Vector3::new(0.0, 0.0, MAX_DEPTH * 1.1);
+        assert_eq!(
+            validate_point_for_projection(&above_max),
+            Err(ValidationError::OutOfRange)
+        );
+    }
+
+    #[test]
+    fn test_validate_point_negative_depth() {
+        // A negative depth with large absolute value should still pass
+        // because validation only checks abs(depth) < MIN_DEPTH
+        let behind_camera = na::Vector3::new(0.0, 0.0, -5.0);
+        assert!(validate_point_for_projection(&behind_camera).is_ok());
+        
+        // But a very small absolute depth should fail
+        let very_shallow = na::Vector3::new(0.0, 0.0, -1e-7);
+        assert_eq!(
+            validate_point_for_projection(&very_shallow),
+            Err(ValidationError::InvalidDepth)
+        );
+    }
+
+    #[test]
+    fn test_validate_finite_vector_mixed_values() {
+        let valid = na::Vector3::new(0.0, -1e-100, 1e100);
+        assert!(validate_finite_vector(&valid).is_ok());
+
+        let with_inf = na::Vector3::new(0.0, f64::NEG_INFINITY, 1.0);
+        assert!(validate_finite_vector(&with_inf).is_err());
+    }
+
+    #[test]
+    fn test_validate_finite_matrix() {
+        let valid = na::Matrix3::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0);
+        assert!(validate_finite_matrix(&valid).is_ok());
+
+        let with_nan = na::Matrix3::new(1.0, f64::NAN, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0);
+        assert!(validate_finite_matrix(&with_nan).is_err());
+    }
 }

@@ -502,4 +502,70 @@ mod tests {
         let tracked = track_points::<LEVELS>(&pyramid0, &pyramid1, &map0, 10, 1e-3);
         assert!(tracked.is_empty());
     }
+
+    #[test]
+    fn pyramid_single_level() {
+        let img = gradient_image(16, 16);
+        let pyramid = build_image_pyramid(&img, 1);
+        assert_eq!(pyramid.len(), 1);
+        assert_eq!(pyramid[0].dimensions(), (16, 16));
+    }
+
+    #[test]
+    fn pyramid_large_levels() {
+        let img = gradient_image(256, 256);
+        let pyramid = build_image_pyramid(&img, 5);
+        assert_eq!(pyramid.len(), 5);
+        assert_eq!(pyramid[0].dimensions(), (256, 256));
+        assert_eq!(pyramid[1].dimensions(), (128, 128));
+        assert_eq!(pyramid[2].dimensions(), (64, 64));
+        assert_eq!(pyramid[3].dimensions(), (32, 32));
+        assert_eq!(pyramid[4].dimensions(), (16, 16));
+    }
+
+    #[test]
+    fn track_points_empty_map() {
+        const LEVELS: u32 = 2;
+        let img = checkerboard_image(64, 64);
+        let pyramid0 = build_image_pyramid(&img, LEVELS);
+        let pyramid1 = build_image_pyramid(&img, LEVELS);
+        let map0 = HashMap::new();
+
+        let tracked = track_points::<LEVELS>(&pyramid0, &pyramid1, &map0, 10, 1e-3);
+        assert!(tracked.is_empty());
+    }
+
+    #[test]
+    fn track_points_zero_iterations() {
+        const LEVELS: u32 = 2;
+        let img = checkerboard_image(64, 64);
+        let pyramid0 = build_image_pyramid(&img, LEVELS);
+        let pyramid1 = build_image_pyramid(&img, LEVELS);
+        let mut map0 = HashMap::new();
+        let mut transform = na::Affine2::<f32>::identity();
+        transform.matrix_mut_unchecked().m13 = 32.0;
+        transform.matrix_mut_unchecked().m23 = 32.0;
+        map0.insert(0usize, transform);
+
+        let tracked = track_points::<LEVELS>(&pyramid0, &pyramid1, &map0, 0, 1e-3);
+        assert!(tracked.len() <= map0.len());
+    }
+
+    #[test]
+    fn track_points_very_high_threshold() {
+        const LEVELS: u32 = 2;
+        let img = checkerboard_image(64, 64);
+        let pyramid0 = build_image_pyramid(&img, LEVELS);
+        let pyramid1 = build_image_pyramid(&img, LEVELS);
+        let mut map0 = HashMap::new();
+        let mut transform = na::Affine2::<f32>::identity();
+        transform.matrix_mut_unchecked().m13 = 32.0;
+        transform.matrix_mut_unchecked().m23 = 32.0;
+        map0.insert(0usize, transform);
+
+        // Very high convergence threshold (100.0) means no points should track
+        // since they won't meet the strict convergence criteria
+        let tracked = track_points::<LEVELS>(&pyramid0, &pyramid1, &map0, 100, 100.0);
+        assert!(tracked.is_empty());
+    }
 }

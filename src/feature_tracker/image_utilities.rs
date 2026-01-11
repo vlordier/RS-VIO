@@ -227,4 +227,104 @@ mod tests {
             .iter()
             .any(|p| p.x >= 10 && p.x <= 22 && p.y >= 10 && p.y <= 22));
     }
+
+    #[test]
+    fn inbound_exact_boundaries() {
+        let img = GrayImage::from_pixel(10, 10, Luma([0u8]));
+        // Just inside bounds
+        assert!(inbound(&img, 1.0, 1.0, 1));
+        // 0.4 rounds to 0, which fails the check (0 >= 1 is false)
+        assert!(!inbound(&img, 0.4, 5.0, 1));
+    }
+
+    #[test]
+    fn image_grad_steep_gradient() {
+        let mut img = GrayImage::from_pixel(6, 6, Luma([0u8]));
+        // Create vertical edge: left half dark, right half bright
+        for x in 3..6 {
+            for y in 0..6 {
+                img.put_pixel(x, y, Luma([255u8]));
+            }
+        }
+        let g = image_grad(&img, 2.5, 2.5);
+        // Should have significant x-gradient
+        assert!(g[1].abs() > 50.0);
+    }
+
+    #[test]
+    fn image_grad_near_boundary() {
+        let img = GrayImage::from_pixel(6, 6, Luma([128u8]));
+        // Near edge - should still compute gradient
+        let g = image_grad(&img, 1.0, 1.0);
+        assert!((g[0] - 128.0).abs() < 1.0);
+    }
+
+    #[test]
+    fn se2_exp_matrix_large_rotation() {
+        let a = na::SVector::<f32, 3>::new(0.0, 0.0, std::f32::consts::PI / 2.0);
+        let mat = se2_exp_matrix(&a);
+        // Rotation by PI/2: cos(PI/2)=0, sin(PI/2)=1
+        assert!(mat.m11.abs() < 0.1);
+        assert!((mat.m12 + 1.0).abs() < 0.1); // Should be -1
+        assert!((mat.m21 - 1.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn se2_exp_matrix_negative_rotation() {
+        let a = na::SVector::<f32, 3>::new(0.0, 0.0, -std::f32::consts::PI / 4.0);
+        let mat = se2_exp_matrix(&a);
+        // Check determinant is 1 (rotation preserves orientation)
+        let det = mat.m11 * mat.m22 - mat.m12 * mat.m21;
+        assert!((det - 1.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn se2_exp_matrix_translation_only() {
+        let a = na::SVector::<f32, 3>::new(5.0, -3.0, 0.0);
+        let mat = se2_exp_matrix(&a);
+        assert!((mat.m13 - 5.0).abs() < 1e-5);
+        assert!((mat.m23 + 3.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn se2_exp_matrix_small_angle() {
+        let a = na::SVector::<f32, 3>::new(1.0, 2.0, 1e-7);
+        let mat = se2_exp_matrix(&a);
+        // Small angle approximation: sin(θ) ≈ θ, cos(θ) ≈ 1
+        assert!((mat.m11 - 1.0).abs() < 1e-6);
+        assert!(mat.m12.abs() < 1e-6);
+    }
+
+    #[test]
+    fn inbound_negative_coordinates() {
+        let img = GrayImage::from_pixel(10, 10, Luma([0u8]));
+        // Negative coordinates: -1.0 rounds to 0 (as u32)
+        // With radius=0, x=0 passes (0 >= 0 && 0 < 10), so need radius > 0
+        assert!(!inbound(&img, -1.0, 5.0, 1));
+        assert!(!inbound(&img, 5.0, -1.0, 1));
+    }
+
+    #[test]
+    fn inbound_large_coordinates() {
+        let img = GrayImage::from_pixel(10, 10, Luma([0u8]));
+        // Coordinates beyond image size
+        assert!(!inbound(&img, 10.0, 5.0, 0));
+        assert!(!inbound(&img, 5.0, 10.0, 0));
+    }
+
+    #[test]
+    fn detect_key_points_no_features() {
+        let img = GrayImage::from_pixel(64, 64, Luma([128u8]));
+        let points = detect_key_points(&img, 8, &Vec::new(), 2);
+        // Flat image should have no features
+        assert!(points.is_empty());
+    }
+
+    #[test]
+    fn detect_key_points_small_image() {
+        let img = GrayImage::from_pixel(8, 8, Luma([0u8]));
+        let points = detect_key_points(&img, 4, &Vec::new(), 2);
+        // Very small image might have no features
+        assert!(points.len() <= 1);
+    }
 }
