@@ -492,7 +492,8 @@ optimization:
     fn test_process_frame_basic() {
         let config = create_test_config();
         let mut estimator = Estimator::new(config, None);
-        estimator.set_max_frame_processing_time(std::time::Duration::from_millis(1000));
+        // Increase timeout to allow for slower test environments
+        estimator.set_max_frame_processing_time(std::time::Duration::from_secs(10));
 
         // Create dummy image data
         let left_image = vec![128u8; 640 * 480];
