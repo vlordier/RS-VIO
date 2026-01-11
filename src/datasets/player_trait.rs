@@ -194,6 +194,16 @@ pub fn execute<P: DatasetPlayer + ?Sized>(
     let start_frame_idx = 0;
     let end_frame_idx = image_data.len();
 
+    // Load IMU data for the full dataset (cached for efficient retrieval)
+    if let Err(e) = player.load_imu_data(
+        &config.dataset_path,
+        &image_data,
+        start_frame_idx,
+        end_frame_idx,
+    ) {
+        log::warn!("[{}] Failed to load IMU data: {}", dataset_name, e);
+    }
+
     // Load full YAML config
     let cfg = crate::datasets::config::Config::load(&config.config_path)?;
 

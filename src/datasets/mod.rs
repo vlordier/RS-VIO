@@ -58,6 +58,11 @@ pub mod frame_processor_trait;
 pub mod player_trait;
 pub mod tum_vi_player;
 
+// Re-export player types for convenience
+pub use euroc_player::EurocPlayer;
+pub use fourseasons_player::FourSeasonsPlayer;
+pub use tum_vi_player::TUMVIPlayer;
+
 use crate::datasets::config::Config;
 use camera_intrinsic_model::generic_model::CameraModel;
 use camera_intrinsic_model::models::opencv5::OpenCVModel5;
