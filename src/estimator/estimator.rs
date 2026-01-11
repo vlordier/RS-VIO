@@ -446,7 +446,26 @@ impl Estimator {
         if current_frame.is_keyframe {
             let optimization_start = Instant::now();
             self.sliding_window.add_frame(current_frame);
-            if let Err(e) = self.sliding_window.optimize() {
+            // Provide IMU motion prior to optimizer when available
+            let imu_prior = if self.config.optimization.imu_prior_enable {
+                self.get_imu_motion_prior()
+            } else {
+                None
+            };
+            let imu_weights = if self.config.optimization.imu_prior_enable {
+                Some((
+                    self.config.optimization.imu_prior_weight_pos,
+                    self.config.optimization.imu_prior_weight_rot,
+                ))
+            } else {
+                None
+            };
+            let imu_huber_delta = if self.config.optimization.imu_prior_enable {
+                Some(self.config.optimization.imu_prior_huber_delta)
+            } else {
+                None
+            };
+            if let Err(e) = self.sliding_window.optimize_with_imu(imu_prior, imu_weights, imu_huber_delta) {
                 log::error!("[Estimator] Bundle adjustment optimization failed: {:?}", e);
                 // Continue execution even if optimization fails
             }

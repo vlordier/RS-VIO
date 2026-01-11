@@ -136,7 +136,7 @@ fn main() {
         format!(
             "{}+{:.1}ms init",
             samples_for_init,
-            samples_for_init as f64 * 0.005
+            (samples_for_init as f64) * 0.005
         ),
         time_per_sample_us
     );
@@ -175,7 +175,7 @@ fn main() {
     println!("Key metrics:");
     println!("  - Preintegration: fast per-sample processing");
     println!("  - Motion prediction: fast per-call processing");
-    println!("  - Bias estimation: <10 μs per-sample");
+    println!("  - Bias estimation: {{<}}10 μs per-sample");
     println!("  - Bias correction: fast per-call processing");
     println!("\nReal-time capable up to 200Hz with margin for all modes.");
 }
