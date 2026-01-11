@@ -9,10 +9,12 @@
 //! - **Camera Model Creation** - Initialization overhead
 //! - **Estimator Initialization** - Setup cost
 //! - **Resolution Scaling** - Impact of image resolution (320×240, 640×480, 1280×960)
+//! - **IMU Processing** - IMU preintegration, motion prediction, velocity estimation
 //!
 //! ## Expected Results (baseline: 640×480)
 //!
 //! Single frame latency: 15-25ms | Camera creation: 1-2ms | 1280×960: 3-4× slower
+//! IMU processing overhead: <1ms per 200Hz batch
 //!
 //! See [BENCHMARKING.md](../BENCHMARKING.md#estimator-benchmarks) for detailed analysis.
 
@@ -22,7 +24,7 @@ use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criteri
 use rs_vio::datasets::config::Config;
 use rs_vio::estimator::Estimator;
 
-fn create_bench_estimator() -> Estimator<'static> {
+fn create_bench_estimator() -> Estimator {
     let yaml = r#"
 camera:
   image_width: 640
@@ -100,7 +102,7 @@ fn bench_sequential_frame_processing(c: &mut Criterion) {
 
                 b.iter(|| {
                     for frame_id in 0..num_frames {
-                        let timestamp_ns = (frame_id as u64) * 100000000;
+                        let timestamp_ns = (frame_id as i64) * 100000000;
                         let _result =
                             estimator.process_frame(&left_image, &right_image, timestamp_ns, None);
                     }
@@ -234,12 +236,129 @@ optimization:
     group.finish();
 }
 
+fn create_test_imu_data(num_samples: usize, base_timestamp: i64) -> Vec<rs_vio::datasets::ImuData> {
+    let dt_ns = 5_000_000; // 5ms between samples (200Hz)
+    (0..num_samples)
+        .map(|i| {
+            let t = (i as f64) * 0.005;
+            rs_vio::datasets::ImuData {
+                timestamp: base_timestamp + (i as i64) * dt_ns,
+                gyro: [(t * 0.1).sin() * 0.05, (t * 0.1).cos() * 0.05, 0.02],
+                accel: [(t * 0.5).sin() * 0.5, (t * 0.5).cos() * 0.5, -9.81],
+            }
+        })
+        .collect()
+}
+
+fn bench_imu_processing(c: &mut Criterion) {
+    let mut group = c.benchmark_group("imu_processing");
+    group.sample_size(10);
+
+    for num_samples in &[10, 50, 200] {
+        group.bench_with_input(
+            BenchmarkId::new("imu_samples", num_samples),
+            num_samples,
+            |b, &num_samples| {
+                let mut estimator = create_bench_estimator();
+                let left_image = black_box(create_test_image(640, 480));
+                let right_image = black_box(create_test_image(640, 480));
+                let base_timestamp = 1000000000;
+
+                b.iter(|| {
+                    let imu_data = create_test_imu_data(num_samples, base_timestamp);
+                    let timestamp_ns = base_timestamp + (num_samples as i64) * 5_000_000;
+                    let _result = estimator.process_frame(
+                        black_box(&left_image),
+                        black_box(&right_image),
+                        black_box(timestamp_ns),
+                        black_box(Some(&imu_data)),
+                    );
+                });
+            },
+        );
+    }
+    group.finish();
+}
+
+fn bench_imu_high_frequency(c: &mut Criterion) {
+    let mut group = c.benchmark_group("imu_high_frequency");
+    group.sample_size(10);
+
+    // 1000Hz IMU with 10Hz frames (100 samples per frame)
+    let num_samples = 100;
+    let mut estimator = create_bench_estimator();
+    let left_image = black_box(create_test_image(640, 480));
+    let right_image = black_box(create_test_image(640, 480));
+    let base_timestamp = 1000000000;
+
+    group.bench_function("1000hz_imu_per_frame", |b| {
+        b.iter(|| {
+            let imu_data = create_test_imu_data(num_samples, base_timestamp);
+            let timestamp_ns = base_timestamp + 100_000_000;
+            let _result = estimator.process_frame(
+                black_box(&left_image),
+                black_box(&right_image),
+                black_box(timestamp_ns),
+                black_box(Some(&imu_data)),
+            );
+        });
+    });
+    group.finish();
+}
+
+fn bench_imu_motion_predictor(c: &mut Criterion) {
+    use rs_vio::imu::{ImuConfig, ImuMotionPredictor};
+
+    let config = ImuConfig::default();
+    let predictor = ImuMotionPredictor::new(config);
+    let imu_data = create_test_imu_data(20, 1000000000);
+    let focal_length = 500.0;
+    let pixel_coord = (320.0, 240.0);
+
+    c.bench_function("imu_motion_prediction", |b| {
+        b.iter(|| {
+            let _result = predictor.predict_feature_displacement(
+                black_box(&imu_data),
+                black_box(pixel_coord),
+                black_box(focal_length),
+            );
+        });
+    });
+}
+
+fn bench_imu_preintegration(c: &mut Criterion) {
+    use rs_vio::imu::{ImuConfig, ImuPreintegrator};
+
+    let config = ImuConfig::default();
+    let mut preintegrator = ImuPreintegrator::new(config);
+    let imu_data = create_test_imu_data(20, 1000000000);
+
+    c.bench_function("imu_preintegration", |b| {
+        b.iter(|| {
+            for (i, imu) in imu_data.iter().enumerate() {
+                let dt = if i > 0 {
+                    (imu.timestamp - imu_data[i - 1].timestamp) as f64 / 1e9
+                } else {
+                    0.005
+                };
+                if dt > 0.0 {
+                    preintegrator.propagate(imu, dt);
+                }
+            }
+        });
+    });
+}
+
 criterion_group!(
     benches,
     bench_frame_processing,
     bench_sequential_frame_processing,
     bench_camera_model_creation,
     bench_estimator_initialization,
-    bench_image_resolution_scaling
+    bench_image_resolution_scaling,
+    bench_imu_processing,
+    bench_imu_high_frequency,
+    bench_imu_motion_predictor,
+    bench_imu_preintegration
 );
 criterion_main!(benches);
