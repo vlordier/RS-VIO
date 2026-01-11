@@ -8,13 +8,18 @@ use image::ImageReader;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
+use std::sync::Mutex;
 
 #[derive(Default)]
-pub struct FourSeasonsPlayer;
+pub struct FourSeasonsPlayer {
+    imu_cache: Mutex<Vec<ImuData>>,
+}
 
 impl FourSeasonsPlayer {
     pub fn new() -> Self {
-        FourSeasonsPlayer
+        FourSeasonsPlayer {
+            imu_cache: Mutex::new(Vec::new()),
+        }
     }
 }
 
@@ -120,6 +125,8 @@ impl DatasetPlayer for FourSeasonsPlayer {
                 "[FourSeasonsPlayer] No IMU file found at {}",
                 imu_file.display()
             );
+            // Clear cache when file doesn't exist
+            *self.imu_cache.lock().unwrap() = Vec::new();
             return Ok(());
         }
 
@@ -131,7 +138,7 @@ impl DatasetPlayer for FourSeasonsPlayer {
         })?;
 
         let reader = BufReader::new(file);
-        let mut imu_data_count = 0;
+        let mut imu_data_vec = Vec::new();
 
         for (line_num, line) in reader.lines().enumerate() {
             let line = line.map_err(|e| {
@@ -147,20 +154,47 @@ impl DatasetPlayer for FourSeasonsPlayer {
                 continue;
             }
 
-            imu_data_count += 1;
+            // Parse timestamp (nanoseconds)
+            let timestamp: i64 = parts[0].trim().parse().unwrap_or(0);
+
+            // Parse gyroscope (rad/s)
+            let gyro_x: f64 = parts[1].trim().parse().unwrap_or(0.0);
+            let gyro_y: f64 = parts[2].trim().parse().unwrap_or(0.0);
+            let gyro_z: f64 = parts[3].trim().parse().unwrap_or(0.0);
+
+            // Parse accelerometer (m/s^2)
+            let accel_x: f64 = parts[4].trim().parse().unwrap_or(0.0);
+            let accel_y: f64 = parts[5].trim().parse().unwrap_or(0.0);
+            let accel_z: f64 = parts[6].trim().parse().unwrap_or(0.0);
+
+            imu_data_vec.push(ImuData {
+                timestamp,
+                gyro: [gyro_x, gyro_y, gyro_z],
+                accel: [accel_x, accel_y, accel_z],
+            });
         }
 
-        log::info!("[FourSeasonsPlayer] Processed {imu_data_count} IMU samples");
+        // Store in cache
+        *self.imu_cache.lock().unwrap() = imu_data_vec;
+
+        log::info!(
+            "[FourSeasonsPlayer] Loaded {} IMU samples",
+            self.imu_cache.lock().unwrap().len()
+        );
         Ok(())
     }
 
     fn get_imu_data_between_frames(
         &self,
-        _previous_timestamp: i64,
-        _current_timestamp: i64,
+        previous_timestamp: i64,
+        current_timestamp: i64,
     ) -> Vec<ImuData> {
-        // TODO: Implement efficient IMU data retrieval between timestamps
-        Vec::new()
+        let cache = self.imu_cache.lock().unwrap();
+        cache
+            .iter()
+            .filter(|imu| imu.timestamp > previous_timestamp && imu.timestamp <= current_timestamp)
+            .cloned()
+            .collect()
     }
 
     fn process_single_frame(

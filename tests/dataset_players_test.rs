@@ -26,7 +26,7 @@ mod euroc_player_tests {
 
         fs::create_dir_all(temp_dir.path().join("mav0/cam0/data")).unwrap();
 
-        let player = EurocPlayer;
+        let player = EurocPlayer::new();
         let result = player.load_imu_data(dataset_path, &[], 0, 0);
 
         assert!(result.is_ok());
@@ -39,7 +39,7 @@ mod euroc_player_tests {
 
         // EuRoC does not check file existence - it returns an error when trying to open
         // This is expected behavior
-        let player = EurocPlayer;
+        let player = EurocPlayer::new();
         let result = player.load_imu_data(dataset_path, &[], 0, 0);
 
         // File doesn't exist so this will return an error
@@ -88,7 +88,7 @@ optimization:
             advance_frame: true,
         };
 
-        let player = EurocPlayer;
+        let player = EurocPlayer::new();
         player.save_trajectories(&estimator, &context, dataset_path);
 
         assert!(trajectory_path.exists());
@@ -123,7 +123,7 @@ optimization:
         let config: datasets::config::Config = serde_yaml::from_str(yaml_config).unwrap();
         let mut estimator = estimator::Estimator::new(config, None);
 
-        let player = EurocPlayer;
+        let player = EurocPlayer::new();
         player.initialize_estimator(&mut estimator, &[]);
     }
 }
@@ -143,7 +143,7 @@ mod fourseasons_player_tests {
 
         fs::create_dir_all(temp_dir.path().join("mav0/cam0/data")).unwrap();
 
-        let player = FourSeasonsPlayer;
+        let player = FourSeasonsPlayer::new();
         let result = player.load_imu_data(dataset_path, &[], 0, 0);
 
         assert!(result.is_ok());
@@ -154,7 +154,7 @@ mod fourseasons_player_tests {
         let temp_dir = tempfile::TempDir::new().unwrap();
         let dataset_path = temp_dir.path().to_str().unwrap();
 
-        let player = FourSeasonsPlayer;
+        let player = FourSeasonsPlayer::new();
         let result = player.load_imu_data(dataset_path, &[], 0, 0);
 
         assert!(result.is_ok());
@@ -202,7 +202,7 @@ optimization:
             advance_frame: true,
         };
 
-        let player = FourSeasonsPlayer;
+        let player = FourSeasonsPlayer::new();
         player.save_trajectories(&estimator, &context, dataset_path);
 
         assert!(trajectory_path.exists());
@@ -237,7 +237,7 @@ optimization:
         let config: datasets::config::Config = serde_yaml::from_str(yaml_config).unwrap();
         let mut estimator = estimator::Estimator::new(config, None);
 
-        let player = FourSeasonsPlayer;
+        let player = FourSeasonsPlayer::new();
         player.initialize_estimator(&mut estimator, &[]);
     }
 }
@@ -260,7 +260,7 @@ mod tumvi_player_tests {
 
         fs::create_dir_all(temp_dir.path().join("mav0/cam0/data")).unwrap();
 
-        let player = TUMVIPlayer;
+        let player = TUMVIPlayer::new();
         let result = player.load_imu_data(dataset_path, &[], 0, 0);
 
         assert!(result.is_ok());
@@ -271,7 +271,7 @@ mod tumvi_player_tests {
         let temp_dir = tempfile::TempDir::new().unwrap();
         let dataset_path = temp_dir.path().to_str().unwrap();
 
-        let player = TUMVIPlayer;
+        let player = TUMVIPlayer::new();
         let result = player.load_imu_data(dataset_path, &[], 0, 0);
 
         assert!(result.is_ok());
@@ -319,7 +319,7 @@ optimization:
             advance_frame: true,
         };
 
-        let player = TUMVIPlayer;
+        let player = TUMVIPlayer::new();
         player.save_trajectories(&estimator, &context, dataset_path);
 
         assert!(trajectory_path.exists());
@@ -354,7 +354,7 @@ optimization:
         let config: datasets::config::Config = serde_yaml::from_str(yaml_config).unwrap();
         let mut estimator = estimator::Estimator::new(config, None);
 
-        let player = TUMVIPlayer;
+        let player = TUMVIPlayer::new();
         player.initialize_estimator(&mut estimator, &[]);
     }
 }
@@ -436,9 +436,9 @@ mod imu_retrieval_tests {
 
     #[test]
     fn test_get_imu_data_between_frames_returns_empty() {
-        let player_euroc = EurocPlayer;
-        let player_4seasons = FourSeasonsPlayer;
-        let player_tumvi = TUMVIPlayer;
+        let player_euroc = EurocPlayer::new();
+        let player_4seasons = FourSeasonsPlayer::new();
+        let player_tumvi = TUMVIPlayer::new();
 
         let result_euroc = player_euroc.get_imu_data_between_frames(0, 1000000000);
         let result_4seasons = player_4seasons.get_imu_data_between_frames(0, 1000000000);
