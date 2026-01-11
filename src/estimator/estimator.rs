@@ -148,7 +148,7 @@ impl<'a> Estimator<'a> {
                 return Err(anyhow::anyhow!(
                     "Failed to create left image: size mismatch"
                 ));
-            }
+            },
         };
         let right_img = match GrayImage::from_raw(img_w, img_h, right_image.to_vec()) {
             Some(img) => img,
@@ -162,7 +162,7 @@ impl<'a> Estimator<'a> {
                 return Err(anyhow::anyhow!(
                     "Failed to create right image: size mismatch"
                 ));
-            }
+            },
         };
 
         // Create frame (images are not stored, only features will be added)
@@ -214,14 +214,14 @@ impl<'a> Estimator<'a> {
                         None => {
                             log::error!("[Estimator] No keyframe poses available");
                             return Err(anyhow::anyhow!("No keyframe poses available"));
-                        }
+                        },
                     };
                     let T_W_B_last_kf_inv = match T_W_B_last_kf.try_inverse() {
                         Some(inv) => inv,
                         None => {
                             log::error!("[Estimator] Matrix inversion failed for T_W_B_last_kf");
                             return Err(anyhow::anyhow!("Matrix inversion failed"));
-                        }
+                        },
                     };
                     let T_rel = T_W_B * T_W_B_last_kf_inv;
                     let t_rel = T_rel.fixed_view::<3, 1>(0, 3).into_owned();
@@ -245,15 +245,15 @@ impl<'a> Estimator<'a> {
                         current_frame.is_keyframe = false;
                     }
                     self.view_motion_tracking_results(&T_W_B);
-                }
+                },
                 Ok(None) => {
                     log::warn!(
                         "[Estimator] Motion tracking failed (optimization did not converge)"
                     );
-                }
+                },
                 Err(e) => {
                     log::error!("[Estimator] Motion tracking error: {:?}", e);
-                }
+                },
             }
             _motion_tracking_time_ms = motion_tracking_start.elapsed().as_secs_f64() * 1000.0;
         } else {
@@ -438,6 +438,7 @@ impl<'a> Estimator<'a> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
     use crate::datasets::config::Config;

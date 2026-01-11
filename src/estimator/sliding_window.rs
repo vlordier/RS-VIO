@@ -310,7 +310,7 @@ impl SlidingWindow {
                         id_frame
                     );
                     return Err(std::io::Error::other("T_W_B matrix inversion failed"));
-                }
+                },
             };
             let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
             let R_B_W = Matrix3x3::from(T_B_W.fixed_view::<3, 3>(0, 0));
@@ -402,7 +402,7 @@ impl SlidingWindow {
                                 None => {
                                     log::warn!("[SlidingWindow] T_W_B matrix is singular for first frame, skipping factor");
                                     continue;
-                                }
+                                },
                             };
                             factor = factor.with_fixed_pose(T_B_W);
                         }
@@ -480,12 +480,12 @@ impl SlidingWindow {
                         Ok(result) => {
                             log::debug!("[SlidingWindow] Fallback solver succeeded");
                             result
-                        }
+                        },
                         Err(e2) => {
                             log::error!("[SlidingWindow] Both Schur complement and fallback solver failed: {:?} - reverting to previous state", e2);
                             self.revert_to_saved_state(&saved_keyframe_poses, &saved_map_points);
                             return Ok(false);
-                        }
+                        },
                     }
                 } else {
                     // Other optimization errors - revert to saved state
@@ -496,7 +496,7 @@ impl SlidingWindow {
                     self.revert_to_saved_state(&saved_keyframe_poses, &saved_map_points);
                     return Ok(false);
                 }
-            }
+            },
         };
 
         // Check if optimization was successful based on status
@@ -574,43 +574,43 @@ impl SlidingWindow {
         let (status, convergence_reason) = match &opt_result.status {
             apex_solver::optimizer::OptimizationStatus::Converged => {
                 ("CONVERGED", "Converged".to_string())
-            }
+            },
             apex_solver::optimizer::OptimizationStatus::CostToleranceReached => {
                 ("CONVERGED", "CostTolerance".to_string())
-            }
+            },
             apex_solver::optimizer::OptimizationStatus::ParameterToleranceReached => {
                 ("CONVERGED", "ParameterTolerance".to_string())
-            }
+            },
             apex_solver::optimizer::OptimizationStatus::GradientToleranceReached => {
                 ("CONVERGED", "GradientTolerance".to_string())
-            }
+            },
             apex_solver::optimizer::OptimizationStatus::TrustRegionRadiusTooSmall => {
                 ("CONVERGED", "TrustRegionRadiusTooSmall".to_string())
-            }
+            },
             apex_solver::optimizer::OptimizationStatus::MinCostThresholdReached => {
                 ("CONVERGED", "MinCostThresholdReached".to_string())
-            }
+            },
             apex_solver::optimizer::OptimizationStatus::MaxIterationsReached => {
                 ("NOT_CONVERGED", "MaxIterations".to_string())
-            }
+            },
             apex_solver::optimizer::OptimizationStatus::Timeout => {
                 ("NOT_CONVERGED", "Timeout".to_string())
-            }
+            },
             apex_solver::optimizer::OptimizationStatus::NumericalFailure => {
                 ("NOT_CONVERGED", "NumericalFailure".to_string())
-            }
+            },
             apex_solver::optimizer::OptimizationStatus::IllConditionedJacobian => {
                 ("NOT_CONVERGED", "IllConditionedJacobian".to_string())
-            }
+            },
             apex_solver::optimizer::OptimizationStatus::InvalidNumericalValues => {
                 ("NOT_CONVERGED", "InvalidNumericalValues".to_string())
-            }
+            },
             apex_solver::optimizer::OptimizationStatus::UserTerminated => {
                 ("NOT_CONVERGED", "UserTerminated".to_string())
-            }
+            },
             apex_solver::optimizer::OptimizationStatus::Failed(msg) => {
                 ("NOT_CONVERGED", format!("Failed:{}", msg))
-            }
+            },
         };
         log::debug!(
             "[SlidingWindow] Optimization status: {}, convergence_reason: {}",
@@ -691,14 +691,14 @@ impl SlidingWindow {
             None => {
                 log::error!("[SlidingWindow] No keyframes available for motion tracking");
                 return Err(std::io::Error::other("No keyframes available"));
-            }
+            },
         };
         let T_B_W = match last_frame.state.T_W_B.try_inverse() {
             Some(inv) => inv,
             None => {
                 log::error!("[SlidingWindow] T_W_B matrix is singular in motion tracking");
                 return Err(std::io::Error::other("T_W_B matrix inversion failed"));
-            }
+            },
         };
         let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
         let R_B_W = Matrix3x3::from(T_B_W.fixed_view::<3, 3>(0, 0));
@@ -715,21 +715,21 @@ impl SlidingWindow {
             None => {
                 log::error!("[SlidingWindow] No keyframes available for camera transforms");
                 return Err(std::io::Error::other("No keyframes available"));
-            }
+            },
         };
         let T_Cl_B = match first_frame.state.T_B_Cl.try_inverse() {
             Some(inv) => inv,
             None => {
                 log::error!("[SlidingWindow] T_B_Cl matrix is singular");
                 return Err(std::io::Error::other("T_B_Cl matrix inversion failed"));
-            }
+            },
         };
         let T_Cr_B = match first_frame.state.T_B_Cr.try_inverse() {
             Some(inv) => inv,
             None => {
                 log::error!("[SlidingWindow] T_B_Cr matrix is singular");
                 return Err(std::io::Error::other("T_B_Cr matrix inversion failed"));
-            }
+            },
         };
         let camera_features = [
             (&frame.left_features, T_Cl_B),
@@ -758,10 +758,10 @@ impl SlidingWindow {
                             Box::new(factor),
                             Some(Box::new(huber_loss)),
                         );
-                    }
+                    },
                     None => {
                         // log::debug!("[SlidingWindow] Motion tracking: point {} is not in the map", feature_id);
-                    }
+                    },
                 }
             }
         }
@@ -776,7 +776,7 @@ impl SlidingWindow {
                 // Optimization error
                 log::error!("[SlidingWindow] Motion tracking optimizer error: {:?}", e);
                 return Ok(None);
-            }
+            },
         };
 
         // Check if optimization was successful
@@ -791,7 +791,7 @@ impl SlidingWindow {
                     None => {
                         log::error!("[SlidingWindow] Optimized T_B_W matrix is singular");
                         return Ok(None);
-                    }
+                    },
                 };
                 log::debug!(
                     "[SlidingWindow] Motion tracking successful. Initial cost: {:.3}, final cost: {:.3}",
@@ -814,6 +814,7 @@ impl SlidingWindow {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
 

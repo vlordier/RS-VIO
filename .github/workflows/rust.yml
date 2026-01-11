@@ -13,7 +13,8 @@ jobs:
     - uses: actions/checkout@v4
     - name: Install Rust
       run: |
-        rustup update stable
+        rustup toolchain install stable
+        rustup default stable
         rustup component add rustfmt clippy
     - name: Install cargo-audit
       run: cargo install cargo-audit

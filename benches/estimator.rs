@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rs_vio::datasets::config::Config;
 use rs_vio::estimator::Estimator;

@@ -19,7 +19,7 @@ pub fn get_feature_color(feature_id: usize) -> [u8; 3] {
         Err(poisoned) => {
             log::warn!("[Viewer] Mutex was poisoned, recovering");
             poisoned.into_inner()
-        }
+        },
     };
 
     if map.is_none() {
@@ -32,7 +32,7 @@ pub fn get_feature_color(feature_id: usize) -> [u8; 3] {
             // This should never happen due to the check above, but handle it safely
             log::error!("[Viewer] Color map is unexpectedly None");
             return [128, 128, 128]; // Return gray as fallback
-        }
+        },
     };
 
     // Check if color already assigned

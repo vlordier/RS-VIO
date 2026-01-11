@@ -75,7 +75,7 @@ impl RerunViewer {
                     entity_path, width, height, actual_size
                 );
                 return None;
-            }
+            },
         };
 
         let dynamic_img = DynamicImage::ImageLuma8(img_buffer);
@@ -122,7 +122,7 @@ impl Viewer for RerunViewer {
                 Err(e) => {
                     log::warn!("[RerunViewer] Failed to log coordinate system: {}", e);
                     // Don't fail initialization if this fails
-                }
+                },
             }
             // Log an origin arrow for the coordinate system at the origin
             // The colors used are: X - red, Y - green, Z - blue (conventional)
@@ -252,7 +252,7 @@ impl Viewer for RerunViewer {
                         "[RerunViewer] Successfully logged equalized image to {}",
                         entity_path
                     );
-                }
+                },
                 Err(e) => {
                     log::warn!(
                         "[RerunViewer] Failed to log equalized image to {}: {} (frame: {})",
@@ -267,7 +267,7 @@ impl Viewer for RerunViewer {
                         log::error!("[RerunViewer] Connection lost, viewer may have closed");
                         self.initialized = false;
                     }
-                }
+                },
             }
         }
     }

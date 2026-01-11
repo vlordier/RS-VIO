@@ -30,11 +30,11 @@ impl TUMVIPlayer {
                     return result;
                 }
                 data
-            }
+            },
             Err(e) => {
                 result.error_message = format!("Failed to load image timestamps: {}", e);
                 return result;
-            }
+            },
         };
 
         let start_frame_idx = 0;
@@ -45,11 +45,11 @@ impl TUMVIPlayer {
             Ok(v) => {
                 log::info!("[EurocPlayer] Viewer initialized successfully");
                 Some(v)
-            }
+            },
             Err(e) => {
                 log::warn!("Failed to initialize viewer: {}", e);
                 None
-            }
+            },
         };
 
         // Load full YAML config
@@ -59,7 +59,7 @@ impl TUMVIPlayer {
                 result.error_message =
                     format!("Failed to load config '{}': {}", config.config_path, e);
                 return result;
-            }
+            },
         };
 
         // Create camera models from config
@@ -68,7 +68,7 @@ impl TUMVIPlayer {
             Err(e) => {
                 result.error_message = format!("Failed to create camera models: {}", e);
                 return result;
-            }
+            },
         };
 
         // Give ownership of the configuration to the estimator and pass a
@@ -113,7 +113,7 @@ impl TUMVIPlayer {
                     Err(e) => {
                         log::warn!("Error processing frame {}: {}", context.current_idx, e);
                         0.0
-                    }
+                    },
                 };
 
                 let frame_duration = frame_start.elapsed();

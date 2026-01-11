@@ -166,6 +166,12 @@ pub fn create_camera_models_from_config(config: &Config) -> (CameraModelType, Ca
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::float_cmp
+)]
 mod tests {
     use super::*;
     use crate::datasets::config::Config;

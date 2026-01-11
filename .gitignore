@@ -1,2 +1,50 @@
+# Rust build artifacts
 /target
+/Cargo.lock
+*.rlib
+*.rmeta
+*.pdb
 
+# IDE and Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS-specific
+Thumbs.db
+
+# Profiling and benchmarking
+/*.prof
+flame*.svg
+
+# Documentation
+/target/doc
+
+# Local testing artifacts
+/test_data/
+*.log
+*.swo
+*~
+.DS_Store
+
+# Development
+.envrc
+.dirlocals
+
+# Profiling and benchmarking
+*.profraw
+*.profdata
+pprof/
+flame-graph.svg
+
+# Test artifacts
+*.profiling
+.tarpaulin-report.html
+
+# OS files
+Thumbs.db
+.AppleDouble
+.LSOverride

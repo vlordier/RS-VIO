@@ -1,3 +1,5 @@
+#![allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_lossless)]
+
 use rs_vio::datasets::config::Config;
 use rs_vio::estimator::Estimator;
 use std::time::Instant;

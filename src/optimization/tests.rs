@@ -1,4 +1,10 @@
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::module_inception
+)]
 mod tests {
     use crate::optimization::factors::BundleAdjustmentFactor;
     use crate::optimization::factors::BundleAdjustmentFactorTranslationOnly;
@@ -102,13 +108,13 @@ mod tests {
             | OptimizationStatus::ParameterToleranceReached
             | OptimizationStatus::GradientToleranceReached => {
                 println!("Optimization converged successfully!");
-            }
+            },
             _ => {
                 println!(
                     "Warning: Optimization did not fully converge. Status: {:?}",
                     opt_result.status
                 );
-            }
+            },
         }
     }
 

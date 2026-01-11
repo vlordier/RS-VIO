@@ -1,3 +1,11 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::float_cmp,
+    clippy::cast_lossless
+)]
+
 use rs_vio::datasets::config::Config;
 use rs_vio::estimator::Estimator;
 use std::time::Duration;

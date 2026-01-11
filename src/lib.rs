@@ -31,6 +31,26 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
+// Allow intentional numeric conversions in VIO mathematics
+// VIO algorithms require conversions between:
+// - Pixel coordinates (u32) ↔ metric space (f32/f64)
+// - Image dimensions (u32) ↔ normalized coordinates (f32)
+// - Timestamps (i64) ↔ floating point time (f64)
+// All conversions are intentional and documented per the VIO math
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::cast_lossless
+)]
+// Default to f64 for scientific computing (standard in robotics/CV)
+// Embedded systems can override with explicit f32 if needed
+#![allow(clippy::default_numeric_fallback)]
+// TODO: Add const fn where beneficial for compile-time computation
+#![allow(clippy::missing_const_for_fn)]
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+
 use thiserror::Error;
 
 /// Custom error type for RS-VIO operations.
