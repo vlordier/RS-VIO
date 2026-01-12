@@ -146,11 +146,11 @@ impl ImuPreintegrator {
 
     /// Process a single IMU measurement and update preintegration
     pub fn propagate(&mut self, imu: &ImuData, dt: f64) {
-        let gyro = na::Vector3::new(imu.gyro[0] as f64, imu.gyro[1] as f64, imu.gyro[2] as f64);
+        let gyro = na::Vector3::new(imu.gyro[0], imu.gyro[1], imu.gyro[2]);
         let accel = na::Vector3::new(
-            imu.accel[0] as f64,
-            imu.accel[1] as f64,
-            imu.accel[2] as f64,
+            imu.accel[0],
+            imu.accel[1],
+            imu.accel[2],
         );
 
         self.propagate_raw(gyro, accel, dt);
@@ -260,9 +260,9 @@ impl ImuMotionPredictor {
             let dt = (imu.timestamp - last_ts) as f64 / 1e9;
             if dt > 0.0 {
                 total_rotation += na::Vector3::new(
-                    imu.gyro[0] as f64 * dt,
-                    imu.gyro[1] as f64 * dt,
-                    imu.gyro[2] as f64 * dt,
+                    imu.gyro[0] * dt,
+                    imu.gyro[1] * dt,
+                    imu.gyro[2] * dt,
                 );
             }
             last_ts = imu.timestamp;
@@ -341,9 +341,9 @@ impl VelocityEstimator {
             let dt = (imu.timestamp - last_ts) as f64 / 1e9;
             if dt > 0.0 {
                 let accel = na::Vector3::new(
-                    imu.accel[0] as f64,
-                    imu.accel[1] as f64,
-                    imu.accel[2] as f64,
+                    imu.accel[0],
+                    imu.accel[1],
+                    imu.accel[2],
                 );
                 // Rotate to world frame and remove gravity
                 let accel_world = initial_orientation * accel - gravity;
@@ -376,9 +376,9 @@ impl VelocityEstimator {
         // Integrate accelerometer
         for imu in imu_measurements {
             let accel = na::Vector3::new(
-                imu.accel[0] as f64,
-                imu.accel[1] as f64,
-                imu.accel[2] as f64,
+                imu.accel[0],
+                imu.accel[1],
+                imu.accel[2],
             );
             // Assume current orientation is approximately identity
             let accel_world = accel - gravity;
@@ -664,11 +664,11 @@ impl ImuAidedKeyframeSelector {
 
     /// Update with new IMU measurement
     pub fn update_imu(&mut self, imu: &ImuData) {
-        let gyro = na::Vector3::new(imu.gyro[0] as f64, imu.gyro[1] as f64, imu.gyro[2] as f64);
+        let gyro = na::Vector3::new(imu.gyro[0], imu.gyro[1], imu.gyro[2]);
         let accel = na::Vector3::new(
-            imu.accel[0] as f64,
-            imu.accel[1] as f64,
-            imu.accel[2] as f64,
+            imu.accel[0],
+            imu.accel[1],
+            imu.accel[2],
         );
 
         // Integrate rotation
@@ -693,12 +693,11 @@ impl ImuAidedKeyframeSelector {
         for imu in imu_measurements {
             let dt = (imu.timestamp - last_ts) as f64 / 1e9;
             if dt > 0.0 {
-                let gyro =
-                    na::Vector3::new(imu.gyro[0] as f64, imu.gyro[1] as f64, imu.gyro[2] as f64);
+                let gyro = na::Vector3::new(imu.gyro[0], imu.gyro[1], imu.gyro[2]);
                 let accel = na::Vector3::new(
-                    imu.accel[0] as f64,
-                    imu.accel[1] as f64,
-                    imu.accel[2] as f64,
+                    imu.accel[0],
+                    imu.accel[1],
+                    imu.accel[2],
                 );
 
                 // Rotation integration
@@ -737,7 +736,11 @@ impl ImuAidedKeyframeSelector {
 
         // Compute visual motion since last keyframe
         if let Some(last_pose) = self.last_keyframe_pose {
-            let T_rel = last_pose.try_inverse().unwrap() * current_pose;
+            let T_rel = if let Some(inv) = last_pose.try_inverse() {
+                inv * current_pose
+            } else {
+                na::Matrix4::identity()
+            };
             let t_rel = T_rel.fixed_view::<3, 1>(0, 3).into_owned();
             let r_rel = T_rel.fixed_view::<3, 3>(0, 0);
             let rotmat = na::Rotation3::from_matrix_unchecked(r_rel.into_owned());

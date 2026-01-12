@@ -1,3 +1,9 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+)]
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
 use rs_vio::feature_tracker::{PatchTracker, StereoPatchTracker};
 use rs_vio::datasets::config::FeatureDetectionConfig;

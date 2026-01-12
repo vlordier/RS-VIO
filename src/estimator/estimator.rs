@@ -129,8 +129,8 @@ impl Estimator {
             velocity_estimator: VelocityEstimator::new(imu_config.clone()),
             extrinsic_calibrator: ExtrinsicCalibrator::new(T_B_Cl),
             keyframe_selector: ImuAidedKeyframeSelector::new(
-                config.keyframe_management.translation_threshold as f64,
-                config.keyframe_management.rotation_threshold as f64,
+                config.keyframe_management.translation_threshold,
+                config.keyframe_management.rotation_threshold,
             ),
             current_imu_preintegration: None,
             last_imu_timestamp: None,
@@ -269,7 +269,7 @@ impl Estimator {
             }
 
             // Use motion predictor for feature tracking
-            let focal_length = self.config.camera.left_intrinsics[0] as f64;
+            let focal_length = self.config.camera.left_intrinsics[0];
             for feature in &mut current_frame.left_features {
                 let (du, dv) = self.imu_motion_predictor.predict_feature_displacement(
                     imu,
@@ -316,7 +316,7 @@ impl Estimator {
                         .add_measurement(&T_W_B_copy, R_W_B);
 
                     // Run calibration periodically
-                    if self.imu_measurement_count % 100 == 0 {
+                    if self.imu_measurement_count.is_multiple_of(100) {
                         let error = self.extrinsic_calibrator.calibrate_iteration();
                         log::debug!(
                             "[Estimator] IMU extrinsic calibration error: {:.6} rad",
@@ -402,9 +402,9 @@ impl Estimator {
 
                     // Keyframe if either visual or IMU criteria met
                     let translation_threshold =
-                        self.config.keyframe_management.translation_threshold as f64;
+                        self.config.keyframe_management.translation_threshold;
                     let rotation_threshold =
-                        self.config.keyframe_management.rotation_threshold as f64;
+                        self.config.keyframe_management.rotation_threshold;
                     let visual_keyframe =
                         t_rel.norm() > translation_threshold || rotation_norm > rotation_threshold;
 

@@ -1,6 +1,17 @@
+#![allow(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_lossless,
+    clippy::len_zero,
+    clippy::float_cmp,
+    clippy::field_reassign_with_default,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::unnecessary_cast
+)]
 /// End-to-end VIO pipeline integration tests
 /// These tests validate the complete system behavior with realistic data patterns
-
 use rs_vio::datasets::config::FeatureDetectionConfig;
 use rs_vio::datasets::ImuData;
 use rs_vio::estimator::Frame;

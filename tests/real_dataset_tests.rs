@@ -1,3 +1,9 @@
+#![allow(
+    clippy::expect_used,
+    clippy::len_zero,
+    clippy::cast_precision_loss
+)]
+
 //! Real dataset smoke tests (EuRoC)
 //! These tests use a few real frames and IMU samples when the environment provides a dataset path.
 //! Set `RS_VIO_EUROC_PATH` to the root of an EuRoC sequence (folder containing `mav0/`).

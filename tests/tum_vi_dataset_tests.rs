@@ -1,3 +1,9 @@
+#![allow(
+    clippy::expect_used,
+    clippy::len_zero,
+    clippy::cast_precision_loss
+)]
+
 //! Real dataset smoke tests (TUM-VI)
 //! Set `RS_VIO_TUMVI_PATH` to the root of a TUM-VI sequence (contains `mav0/`).
 //! Tests will skip gracefully if the dataset path is missing.

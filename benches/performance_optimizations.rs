@@ -1,3 +1,8 @@
+#![allow(
+    clippy::cast_precision_loss,
+    clippy::needless_range_loop
+)]
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
 use rs_vio::feature_tracker::patch::{Pattern52, PATTERN52_SIZE};
 use nalgebra as na;

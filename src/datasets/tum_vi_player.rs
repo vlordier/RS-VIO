@@ -121,7 +121,9 @@ impl DatasetPlayer for TUMVIPlayer {
         if !imu_file.exists() {
             log::info!("[TUMVIPlayer] No IMU file found at {}", imu_file.display());
             // Clear cache when file doesn't exist
-            *self.imu_cache.lock().unwrap() = Vec::new();
+            if let Ok(mut cache) = self.imu_cache.lock() {
+                *cache = Vec::new();
+            }
             return Ok(());
         }
 
@@ -174,12 +176,10 @@ impl DatasetPlayer for TUMVIPlayer {
         }
 
         // Store in cache
-        *self.imu_cache.lock().unwrap() = imu_data_vec;
-
-        log::info!(
-            "[TUMVIPlayer] Loaded {} IMU samples",
-            self.imu_cache.lock().unwrap().len()
-        );
+        if let Ok(mut cache) = self.imu_cache.lock() {
+            *cache = imu_data_vec;
+            log::info!("[TUMVIPlayer] Loaded {} IMU samples", cache.len());
+        }
         Ok(())
     }
 
@@ -188,12 +188,16 @@ impl DatasetPlayer for TUMVIPlayer {
         previous_timestamp: i64,
         current_timestamp: i64,
     ) -> Vec<ImuData> {
-        let cache = self.imu_cache.lock().unwrap();
-        cache
-            .iter()
-            .filter(|imu| imu.timestamp > previous_timestamp && imu.timestamp <= current_timestamp)
-            .cloned()
-            .collect()
+        self.imu_cache
+            .lock()
+            .map(|cache| {
+                cache
+                    .iter()
+                    .filter(|imu| imu.timestamp > previous_timestamp && imu.timestamp <= current_timestamp)
+                    .cloned()
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     fn process_single_frame(
@@ -231,9 +235,9 @@ impl DatasetPlayer for TUMVIPlayer {
                     let timestamp_s = context.previous_frame_timestamp as f64 / 1e9;
 
                     // Extract translation
-                    let tx = pose[(0, 3)] as f64;
-                    let ty = pose[(1, 3)] as f64;
-                    let tz = pose[(2, 3)] as f64;
+                    let tx = pose[(0, 3)];
+                    let ty = pose[(1, 3)];
+                    let tz = pose[(2, 3)];
 
                     // Extract rotation as quaternion
                     let r = pose.fixed_view::<3, 3>(0, 0);

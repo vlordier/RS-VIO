@@ -3,7 +3,10 @@
     clippy::expect_used,
     clippy::panic,
     clippy::float_cmp,
-    clippy::cast_lossless
+    clippy::cast_lossless,
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss
 )]
 
 use rs_vio::datasets::config::Config;

@@ -17,10 +17,8 @@ References:
 - Tightly Integrated GNSS/INS for Pedestrian Navigation in GNSS-denied Environments
 """
 
-import json
 from dataclasses import dataclass
-from typing import List, Tuple, Optional
-import math
+from typing import Dict, Any, Tuple
 
 
 @dataclass
@@ -107,7 +105,6 @@ class TightCoupledVIOSimulator:
             ('tum_vi', 'rotational', 'moderate'): 0.1730,  # Challenging
             ('tum_vi', 'rotational', 'fast'): 0.2100,
             ('4seasons', 'dynamic', 'fast'): 0.2810,   # Outdoor difficult
-            ('4seasons', 'dynamic', 'fast'): 0.3200,   # Most challenging
         }
         
         # Tight coupling improvements (empirical from literature)
@@ -157,7 +154,7 @@ class StateOfTheArtComparison:
     """Compare different VIO approaches"""
     
     @staticmethod
-    def loose_coupling_metrics() -> dict:
+    def loose_coupling_metrics() -> Dict[str, Any]:
         """Loose coupling: IMU prior on latest pose only"""
         return {
             'name': 'Loose Coupling (IMU Prior)',
@@ -170,7 +167,7 @@ class StateOfTheArtComparison:
         }
     
     @staticmethod
-    def tight_coupling_metrics() -> dict:
+    def tight_coupling_metrics() -> Dict[str, Any]:
         """Tight coupling: velocity + bias + inter-keyframe IMU factors"""
         return {
             'name': 'Tight Coupling (SOTA)',

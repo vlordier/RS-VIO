@@ -1,4 +1,9 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(
+  clippy::unwrap_used,
+  clippy::expect_used,
+  clippy::panic,
+  clippy::float_cmp
+)]
 
 use rs_vio::datasets::euroc_player::EurocPlayer;
 use rs_vio::datasets::fourseasons_player::FourSeasonsPlayer;

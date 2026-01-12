@@ -4,6 +4,19 @@
 
 #[cfg(test)]
 mod comprehensive_tests {
+    #![allow(
+        clippy::cast_precision_loss,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        clippy::cast_lossless,
+        clippy::float_cmp,
+        clippy::redundant_closure,
+        clippy::useless_vec,
+        clippy::len_zero,
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::unused_enumerate_index
+    )]
     use rs_vio::estimator::{Frame, State};
     use rs_vio::feature_tracker::Feature;
     use rs_vio::types::*;

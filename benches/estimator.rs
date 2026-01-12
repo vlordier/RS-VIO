@@ -18,7 +18,13 @@
 //!
 //! See [BENCHMARKING.md](../BENCHMARKING.md#estimator-benchmarks) for detailed analysis.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::cast_precision_loss,
+    clippy::cast_lossless
+)]
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use rs_vio::datasets::config::Config;

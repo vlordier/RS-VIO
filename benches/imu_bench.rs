@@ -8,7 +8,12 @@
 //!
 //! Run with: cargo bench --bench imu_bench
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::cast_precision_loss
+)]
 
 use rs_vio::datasets::ImuData;
 use rs_vio::imu::{ImuBiasEstimator, ImuConfig, ImuMotionPredictor, ImuPreintegrator};

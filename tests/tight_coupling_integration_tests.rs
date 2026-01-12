@@ -5,6 +5,7 @@ use std::fs;
 /// Integration tests validating tight-coupled VIO on real datasets
 #[cfg(test)]
 mod tight_coupling_integration_tests {
+    #![allow(clippy::expect_used, clippy::unwrap_used)]
     use super::*;
 
     /// Helper to run a sequence and extract metrics
@@ -166,6 +167,7 @@ mod tight_coupling_integration_tests {
 
 #[cfg(test)]
 mod tight_coupling_performance_tests {
+    #![allow(clippy::expect_used, clippy::unwrap_used)]
     use super::*;
 
     #[test]

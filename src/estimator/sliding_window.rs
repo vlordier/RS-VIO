@@ -588,7 +588,7 @@ impl SlidingWindow {
         // If IMU prior is available, add a residual on the latest keyframe pose
         if let Some(prior) = imu_prior {
             let last_index = self.keyframes.len().saturating_sub(1);
-            if self.keyframes.len() > 0 {
+            if !self.keyframes.is_empty() {
                 let kf_var = format!("KF_{}", last_index);
                 // Predict pose from IMU prior (world-from-body), then invert to body-from-world
                 let (T_W_B_pred, _v_pred) = prior.predict_state();

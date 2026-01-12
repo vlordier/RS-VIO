@@ -1,8 +1,6 @@
 /// Test triangulation quality
-/// 
 /// This example demonstrates the new triangulation-based depth initialization
 /// compared to the old fixed-depth approach.
-
 use nalgebra as na;
 
 type Vector3 = na::Vector3<f64>;
@@ -13,11 +11,11 @@ fn main() {
     
     // Create a simple stereo pair with known geometry
     // Left camera at origin, right camera 10cm baseline
-    let _T_W_B = Matrix4x4::identity();
+    let _t_w_b = Matrix4x4::identity();
     
-    let _T_B_Cl = Matrix4x4::identity();
+    let _t_b_cl = Matrix4x4::identity();
     
-    let _T_B_Cr = {
+    let _t_b_cr = {
         let mut m = Matrix4x4::identity();
         m[(0, 3)] = 0.1; // 10cm baseline
         m

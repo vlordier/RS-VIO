@@ -1,8 +1,7 @@
-/// Adaptive frame skipping for real-time VIO
-///
-/// This module implements intelligent frame skipping that maintains real-time performance
-/// while maximizing visual information utilization.
-
+//! Adaptive frame skipping for real-time VIO
+//!
+//! This module implements intelligent frame skipping that maintains real-time performance
+//! while maximizing visual information utilization.
 use std::time::{Duration, Instant};
 
 /// Frame skipping strategy for maintaining real-time constraints

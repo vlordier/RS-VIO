@@ -1,8 +1,7 @@
-/// SIMD-optimized patch matching for real-time performance
-///
-/// This module provides vectorized implementations of patch-based tracking operations
-/// using platform-specific SIMD intrinsics when available.
-
+//! SIMD-optimized patch matching for real-time performance
+//!
+//! This module provides vectorized implementations of patch-based tracking operations
+//! using platform-specific SIMD intrinsics when available.
 use nalgebra as na;
 
 #[cfg(target_arch = "x86_64")]

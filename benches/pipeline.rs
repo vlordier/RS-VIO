@@ -20,7 +20,12 @@
     clippy::unwrap_used,
     clippy::expect_used,
     clippy::panic,
-    clippy::missing_const_for_fn
+    clippy::missing_const_for_fn,
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_lossless,
+    clippy::cast_sign_loss,
+    clippy::implicit_saturating_sub
 )]
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};

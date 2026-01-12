@@ -16,18 +16,20 @@ use std::f64::consts::PI;
 use apex_solver::factors::Factor;
 use nalgebra::{DVector, DMatrix};
 
-/// ============================================================================
-/// 1. GRAVITY MODELING (SOTA)
-/// ============================================================================
+// ============================================================================
+// 1. GRAVITY MODELING (SOTA)
+// ============================================================================
 
 /// Gravity vector in world frame (fixed during optimization in most cases)
-/// 
+///
 /// Recommended approach:
-/// - Fix gravity magnitude and direction (down) during initial BA
-/// - Optionally estimate roll/pitch during initialization if needed
+///   - Fix gravity magnitude and direction (down) during initial BA
+///   - Optionally estimate roll/pitch during initialization if needed
+///
+/// World frame Z-axis points up (opposite to gravity direction).
+///
+///   Gravity = [0, 0, -g] in world frame (right-hand Z-up convention)
 #[derive(Debug, Clone, Copy)]
-/// World frame Z-axis points up (opposite to gravity direction)
-/// Gravity = [0, 0, -g] in world frame (right-hand Z-up convention)
 pub struct GravityModel {
     /// Gravity acceleration magnitude (m/s²), typically ~9.81
     pub magnitude: f64,
@@ -51,9 +53,9 @@ impl GravityModel {
     }
 }
 
-/// ============================================================================
-/// 2. INTER-KEYFRAME IMU PREINTEGRATION FACTOR (SOTA)
-/// ============================================================================
+// ============================================================================
+// 2. INTER-KEYFRAME IMU PREINTEGRATION FACTOR (SOTA)
+// ============================================================================
 
 /// Inter-keyframe IMU factor for tight coupling
 ///
@@ -99,7 +101,7 @@ pub struct InterKeyframeImuFactor {
 #[derive(Debug, Clone)]
 pub struct ImuPreintegration {
     /// Integrated rotation from IMU frame at i to frame at j: R_ij
-    pub delta_R: na::Matrix3<f64>,
+    pub delta_r: na::Matrix3<f64>,
     
     /// Integrated velocity change: Δv = R_i^T * ∫(a - a_bias) dt
     pub delta_v: Vector3,
@@ -108,12 +110,12 @@ pub struct ImuPreintegration {
     pub delta_p: Vector3,
     
     /// Covariance of integration errors
-    pub cov_R: na::Matrix3<f64>,
+    pub cov_r: na::Matrix3<f64>,
     pub cov_v: na::Matrix3<f64>,
     pub cov_p: na::Matrix3<f64>,
     
     /// Cross-covariance terms for bias jacobians
-    pub cov_R_bw: na::Matrix3<f64>,  // cov(ΔR, δw_bias)
+    pub cov_r_bw: na::Matrix3<f64>,  // cov(ΔR, δw_bias)
     pub cov_v_ba: na::Matrix3<f64>,  // cov(Δv, δa_bias)
     pub cov_p_ba: na::Matrix3<f64>,  // cov(Δp, δa_bias)
 }
@@ -129,7 +131,7 @@ impl InterKeyframeImuFactor {
         let mut cov = na::Matrix6::zeros();
         cov.fixed_view_mut::<3, 3>(0, 0).copy_from(&preintegration.cov_p);
         cov.fixed_view_mut::<3, 3>(3, 3).copy_from(&preintegration.cov_v);
-        cov.fixed_view_mut::<3, 3>(3, 3).copy_from(&preintegration.cov_R);
+        cov.fixed_view_mut::<3, 3>(3, 3).copy_from(&preintegration.cov_r);
         
         // Add small regularization to avoid singularity
         let reg = 1e-8;
@@ -141,9 +143,9 @@ impl InterKeyframeImuFactor {
         let information = cov.try_inverse().unwrap_or(na::Matrix6::identity());
         
         // Jacobians w.r.t. biases (for online refinement)
-        let jacobian_pos_bias = preintegration.cov_p_ba.clone();
-        let jacobian_vel_bias = preintegration.cov_v_ba.clone();
-        let jacobian_rot_bias = preintegration.cov_R_bw.clone();
+        let jacobian_pos_bias = preintegration.cov_p_ba;
+        let jacobian_vel_bias = preintegration.cov_v_ba;
+        let jacobian_rot_bias = preintegration.cov_r_bw;
         
         Self {
             dt,
@@ -162,25 +164,26 @@ impl InterKeyframeImuFactor {
     /// Residuals (6D):
     /// - r_p (3D): position prediction error
     /// - r_v (3D): velocity prediction error
+        #[allow(clippy::too_many_arguments)]
     pub fn compute_residual(
         &self,
-        T_W_B_i: Matrix4x4,      // Pose at keyframe i
+        t_w_b_i: Matrix4x4,      // Pose at keyframe i
         v_i: Vector3,            // Velocity at keyframe i
         _bias_a_i: Vector3,      // Accel bias (should match bias_a_j)
         _bias_w_i: Vector3,      // Gyro bias (should match bias_w_j)
         
-        T_W_B_j: Matrix4x4,      // Pose at keyframe j
+        t_w_b_j: Matrix4x4,      // Pose at keyframe j
         v_j: Vector3,            // Velocity at keyframe j
         _bias_a_j: Vector3,      // Accel bias at j (for consistency check)
         _bias_w_j: Vector3,      // Gyro bias at j (for consistency check)
     ) -> na::Vector6<f64> {
         // Extract positions
-        let p_W_B_i = T_W_B_i.fixed_view::<3, 1>(0, 3).into_owned();
-        let p_W_B_j = T_W_B_j.fixed_view::<3, 1>(0, 3).into_owned();
+        let p_w_b_i = t_w_b_i.fixed_view::<3, 1>(0, 3).into_owned();
+        let p_w_b_j = t_w_b_j.fixed_view::<3, 1>(0, 3).into_owned();
         
         // Extract rotations
-        let R_W_B_i = T_W_B_i.fixed_view::<3, 3>(0, 0).into_owned();
-        let R_W_B_j = T_W_B_j.fixed_view::<3, 3>(0, 0).into_owned();
+        let r_w_b_i = t_w_b_i.fixed_view::<3, 3>(0, 0).into_owned();
+        let r_w_b_j = t_w_b_j.fixed_view::<3, 3>(0, 0).into_owned();
         
         // Gravity vector
         let g = self.gravity.gravity_vector();
@@ -188,20 +191,20 @@ impl InterKeyframeImuFactor {
         // Position prediction error:
         // p_pred = p_i + v_i * dt + 0.5 * g * dt² + R_i * Δp
         let dt2 = self.dt * self.dt;
-        let p_pred = p_W_B_i + v_i * self.dt + 0.5 * g * dt2 + R_W_B_i * self.preintegration.delta_p;
-        let r_p = p_W_B_j - p_pred;
+        let p_pred = p_w_b_i + v_i * self.dt + 0.5 * g * dt2 + r_w_b_i * self.preintegration.delta_p;
+        let r_p = p_w_b_j - p_pred;
         
         // Velocity prediction error:
         // v_pred = v_i + g * dt + R_i * Δv
-        let v_pred = v_i + g * self.dt + R_W_B_i * self.preintegration.delta_v;
+        let v_pred = v_i + g * self.dt + r_w_b_i * self.preintegration.delta_v;
         let r_v = v_j - v_pred;
         
         // Rotation prediction error:
         // R_pred = R_i * ΔR
         // Error = log((R_pred^T * R_j)) in axis-angle form
-        let R_pred = R_W_B_i * self.preintegration.delta_R;
-        let R_error = R_pred.transpose() * R_W_B_j;
-        let _r_R = matrix_to_axis_angle(&R_error);
+        let r_pred = r_w_b_i * self.preintegration.delta_r;
+        let r_error = r_pred.transpose() * r_w_b_j;
+        let _rot_residual = matrix_to_axis_angle(&r_error);
         
         // Combine residuals [p, v, R]
         let mut residual = na::Vector6::zeros();
@@ -236,7 +239,14 @@ pub struct BiasRefinement {
     pub max_gyro_bias: f64,   // Typically 0.1 rad/s
 }
 
+impl Default for BiasRefinement {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BiasRefinement {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             accel_bias: Vector3::zeros(),
@@ -326,11 +336,11 @@ impl TightCouplingInitializer {
         // 3. Estimate gravity direction from accelerometer mean
         // 4. Return initial [T_W_B, velocity, gravity]
         
-        let T_W_B = Matrix4x4::identity();
+        let t_w_b = Matrix4x4::identity();
         let velocity = Vector3::zeros();
         let gravity = self.gravity.gravity_vector();
         
-        Some((T_W_B, velocity, gravity))
+        Some((t_w_b, velocity, gravity))
     }
 }
 
@@ -339,7 +349,7 @@ impl TightCouplingInitializer {
 // ============================================================================
 
 /// Factor for inter-keyframe IMU constraints in optimization graph
-/// 
+///
 /// This factor enforces constraints between consecutive keyframes based on
 /// IMU preintegration. It models:
 /// - Position constraint: p_j ≈ p_i + v_i*dt + 0.5*g*dt² + ΔP
@@ -386,48 +396,53 @@ impl Factor for InterKeyframeImuFactor {
 // ============================================================================
 
 /// Convert rotation matrix to axis-angle representation (3D vector)
-fn matrix_to_axis_angle(R: &na::Matrix3<f64>) -> Vector3 {
+fn matrix_to_axis_angle(r: &na::Matrix3<f64>) -> Vector3 {
     // Use Rodrigues' formula inverse
-    let trace = R[(0, 0)] + R[(1, 1)] + R[(2, 2)];
+    let trace = r[(0, 0)] + r[(1, 1)] + r[(2, 2)];
     let angle = ((trace - 1.0) / 2.0).clamp(-1.0, 1.0).acos();
     
     if angle.abs() < 1e-6 {
         // Small angle: use skew-symmetric part
         Vector3::new(
-            R[(2, 1)] - R[(1, 2)],
-            R[(0, 2)] - R[(2, 0)],
-            R[(1, 0)] - R[(0, 1)],
+            r[(2, 1)] - r[(1, 2)],
+            r[(0, 2)] - r[(2, 0)],
+            r[(1, 0)] - r[(0, 1)],
         ) * 0.5
     } else if (angle - PI).abs() < 1e-6 {
         // Angle close to π: extract from diagonal
-        let diag = [R[(0, 0)] + 1.0, R[(1, 1)] + 1.0, R[(2, 2)] + 1.0];
-        let idx = diag.iter().enumerate().max_by(|a, b| a.1.partial_cmp(b.1).unwrap()).unwrap().0;
+        let diag = [r[(0, 0)] + 1.0, r[(1, 1)] + 1.0, r[(2, 2)] + 1.0];
+        let idx_opt = diag
+            .iter()
+            .enumerate()
+            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal));
+        
+        let idx = if let Some((i, _)) = idx_opt { i } else { 0 };
         
         let mut v = Vector3::zeros();
         match idx {
             0 => {
                 v.x = (diag[0] / 2.0).sqrt();
-                v.y = R[(0, 1)] / (2.0 * v.x);
-                v.z = R[(0, 2)] / (2.0 * v.x);
+                v.y = r[(0, 1)] / (2.0 * v.x);
+                v.z = r[(0, 2)] / (2.0 * v.x);
             },
             1 => {
                 v.y = (diag[1] / 2.0).sqrt();
-                v.x = R[(0, 1)] / (2.0 * v.y);
-                v.z = R[(1, 2)] / (2.0 * v.y);
+                v.x = r[(0, 1)] / (2.0 * v.y);
+                v.z = r[(1, 2)] / (2.0 * v.y);
             },
             _ => {
                 v.z = (diag[2] / 2.0).sqrt();
-                v.x = R[(0, 2)] / (2.0 * v.z);
-                v.y = R[(1, 2)] / (2.0 * v.z);
+                v.x = r[(0, 2)] / (2.0 * v.z);
+                v.y = r[(1, 2)] / (2.0 * v.z);
             }
         }
         v * angle
     } else {
         // Normal case
         Vector3::new(
-            R[(2, 1)] - R[(1, 2)],
-            R[(0, 2)] - R[(2, 0)],
-            R[(1, 0)] - R[(0, 1)],
+            r[(2, 1)] - r[(1, 2)],
+            r[(0, 2)] - r[(2, 0)],
+            r[(1, 0)] - r[(0, 1)],
         ) * (angle / (2.0 * angle.sin()))
     }
 }
@@ -447,13 +462,13 @@ mod tests {
     #[test]
     fn test_inter_keyframe_factor_creation() {
         let preintegration = ImuPreintegration {
-            delta_R: na::Matrix3::identity(),
+            delta_r: na::Matrix3::identity(),
             delta_v: Vector3::zeros(),
             delta_p: Vector3::zeros(),
-            cov_R: na::Matrix3::identity() * 1e-4,
+            cov_r: na::Matrix3::identity() * 1e-4,
             cov_v: na::Matrix3::identity() * 1e-4,
             cov_p: na::Matrix3::identity() * 1e-6,
-            cov_R_bw: na::Matrix3::identity() * 1e-5,
+            cov_r_bw: na::Matrix3::identity() * 1e-5,
             cov_v_ba: na::Matrix3::identity() * 1e-5,
             cov_p_ba: na::Matrix3::identity() * 1e-7,
         };
