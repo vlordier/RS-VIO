@@ -2,9 +2,9 @@ name: Rust CI
 
 on:
   push:
-    branches: [ main, apply-rust-best-practices ]
+    branches: [ main, apply-rust-best-practices, feature/realtime-performance ]
   pull_request:
-    branches: [ main, apply-rust-best-practices ]
+    branches: [ main, apply-rust-best-practices, feature/realtime-performance ]
 
 jobs:
   check:
@@ -41,3 +41,41 @@ jobs:
              -H "Content-Type: application/json" \
              https://docs.rs/crate/rs-vio/0.1.0/build
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+  performance-smoke:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Rust
+      run: |
+        rustup toolchain install stable
+        rustup default stable
+    - name: Run quick performance benchmarks
+      run: |
+        cargo bench --bench performance_optimizations -- --warm-up-time 1 --measurement-time 3
+        cargo bench --bench real_world_performance -- --warm-up-time 1 --measurement-time 3
+    - name: Cache benchmark results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: perf-results
+        path: target/criterion/
+
+  benchmark-full:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Rust
+      run: |
+        rustup toolchain install stable
+        rustup default stable
+    - name: Run full benchmarks
+      run: cargo bench
+      if: ${{ env.ENABLE_FULL_BENCH == 'true' }}
+    - name: Cache full benchmark results
+      uses: actions/upload-artifact@v3
+      if: always() && env.ENABLE_FULL_BENCH == 'true'
+      with:
+        name: full-perf-results
+        path: target/criterion/
