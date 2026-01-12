@@ -48,11 +48,12 @@ run_benchmark() {
     avg_time=$(echo "$output" | grep "average" | tail -1 | sed 's/.*average //' | sed 's/ per.*//')
     fps=$(echo "$output" | grep "average" | tail -1 | awk '{print $(NF-2)}' | tr -d 'ms' || echo "N/A")
     
-    total_ms=$((($end_time - $start_time) / 1000000))
+    total_ms=$(((end_time - start_time) / 1000000))
     total_sec=$(echo "scale=2; $total_ms / 1000" | bc)
     
     echo -e "  Frames: ${frames}"
     echo -e "  Avg time/frame: ${avg_time}"
+    echo -e "  FPS (reported): ${fps}"
     echo -e "  Wall clock: ${total_sec}s"
     echo -e "  Details: ${output}" >> "$RESULTS_FILE"
     echo ""
@@ -60,9 +61,9 @@ run_benchmark() {
     # Append to results
     cat >> "$RESULTS_FILE" << EOF
 
-| Dataset | Frames | Avg Time | Wall Clock |
-|---------|--------|----------|------------|
-| ${dataset_name} | ${frames} | ${avg_time} | ${total_sec}s |
+| Dataset | Frames | Avg Time | FPS | Wall Clock |
+|---------|--------|----------|-----|------------|
+| ${dataset_name} | ${frames} | ${avg_time} | ${fps} | ${total_sec}s |
 
 EOF
 }

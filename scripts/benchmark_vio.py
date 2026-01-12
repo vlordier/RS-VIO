@@ -9,11 +9,11 @@ comparing visual-only vs visual+IMU-prior tight-coupled approaches.
 import subprocess
 import time
 import json
-import psutil
+import psutil  # type: ignore[import-untyped]
 import os
 from pathlib import Path
 from dataclasses import dataclass, asdict
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 import sys
 
 @dataclass
@@ -35,27 +35,27 @@ class BenchmarkResult:
 class PerformanceMonitor:
     """Monitor CPU/memory during benchmark"""
     
-    def __init__(self):
+    def __init__(self) -> None:
         self.process = psutil.Process(os.getpid())
-        self.peak_memory = 0.0
-        self.measurements = []
+        self.peak_memory: float = 0.0
+        self.measurements: List[Tuple[float, float]] = []
     
-    def start(self):
+    def start(self) -> None:
         """Start monitoring"""
         self.peak_memory = 0.0
         self.measurements = []
     
-    def sample(self):
+    def sample(self) -> None:
         """Take a sample"""
         try:
             mem_mb = self.process.memory_info().rss / (1024 * 1024)
             cpu = self.process.cpu_percent(interval=0.1)
             self.peak_memory = max(self.peak_memory, mem_mb)
             self.measurements.append((mem_mb, cpu))
-        except:
+        except Exception:
             pass
     
-    def get_stats(self) -> tuple:
+    def get_stats(self) -> Tuple[float, float, float]:
         """Return (peak_memory_mb, avg_memory_mb, avg_cpu_percent)"""
         if not self.measurements:
             return 0.0, 0.0, 0.0
@@ -68,7 +68,7 @@ class PerformanceMonitor:
 class VIOBenchmark:
     """Run and analyze VIO benchmarks"""
     
-    def __init__(self, rs_vio_root: Path, binary_path: Path):
+    def __init__(self, rs_vio_root: Path, binary_path: Path) -> None:
         self.rs_vio_root = Path(rs_vio_root)
         self.binary = Path(binary_path)
         self.monitor = PerformanceMonitor()
@@ -144,7 +144,7 @@ class VIOBenchmark:
                 try:
                     opt_iters = int(''.join(filter(str.isdigit, line.split()[-1])))
                     break
-                except:
+                except Exception:
                     pass
         
         # Estimate per-iteration time
@@ -160,7 +160,7 @@ class VIOBenchmark:
                         if 'rmse' in p.lower() or 'ate' in p.lower():
                             rmse = float(parts[i+1])
                             break
-                except:
+                except Exception:
                     pass
         
         return BenchmarkResult(
@@ -181,10 +181,10 @@ class VIOBenchmark:
 class BenchmarkAnalysis:
     """Analyze and report benchmark results"""
     
-    def __init__(self, results: List[BenchmarkResult]):
+    def __init__(self, results: List[BenchmarkResult]) -> None:
         self.results = results
     
-    def print_summary(self):
+    def print_summary(self) -> None:
         """Print human-readable summary"""
         
         print("\n" + "="*100)
@@ -246,9 +246,9 @@ class BenchmarkAnalysis:
             print(f"Accuracy improvement:     {accuracy_gain:+.1f}%")
             print()
     
-    def save_json(self, output_path: Path):
+    def save_json(self, output_path: Path) -> None:
         """Save detailed results to JSON"""
-        data = {
+        data: Dict[str, object] = {
             'timestamp': '2024',
             'results': [asdict(r) for r in self.results],
             'summary': self._compute_summary()
@@ -259,7 +259,7 @@ class BenchmarkAnalysis:
         
         print(f"✅ Detailed results saved to {output_path}")
     
-    def _compute_summary(self) -> dict:
+    def _compute_summary(self) -> Dict[str, Dict[str, float]]:
         """Compute aggregate statistics"""
         
         if not self.results:
@@ -281,7 +281,7 @@ class BenchmarkAnalysis:
             }
         }
 
-def main():
+def main() -> None:
     """Main benchmarking workflow"""
     
     rs_vio_root = Path('/Users/vincent/Work/RS-VIO')
@@ -297,14 +297,14 @@ def main():
     print(f"   Binary: {binary}\n")
     
     # Configure test sequences
-    test_sequences = [
+    test_sequences: List[Tuple[str, str]] = [
         ('MH_01_easy', 'Easy smooth motion'),
         ('MH_03_medium', 'Medium complexity'),
         ('MH_04_difficult', 'Difficult dynamic motion'),
     ]
     
     benchmark = VIOBenchmark(rs_vio_root, binary)
-    results = []
+    results: List[BenchmarkResult] = []
     
     for seq_name, description in test_sequences:
         print(f"\n📍 Sequence: {seq_name} ({description})")

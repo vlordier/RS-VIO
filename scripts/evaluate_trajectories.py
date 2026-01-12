@@ -6,14 +6,11 @@ Compares visual-only vs IMU-prior-enhanced trajectories across datasets.
 Computes standard SLAM accuracy metrics (ATE, RPE) and generates comparison plots.
 """
 
-import sys
-import subprocess
 import json
-import math
-from pathlib import Path
+import subprocess
 from dataclasses import dataclass
-from typing import List, Tuple, Optional
-import numpy as np
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple, TypedDict
 
 @dataclass
 class TrajectoryMetrics:
@@ -34,10 +31,19 @@ class TrajectoryMetrics:
         """Improvement percentage for display"""
         return f"ATE: {self.ate_mean:.4f}m ± {self.ate_std:.4f}m"
 
+
+class ConfigDict(TypedDict):
+    imu_prior_enable: bool
+    imu_prior_weight_pos: float
+
+
+ReportEntry = Dict[str, float | str]
+
+
 class EuRoCEvaluator:
     """Evaluate on EuRoC dataset sequences"""
     
-    SEQUENCES = {
+    SEQUENCES: Dict[str, List[str]] = {
         'MH': ['01_easy', '02_easy', '03_medium', '04_difficult', '05_difficult'],
         'V': ['01_easy', '02_medium'],
     }
@@ -56,7 +62,7 @@ class EuRoCEvaluator:
     
     def list_sequences(self) -> List[str]:
         """List available sequences"""
-        sequences = []
+        sequences: List[str] = []
         for prefix, suffixes in self.SEQUENCES.items():
             for suffix in suffixes:
                 if prefix == 'MH':
@@ -68,7 +74,7 @@ class EuRoCEvaluator:
 class TUMVIEvaluator:
     """Evaluate on TUM-VI dataset sequences"""
     
-    SEQUENCES = ['dataset-room1_512_16', 'dataset-room2_512_16', 'dataset-room3_512_16',
+    SEQUENCES: List[str] = ['dataset-room1_512_16', 'dataset-room2_512_16', 'dataset-room3_512_16',
                  'dataset-room4_512_16', 'dataset-room5_512_16', 'dataset-room6_512_16']
     
     def __init__(self, tum_path: Path):
@@ -80,7 +86,7 @@ class TUMVIEvaluator:
 class FourSeasonsEvaluator:
     """Evaluate on 4Seasons dataset sequences"""
     
-    SEQUENCES = ['recording_2020-04-30_seq-01', 'recording_2020-05-04_seq-08',
+    SEQUENCES: List[str] = ['recording_2020-04-30_seq-01', 'recording_2020-05-04_seq-08',
                  'recording_2020-07-14_seq-15', 'recording_2020-11-27_seq-20']
     
     def __init__(self, four_seasons_path: Path):
@@ -159,18 +165,15 @@ class TrajectoryComparison:
         finally:
             config_path.unlink(missing_ok=True)
     
-    def _get_config(self, dataset: str) -> dict:
+    def _get_config(self, dataset: str) -> ConfigDict:
         """Load base config for dataset"""
-        config_path = self.rs_vio_root / f'config/{dataset}_vio.yaml'
-        # Simplified: return dict with key settings
-        # In production, use YAML library
         return {'imu_prior_enable': False, 'imu_prior_weight_pos': 0.5}
     
-    def _update_config(self, config: dict, imu_prior: bool):
+    def _update_config(self, config: ConfigDict, imu_prior: bool):
         """Update config with IMU prior setting"""
         config['imu_prior_enable'] = imu_prior
     
-    def _write_config(self, path: Path, config: dict):
+    def _write_config(self, path: Path, config: ConfigDict):
         """Write config to YAML file"""
         # Simplified: in production use YAML library
         path.write_text(f"imu_prior_enable: {str(config['imu_prior_enable']).lower()}\n")
@@ -197,7 +200,7 @@ class TrajectoryComparison:
         """Evaluate all sequences with and without IMU prior"""
         print(f"\n📊 Evaluating {dataset.upper()} dataset...")
         
-        results = []
+        results: List[Tuple[TrajectoryMetrics, TrajectoryMetrics]] = []
         for seq in sequences:
             print(f"\n  Sequence: {seq}")
             
@@ -217,7 +220,7 @@ class ResultsComparison:
     """Analyze and display comparison results"""
     
     def __init__(self, results_list: List[List[Tuple[TrajectoryMetrics, TrajectoryMetrics]]]):
-        self.results_list = results_list
+        self.results_list: List[List[Tuple[TrajectoryMetrics, TrajectoryMetrics]]] = results_list
     
     def print_summary(self):
         """Print human-readable summary"""
@@ -255,10 +258,11 @@ class ResultsComparison:
     
     def generate_report(self, output_file: Path):
         """Generate JSON report for further analysis"""
-        report = {
+        report_results: List[ReportEntry] = []
+        report: Dict[str, object] = {
             'timestamp': '2024',
             'summary': 'Trajectory evaluation comparing visual-only vs visual+IMU-prior',
-            'results': []
+            'results': report_results
         }
         
         for dataset_results in self.results_list:
@@ -268,7 +272,7 @@ class ResultsComparison:
                     metrics_without.ate_mean * 100
                 )
                 
-                report['results'].append({
+                report_results.append({
                     'dataset': metrics_without.dataset,
                     'sequence': metrics_without.sequence,
                     'visual_only_ate': metrics_without.ate_mean,
@@ -283,7 +287,7 @@ class ResultsComparison:
         
         print(f"✅ Report saved to {output_file}")
 
-def main():
+def main() -> None:
     """Main evaluation workflow"""
     
     # Configuration
@@ -303,7 +307,7 @@ def main():
     comparison = TrajectoryComparison(rs_vio_root)
     
     # Evaluate each dataset
-    all_results = []
+    all_results: List[List[Tuple[TrajectoryMetrics, TrajectoryMetrics]]] = []
     
     # EuRoC (if data available)
     if euroc_path.exists():

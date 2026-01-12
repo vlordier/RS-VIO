@@ -51,7 +51,6 @@ cargo build --release --bin run_euroc 2>&1 | tail -5
 # Function to evaluate a single dataset
 evaluate_dataset() {
     local dataset=$1
-    local output_file="$EVAL_DIR/${dataset}_evaluation.txt"
     
     print_header "Evaluating: $dataset"
     

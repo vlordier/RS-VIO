@@ -4,16 +4,23 @@ Enhanced trajectory evaluation with visualization
 Runs RS-VIO with/without IMU prior and generates comparison plots
 """
 
-import subprocess
 import json
+import subprocess
 import time
+from dataclasses import asdict, dataclass
 from pathlib import Path
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
+from typing import List, TypedDict
+
+import matplotlib.pyplot as plt  # type: ignore[import-not-found,import-untyped]
 import numpy as np
-from dataclasses import dataclass, asdict
-from typing import List, Optional, Dict
-import yaml
+import yaml  # type: ignore[import-untyped]
+
+
+class ParsedMetrics(TypedDict):
+    rmse_position: float
+    rmse_rotation: float
+    num_keyframes: int
+    convergence_iterations: int
 
 @dataclass
 class EvaluationResult:
@@ -106,9 +113,9 @@ class VIOEvaluator:
             if temp_config.exists():
                 temp_config.unlink()
     
-    def _parse_output(self, output: str) -> Dict:
+    def _parse_output(self, output: str) -> ParsedMetrics:
         """Extract metrics from output"""
-        metrics = {
+        metrics: ParsedMetrics = {
             'rmse_position': 0.15,  # Default estimate
             'rmse_rotation': 0.05,
             'num_keyframes': 0,
@@ -123,14 +130,11 @@ class VIOEvaluator:
             
             # Look for convergence info
             if 'iteration' in line.lower() or 'converged' in line.lower():
-                try:
-                    parts = line.split()
-                    for i, part in enumerate(parts):
-                        if part.isdigit() and int(part) < 100:
-                            metrics['convergence_iterations'] = int(part)
-                            break
-                except:
-                    pass
+                parts = line.split()
+                for part in parts:
+                    if part.isdigit() and int(part) < 100:
+                        metrics['convergence_iterations'] = int(part)
+                        break
         
         # Estimate RMSE based on sequence length and IMU usage
         metrics['num_keyframes'] = max(metrics['num_keyframes'], 50)
@@ -141,7 +145,7 @@ class ResultsVisualizer:
     """Create visualizations from evaluation results"""
     
     def __init__(self, results: List[EvaluationResult]):
-        self.results = results
+        self.results: List[EvaluationResult] = results
         
         # Set up nice plot style
         plt.style.use('seaborn-v0_8-darkgrid')
@@ -152,10 +156,10 @@ class ResultsVisualizer:
     
     def plot_execution_time_comparison(self, save_path: Path):
         """Bar chart comparing execution times"""
-        sequences = sorted(set(r.sequence for r in self.results))
+        sequences = sorted({r.sequence for r in self.results})
         
-        visual_times = []
-        imu_times = []
+        visual_times: List[float] = []
+        imu_times: List[float] = []
         
         for seq in sequences:
             visual = [r for r in self.results if r.sequence == seq and not r.imu_prior_enabled]
@@ -167,40 +171,40 @@ class ResultsVisualizer:
         x = np.arange(len(sequences))
         width = 0.35
         
-        fig, ax = plt.subplots(figsize=(12, 6))
+        _fig, ax = plt.subplots(figsize=(12, 6))  # type: ignore[misc]
         
-        bars1 = ax.bar(x - width/2, visual_times, width, label='Visual-only', 
+        bars1 = ax.bar(x - width/2, visual_times, width, label='Visual-only',  # type: ignore[misc]
                        color=self.colors['visual'], alpha=0.8)
-        bars2 = ax.bar(x + width/2, imu_times, width, label='Visual + IMU Prior',
+        bars2 = ax.bar(x + width/2, imu_times, width, label='Visual + IMU Prior',  # type: ignore[misc]  # type: ignore[misc]
                        color=self.colors['imu'], alpha=0.8)
         
-        ax.set_xlabel('Sequence', fontsize=12, fontweight='bold')
-        ax.set_ylabel('Execution Time (seconds)', fontsize=12, fontweight='bold')
-        ax.set_title('RS-VIO Execution Time Comparison', fontsize=14, fontweight='bold')
-        ax.set_xticks(x)
-        ax.set_xticklabels(sequences, rotation=45, ha='right')
-        ax.legend(fontsize=11)
-        ax.grid(axis='y', alpha=0.3)
+        ax.set_xlabel('Sequence', fontsize=12, fontweight='bold')  # type: ignore[misc]
+        ax.set_ylabel('Execution Time (seconds)', fontsize=12, fontweight='bold')  # type: ignore[misc]
+        ax.set_title('RS-VIO Execution Time Comparison', fontsize=14, fontweight='bold')  # type: ignore[misc]
+        ax.set_xticks(x)  # type: ignore[misc]
+        ax.set_xticklabels(sequences, rotation=45, ha='right')  # type: ignore[misc]
+        ax.legend(fontsize=11)  # type: ignore[misc]
+        ax.grid(axis='y', alpha=0.3)  # type: ignore[misc]
         
         # Add value labels on bars
         for bars in [bars1, bars2]:
-            for bar in bars:
-                height = bar.get_height()
-                ax.text(bar.get_x() + bar.get_width()/2., height,
+            for bar in bars:  # type: ignore[misc]
+                height = bar.get_height()  # type: ignore[misc]
+                ax.text(bar.get_x() + bar.get_width()/2., height,  # type: ignore[misc]
                        f'{height:.1f}s',
                        ha='center', va='bottom', fontsize=9)
         
-        plt.tight_layout()
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.tight_layout()  # type: ignore[misc]
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')  # type: ignore[misc]
         print(f"📊 Saved execution time plot: {save_path}")
-        plt.close()
+        plt.close()  # type: ignore[misc]
     
     def plot_keyframe_count(self, save_path: Path):
         """Bar chart showing keyframe counts"""
-        sequences = sorted(set(r.sequence for r in self.results))
+        sequences = sorted({r.sequence for r in self.results})
         
-        visual_kf = []
-        imu_kf = []
+        visual_kf: List[int] = []
+        imu_kf: List[int] = []
         
         for seq in sequences:
             visual = [r for r in self.results if r.sequence == seq and not r.imu_prior_enabled]
@@ -212,32 +216,32 @@ class ResultsVisualizer:
         x = np.arange(len(sequences))
         width = 0.35
         
-        fig, ax = plt.subplots(figsize=(12, 6))
+        _fig, ax = plt.subplots(figsize=(12, 6))  # type: ignore[misc]
         
-        bars1 = ax.bar(x - width/2, visual_kf, width, label='Visual-only',
-                       color=self.colors['visual'], alpha=0.8)
-        bars2 = ax.bar(x + width/2, imu_kf, width, label='Visual + IMU Prior',
-                       color=self.colors['imu'], alpha=0.8)
+        _ = ax.bar(x - width/2, visual_kf, width, label='Visual-only',  # type: ignore[misc]
+               color=self.colors['visual'], alpha=0.8)
+        _ = ax.bar(x + width/2, imu_kf, width, label='Visual + IMU Prior',  # type: ignore[misc]
+               color=self.colors['imu'], alpha=0.8)
         
-        ax.set_xlabel('Sequence', fontsize=12, fontweight='bold')
-        ax.set_ylabel('Number of Keyframes', fontsize=12, fontweight='bold')
-        ax.set_title('Keyframe Count Comparison', fontsize=14, fontweight='bold')
-        ax.set_xticks(x)
-        ax.set_xticklabels(sequences, rotation=45, ha='right')
-        ax.legend(fontsize=11)
-        ax.grid(axis='y', alpha=0.3)
+        ax.set_xlabel('Sequence', fontsize=12, fontweight='bold')  # type: ignore[misc]
+        ax.set_ylabel('Number of Keyframes', fontsize=12, fontweight='bold')  # type: ignore[misc]
+        ax.set_title('Keyframe Count Comparison', fontsize=14, fontweight='bold')  # type: ignore[misc]
+        ax.set_xticks(x)  # type: ignore[misc]
+        ax.set_xticklabels(sequences, rotation=45, ha='right')  # type: ignore[misc]
+        ax.legend(fontsize=11)  # type: ignore[misc]
+        ax.grid(axis='y', alpha=0.3)  # type: ignore[misc]
         
-        plt.tight_layout()
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.tight_layout()  # type: ignore[misc]
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')  # type: ignore[misc]
         print(f"📊 Saved keyframe count plot: {save_path}")
-        plt.close()
+        plt.close()  # type: ignore[misc]
     
     def plot_summary_comparison(self, save_path: Path):
         """Create comprehensive summary plot"""
         
         # Calculate averages
-        visual_results = [r for r in self.results if not r.imu_prior_enabled and r.success]
-        imu_results = [r for r in self.results if r.imu_prior_enabled and r.success]
+        visual_results: List[EvaluationResult] = [r for r in self.results if not r.imu_prior_enabled and r.success]
+        imu_results: List[EvaluationResult] = [r for r in self.results if r.imu_prior_enabled and r.success]
         
         if not visual_results or not imu_results:
             print("⚠️  Insufficient data for summary plot")
@@ -253,7 +257,7 @@ class ResultsVisualizer:
         avg_imu_iter = np.mean([r.convergence_iterations for r in imu_results])
         
         # Create figure with 3 subplots
-        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+        _fig, axes = plt.subplots(1, 3, figsize=(15, 5))  # type: ignore[misc]
         
         metrics = [
             ('Avg Execution\nTime (s)', [avg_visual_time, avg_imu_time]),
@@ -276,11 +280,11 @@ class ResultsVisualizer:
                        f'{height:.1f}',
                        ha='center', va='bottom', fontsize=10, fontweight='bold')
         
-        plt.suptitle('RS-VIO Performance Summary', fontsize=16, fontweight='bold')
-        plt.tight_layout()
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.suptitle('RS-VIO Performance Summary', fontsize=16, fontweight='bold')  # type: ignore[misc]
+        plt.tight_layout()  # type: ignore[misc]
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')  # type: ignore[misc]
         print(f"📊 Saved summary plot: {save_path}")
-        plt.close()
+        plt.close()  # type: ignore[misc]
     
     def generate_all_plots(self, output_dir: Path):
         """Generate all visualization plots"""
@@ -290,7 +294,7 @@ class ResultsVisualizer:
         self.plot_keyframe_count(output_dir / 'keyframe_count.png')
         self.plot_summary_comparison(output_dir / 'summary_comparison.png')
 
-def main():
+def main() -> None:
     """Main evaluation workflow"""
     
     rs_vio_root = Path('/Users/vincent/Work/RS-VIO')
@@ -309,14 +313,14 @@ def main():
     ]
     
     evaluator = VIOEvaluator(rs_vio_root)
-    results = []
+    results: List[EvaluationResult] = []
     
     for seq_name, description in sequences:
         print(f"\n📍 {seq_name} ({description})")
         seq_path = euroc_data / seq_name
         
         if not seq_path.exists():
-            print(f"   ⚠️  Data not found, skipping")
+            print("   ⚠️  Data not found, skipping")
             continue
         
         # Run with visual-only
@@ -354,9 +358,9 @@ def main():
     
     print("="*80)
     print(f"\n✅ Evaluation complete! Check plots in: {output_dir}/")
-    print(f"   - execution_time_comparison.png")
-    print(f"   - keyframe_count.png")
-    print(f"   - summary_comparison.png")
+    print("   - execution_time_comparison.png")
+    print("   - keyframe_count.png")
+    print("   - summary_comparison.png")
 
 if __name__ == '__main__':
     main()

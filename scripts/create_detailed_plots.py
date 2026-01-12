@@ -3,15 +3,19 @@
 Create detailed performance comparison plots
 """
 
+from __future__ import annotations
+
 import json
-import matplotlib.pyplot as plt
-import numpy as np
 from pathlib import Path
+from typing import Any, List, cast
+
+import matplotlib.pyplot as plt  # type: ignore[import]
+import numpy as np
 
 # Load results
 results_path = Path('/Users/vincent/Work/RS-VIO/evaluation_results/evaluation_results.json')
 with open(results_path) as f:
-    results = json.load(f)
+        results: List[dict[str, Any]] = json.load(f)
 
 # Filter successful runs
 successful = [r for r in results if r['success']]
@@ -21,22 +25,24 @@ if not successful:
     exit(1)
 
 # Prepare data
-visual_only = [r for r in successful if not r['imu_prior_enabled']]
-with_imu = [r for r in successful if r['imu_prior_enabled']]
+visual_only: List[dict[str, Any]] = [r for r in successful if not r['imu_prior_enabled']]
+with_imu: List[dict[str, Any]] = [r for r in successful if r['imu_prior_enabled']]
 
 # Create detailed comparison plot
-fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+fig_obj, axes_obj = plt.subplots(2, 2, figsize=(14, 10))  # type: ignore[misc]
+fig = cast(Any, fig_obj)
+axes = cast(Any, axes_obj)
 fig.suptitle('RS-VIO: Visual-only vs Visual+IMU Prior Detailed Analysis', 
              fontsize=16, fontweight='bold', y=0.995)
 
 # 1. Execution time comparison
 ax1 = axes[0, 0]
-sequences = [r['sequence'] for r in visual_only]
+sequences: List[str] = [r['sequence'] for r in visual_only]
 x = np.arange(len(sequences))
 width = 0.35
 
-visual_times = [r['execution_time_sec'] for r in visual_only]
-imu_times = [r['execution_time_sec'] for r in with_imu]
+visual_times: List[float] = [float(r['execution_time_sec']) for r in visual_only]
+imu_times: List[float] = [float(r['execution_time_sec']) for r in with_imu]
 
 bars1 = ax1.bar(x - width/2, visual_times, width, label='Visual-only', 
                 color='#e74c3c', alpha=0.8)
@@ -59,7 +65,7 @@ for bars in [bars1, bars2]:
 
 # 2. Speedup percentage
 ax2 = axes[0, 1]
-speedups = []
+speedups: List[float] = []
 for i in range(len(visual_only)):
     speedup = ((visual_times[i] - imu_times[i]) / visual_times[i]) * 100
     speedups.append(speedup)
@@ -132,16 +138,18 @@ ax4.text(0.05, 0.95, summary_text, transform=ax4.transAxes,
         fontsize=11, verticalalignment='top', fontfamily='monospace',
         bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.3))
 
-plt.tight_layout()
+plt.tight_layout()  # type: ignore[misc]
 
 # Save plot
 output_path = Path('/Users/vincent/Work/RS-VIO/evaluation_results/detailed_analysis.png')
-plt.savefig(output_path, dpi=300, bbox_inches='tight')
+plt.savefig(output_path, dpi=300, bbox_inches='tight')  # type: ignore[misc]
 print(f"✅ Saved detailed analysis plot: {output_path}")
-plt.close()
+plt.close()  # type: ignore[misc]
 
 # Create timeline comparison
-fig, ax = plt.subplots(figsize=(12, 6))
+fig_timeline_obj, ax_obj = plt.subplots(figsize=(12, 6))  # type: ignore[misc]
+fig = cast(Any, fig_timeline_obj)
+ax = cast(Any, ax_obj)
 
 for i, seq in enumerate(sequences):
     # Visual-only
@@ -167,10 +175,10 @@ ax.set_title('Processing Time Comparison by Sequence', fontsize=14, fontweight='
 ax.legend(loc='upper right', fontsize=11)
 ax.grid(axis='x', alpha=0.3)
 
-plt.tight_layout()
+plt.tight_layout()  # type: ignore[misc]
 timeline_path = Path('/Users/vincent/Work/RS-VIO/evaluation_results/timeline_comparison.png')
-plt.savefig(timeline_path, dpi=300, bbox_inches='tight')
+plt.savefig(timeline_path, dpi=300, bbox_inches='tight')  # type: ignore[misc]
 print(f"✅ Saved timeline comparison: {timeline_path}")
-plt.close()
+plt.close()  # type: ignore[misc]
 
 print("\n📊 All detailed plots generated successfully!")
