@@ -1,6 +1,9 @@
 use crate::{Result, VIOError};
 use serde::{Deserialize, Serialize};
 
+#[doc(inline)]
+pub use crate::optimization::marginalization::MarginalizationConfig;
+
 /// Main configuration structure for the VIO system.
 ///
 /// This struct holds all configuration parameters loaded from YAML files,
@@ -17,6 +20,9 @@ pub struct Config {
     #[serde(default)]
     pub visualization: VisualizationConfig,
     pub optimization: OptimizationConfig,
+    #[serde(rename = "marginalization")]
+    #[serde(default)]
+    pub marginalization: crate::optimization::marginalization::MarginalizationConfig,
 }
 
 /// Camera configuration including intrinsics, distortion, and extrinsics.

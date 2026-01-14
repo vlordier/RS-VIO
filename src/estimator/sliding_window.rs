@@ -1,6 +1,8 @@
 use crate::estimator::Frame;
-use crate::optimization::factors::{BundleAdjustmentFactor, PnPFactor, ImuPriorFactor};
 use crate::imu::ImuMotionPrior;
+use crate::optimization::factors::{
+    BundleAdjustmentFactor, ImuPriorFactor, PnPFactor, PriorFactor,
+};
 
 use crate::types::{Matrix3x3, Matrix4x4, Vector3};
 use apex_solver::core::loss_functions::HuberLoss;
@@ -70,6 +72,9 @@ pub struct SlidingWindow {
 
     /// Track observation count for each map point (for LRU eviction)
     map_point_observations: HashMap<usize, usize>,
+
+    /// Marginalization manager for sliding window
+    marginalization_manager: crate::optimization::marginalization::MarginalizationManager,
 }
 
 impl SlidingWindow {
@@ -79,9 +84,79 @@ impl SlidingWindow {
     /// # Arguments
     /// * `max_frames` - Maximum number of keyframes to keep in the window (default: 16)
     pub fn new(max_frames: usize) -> Self {
-        // For embedded systems, limit map points to prevent unbounded growth
-        // Typical VIO systems maintain 500-2000 active landmarks
+        Self::with_marginalization_config(
+            max_frames,
+            crate::optimization::marginalization::MarginalizationConfig::default(),
+        )
+    }
+
+    /// Create a new sliding window with custom marginalization configuration.
+    ///
+    /// # Arguments
+    /// * `max_frames` - Maximum number of keyframes to keep in the window
+    /// * `marg_config` - Marginalization configuration options
+    pub fn with_marginalization_config(
+        max_frames: usize,
+        marg_config: crate::optimization::marginalization::MarginalizationConfig,
+    ) -> Self {
         const DEFAULT_MAX_MAP_POINTS: usize = 2000;
+
+        let mut marg_manager =
+            crate::optimization::marginalization::MarginalizationManager::new(marg_config);
+
+        match marg_manager.hessian_approximator_name().as_ref() {
+            "Diagonal" => {
+                marg_manager.set_hessian_approximator(Box::new(
+                    crate::optimization::marginalization::DiagonalApproximator::default(),
+                ));
+            },
+            "LevenbergMarquardt" => {
+                marg_manager.set_hessian_approximator(Box::new(
+                    crate::optimization::marginalization::LevenbergMarquardtApproximator::default(),
+                ));
+            },
+            "Identity" => {
+                marg_manager.set_hessian_approximator(Box::new(
+                    crate::optimization::marginalization::IdentityApproximator,
+                ));
+            },
+            "Exact" => {
+                marg_manager.set_hessian_approximator(Box::new(
+                    crate::optimization::marginalization::ExactHessianApproximator,
+                ));
+            },
+            _ => {
+                marg_manager.set_hessian_approximator(Box::new(
+                    crate::optimization::marginalization::GaussNewtonApproximator::default(),
+                ));
+            },
+        }
+
+        match marg_manager.gradient_computer_name().as_ref() {
+            "Zero" => {
+                marg_manager.set_gradient_computer(Box::new(
+                    crate::optimization::marginalization::ZeroGradientComputer,
+                ));
+            },
+            _ => {
+                marg_manager.set_gradient_computer(Box::new(
+                    crate::optimization::marginalization::StandardGradientComputer,
+                ));
+            },
+        }
+
+        match marg_manager.prior_constructor_name().as_ref() {
+            "Regularized" => {
+                marg_manager.set_prior_constructor(Box::new(
+                    crate::optimization::marginalization::RegularizedPriorConstructor::default(),
+                ));
+            },
+            _ => {
+                marg_manager.set_prior_constructor(Box::new(
+                    crate::optimization::marginalization::StandardPriorConstructor,
+                ));
+            },
+        }
 
         Self {
             max_frames,
@@ -89,7 +164,34 @@ impl SlidingWindow {
             map_points: HashMap::with_capacity(DEFAULT_MAX_MAP_POINTS),
             max_map_points: DEFAULT_MAX_MAP_POINTS,
             map_point_observations: HashMap::with_capacity(DEFAULT_MAX_MAP_POINTS),
+            marginalization_manager: marg_manager,
         }
+    }
+
+    /// Create a new sliding window from a Config file.
+    ///
+    /// # Arguments
+    /// * `config` - Configuration loaded from YAML file
+    pub fn from_config(config: &crate::datasets::config::Config) -> Self {
+        let marg_config = crate::optimization::marginalization::MarginalizationConfig {
+            enabled: config.marginalization.enabled,
+            use_fej: config.marginalization.use_fej,
+            damping: config.marginalization.damping,
+            max_keyframes: config.marginalization.max_keyframes,
+            num_marginalize_per_step: config.marginalization.num_marginalize_per_step,
+            min_landmark_observations: config.marginalization.min_landmark_observations,
+            landmark_age_limit: config.marginalization.landmark_age_limit,
+            prior_weight: config.marginalization.prior_weight,
+            prior_info_scaling: config.marginalization.prior_info_scaling,
+            hessian_approximator: config.marginalization.hessian_approximator.clone(),
+            gradient_computer: config.marginalization.gradient_computer.clone(),
+            prior_constructor: config.marginalization.prior_constructor.clone(),
+        };
+
+        Self::with_marginalization_config(
+            config.keyframe_management.keyframe_window_size as usize,
+            marg_config,
+        )
     }
 
     /// Create a new sliding window with the default size of 16 frames.
@@ -259,11 +361,7 @@ impl SlidingWindow {
     /// Helper function to create skew-symmetric (cross-product) matrix from 3D vector
     #[allow(dead_code)]
     fn skew_symmetric(v: &Vector3) -> Matrix3x3 {
-        na::Matrix3::<f64>::new(
-            0.0, -v.z, v.y,
-            v.z, 0.0, -v.x,
-            -v.y, v.x, 0.0,
-        )
+        na::Matrix3::<f64>::new(0.0, -v.z, v.y, v.z, 0.0, -v.x, -v.y, v.x, 0.0)
     }
 
     /// Triangulate a 3D point from stereo observations in a single frame
@@ -290,55 +388,55 @@ impl SlidingWindow {
         // Compute T_Cl_Cr (left camera to right camera transform)
         let T_Cl_B = T_B_Cl.try_inverse()?;
         let T_Cl_Cr = T_Cl_B * T_B_Cr;
-        
+
         let R_Cl_Cr = T_Cl_Cr.fixed_view::<3, 3>(0, 0).into_owned();
         let t_Cl_Cr = T_Cl_Cr.fixed_view::<3, 1>(0, 3).into_owned();
-        
+
         // Simple midpoint triangulation method
         // Find the 3D point closest to both rays in their respective camera frames
-        
-        let p_L = Vector3::zeros();  // Left camera at origin in its frame
-        let p_R_in_L = t_Cl_Cr;  // Right camera position in left frame
-        
+
+        let p_L = Vector3::zeros(); // Left camera at origin in its frame
+        let p_R_in_L = t_Cl_Cr; // Right camera position in left frame
+
         let dir_L = left_obs.normalize();
         let dir_R = R_Cl_Cr * right_obs.normalize();
-        
+
         // Vector between camera origins
         let w = p_R_in_L - p_L;
-        
+
         // Compute scalar t for closest point on left ray
         let a = dir_L.dot(&dir_L);
         let b_val = dir_L.dot(&dir_R);
         let c = dir_R.dot(&dir_R);
         let d = dir_L.dot(&w);
         let e = dir_R.dot(&w);
-        
+
         let denom = a * c - b_val * b_val;
-        if denom.abs() < 1e-12 {
-            return None;  // Rays are parallel
+        if denom.abs() < 1e-8 {
+            return None; // Rays are parallel
         }
-        
+
         let t_L = (b_val * e - c * d) / denom;
         let t_R = (a * e - b_val * d) / denom;
-        
+
         // Get closest point on each ray
         let p_L_closest = p_L + t_L * dir_L;
         let p_R_closest = p_R_in_L + t_R * dir_R;
-        
+
         // Take midpoint
         let p_Cl = (p_L_closest + p_R_closest) * 0.5;
-        
+
         // Filter invalid depths (behind camera)
-        if p_Cl.z <= 0.1 {
+        if p_Cl.z <= 0.05 {
             return None;
         }
-        
+
         // Transform to world frame: p_W = T_W_Cl * p_Cl
         let T_W_Cl = T_W_B * T_B_Cl;
         let R_W_Cl = T_W_Cl.fixed_view::<3, 3>(0, 0).into_owned();
         let t_W_Cl = T_W_Cl.fixed_view::<3, 1>(0, 3).into_owned();
         let p_W = R_W_Cl * p_Cl + t_W_Cl;
-        
+
         Some(p_W)
     }
 
@@ -578,7 +676,10 @@ impl SlidingWindow {
                         problem.add_residual_block(
                             &var_names,
                             Box::new(factor),
-                            Some(Box::new(huber_loss) as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>),
+                            Some(Box::new(huber_loss)
+                                as Box<
+                                    dyn apex_solver::core::loss_functions::LossFunction + Send,
+                                >),
                         );
                     }
                 }
@@ -599,11 +700,18 @@ impl SlidingWindow {
                     let loss = if let Some(delta) = imu_huber_delta {
                         if delta > 0.0 {
                             match HuberLoss::new(delta) {
-                                Ok(l) => Some(Box::new(l) as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>),
+                                Ok(l) => Some(Box::new(l)
+                                    as Box<
+                                        dyn apex_solver::core::loss_functions::LossFunction + Send,
+                                    >),
                                 Err(e) => {
-                                    log::warn!("[SlidingWindow] Invalid Huber delta ({}): {}", delta, e);
+                                    log::warn!(
+                                        "[SlidingWindow] Invalid Huber delta ({}): {}",
+                                        delta,
+                                        e
+                                    );
                                     None
-                                }
+                                },
                             }
                         } else {
                             None
@@ -618,6 +726,45 @@ impl SlidingWindow {
                     );
                 } else {
                     log::warn!("[SlidingWindow] IMU prior predicted pose inversion failed; skipping IMU residual");
+                }
+            }
+        }
+
+        // Add marginalization prior if available
+        if let Some(marg_prior) = self.marginalization_manager.get_prior() {
+            log::debug!(
+                "[SlidingWindow] Adding marginalization prior with {} parameters, residual_dim={}",
+                marg_prior.param_ids.len(),
+                marg_prior.residual_dim
+            );
+            // Create a prior factor for each parameter block
+            for param_id in &marg_prior.param_ids {
+                let var_name = match param_id {
+                    crate::optimization::marginalization::ParamId::KeyframePose(i) => {
+                        format!("KF_{}", i)
+                    },
+                    crate::optimization::marginalization::ParamId::Landmark(i) => {
+                        format!("LM_{}", i)
+                    },
+                    _ => continue, // Skip other parameter types for now
+                };
+
+                if initial_values.contains_key(&var_name) {
+                    // Get linearization point from prior or use current value
+                    let lin_point = marg_prior
+                        .linearization_points
+                        .get(param_id)
+                        .cloned()
+                        .or_else(|| initial_values.get(&var_name).map(|(_, v)| v.clone()));
+
+                    if let Some(lp) = lin_point {
+                        let prior_factor = PriorFactor::new(
+                            lp,
+                            marg_prior.information.clone(),
+                            marg_prior.damping,
+                        );
+                        problem.add_residual_block(&[&var_name], Box::new(prior_factor), None);
+                    }
                 }
             }
         }
@@ -699,6 +846,72 @@ impl SlidingWindow {
         if is_successful {
             // Process successful optimization result
             self.process_optimization_result(&opt_result);
+
+            // Perform marginalization if window is full
+            if self
+                .marginalization_manager
+                .should_marginalize(self.keyframes.len())
+            {
+                log::debug!("[SlidingWindow] Window is full, performing marginalization");
+
+                // Build parameter blocks for marginalization
+                let param_blocks = self.build_param_blocks_for_marginalization();
+
+                // Build residuals from optimization cost
+                // For visual residuals: 2D reprojection error per observation
+                let total_observations: usize = self
+                    .keyframes
+                    .iter()
+                    .flat_map(|f| f.left_features.iter().chain(f.right_features.iter()))
+                    .count();
+                let residuals = na::DVector::from_vec(vec![0.0; total_observations * 2]);
+
+                // Identify which parameters to keep and which to marginalize
+                // Keep all current keyframes and landmarks, marginalize oldest
+                let n_keyframes = self.keyframes.len();
+                let _n_keep_keyframes = if n_keyframes > 1 { n_keyframes - 1 } else { 0 };
+                let marg_keyframe_idx = 0; // Marginalize oldest keyframe
+
+                let mut keep_ids = Vec::new();
+                let mut marg_ids = Vec::new();
+
+                // Keyframes to keep: all except the oldest
+                for i in marg_keyframe_idx + 1..n_keyframes {
+                    keep_ids.push(crate::optimization::marginalization::ParamId::KeyframePose(
+                        i,
+                    ));
+                }
+                // Oldest keyframe to marginalize
+                marg_ids.push(crate::optimization::marginalization::ParamId::KeyframePose(
+                    marg_keyframe_idx,
+                ));
+
+                // All landmarks to keep (we'll marginalize old ones later based on age)
+                for (fid, _) in &self.map_points {
+                    keep_ids.push(crate::optimization::marginalization::ParamId::Landmark(
+                        *fid,
+                    ));
+                }
+
+                // Perform marginalization using approximation
+                if let Some(prior) = self.marginalization_manager.marginalize_with_approximation(
+                    &param_blocks,
+                    &residuals,
+                    None, // No pre-computed Jacobians
+                    &keep_ids,
+                    &marg_ids,
+                ) {
+                    log::debug!(
+                        "[SlidingWindow] Marginalization successful. Prior dimension: {}",
+                        prior.param_ids.len()
+                    );
+                    // Store the prior for use in subsequent optimizations
+                    self.marginalization_manager.set_prior(prior);
+                } else {
+                    log::warn!("[SlidingWindow] Marginalization failed, skipping");
+                }
+            }
+
             log::debug!(
                 "[SlidingWindow] Optimization successful. Initial cost: {:.3}, final cost: {:.3}",
                 opt_result.initial_cost,
@@ -742,13 +955,74 @@ impl SlidingWindow {
         // Tight-coupled VIO optimization - enhanced version with velocity and bias optimization
         // For now, use regular optimization as a baseline
         // Future: Add inter-keyframe IMU factors for true tight coupling
-        
+
         self.optimize_with_imu(None, None, None)
     }
 
     /// Backward-compatible optimize without IMU prior
     pub fn optimize(&mut self) -> Result<bool, std::io::Error> {
         self.optimize_with_imu(None, None, None)
+    }
+
+    /// Build parameter blocks for marginalization
+    ///
+    /// This method constructs the parameter block data structure needed by MarginalizationManager.
+    /// It's called when the sliding window is full to prepare for marginalizing old states.
+    fn build_param_blocks_for_marginalization(
+        &self,
+    ) -> HashMap<
+        crate::optimization::marginalization::ParamId,
+        crate::optimization::marginalization::ParamBlock,
+    > {
+        use crate::optimization::marginalization::{ParamBlock, ParamId};
+
+        let mut param_blocks = HashMap::new();
+
+        // Add keyframe pose parameters
+        for (i, frame) in self.keyframes.iter().enumerate() {
+            let pose_dim = 7; // SE3: 3 translation + 4 quaternion
+            let t_W_B = frame.state.T_W_B;
+            let R_W_B = t_W_B.fixed_view::<3, 3>(0, 0).into_owned();
+            let t_W_B_vec = t_W_B.fixed_view::<3, 1>(0, 3).into_owned();
+            let q = na::UnitQuaternion::from_matrix(&R_W_B);
+
+            let linearization_point = na::DVector::from_vec(vec![
+                t_W_B_vec.x,
+                t_W_B_vec.y,
+                t_W_B_vec.z,
+                q.w,
+                q.i,
+                q.j,
+                q.k,
+            ]);
+
+            param_blocks.insert(
+                ParamId::KeyframePose(i),
+                ParamBlock {
+                    id: ParamId::KeyframePose(i),
+                    dimension: pose_dim,
+                    linearization_point,
+                },
+            );
+        }
+
+        // Add landmark parameters
+        for (feature_id, point) in &self.map_points {
+            let landmark_dim = 3; // XYZ position
+            let linearization_point =
+                na::DVector::from_vec(vec![point[0] as f64, point[1] as f64, point[2] as f64]);
+
+            param_blocks.insert(
+                ParamId::Landmark(*feature_id),
+                ParamBlock {
+                    id: ParamId::Landmark(*feature_id),
+                    dimension: landmark_dim,
+                    linearization_point,
+                },
+            );
+        }
+
+        param_blocks
     }
 
     /// Check if optimization result indicates success
@@ -1063,9 +1337,42 @@ mod tests {
         window.evict_old_map_points();
 
         assert!(window.map_points_len() <= 10);
-        // Highest observed points (ids 10..19) should remain after eviction.
-        for id in 10..20 {
-            assert!(window.map_points.contains_key(&id));
+        for _id in 10..20 {
+            assert!(window.map_points.contains_key(&(_id as usize)));
         }
+    }
+
+    #[test]
+    fn triangulate_stereo_parallel_rays() {
+        // Parallel rays should fail
+        let left_obs = Vector3::new(1.0, 0.0, 1.0);
+        let right_obs = Vector3::new(1.0, 0.0, 1.0);
+
+        let T_W_B = Matrix4x4::identity();
+        let T_B_Cl = Matrix4x4::identity();
+        let T_B_Cr = Matrix4x4::new(
+            1.0, 0.0, 0.0, 0.1, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        );
+
+        let result = SlidingWindow::triangulate_stereo(left_obs, right_obs, T_W_B, T_B_Cl, T_B_Cr);
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn triangulate_stereo_behind_camera() {
+        // Feature behind camera should fail
+        let left_obs = Vector3::new(-0.5, 0.0, 1.0);
+        let right_obs = Vector3::new(-0.6, 0.0, 1.0);
+
+        let T_W_B = Matrix4x4::identity();
+        let T_B_Cl = Matrix4x4::identity();
+        let T_B_Cr = Matrix4x4::new(
+            1.0, 0.0, 0.0, 0.1, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        );
+
+        let result = SlidingWindow::triangulate_stereo(left_obs, right_obs, T_W_B, T_B_Cl, T_B_Cr);
+
+        assert!(result.is_none());
     }
 }

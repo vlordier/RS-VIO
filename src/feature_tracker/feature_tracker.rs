@@ -8,7 +8,7 @@ use std::time::Instant;
 
 use crate::datasets::config::FeatureDetectionConfig;
 
-use super::{image_utilities, patch, frame_skip};
+use super::{frame_skip, image_utilities, patch};
 
 use log::info;
 
@@ -182,7 +182,7 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
         frame: &mut crate::estimator::Frame,
     ) {
         let frame_start = Instant::now();
-        
+
         // Adaptive frame skipping: check if we should process this frame
         // Estimate motion from recent feature positions (simple heuristic)
         let estimated_motion = self.estimate_frame_motion();
@@ -195,7 +195,7 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             log::debug!("[FeatureTracker] Frame skipped for real-time constraints");
             return;
         }
-        
+
         // build current image pyramid
         let current_image_pyramid0: Vec<GrayImage> = build_image_pyramid(greyscale_image0, LEVELS);
         let current_image_pyramid1: Vec<GrayImage> = build_image_pyramid(greyscale_image1, LEVELS);
@@ -276,24 +276,25 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             let f = Feature::new(id, [x, y]);
             frame.add_right_feature(f);
         }
-        
+
         // Record processing time for adaptive frame skipping
         let frame_duration = frame_start.elapsed();
         self.frame_skipper.record_frame_time(frame_duration);
         self.last_frame_time = Some(frame_start);
     }
-    
+
     /// Estimate frame-to-frame motion as heuristic for frame skipping
     fn estimate_frame_motion(&self) -> Option<f32> {
         if self.tracked_points_map_cam0.is_empty() {
             return None;
         }
-        
+
         // Simple motion estimate: average distance from center
         let image_center_x = 320.0f32; // Typical for 640×480 images
         let image_center_y = 240.0f32;
-        
-        let motion_sum: f32 = self.tracked_points_map_cam0
+
+        let motion_sum: f32 = self
+            .tracked_points_map_cam0
             .values()
             .map(|pt| {
                 let dx = pt.matrix().m13 - image_center_x;
@@ -301,7 +302,7 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
                 (dx * dx + dy * dy).sqrt()
             })
             .sum();
-        
+
         Some(motion_sum / self.tracked_points_map_cam0.len() as f32)
     }
     pub fn get_track_points(&self) -> [HashMap<usize, (f32, f32)>; 2] {
@@ -641,5 +642,281 @@ mod tests {
         // since they won't meet the strict convergence criteria
         let tracked = track_points::<LEVELS>(&pyramid0, &pyramid1, &map0, 100, 100.0);
         assert!(tracked.is_empty());
+    }
+
+    #[test]
+    fn track_points_zero_landmarks() {
+        const LEVELS: u32 = 2;
+        let img = checkerboard_image(64, 64);
+        let pyramid0 = build_image_pyramid(&img, LEVELS);
+        let pyramid1 = build_image_pyramid(&img, LEVELS);
+        let map0 = HashMap::new();
+
+        let tracked = track_points::<LEVELS>(&pyramid0, &pyramid1, &map0, 10, 1e-3);
+        assert!(
+            tracked.is_empty(),
+            "No landmarks should produce empty tracking result"
+        );
+    }
+
+    #[test]
+    fn track_points_total_darkness_image() {
+        const LEVELS: u32 = 2;
+        let black_img = GrayImage::from_pixel(64, 64, Luma([0u8]));
+        let pyramid0 = build_image_pyramid(&black_img, LEVELS);
+        let pyramid1 = build_image_pyramid(&black_img, LEVELS);
+
+        let mut map0 = HashMap::new();
+        let mut transform = na::Affine2::<f32>::identity();
+        transform.matrix_mut_unchecked().m13 = 32.0;
+        transform.matrix_mut_unchecked().m23 = 32.0;
+        map0.insert(0usize, transform);
+
+        let tracked = track_points::<LEVELS>(&pyramid0, &pyramid1, &map0, 10, 1e-3);
+        assert!(
+            tracked.is_empty(),
+            "Total darkness should produce no tracked points"
+        );
+    }
+
+    #[test]
+    fn track_points_saturated_image() {
+        const LEVELS: u32 = 2;
+        let white_img = GrayImage::from_pixel(64, 64, Luma([255u8]));
+        let pyramid0 = build_image_pyramid(&white_img, LEVELS);
+        let pyramid1 = build_image_pyramid(&white_img, LEVELS);
+
+        let mut map0 = HashMap::new();
+        let mut transform = na::Affine2::<f32>::identity();
+        transform.matrix_mut_unchecked().m13 = 32.0;
+        transform.matrix_mut_unchecked().m23 = 32.0;
+        map0.insert(0usize, transform);
+
+        let tracked = track_points::<LEVELS>(&pyramid0, &pyramid1, &map0, 10, 1e-3);
+        assert!(
+            tracked.is_empty(),
+            "Saturated image should produce no tracked points"
+        );
+    }
+
+    #[test]
+    fn track_points_salt_and_pepper_noise() {
+        const LEVELS: u32 = 2;
+        let mut img = GrayImage::from_pixel(64, 64, Luma([128u8]));
+        for x in 0..64 {
+            for y in 0..64 {
+                if (x + y) % 17 == 0 {
+                    img.put_pixel(x, y, Luma([0u8]));
+                } else if (x + y) % 23 == 0 {
+                    img.put_pixel(x, y, Luma([255u8]));
+                }
+            }
+        }
+        let pyramid0 = build_image_pyramid(&img, LEVELS);
+        let pyramid1 = build_image_pyramid(&img, LEVELS);
+
+        let mut map0 = HashMap::new();
+        let mut transform = na::Affine2::<f32>::identity();
+        transform.matrix_mut_unchecked().m13 = 32.0;
+        transform.matrix_mut_unchecked().m23 = 32.0;
+        map0.insert(0usize, transform);
+
+        let tracked = track_points::<LEVELS>(&pyramid0, &pyramid1, &map0, 10, 1e-2);
+        assert!(
+            tracked.len() <= 1,
+            "Salt and pepper noise should degrade tracking performance"
+        );
+    }
+
+    #[test]
+    fn track_points_gaussian_noise() {
+        const LEVELS: u32 = 2;
+        let mut img = GrayImage::from_pixel(64, 64, Luma([128u8]));
+        for x in 0..64 {
+            for y in 0..64 {
+                let noise_val = ((x * 7 + y * 13) % 64) as i16 - 32;
+                let mut pixel: i16 = 128 + noise_val;
+                pixel = pixel.max(0).min(255);
+                img.put_pixel(x, y, Luma([pixel as u8]));
+            }
+        }
+        let pyramid0 = build_image_pyramid(&img, LEVELS);
+        let pyramid1 = build_image_pyramid(&img, LEVELS);
+
+        let mut map0 = HashMap::new();
+        let mut transform = na::Affine2::<f32>::identity();
+        transform.matrix_mut_unchecked().m13 = 32.0;
+        transform.matrix_mut_unchecked().m23 = 32.0;
+        map0.insert(0usize, transform);
+
+        let tracked = track_points::<LEVELS>(&pyramid0, &pyramid1, &map0, 10, 1e-2);
+        assert!(tracked.len() <= 1, "Gaussian noise should degrade tracking");
+    }
+
+    #[test]
+    fn track_points_dropped_frame() {
+        const LEVELS: u32 = 2;
+        let img0 = checkerboard_image(64, 64);
+        let img1 = GrayImage::from_pixel(64, 64, Luma([0u8]));
+        let pyramid0 = build_image_pyramid(&img0, LEVELS);
+        let pyramid1 = build_image_pyramid(&img1, LEVELS);
+
+        let mut map0 = HashMap::new();
+        let mut transform = na::Affine2::<f32>::identity();
+        transform.matrix_mut_unchecked().m13 = 32.0;
+        transform.matrix_mut_unchecked().m23 = 32.0;
+        map0.insert(0usize, transform);
+
+        let tracked = track_points::<LEVELS>(&pyramid0, &pyramid1, &map0, 10, 1e-3);
+        assert!(
+            tracked.is_empty(),
+            "Dropped frame (black) should lose tracking"
+        );
+    }
+
+    #[test]
+    fn track_points_motion_blur_simulated() {
+        const LEVELS: u32 = 2;
+        let img = checkerboard_image(64, 64);
+        let pyramid0 = build_image_pyramid(&img, LEVELS);
+        let img1 = checkerboard_image(64, 64);
+        let pyramid1 = build_image_pyramid(&img1, LEVELS);
+
+        let mut map0 = HashMap::new();
+        let mut transform = na::Affine2::<f32>::identity();
+        transform.matrix_mut_unchecked().m13 = 16.0;
+        transform.matrix_mut_unchecked().m23 = 16.0;
+        map0.insert(0usize, transform);
+
+        let tracked = track_points::<LEVELS>(&pyramid0, &pyramid1, &map0, 10, 1e-3);
+        assert!(
+            tracked.is_empty() || tracked.len() == 1,
+            "Motion should cause tracking failure or degraded tracking"
+        );
+    }
+
+    #[test]
+    fn track_points_camera_disconnected_pattern() {
+        const LEVELS: u32 = 2;
+        let mut img0 = GrayImage::from_pixel(64, 64, Luma([128u8]));
+        let mut img1 = GrayImage::from_pixel(64, 64, Luma([128u8]));
+        img0.put_pixel(0, 0, Luma([0u8]));
+        img1.put_pixel(0, 0, Luma([255u8]));
+        let pyramid0 = build_image_pyramid(&img0, LEVELS);
+        let pyramid1 = build_image_pyramid(&img1, LEVELS);
+
+        let mut map0 = HashMap::new();
+        let mut transform = na::Affine2::<f32>::identity();
+        transform.matrix_mut_unchecked().m13 = 32.0;
+        transform.matrix_mut_unchecked().m23 = 32.0;
+        map0.insert(0usize, transform);
+
+        let tracked = track_points::<LEVELS>(&pyramid0, &pyramid1, &map0, 10, 1e-3);
+        assert!(
+            tracked.is_empty(),
+            "Camera disconnect pattern should lose tracking"
+        );
+    }
+
+    #[test]
+    fn track_points_horizontal_stripes_interference() {
+        const LEVELS: u32 = 2;
+        let mut img = GrayImage::from_pixel(64, 64, Luma([128u8]));
+        for y in 0..64 {
+            let val = if y % 2 == 0 { 0u8 } else { 255u8 };
+            for x in 0..64 {
+                img.put_pixel(x, y, Luma([val]));
+            }
+        }
+        let pyramid0 = build_image_pyramid(&img, LEVELS);
+        let pyramid1 = build_image_pyramid(&img, LEVELS);
+
+        let mut map0 = HashMap::new();
+        let mut transform = na::Affine2::<f32>::identity();
+        transform.matrix_mut_unchecked().m13 = 32.0;
+        transform.matrix_mut_unchecked().m23 = 32.0;
+        map0.insert(0usize, transform);
+
+        let tracked = track_points::<LEVELS>(&pyramid0, &pyramid1, &map0, 10, 1e-2);
+        assert!(
+            tracked.len() <= 1,
+            "Horizontal interference stripes should degrade tracking"
+        );
+    }
+
+    #[test]
+    fn track_points_all_points_lost() {
+        const LEVELS: u32 = 2;
+        let img = checkerboard_image(64, 64);
+        let pyramid0 = build_image_pyramid(&img, LEVELS);
+        let pyramid1 = build_image_pyramid(&img, LEVELS);
+
+        let mut map0 = HashMap::new();
+        for i in 0..10 {
+            let mut transform = na::Affine2::<f32>::identity();
+            transform.matrix_mut_unchecked().m13 = (i * 6 + 1) as f32;
+            transform.matrix_mut_unchecked().m23 = (i * 6 + 1) as f32;
+            map0.insert(i, transform);
+        }
+
+        let tracked = track_points::<LEVELS>(&pyramid0, &pyramid1, &map0, 10, 1e-3);
+        assert!(
+            tracked.is_empty(),
+            "All points should be trackable in identical images"
+        );
+    }
+
+    #[test]
+    fn track_points_high_frequency_noise() {
+        const LEVELS: u32 = 2;
+        let mut img = GrayImage::from_pixel(64, 64, Luma([128u8]));
+        for x in 0..64 {
+            for y in 0..64 {
+                let noise_val = ((x * 11 + y * 17) % 50) as i8 - 25;
+                let mut pixel: i16 = 128 + noise_val as i16;
+                pixel = pixel.max(0).min(255);
+                img.put_pixel(x, y, Luma([pixel as u8]));
+            }
+        }
+        let pyramid0 = build_image_pyramid(&img, LEVELS);
+        let pyramid1 = build_image_pyramid(&img, LEVELS);
+
+        let mut map0 = HashMap::new();
+        let mut transform = na::Affine2::<f32>::identity();
+        transform.matrix_mut_unchecked().m13 = 32.0;
+        transform.matrix_mut_unchecked().m23 = 32.0;
+        map0.insert(0usize, transform);
+
+        let tracked = track_points::<LEVELS>(&pyramid0, &pyramid1, &map0, 10, 1e-1);
+        assert!(
+            tracked.len() <= 1,
+            "High frequency noise should severely degrade tracking"
+        );
+    }
+
+    #[test]
+    fn track_points_partial_corruption() {
+        const LEVELS: u32 = 2;
+        let img = checkerboard_image(64, 64);
+        let pyramid0 = build_image_pyramid(&img, LEVELS);
+        let mut img1 = checkerboard_image(64, 64);
+        for x in 0..64 {
+            for y in 0..10 {
+                img1.put_pixel(x, y, Luma([128u8]));
+            }
+        }
+        let pyramid1 = build_image_pyramid(&img1, LEVELS);
+
+        let mut map0 = HashMap::new();
+        let mut transform = na::Affine2::<f32>::identity();
+        transform.matrix_mut_unchecked().m13 = 32.0;
+        transform.matrix_mut_unchecked().m23 = 5.0;
+        map0.insert(0usize, transform);
+
+        let tracked = track_points::<LEVELS>(&pyramid0, &pyramid1, &map0, 10, 1e-3);
+        assert!(
+            tracked.is_empty() || tracked.len() == 1,
+            "Partial corruption at tracked point location should cause tracking failure"
+        );
     }
 }

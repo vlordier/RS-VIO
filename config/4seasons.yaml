@@ -56,3 +56,18 @@ optimization:
   imu_prior_weight_pos: 0.5      # Position constraint weight (start conservative)
   imu_prior_weight_rot: 1.0      # Rotation constraint weight
   imu_prior_huber_delta: 1.0     # Robust loss threshold (meters for position, radians for rotation)
+
+# Marginalization settings for sliding window VIO
+marginalization:
+  enabled: true                     # Enable marginalization of old states
+  max_keyframes: 10                 # Maximum number of keyframes in sliding window
+  num_marginalize_per_step: 1       # Number of keyframes to marginalize when window is full
+  min_landmark_observations: 3      # Minimum observations to keep a landmark
+  landmark_age_limit: 50            # Maximum frames without observation before marginalizing
+  use_fej: true                     # Use First-Estimate Jacobian for consistency
+  damping: 1e-7                     # Damping factor for numerical stability
+  prior_weight: 1.0                 # Weight for marginalization prior
+  prior_info_scaling: 1.0           # Scaling factor for information matrix
+  hessian_approximator: "GaussNewton"  # Strategy: GaussNewton, Diagonal, LevenbergMarquardt, Exact, Identity
+  gradient_computer: "Standard"     # Strategy: Standard, Zero
+  prior_constructor: "Standard"     # Strategy: Standard, Regularized
