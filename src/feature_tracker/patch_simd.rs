@@ -1,7 +1,7 @@
-//! SIMD-optimized patch matching for real-time performance
-//!
-//! This module provides vectorized implementations of patch-based tracking operations
-//! using platform-specific SIMD intrinsics when available.
+/// SIMD-optimized patch matching for real-time performance
+///
+/// This module provides vectorized implementations of patch-based tracking operations
+/// using platform-specific SIMD intrinsics when available.
 use nalgebra as na;
 
 #[cfg(target_arch = "x86_64")]
@@ -33,17 +33,49 @@ pub fn compute_residuals_simd(
     #[cfg(target_arch = "x86_64")]
     {
         if is_x86_feature_detected!("avx2") {
-            unsafe { compute_residuals_avx2(sampled, template, template_mean, num_valid, sample_sum, &mut residuals) }
+            unsafe {
+                compute_residuals_avx2(
+                    sampled,
+                    template,
+                    template_mean,
+                    num_valid,
+                    sample_sum,
+                    &mut residuals,
+                )
+            }
         } else if is_x86_feature_detected!("sse4.1") {
-            unsafe { compute_residuals_sse(sampled, template, template_mean, num_valid, sample_sum, &mut residuals) }
+            unsafe {
+                compute_residuals_sse(
+                    sampled,
+                    template,
+                    template_mean,
+                    num_valid,
+                    sample_sum,
+                    &mut residuals,
+                )
+            }
         } else {
-            compute_residuals_scalar(sampled, template, template_mean, num_valid, sample_sum, &mut residuals);
+            compute_residuals_scalar(
+                sampled,
+                template,
+                template_mean,
+                num_valid,
+                sample_sum,
+                &mut residuals,
+            );
         }
     }
 
     #[cfg(not(target_arch = "x86_64"))]
     {
-        compute_residuals_scalar(sampled, template, _template_mean, num_valid, sample_sum, &mut residuals);
+        compute_residuals_scalar(
+            sampled,
+            template,
+            _template_mean,
+            num_valid,
+            sample_sum,
+            &mut residuals,
+        );
     }
 
     residuals
@@ -82,7 +114,7 @@ unsafe fn compute_residuals_avx2(
 ) {
     let zero = _mm256_setzero_ps();
     let norm_factor = _mm256_set1_ps(num_valid / sample_sum);
-    
+
     // Process 8 elements at a time
     for i in (0..PATTERN52_SIZE).step_by(8) {
         let remaining = PATTERN52_SIZE - i;
@@ -133,7 +165,7 @@ unsafe fn compute_residuals_sse(
 ) {
     let zero = _mm_setzero_ps();
     let norm_factor = _mm_set1_ps(num_valid / sample_sum);
-    
+
     // Process 4 elements at a time
     for i in (0..PATTERN52_SIZE).step_by(4) {
         let remaining = PATTERN52_SIZE - i;
@@ -174,18 +206,30 @@ mod tests {
         let mut sampled = [0.5f32; PATTERN52_SIZE];
         let template = [0.3f32; PATTERN52_SIZE];
         sampled[0] = -1.0; // Invalid value
-        
+
         let num_valid = 51.0;
         let sample_sum = 25.5;
-        
+
         let mut scalar_result = na::SVector::<f32, PATTERN52_SIZE>::zeros();
-        compute_residuals_scalar(&sampled, template, 0.3, num_valid, sample_sum, &mut scalar_result);
-        
+        compute_residuals_scalar(
+            &sampled,
+            template,
+            0.3,
+            num_valid,
+            sample_sum,
+            &mut scalar_result,
+        );
+
         let simd_result = compute_residuals_simd(&sampled, template, 0.3, num_valid, sample_sum);
-        
+
         for i in 0..PATTERN52_SIZE {
-            assert!((scalar_result[i] - simd_result[i]).abs() < 1e-4,
-                "Mismatch at index {}: scalar={}, simd={}", i, scalar_result[i], simd_result[i]);
+            assert!(
+                (scalar_result[i] - simd_result[i]).abs() < 1e-4,
+                "Mismatch at index {}: scalar={}, simd={}",
+                i,
+                scalar_result[i],
+                simd_result[i]
+            );
         }
     }
 }

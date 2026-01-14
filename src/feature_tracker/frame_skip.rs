@@ -1,27 +1,27 @@
-//! Adaptive frame skipping for real-time VIO
-//!
-//! This module implements intelligent frame skipping that maintains real-time performance
-//! while maximizing visual information utilization.
+/// Adaptive frame skipping for real-time VIO
+///
+/// This module implements intelligent frame skipping that maintains real-time performance
+/// while maximizing visual information utilization.
 use std::time::{Duration, Instant};
 
 /// Frame skipping strategy for maintaining real-time constraints
 pub struct AdaptiveFrameSkipper {
     /// Target frame processing budget in milliseconds
     target_frame_time_ms: f64,
-    
+
     /// Recent processing times (ring buffer)
     recent_times: Vec<Duration>,
     recent_idx: usize,
-    
+
     /// Current skip counter
     skip_count: u32,
-    
+
     /// Maximum frames to skip before forcing a process
     max_skip: u32,
-    
+
     /// Minimum motion threshold (pixels) to force processing despite time budget
     motion_threshold: f32,
-    
+
     /// Last processed timestamp
     last_processed_time: Option<Instant>,
 }
@@ -86,7 +86,7 @@ impl AdaptiveFrameSkipper {
         self.recent_idx = (self.recent_idx + 1) % self.recent_times.len();
         self.last_processed_time = Some(Instant::now());
     }
-    
+
     /// Record frame processing time (alias for record_processing_time)
     pub fn record_frame_time(&mut self, duration: Duration) {
         self.record_processing_time(duration);
@@ -147,12 +147,12 @@ mod tests {
     #[test]
     fn test_skip_on_overload() {
         let mut skipper = AdaptiveFrameSkipper::new(30.0, 2, 10.0);
-        
+
         // Simulate sustained slow processing (fill buffer with slow times)
         for _ in 0..10 {
             skipper.record_processing_time(Duration::from_millis(50)); // Over budget
         }
-        
+
         // Should skip next frame
         assert!(!skipper.should_process(None));
         assert_eq!(skipper.skip_count, 1);
@@ -161,12 +161,12 @@ mod tests {
     #[test]
     fn test_force_on_motion() {
         let mut skipper = AdaptiveFrameSkipper::new(30.0, 2, 10.0);
-        
+
         // Fill buffer with slow processing times
         for _ in 0..10 {
             skipper.record_processing_time(Duration::from_millis(50));
         }
-        
+
         // High motion should force processing despite overload
         assert!(skipper.should_process(Some(15.0)));
         assert_eq!(skipper.skip_count, 0);
@@ -175,12 +175,12 @@ mod tests {
     #[test]
     fn test_max_skip_limit() {
         let mut skipper = AdaptiveFrameSkipper::new(30.0, 2, 10.0);
-        
+
         // Simulate sustained overload (fill buffer)
         for _ in 0..10 {
             skipper.record_processing_time(Duration::from_millis(50));
         }
-        
+
         // Skip first
         assert!(!skipper.should_process(None));
         // Skip second

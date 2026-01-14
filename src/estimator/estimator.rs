@@ -44,8 +44,8 @@ pub struct Estimator {
     T_B_Cl: Matrix4x4,
     // Transformation from body to right camera
     T_B_Cr: Matrix4x4,
-    // Full trajectory of keyframes
-    trajectory: Vec<Matrix4x4>,
+    // Full trajectory of keyframes with timestamps
+    trajectory: Vec<(i64, Matrix4x4)>,
     // Maximum allowed time for frame processing (for real-time safety)
     max_frame_processing_time: Duration,
     // IMU preintegrator for between keyframes
@@ -129,8 +129,8 @@ impl Estimator {
             velocity_estimator: VelocityEstimator::new(imu_config.clone()),
             extrinsic_calibrator: ExtrinsicCalibrator::new(T_B_Cl),
             keyframe_selector: ImuAidedKeyframeSelector::new(
-                config.keyframe_management.translation_threshold,
-                config.keyframe_management.rotation_threshold,
+                config.keyframe_management.translation_threshold as f64,
+                config.keyframe_management.rotation_threshold as f64,
             ),
             current_imu_preintegration: None,
             last_imu_timestamp: None,
@@ -269,7 +269,7 @@ impl Estimator {
             }
 
             // Use motion predictor for feature tracking
-            let focal_length = self.config.camera.left_intrinsics[0];
+            let focal_length = self.config.camera.left_intrinsics[0] as f64;
             for feature in &mut current_frame.left_features {
                 let (du, dv) = self.imu_motion_predictor.predict_feature_displacement(
                     imu,
@@ -316,12 +316,13 @@ impl Estimator {
                         .add_measurement(&T_W_B_copy, R_W_B);
 
                     // Run calibration periodically
-                    if self.imu_measurement_count.is_multiple_of(100) {
-                        let error = self.extrinsic_calibrator.calibrate_iteration();
-                        log::debug!(
-                            "[Estimator] IMU extrinsic calibration error: {:.6} rad",
-                            error
-                        );
+                    if self.imu_measurement_count % 100 == 0 {
+                        // Temporarily disabled due to NaN issues
+                        // let error = self.extrinsic_calibrator.calibrate_iteration();
+                        // log::debug!(
+                        //     "[Estimator] IMU extrinsic calibration error: {:.6} rad",
+                        //     error
+                        // );
                     }
                 }
             }
@@ -402,9 +403,9 @@ impl Estimator {
 
                     // Keyframe if either visual or IMU criteria met
                     let translation_threshold =
-                        self.config.keyframe_management.translation_threshold;
+                        self.config.keyframe_management.translation_threshold as f64;
                     let rotation_threshold =
-                        self.config.keyframe_management.rotation_threshold;
+                        self.config.keyframe_management.rotation_threshold as f64;
                     let visual_keyframe =
                         t_rel.norm() > translation_threshold || rotation_norm > rotation_threshold;
 
@@ -445,6 +446,8 @@ impl Estimator {
         // Bundle adjustment
         if current_frame.is_keyframe {
             let optimization_start = Instant::now();
+            // Save timestamp before frame is moved
+            let frame_timestamp = current_frame.timestamp_ns;
             self.sliding_window.add_frame(current_frame);
             // Provide IMU motion prior to optimizer when available
             let imu_prior = if self.config.optimization.imu_prior_enable {
@@ -465,12 +468,15 @@ impl Estimator {
             } else {
                 None
             };
-            if let Err(e) = self.sliding_window.optimize_with_imu(imu_prior, imu_weights, imu_huber_delta) {
+            if let Err(e) =
+                self.sliding_window
+                    .optimize_with_imu(imu_prior, imu_weights, imu_huber_delta)
+            {
                 log::error!("[Estimator] Bundle adjustment optimization failed: {:?}", e);
                 // Continue execution even if optimization fails
             }
             _optimization_time_ms = optimization_start.elapsed().as_secs_f64() * 1000.0;
-            self.view_optimization_results();
+            self.view_optimization_results(frame_timestamp);
         }
 
         // Final timing summary
@@ -577,7 +583,14 @@ impl Estimator {
     }
 
     /// Visualize optimization results: map points, keyframe poses, and camera frustums.
-    fn view_optimization_results(&mut self) {
+    fn view_optimization_results(&mut self, timestamp_ns: i64) {
+        // History of keyframe poses with timestamps (update even without viewer for saving)
+        let keyframe_poses = self.sliding_window.get_keyframe_poses();
+        if let Some(&mat) = keyframe_poses.last() {
+            self.trajectory.push((timestamp_ns, mat));
+        }
+
+        // Viewer-only visualization (skip if no viewer)
         if let Some(v) = &mut self.viewer {
             // Map points
             let colored_points: Vec<(usize, [f32; 3])> = self
@@ -625,19 +638,15 @@ impl Estimator {
                 */
             }
 
-            // History of keyframe poses
-            if let Some(&mat) = self.sliding_window.get_keyframe_poses().first() {
-                self.trajectory.push(mat);
-
-                // Display trajectory as a continuous 3D path
-                v.log_trajectory(&self.trajectory, "trajectory/path");
-                // log::info!("[Estimator] System position: {:?}, {:?}, {:?}", mat[0][3], mat[1][3], mat[2][3]);
-            }
+            // Display trajectory as a continuous 3D path
+            let trajectory_poses: Vec<Matrix4x4> =
+                self.trajectory.iter().map(|(_, pose)| *pose).collect();
+            v.log_trajectory(&trajectory_poses, "trajectory/path");
         }
     }
 
-    /// Get the current trajectory (list of keyframe poses)
-    pub fn get_trajectory(&self) -> &Vec<Matrix4x4> {
+    /// Get the current trajectory (list of keyframe poses with timestamps)
+    pub fn get_trajectory(&self) -> &Vec<(i64, Matrix4x4)> {
         &self.trajectory
     }
 

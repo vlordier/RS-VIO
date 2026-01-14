@@ -72,6 +72,7 @@
 //! - [feature_tracker](crate::feature_tracker) - Feature observations
 
 pub mod factors;
+pub mod marginalization;
 pub mod observer;
 pub mod tight_coupling;
 

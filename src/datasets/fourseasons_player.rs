@@ -223,7 +223,12 @@ impl DatasetPlayer for FourSeasonsPlayer {
         crate::datasets::player_trait::save_statistics_common(result, stats_path);
     }
 
-    fn save_trajectories(&self, estimator: &Estimator, context: &FrameContext, dataset_path: &str) {
+    fn save_trajectories(
+        &self,
+        estimator: &Estimator,
+        _context: &FrameContext,
+        dataset_path: &str,
+    ) {
         let trajectory_path = Path::new(dataset_path).join("trajectory.txt");
 
         match std::fs::File::create(&trajectory_path) {
@@ -232,8 +237,8 @@ impl DatasetPlayer for FourSeasonsPlayer {
                 let trajectory = estimator.get_trajectory();
                 let mut count = 0;
 
-                for pose in trajectory.iter() {
-                    let timestamp_s = context.previous_frame_timestamp as f64 / 1e9;
+                for (timestamp_ns, pose) in trajectory.iter() {
+                    let timestamp_s = *timestamp_ns as f64 / 1e9;
 
                     // Extract translation
                     let tx = pose[(0, 3)];

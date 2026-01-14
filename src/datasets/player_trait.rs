@@ -330,8 +330,13 @@ pub fn execute<P: DatasetPlayer + ?Sized>(
     }
 
     log::info!(
-        "[{}] Processing completed! Viewer remains open for inspection.",
-        dataset_name
+        "[{}] Processing completed!{}",
+        dataset_name,
+        if visualization.enable_viewer {
+            " Viewer remains open for inspection."
+        } else {
+            ""
+        }
     );
 
     Ok(result)

@@ -9,15 +9,17 @@
 //! Set `RS_VIO_EUROC_PATH` to the root of an EuRoC sequence (folder containing `mav0/`).
 //! Tests skip gracefully if the dataset is not available.
 
-use rs_vio::datasets::{EurocPlayer, ImageData};
-use rs_vio::datasets::player_trait::DatasetPlayer;
+use image::GrayImage;
 use rs_vio::datasets::config::{Config, FeatureDetectionConfig};
+use rs_vio::datasets::player_trait::DatasetPlayer;
+use rs_vio::datasets::{EurocPlayer, ImageData};
 use rs_vio::feature_tracker::PatchTracker;
 use rs_vio::imu::{ImuConfig, ImuPreintegrator};
-use image::GrayImage;
 
 fn get_env_path(var: &str) -> Option<String> {
-    std::env::var(var).ok().filter(|p| std::path::Path::new(p).exists())
+    std::env::var(var)
+        .ok()
+        .filter(|p| std::path::Path::new(p).exists())
 }
 
 fn gray_from_bytes(width: u32, height: u32, bytes: Vec<u8>) -> Option<GrayImage> {
@@ -47,7 +49,10 @@ fn euroc_real_mono_patch_tracking() {
     let images = player
         .load_image_timestamps(&ds_path)
         .expect("should load EuRoC cam0 timestamps");
-    assert!(images.len() > 5, "EuRoC sequence should have multiple frames");
+    assert!(
+        images.len() > 5,
+        "EuRoC sequence should have multiple frames"
+    );
 
     // Pick a few indices deterministically
     let picks = [images.len() / 10, images.len() / 5, images.len() / 3];
@@ -76,7 +81,10 @@ fn euroc_real_imu_preintegration() {
     let images = player
         .load_image_timestamps(&ds_path)
         .expect("should load EuRoC cam0 timestamps");
-    assert!(images.len() > 10, "EuRoC sequence should have sufficient frames");
+    assert!(
+        images.len() > 10,
+        "EuRoC sequence should have sufficient frames"
+    );
 
     // Load IMU CSV into cache
     player

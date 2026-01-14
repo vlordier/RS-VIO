@@ -8,16 +8,18 @@
 //! Set `RS_VIO_TUMVI_PATH` to the root of a TUM-VI sequence (contains `mav0/`).
 //! Tests will skip gracefully if the dataset path is missing.
 
-use rs_vio::datasets::{ImageData, TUMVIPlayer};
-use rs_vio::datasets::player_trait::DatasetPlayer;
-use rs_vio::datasets::config::Config;
-use rs_vio::feature_tracker::PatchTracker;
-use rs_vio::datasets::config::FeatureDetectionConfig;
-use rs_vio::imu::{ImuConfig, ImuPreintegrator};
 use image::GrayImage;
+use rs_vio::datasets::config::Config;
+use rs_vio::datasets::config::FeatureDetectionConfig;
+use rs_vio::datasets::player_trait::DatasetPlayer;
+use rs_vio::datasets::{ImageData, TUMVIPlayer};
+use rs_vio::feature_tracker::PatchTracker;
+use rs_vio::imu::{ImuConfig, ImuPreintegrator};
 
 fn get_env_path(var: &str) -> Option<String> {
-    std::env::var(var).ok().filter(|p| std::path::Path::new(p).exists())
+    std::env::var(var)
+        .ok()
+        .filter(|p| std::path::Path::new(p).exists())
 }
 
 fn gray_from_bytes(width: u32, height: u32, bytes: Vec<u8>) -> Option<GrayImage> {
@@ -45,7 +47,10 @@ fn tumvi_real_mono_patch_tracking() {
     let images = player
         .load_image_timestamps(&ds_path)
         .expect("should load TUM-VI cam0 timestamps");
-    assert!(images.len() > 5, "TUM-VI sequence should have multiple frames");
+    assert!(
+        images.len() > 5,
+        "TUM-VI sequence should have multiple frames"
+    );
 
     // Select a few frames deterministically
     let picks = [images.len() / 12, images.len() / 6, images.len() / 4];
@@ -70,7 +75,10 @@ fn tumvi_real_imu_preintegration() {
     let images = player
         .load_image_timestamps(&ds_path)
         .expect("should load TUM-VI cam0 timestamps");
-    assert!(images.len() > 10, "TUM-VI sequence should have sufficient frames");
+    assert!(
+        images.len() > 10,
+        "TUM-VI sequence should have sufficient frames"
+    );
 
     // Load IMU data into cache
     player

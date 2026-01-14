@@ -590,7 +590,11 @@ impl Factor for ImuPriorFactor {
         params: &[DVector<f64>],
         compute_jacobian: bool,
     ) -> (DVector<f64>, Option<DMatrix<f64>>) {
-        assert_eq!(params.len(), 1, "ImuPriorFactor requires 1 parameter vector");
+        assert_eq!(
+            params.len(),
+            1,
+            "ImuPriorFactor requires 1 parameter vector"
+        );
         assert_eq!(
             params[0].len(),
             7,
@@ -611,7 +615,8 @@ impl Factor for ImuPriorFactor {
 
         // Rotation residual: axis-angle from R_pred^T * R_var
         let R_err = R_B_W_pred.transpose() * R_B_W_var;
-        let q_err = na::UnitQuaternion::from_rotation_matrix(&na::Rotation3::from_matrix_unchecked(R_err));
+        let q_err =
+            na::UnitQuaternion::from_rotation_matrix(&na::Rotation3::from_matrix_unchecked(R_err));
         let angle = q_err.angle();
         // For small angles, axis might be ill-defined; handle gracefully
         let axis = if angle > 1e-12 {
@@ -654,5 +659,123 @@ impl Factor for ImuPriorFactor {
 
     fn get_dimension(&self) -> usize {
         6 // 3 position + 3 rotation
+    }
+}
+
+/// Prior factor for marginalization.
+///
+/// This factor encodes the information from marginalized states as a prior
+/// on the remaining parameters. It implements a quadratic prior:
+///
+/// ```text
+/// r = prior_weight * (x - x0)
+/// J = prior_weight
+/// H = J^T * Information * J = prior_weight^2 * Information
+/// ```
+///
+/// - Variables: Parameters with prior (variable dimension)
+/// - Data: Linearization point `x0`, information matrix `Omega`
+/// - Residual: `sqrt(Omega) * (x - x0)` scaled by prior_weight
+///
+/// # Mathematical Formulation
+///
+/// Given parameter vector `x` and prior information `x0`, `Omega`:
+///
+/// ```text
+/// r = prior_weight * (x - x0)
+/// Cost = 0.5 * r^T * Omega * r
+/// ```
+///
+/// For Gaussian priors, `Omega` is the information matrix (inverse covariance).
+#[derive(Debug, Clone)]
+pub struct PriorFactor {
+    /// Linearization point (prior mean)
+    pub linearization_point: DVector<f64>,
+    /// Information matrix (inverse covariance)
+    pub information: DMatrix<f64>,
+    /// Prior weight (scales the prior strength)
+    pub prior_weight: f64,
+}
+
+impl PriorFactor {
+    /// Create a new prior factor.
+    ///
+    /// # Arguments
+    /// * `linearization_point` - Prior mean vector
+    /// * `information` - Information matrix (must be square, matching parameter dimension)
+    /// * `prior_weight` - Scaling factor for prior strength
+    pub fn new(
+        linearization_point: DVector<f64>,
+        information: DMatrix<f64>,
+        prior_weight: f64,
+    ) -> Self {
+        assert_eq!(
+            linearization_point.len(),
+            information.nrows(),
+            "Linearization point dimension must match information matrix"
+        );
+        assert_eq!(
+            information.nrows(),
+            information.ncols(),
+            "Information matrix must be square"
+        );
+
+        Self {
+            linearization_point,
+            information,
+            prior_weight,
+        }
+    }
+
+    /// Create a prior factor for SE3 pose (7 parameters).
+    pub fn for_se3_pose(T_B_W: Matrix4<f64>, information: DMatrix<f64>, prior_weight: f64) -> Self {
+        // Extract SE3 parameters: [tx, ty, tz, qw, qx, qy, qz]
+        let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3).into_owned();
+        let R_B_W = T_B_W.fixed_view::<3, 3>(0, 0).into_owned();
+        let q = na::UnitQuaternion::from_matrix(&R_B_W);
+
+        let linearization_point =
+            DVector::from_vec(vec![t_B_W.x, t_B_W.y, t_B_W.z, q.w, q.i, q.j, q.k]);
+
+        Self::new(linearization_point, information, prior_weight)
+    }
+}
+
+impl Factor for PriorFactor {
+    fn linearize(
+        &self,
+        params: &[DVector<f64>],
+        compute_jacobian: bool,
+    ) -> (DVector<f64>, Option<DMatrix<f64>>) {
+        assert_eq!(params.len(), 1, "PriorFactor requires 1 parameter vector");
+
+        let param = &params[0];
+        assert_eq!(
+            param.len(),
+            self.linearization_point.len(),
+            "Parameter dimension must match prior"
+        );
+
+        // Residual: r = prior_weight * (x - x0)
+        let delta = param - self.linearization_point.clone();
+        let residuals = &delta * self.prior_weight;
+
+        // Jacobian: J = prior_weight * I
+        let jacobian_matrix = if compute_jacobian {
+            let dim = param.len();
+            let mut jac = DMatrix::zeros(dim, dim);
+            for i in 0..dim {
+                jac[(i, i)] = self.prior_weight;
+            }
+            Some(jac)
+        } else {
+            None
+        };
+
+        (residuals, jacobian_matrix)
+    }
+
+    fn get_dimension(&self) -> usize {
+        self.linearization_point.len()
     }
 }

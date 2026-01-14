@@ -1,6 +1,6 @@
+use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
-use std::fs;
 
 /// Integration tests validating tight-coupled VIO on real datasets
 #[cfg(test)]
@@ -9,11 +9,7 @@ mod tight_coupling_integration_tests {
     use super::*;
 
     /// Helper to run a sequence and extract metrics
-    fn run_sequence(
-        binary: &str,
-        config: &str,
-        data_path: &str,
-    ) -> (bool, f64, String) {
+    fn run_sequence(binary: &str, config: &str, data_path: &str) -> (bool, f64, String) {
         let output = Command::new(binary)
             .arg(config)
             .arg(data_path)
@@ -28,8 +24,7 @@ mod tight_coupling_integration_tests {
         let mut rmse = 0.0;
         for line in stdout.lines() {
             if line.contains("RMSE") || line.contains("ATE") {
-                if let Some(val) = line.split_whitespace()
-                    .find_map(|w| w.parse::<f64>().ok()) {
+                if let Some(val) = line.split_whitespace().find_map(|w| w.parse::<f64>().ok()) {
                     rmse = val;
                     break;
                 }
@@ -70,11 +65,7 @@ mod tight_coupling_integration_tests {
     #[test]
     #[ignore]
     fn test_tum_vi_tight_coupling() {
-        let test_cases = vec![
-            ("room1", 0.20),
-            ("room2", 0.20),
-            ("room6", 0.35),
-        ];
+        let test_cases = vec![("room1", 0.20), ("room2", 0.20), ("room6", 0.35)];
 
         for (sequence, max_ate) in test_cases {
             let binary = "target/release/run_tum";
@@ -98,11 +89,7 @@ mod tight_coupling_integration_tests {
     #[test]
     #[ignore]
     fn test_4seasons_tight_coupling() {
-        let test_cases = vec![
-            ("overcast", 0.30),
-            ("fog", 0.35),
-            ("dusk", 0.40),
-        ];
+        let test_cases = vec![("overcast", 0.30), ("fog", 0.35), ("dusk", 0.40)];
 
         for (sequence, max_ate) in test_cases {
             let binary = "target/release/run_4seasons";
@@ -133,9 +120,13 @@ mod tight_coupling_integration_tests {
         let T_B_Cl = Matrix4x4::identity();
         let T_B_Cr = Matrix4x4::identity();
         let state = State::new(T_B_Cl, T_B_Cr);
-        
+
         // Verify state is properly initialized
-        assert_eq!(state.T_W_B, Matrix4x4::identity(), "Initial pose should be identity");
+        assert_eq!(
+            state.T_W_B,
+            Matrix4x4::identity(),
+            "Initial pose should be identity"
+        );
         println!("  ✅ State structure is properly initialized");
     }
 
@@ -174,7 +165,7 @@ mod tight_coupling_performance_tests {
     #[ignore]
     fn bench_euroc_mh01() {
         println!("\n📊 EuRoC MH_01_easy Performance Benchmark");
-        
+
         let binary = "target/release/run_euroc";
         let config = "config/euroc_vio.yaml";
         let data_path = "data/euroc/MH_01_easy";
@@ -194,6 +185,13 @@ mod tight_coupling_performance_tests {
         let elapsed = start.elapsed();
 
         println!("Execution time: {:.2}s", elapsed.as_secs_f32());
-        println!("Status: {}", if output.status.success() { "✅ Success" } else { "❌ Failed" });
+        println!(
+            "Status: {}",
+            if output.status.success() {
+                "✅ Success"
+            } else {
+                "❌ Failed"
+            }
+        );
     }
 }

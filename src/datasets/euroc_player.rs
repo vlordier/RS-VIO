@@ -209,7 +209,12 @@ impl DatasetPlayer for EurocPlayer {
         )
     }
 
-    fn save_trajectories(&self, estimator: &Estimator, context: &FrameContext, dataset_path: &str) {
+    fn save_trajectories(
+        &self,
+        estimator: &Estimator,
+        _context: &FrameContext,
+        dataset_path: &str,
+    ) {
         // Save trajectory in TUM format: timestamp x y z qx qy qz qw
         let trajectory_path = Path::new(dataset_path).join("trajectory.txt");
 
@@ -219,10 +224,7 @@ impl DatasetPlayer for EurocPlayer {
                 let trajectory = estimator.get_trajectory();
                 let mut count = 0;
 
-                for pose in trajectory.iter() {
-                    // Extract timestamp from context
-                    let timestamp_s = context.previous_frame_timestamp as f64 / 1e9;
-
+                for (timestamp_ns, pose) in trajectory.iter() {
                     // Extract translation
                     let tx = pose[(0, 3)];
                     let ty = pose[(1, 3)];
@@ -232,6 +234,8 @@ impl DatasetPlayer for EurocPlayer {
                     let r = pose.fixed_view::<3, 3>(0, 0);
                     let rotmat = nalgebra::Rotation3::from_matrix_unchecked(r.into_owned());
                     let q = nalgebra::UnitQuaternion::from_rotation_matrix(&rotmat);
+
+                    let timestamp_s = *timestamp_ns as f64 / 1e9;
 
                     if writeln!(
                         file,
