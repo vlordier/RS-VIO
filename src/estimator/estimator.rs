@@ -1,6 +1,7 @@
 use crate::datasets::config::Config;
 use crate::datasets::CameraModelType;
 use crate::datasets::ImuData;
+use crate::estimator::constant_velocity_model::{ConstantVelocityConfig, ConstantVelocityModel};
 use crate::estimator::sliding_window::SlidingWindow;
 use crate::estimator::Frame;
 use crate::feature_tracker::StereoPatchTracker;
@@ -10,6 +11,7 @@ use crate::imu::ImuMotionPredictor;
 use crate::imu::ImuPreintegrator;
 use crate::imu::PreintegratedImu;
 use crate::imu::VelocityEstimator;
+use crate::imu::initialization::ImuBiasEstimator;
 use crate::types::{Float, Matrix4x4, UnitQuaternion, Vector3};
 use crate::viewers::Viewer;
 use anyhow::Result;
@@ -59,6 +61,17 @@ pub struct Estimator<'a> {
     last_imu_timestamp: Option<i64>,
     // Number of IMU measurements processed
     imu_measurement_count: usize,
+    // Current body velocity estimate
+    current_velocity: na::Vector3<f64>,
+    // Whether velocity estimator has been initialized
+    velocity_estimator_initialized: bool,
+    // IMU bias estimator for initialization
+    bias_estimator: ImuBiasEstimator,
+    // Whether system is in initialization phase (collecting IMU for bias estimation)
+    is_initializing: bool,
+    // Constant velocity motion model (fallback when IMU unavailable)
+    #[allow(dead_code)]
+    cv_motion_model: ConstantVelocityModel,
 }
 
 impl<'a> Estimator<'a> {
@@ -116,18 +129,23 @@ impl<'a> Estimator<'a> {
             right_cam,
             T_B_Cl,
             T_B_Cr,
-                trajectory: Vec::new(),
-                // Default: 100ms deadline for 10Hz operation (with margin)
-                // For 30Hz target 33ms, use Duration::from_millis(30)
-                max_frame_processing_time: Duration::from_millis(processing_timeout_ms),
-                // IMU components
-                imu_preintegrator: ImuPreintegrator::new(imu_config.clone()),
-                imu_motion_predictor: ImuMotionPredictor::new(imu_config.clone()),
-                velocity_estimator: VelocityEstimator::new(imu_config.clone()),
-                extrinsic_calibrator: ExtrinsicCalibrator::new(T_B_Cl),
-                current_imu_preintegration: None,
-                last_imu_timestamp: None,
-                imu_measurement_count: 0,
+            trajectory: Vec::new(),
+            // Default: 100ms deadline for 10Hz operation (with margin)
+            // For 30Hz target 33ms, use Duration::from_millis(30)
+            max_frame_processing_time: Duration::from_millis(processing_timeout_ms),
+            // IMU components
+            imu_preintegrator: ImuPreintegrator::new(imu_config.clone()),
+            imu_motion_predictor: ImuMotionPredictor::new(imu_config.clone()),
+            velocity_estimator: VelocityEstimator::new(imu_config.clone()),
+            extrinsic_calibrator: ExtrinsicCalibrator::new(T_B_Cl),
+            current_imu_preintegration: None,
+            last_imu_timestamp: None,
+            imu_measurement_count: 0,
+            current_velocity: na::Vector3::zeros(),
+            velocity_estimator_initialized: false,
+            bias_estimator: ImuBiasEstimator::new(imu_config.clone()),
+            is_initializing: true,
+            cv_motion_model: ConstantVelocityModel::new(ConstantVelocityConfig::default()),
         }
     }
 
