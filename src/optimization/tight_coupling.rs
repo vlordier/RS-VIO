@@ -10,7 +10,8 @@
 // - Forster et al. (2016): "On-Manifold Preintegration for Real-Time Visual-Inertial Odometry"
 // - Lowe et al. (2020): "Direct Visual-Inertial Odometry with Stereo Cameras"
 
-use crate::types::{Matrix4x4, Vector3};
+use crate::types::{Float, Matrix4x4, Vector3};
+use crate::fl;
 use apex_solver::factors::Factor;
 use nalgebra as na;
 use nalgebra::{DMatrix, DVector};
@@ -31,22 +32,22 @@ use std::f64::consts::PI;
 #[derive(Debug, Clone, Copy)]
 pub struct GravityModel {
     /// Gravity acceleration magnitude (m/s²), typically ~9.81
-    pub magnitude: f64,
+    pub magnitude: Float,
 }
 
 impl GravityModel {
-    pub fn new(magnitude: f64) -> Self {
+    pub fn new(magnitude: Float) -> Self {
         Self { magnitude }
     }
 
     /// Standard Earth gravity (9.81 m/s²)
     pub fn earth() -> Self {
-        Self { magnitude: 9.81 }
+        Self { magnitude: fl!(9.81) }
     }
 
     /// Get gravity vector in world frame
     pub fn gravity_vector(&self) -> Vector3 {
-        Vector3::new(0.0, 0.0, -self.magnitude)
+        Vector3::new(fl!(0.0), fl!(0.0), -self.magnitude)
     }
 }
 
@@ -74,31 +75,31 @@ impl GravityModel {
 #[derive(Debug, Clone)]
 pub struct InterKeyframeImuFactor {
     /// Time interval between keyframes (seconds)
-    pub dt: f64,
+    pub dt: Float,
 
     /// Preintegration data: integrated rotation, velocity, position
     pub preintegration: ImuPreintegration,
 
     /// Jacobians w.r.t. biases (for online refinement)
-    pub jacobian_pos_bias: na::Matrix3<f64>, // ∂p/∂bias
-    pub jacobian_vel_bias: na::Matrix3<f64>, // ∂v/∂bias
-    pub jacobian_rot_bias: na::Matrix3<f64>, // ∂R/∂bias
+    pub jacobian_pos_bias: na::Matrix3<Float>, // ∂p/∂bias
+    pub jacobian_vel_bias: na::Matrix3<Float>, // ∂v/∂bias
+    pub jacobian_rot_bias: na::Matrix3<Float>, // ∂R/∂bias
 
     /// Covariance of preintegration noise
-    pub covariance: na::Matrix6<f64>,
+    pub covariance: na::Matrix6<Float>,
 
     /// Gravity model
     pub gravity: GravityModel,
 
     /// Information matrix (inverse covariance) for weighting
-    pub information: na::Matrix6<f64>,
+    pub information: na::Matrix6<Float>,
 }
 
 /// Preintegration result between two consecutive keyframes
 #[derive(Debug, Clone)]
 pub struct ImuPreintegration {
     /// Integrated rotation from IMU frame at i to frame at j: R_ij
-    pub delta_R: na::Matrix3<f64>,
+    pub delta_R: na::Matrix3<Float>,
 
     /// Integrated velocity change: Δv = R_i^T * ∫(a - a_bias) dt
     pub delta_v: Vector3,
@@ -107,19 +108,19 @@ pub struct ImuPreintegration {
     pub delta_p: Vector3,
 
     /// Covariance of integration errors
-    pub cov_R: na::Matrix3<f64>,
-    pub cov_v: na::Matrix3<f64>,
-    pub cov_p: na::Matrix3<f64>,
+    pub cov_R: na::Matrix3<Float>,
+    pub cov_v: na::Matrix3<Float>,
+    pub cov_p: na::Matrix3<Float>,
 
     /// Cross-covariance terms for bias jacobians
-    pub cov_R_bw: na::Matrix3<f64>, // cov(ΔR, δw_bias)
-    pub cov_v_ba: na::Matrix3<f64>, // cov(Δv, δa_bias)
-    pub cov_p_ba: na::Matrix3<f64>, // cov(Δp, δa_bias)
+    pub cov_R_bw: na::Matrix3<Float>, // cov(ΔR, δw_bias)
+    pub cov_v_ba: na::Matrix3<Float>, // cov(Δv, δa_bias)
+    pub cov_p_ba: na::Matrix3<Float>, // cov(Δp, δa_bias)
 }
 
 impl InterKeyframeImuFactor {
     /// Create inter-keyframe IMU factor from preintegration data
-    pub fn new(dt: f64, preintegration: ImuPreintegration, gravity: GravityModel) -> Self {
+    pub fn new(dt: Float, preintegration: ImuPreintegration, gravity: GravityModel) -> Self {
         // Build covariance matrix (6x6: p, v, R)
         let mut cov = na::Matrix6::zeros();
         cov.fixed_view_mut::<3, 3>(0, 0)
@@ -130,7 +131,7 @@ impl InterKeyframeImuFactor {
             .copy_from(&preintegration.cov_R);
 
         // Add small regularization to avoid singularity
-        let reg = 1e-8;
+        let reg = fl!(1e-8);
         for i in 0..6 {
             cov[(i, i)] += reg;
         }
@@ -187,7 +188,7 @@ impl InterKeyframeImuFactor {
         // p_pred = p_i + v_i * dt + 0.5 * g * dt² + R_i * Δp
         let dt2 = self.dt * self.dt;
         let p_pred =
-            p_W_B_i + v_i * self.dt + 0.5 * g * dt2 + R_W_B_i * self.preintegration.delta_p;
+            p_W_B_i + v_i * self.dt + fl!(0.5) * g * dt2 + R_W_B_i * self.preintegration.delta_p;
         let r_p = p_W_B_j - p_pred;
 
         // Velocity prediction error:
@@ -227,12 +228,12 @@ pub struct BiasRefinement {
     pub gyro_bias: Vector3,
 
     /// Bias estimate covariance
-    pub cov_accel: na::Matrix3<f64>,
-    pub cov_gyro: na::Matrix3<f64>,
+    pub cov_accel: na::Matrix3<Float>,
+    pub cov_gyro: na::Matrix3<Float>,
 
     /// Bias uncertainty threshold (meters/s² and rad/s)
-    pub max_accel_bias: f64, // Typically 0.5 m/s²
-    pub max_gyro_bias: f64, // Typically 0.1 rad/s
+    pub max_accel_bias: Float, // Typically 0.5 m/s²
+    pub max_gyro_bias: Float, // Typically 0.1 rad/s
 }
 
 impl Default for BiasRefinement {
@@ -246,10 +247,10 @@ impl BiasRefinement {
         Self {
             accel_bias: Vector3::zeros(),
             gyro_bias: Vector3::zeros(),
-            cov_accel: na::Matrix3::identity() * 0.01,
-            cov_gyro: na::Matrix3::identity() * 0.001,
-            max_accel_bias: 0.5,
-            max_gyro_bias: 0.1,
+            cov_accel: na::Matrix3::identity() * fl!(0.01),
+            cov_gyro: na::Matrix3::identity() * fl!(0.001),
+            max_accel_bias: fl!(0.5),
+            max_gyro_bias: fl!(0.1),
         }
     }
 
@@ -261,12 +262,12 @@ impl BiasRefinement {
     /// Update bias estimate from optimization residuals
     pub fn update_from_residuals(
         &mut self,
-        residual_delta: &na::Vector6<f64>, // [Δp, Δv, (Δθ)]
-        _jacobian: &na::Matrix6<f64>,      // Jacobian w.r.t. state
+        residual_delta: &na::Vector6<Float>, // [Δp, Δv, (Δθ)]
+        _jacobian: &na::Matrix6<Float>,      // Jacobian w.r.t. state
     ) {
         // In full implementation, use EKF update or direct damping
         // For now: simple proportional update
-        let damping = 0.1;
+        let damping = fl!(0.1);
         self.accel_bias += damping * residual_delta.fixed_view::<3, 1>(0, 0);
         self.gyro_bias += damping * residual_delta.fixed_view::<3, 1>(3, 0);
 
@@ -411,44 +412,44 @@ impl Factor for InterKeyframeImuFactor {
 // ============================================================================
 
 /// Convert rotation matrix to axis-angle representation (3D vector)
-fn matrix_to_axis_angle(R: &na::Matrix3<f64>) -> Vector3 {
+fn matrix_to_axis_angle(R: &na::Matrix3<Float>) -> Vector3 {
     // Use Rodrigues' formula inverse
     let trace = R[(0, 0)] + R[(1, 1)] + R[(2, 2)];
-    let angle = ((trace - 1.0) / 2.0).clamp(-1.0, 1.0).acos();
+    let angle = ((trace - fl!(1.0)) / fl!(2.0)).clamp(fl!(-1.0), fl!(1.0)).acos();
 
-    if angle.abs() < 1e-6 {
+    if angle.abs() < fl!(1e-6) {
         // Small angle: use skew-symmetric part
         Vector3::new(
             R[(2, 1)] - R[(1, 2)],
             R[(0, 2)] - R[(2, 0)],
             R[(1, 0)] - R[(0, 1)],
-        ) * 0.5
-    } else if (angle - PI).abs() < 1e-6 {
+        ) * fl!(0.5)
+    } else if (angle - fl!(PI)).abs() < fl!(1e-6) {
         // Angle close to π: extract from diagonal
-        let diag = [R[(0, 0)] + 1.0, R[(1, 1)] + 1.0, R[(2, 2)] + 1.0];
+        let diag = [R[(0, 0)] + fl!(1.0), R[(1, 1)] + fl!(1.0), R[(2, 2)] + fl!(1.0)];
         let idx = diag
             .iter()
             .enumerate()
-            .max_by(|a, b| a.1.total_cmp(b.1))
+            .max_by(|a, b| a.total_cmp(b))
             .map(|(i, _)| i)
             .unwrap_or(0);
 
         let mut v = Vector3::zeros();
         match idx {
             0 => {
-                v.x = (diag[0] / 2.0).sqrt();
-                v.y = R[(0, 1)] / (2.0 * v.x);
-                v.z = R[(0, 2)] / (2.0 * v.x);
+                v.x = (diag[0] / fl!(2.0)).sqrt();
+                v.y = R[(0, 1)] / (fl!(2.0) * v.x);
+                v.z = R[(0, 2)] / (fl!(2.0) * v.x);
             },
             1 => {
-                v.y = (diag[1] / 2.0).sqrt();
-                v.x = R[(0, 1)] / (2.0 * v.y);
-                v.z = R[(1, 2)] / (2.0 * v.y);
+                v.y = (diag[1] / fl!(2.0)).sqrt();
+                v.x = R[(0, 1)] / (fl!(2.0) * v.y);
+                v.z = R[(1, 2)] / (fl!(2.0) * v.y);
             },
             _ => {
-                v.z = (diag[2] / 2.0).sqrt();
-                v.x = R[(0, 2)] / (2.0 * v.z);
-                v.y = R[(1, 2)] / (2.0 * v.z);
+                v.z = (diag[2] / fl!(2.0)).sqrt();
+                v.x = R[(0, 2)] / (fl!(2.0) * v.z);
+                v.y = R[(1, 2)] / (fl!(2.0) * v.z);
             },
         }
         v * angle
@@ -458,7 +459,7 @@ fn matrix_to_axis_angle(R: &na::Matrix3<f64>) -> Vector3 {
             R[(2, 1)] - R[(1, 2)],
             R[(0, 2)] - R[(2, 0)],
             R[(1, 0)] - R[(0, 1)],
-        ) * (angle / (2.0 * angle.sin()))
+        ) * (angle / (fl!(2.0) * angle.sin()))
     }
 }
 
