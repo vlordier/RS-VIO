@@ -187,7 +187,6 @@ impl PnPRansacSolver {
     }
 
     /// DLT (Direct Linear Transform) solver for PnP
-    #[allow(clippy::expect_used)]
     fn solve_dlt(
         &self,
         correspondences: &[Correspondence],
@@ -235,23 +234,8 @@ impl PnPRansacSolver {
 
         // Solve using SVD
         let svd = A.svd(true, true);
-        let v_t = svd
-            .v_t
-            .expect("SVD should produce V matrix for tall matrix A");
-
-        // For a tall matrix (m > n), nalgebra returns economy SVD
-        // v_t is (m, n), so we need to find the nullspace from the right singular vectors
-        // The nullspace corresponds to the smallest singular value
-        let min_sv_idx = svd
-            .singular_values
-            .iter()
-            .enumerate()
-            .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(idx, _)| idx)
-            .expect("Singular values should not be empty for tall matrix");
-
-        // Use the corresponding row of v_t (which is a column of V)
-        let solution = v_t.row(min_sv_idx);
+        let V = svd.u.unwrap(); // Last column of V (or U for our case)
+        let solution = V.column(11);
 
         // Extract pose from solution
         let R = na::Matrix3::from_row_slice(&[
@@ -322,7 +306,6 @@ impl PnPRansacSolver {
 }
 
 #[cfg(test)]
-#[allow(clippy::all)]
 mod tests {
     use super::*;
 

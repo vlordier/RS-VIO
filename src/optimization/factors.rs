@@ -808,7 +808,12 @@ impl LoopClosurePoseFactor {
         }
     }
 
-    fn compute_relative(R1: &na::Matrix3<f64>, t1: &na::Vector3<f64>, R2: &na::Matrix3<f64>, t2: &na::Vector3<f64>) -> (na::Matrix3<f64>, na::Vector3<f64>) {
+    fn compute_relative(
+        R1: &na::Matrix3<f64>,
+        t1: &na::Vector3<f64>,
+        R2: &na::Matrix3<f64>,
+        t2: &na::Vector3<f64>,
+    ) -> (na::Matrix3<f64>, na::Vector3<f64>) {
         // Relative rotation R_rel = R1 * R2^T
         let R_rel = R1 * R2.transpose();
         // Relative translation t_rel = t1 - R_rel * t2
@@ -837,9 +842,21 @@ impl Factor for LoopClosurePoseFactor {
         params: &[DVector<f64>],
         compute_jacobian: bool,
     ) -> (DVector<f64>, Option<DMatrix<f64>>) {
-        assert_eq!(params.len(), 2, "LoopClosurePoseFactor requires 2 parameter vectors (KF1, KF2)");
-        assert_eq!(params[0].len(), 7, "Pose 1 must have 7 parameters (tx, ty, tz, qw, qx, qy, qz)");
-        assert_eq!(params[1].len(), 7, "Pose 2 must have 7 parameters (tx, ty, tz, qw, qx, qy, qz)");
+        assert_eq!(
+            params.len(),
+            2,
+            "LoopClosurePoseFactor requires 2 parameter vectors (KF1, KF2)"
+        );
+        assert_eq!(
+            params[0].len(),
+            7,
+            "Pose 1 must have 7 parameters (tx, ty, tz, qw, qx, qy, qz)"
+        );
+        assert_eq!(
+            params[1].len(),
+            7,
+            "Pose 2 must have 7 parameters (tx, ty, tz, qw, qx, qy, qz)"
+        );
 
         let T1 = se3::SE3::from(params[0].clone());
         let T2 = se3::SE3::from(params[1].clone());
@@ -921,7 +938,10 @@ mod tests {
     fn loop_closure_zero_residual_for_perfect_measurement() {
         let factor = LoopClosurePoseFactor::new(na::Matrix4::identity(), na::Matrix6::identity());
         let (res, jac) = factor.linearize(&[se3_identity_vec(), se3_identity_vec()], true);
-        assert!(res.amax() < 1e-9, "residual should be zero for identity measurement");
+        assert!(
+            res.amax() < 1e-9,
+            "residual should be zero for identity measurement"
+        );
         let jac = jac.expect("jacobian should be present");
         assert_eq!(jac.nrows(), 6);
         assert_eq!(jac.ncols(), 12);
