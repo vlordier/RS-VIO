@@ -25,11 +25,31 @@ See [QUALITY_BASELINE.md](QUALITY_BASELINE.md) for detailed metrics and [QUALITY
 ### Quick Quality Check
 ```bash
 # Run all quality checks
-make quality-check
+make quality-quick
 
 # Or use the convenience script
 ./scripts/check_quality.sh
+
+# Full check with security audit
+./scripts/check_quality.sh --full
 ```
+
+### Performance Profiling
+```bash
+# Generate flamegraph for hotspot analysis
+make flamegraph
+
+# Run benchmarks and save baseline
+make benchmark-baseline
+
+# Compare against baseline
+make benchmark-compare
+
+# Quick performance check
+make perf-quick
+```
+
+See [PERFORMANCE_PROFILING_GUIDE.md](PERFORMANCE_PROFILING_GUIDE.md) for detailed profiling workflow.
 
 ## Features
 

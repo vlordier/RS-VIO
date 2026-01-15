@@ -182,6 +182,58 @@ quality-full: quality-quick
 	@echo ""
 	@echo "$(COLOR_GREEN)✅ Full quality check complete!$(NC)"
 
+# ============================================================================
+# Performance Profiling Targets
+# ============================================================================
+
+# Generate flamegraph for hotspot analysis
+flamegraph:
+	@echo "$(COLOR_YELLOW)Generating flamegraph...$(NC)"
+	@if command -v cargo-flamegraph >/dev/null 2>&1; then \
+		cargo flamegraph --bin run_euroc -- config/euroc_vio.yaml /tmp/dataset/; \
+		echo "$(COLOR_GREEN)✅ Flamegraph saved to flamegraph.svg$(NC)"; \
+	else \
+		echo "$(COLOR_RED)Install: cargo install flamegraph$(NC)"; \
+	fi
+
+# Profile memory allocations with DHAT
+profile-allocations:
+	@echo "$(COLOR_YELLOW)Profiling memory allocations...$(NC)"
+	@echo "$(COLOR_YELLOW)Note: Build with dhat feature enabled$(NC)"
+	@cargo build --release --features dhat
+	@echo "$(COLOR_GREEN)Run your binary to generate dhat-heap.json$(NC)"
+
+# Run benchmarks and save baseline
+benchmark-baseline:
+	@echo "$(COLOR_YELLOW)Running benchmarks and saving baseline...$(NC)"
+	@mkdir -p metrics/benchmarks
+	@cargo bench --all | tee metrics/benchmarks/baseline_$$(date +%Y%m%d_%H%M%S).txt
+	@cp metrics/benchmarks/baseline_$$(date +%Y%m%d_%H%M%S).txt metrics/benchmarks/baseline_latest.txt 2>/dev/null || true
+	@echo "$(COLOR_GREEN)✅ Baseline saved to metrics/benchmarks/$(NC)"
+
+# Compare current benchmarks against baseline
+benchmark-compare:
+	@echo "$(COLOR_YELLOW)Comparing benchmarks against baseline...$(NC)"
+	@./scripts/benchmark_comparison.sh
+
+# Profile with perf (Linux only)
+perf-record:
+	@echo "$(COLOR_YELLOW)Recording perf data...$(NC)"
+	@if command -v perf >/dev/null 2>&1; then \
+		cargo build --release; \
+		perf record -F 99 -g ./target/release/run_euroc config/euroc_vio.yaml /tmp/dataset/; \
+		echo "$(COLOR_GREEN)✅ Run 'perf report' to view results$(NC)"; \
+	else \
+		echo "$(COLOR_YELLOW)perf not available (Linux only)$(NC)"; \
+	fi
+
+# Quick performance check (runs key benchmarks)
+perf-quick:
+	@echo "$(COLOR_YELLOW)Running quick performance benchmarks...$(NC)"
+	@cargo bench --bench feature_tracker --bench optimization
+	@echo "$(COLOR_GREEN)✅ Performance check complete!$(NC)"
+
+# ============================================================================
 
 audit:
 	@echo "$(COLOR_GREEN)Running security audit...$(NC)"

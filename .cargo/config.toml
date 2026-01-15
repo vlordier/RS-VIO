@@ -1,5 +1,44 @@
+# Cargo configuration for RS-VIO development and profiling
+
+[build]
+# Incremental compilation for faster debug builds
+incremental = true
+
+# Use all available CPU cores
+jobs = 0  # 0 = auto-detect
+
 [target.aarch64-apple-darwin]
-rustflags = ["-C", "link-arg=-framework", "-C", "link-arg=Metal"]
+rustflags = [
+    "-C", "link-arg=-framework", 
+    "-C", "link-arg=Metal",
+    "-C", "force-frame-pointers=yes"  # Better profiling on Apple Silicon
+]
 
 [target.x86_64-apple-darwin]
-rustflags = ["-C", "link-arg=-framework", "-C", "link-arg=Metal"]
+rustflags = [
+    "-C", "link-arg=-framework", 
+    "-C", "link-arg=Metal",
+    "-C", "force-frame-pointers=yes"  # Better profiling on Intel Mac
+]
+
+[target.x86_64-unknown-linux-gnu]
+# Enable frame pointers for better profiling on Linux
+rustflags = ["-C", "force-frame-pointers=yes"]
+
+# Profile for release builds with debug info (for profiling)
+[profile.release-with-debug]
+inherits = "release"
+debug = true
+strip = false
+
+# Profile for benchmarking (maximum optimization)
+[profile.bench]
+inherits = "release"
+lto = "thin"
+codegen-units = 1
+
+# Profile for profiling with flamegraph
+[profile.flamegraph]
+inherits = "release"
+debug = true
+strip = false
