@@ -9,8 +9,12 @@
 //! - OpenCV's solvePnPRansac implementation
 //! - Lindenberger et al., "LightGlue: Local Feature Matching at Light Speed", ICCV 2023
 
+#![allow(dead_code)]
+
 use super::{GeometricVerifier, VerifiedMatch, KeyframeDescriptor, MatchMetrics};
 use super::pnp_ransac::{PnPRansacSolver, PnPRansacConfig, Correspondence};
+#[cfg(feature = "lightglue")]
+use super::lightglue::{LightGlueMatcher, LightGlueConfig};
 use nalgebra as na;
 
 /// Configuration for enhanced geometric verifier
@@ -22,8 +26,11 @@ pub struct EnhancedVerifierConfig {
     pub pnp_config: PnPRansacConfig,
     /// Minimum similarity threshold before PnP verification
     pub min_pre_filter_similarity: f64,
-    /// Enable optional LightGlue verification for hard cases (future)
+    /// Enable optional LightGlue verification for hard cases
     pub use_lightglue_fallback: bool,
+    /// LightGlue configuration (only used if use_lightglue_fallback is true)
+    #[cfg(feature = "lightglue")]
+    pub lightglue_config: Option<LightGlueConfig>,
 }
 
 impl Default for EnhancedVerifierConfig {
@@ -33,6 +40,8 @@ impl Default for EnhancedVerifierConfig {
             pnp_config: PnPRansacConfig::default(),
             min_pre_filter_similarity: 0.2,
             use_lightglue_fallback: false,
+            #[cfg(feature = "lightglue")]
+            lightglue_config: None,
         }
     }
 }
@@ -41,13 +50,45 @@ impl Default for EnhancedVerifierConfig {
 pub struct EnhancedGeometricVerifier {
     config: EnhancedVerifierConfig,
     pnp_solver: PnPRansacSolver,
+    #[cfg(feature = "lightglue")]
+    lightglue_matcher: Option<LightGlueMatcher>,
 }
 
 impl EnhancedGeometricVerifier {
     /// Create new enhanced verifier
     pub fn new(config: EnhancedVerifierConfig) -> Self {
         let pnp_solver = PnPRansacSolver::new(config.pnp_config.clone());
-        Self { config, pnp_solver }
+        
+        #[cfg(feature = "lightglue")]
+        let lightglue_matcher = if config.use_lightglue_fallback {
+            match config.lightglue_config.as_ref() {
+                Some(lg_config) => {
+                    match LightGlueMatcher::new(lg_config.clone()) {
+                        Ok(matcher) => {
+                            log::info!("LightGlue matcher initialized successfully");
+                            Some(matcher)
+                        }
+                        Err(e) => {
+                            log::warn!("Failed to initialize LightGlue: {}. Continuing without it.", e);
+                            None
+                        }
+                    }
+                }
+                None => {
+                    log::warn!("LightGlue fallback enabled but no config provided");
+                    None
+                }
+            }
+        } else {
+            None
+        };
+        
+        Self { 
+            config, 
+            pnp_solver,
+            #[cfg(feature = "lightglue")]
+            lightglue_matcher,
+        }
     }
 
     /// Extract 2D points from descriptor (simplified - would use actual feature matches)

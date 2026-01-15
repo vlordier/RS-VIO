@@ -43,6 +43,8 @@ pub mod vocabulary;
 pub mod bow_retriever;
 pub mod pnp_ransac;
 pub mod enhanced_verifier;
+#[cfg(feature = "lightglue")]
+pub mod lightglue;
 
 use nalgebra as na;
 use serde::{Deserialize, Serialize};

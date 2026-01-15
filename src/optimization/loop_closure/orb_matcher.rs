@@ -1,6 +1,5 @@
 use super::{DescriptorMatcher, MatchMetrics};
 use crate::optimization::loop_closure::KeyframeDescriptor;
-use nalgebra::Isometry3;
 
 /// ORB-based descriptor matcher using Hamming distance
 pub struct OrbMatcher {
@@ -124,6 +123,7 @@ impl DescriptorMatcher for OrbMatcher {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use nalgebra::Isometry3;
 
     fn create_test_descriptor(seed: u64) -> KeyframeDescriptor {
         // Create a deterministic descriptor from seed
