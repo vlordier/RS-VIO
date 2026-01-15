@@ -19,7 +19,6 @@ use std::f64::consts::PI;
 /// ============================================================================
 /// 1. GRAVITY MODELING (SOTA)
 /// ============================================================================
-
 /// Gravity vector in world frame (fixed during optimization in most cases)
 ///
 /// Recommended approach:
@@ -52,7 +51,6 @@ impl GravityModel {
 /// ============================================================================
 /// 2. INTER-KEYFRAME IMU PREINTEGRATION FACTOR (SOTA)
 /// ============================================================================
-
 /// Inter-keyframe IMU factor for tight coupling
 ///
 /// This factor models the IMU preintegration constraint between two keyframes.

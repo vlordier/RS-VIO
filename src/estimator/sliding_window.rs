@@ -553,7 +553,7 @@ impl SlidingWindow {
                                 // Triangulate from stereo observations if available
                                 let left_feat = frame.left_features.iter().find(|f| f.feature_id == feature_id);
                                 let right_feat = frame.right_features.iter().find(|f| f.feature_id == feature_id);
-                                
+
                                 if let (Some(l_feat), Some(r_feat)) = (left_feat, right_feat) {
                                     // Perform stereo triangulation
                                     let left_obs = Vector3::new(
@@ -566,7 +566,7 @@ impl SlidingWindow {
                                         r_feat.undistorted_coord[1] as f64,
                                         1.0_f64,
                                     );
-                                    
+
                                     match Self::triangulate_stereo(
                                         left_obs,
                                         right_obs,
@@ -671,7 +671,7 @@ impl SlidingWindow {
 
                 let factor = LoopClosurePoseFactor::new(
                     constraint.relative_pose.to_homogeneous(),
-                    constraint.information_matrix.clone(),
+                    constraint.information_matrix,
                 );
 
                 let loss = HuberLoss::new(1.0).ok().map(|l| {
@@ -867,7 +867,7 @@ impl SlidingWindow {
                 // Identify which parameters to keep and which to marginalize
                 // Keep all current keyframes and landmarks, marginalize oldest
                 let n_keyframes = self.keyframes.len();
-                let _n_keep_keyframes = if n_keyframes > 1 { n_keyframes - 1 } else { 0 };
+                let _n_keep_keyframes = n_keyframes.saturating_sub(1);
                 let marg_keyframe_idx = 0; // Marginalize oldest keyframe
 
                 let mut keep_ids = Vec::new();
@@ -885,7 +885,7 @@ impl SlidingWindow {
                 ));
 
                 // All landmarks to keep (we'll marginalize old ones later based on age)
-                for (fid, _) in &self.map_points {
+                for fid in self.map_points.keys() {
                     keep_ids.push(crate::optimization::marginalization::ParamId::Landmark(
                         *fid,
                     ));

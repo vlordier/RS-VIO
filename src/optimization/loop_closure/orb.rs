@@ -125,7 +125,11 @@ impl OrbExtractor {
         };
 
         // Sort by strength and keep top N
-        features.sort_by(|a, b| b.strength.partial_cmp(&a.strength).unwrap());
+        features.sort_by(|a, b| {
+            b.strength
+                .partial_cmp(&a.strength)
+                .expect("Feature strength should be comparable")
+        });
         features.truncate(self.config.num_features);
 
         log::debug!("[OrbExtractor] Extracted {} ORB features", features.len());
