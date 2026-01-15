@@ -2,6 +2,8 @@
 //!
 //! These tests use macro-based parametrization to efficiently test multiple scenarios.
 
+#![allow(clippy::float_cmp)]
+
 #[cfg(test)]
 mod parametrized_tests {
     use rs_vio::types::*;

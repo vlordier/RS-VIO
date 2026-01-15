@@ -194,6 +194,16 @@ pub fn execute<P: DatasetPlayer + ?Sized>(
     let start_frame_idx = 0;
     let end_frame_idx = image_data.len();
 
+    // Load IMU data for the full dataset (cached for efficient retrieval)
+    if let Err(e) = player.load_imu_data(
+        &config.dataset_path,
+        &image_data,
+        start_frame_idx,
+        end_frame_idx,
+    ) {
+        log::warn!("[{}] Failed to load IMU data: {}", dataset_name, e);
+    }
+
     // Load full YAML config
     let cfg = crate::datasets::config::Config::load(&config.config_path)?;
 
@@ -320,8 +330,13 @@ pub fn execute<P: DatasetPlayer + ?Sized>(
     }
 
     log::info!(
-        "[{}] Processing completed! Viewer remains open for inspection.",
-        dataset_name
+        "[{}] Processing completed!{}",
+        dataset_name,
+        if visualization.enable_viewer {
+            " Viewer remains open for inspection."
+        } else {
+            ""
+        }
     );
 
     Ok(result)
@@ -338,6 +353,7 @@ pub fn process_single_frame_common(
     dataset_path: &str,
     load_left_image: impl Fn(&str, &str, u32) -> Result<Vec<u8>>,
     load_right_image: impl Fn(&str, &str, u32) -> Result<Vec<u8>>,
+    get_imu_data: impl Fn(i64, i64) -> Vec<ImuData>,
 ) -> Result<f64> {
     let frame_start = std::time::Instant::now();
 
@@ -355,12 +371,12 @@ pub fn process_single_frame_common(
         )));
     }
 
-    // Get IMU data if VIO mode
-    // TODO when implementing IMU data loading
-    #[allow(clippy::overly_complex_bool_expr)]
-    let imu_data: Option<Vec<ImuData>> = if false && context.processed_frames > 0 {
-        // Would call player.get_imu_data_between_frames here
-        None
+    // Get IMU data for VIO mode (skip first frame since no previous timestamp)
+    let imu_data: Option<Vec<ImuData>> = if context.processed_frames > 0 {
+        Some(get_imu_data(
+            context.previous_frame_timestamp,
+            image_data[context.current_idx].timestamp,
+        ))
     } else {
         None
     };

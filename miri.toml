@@ -1,0 +1,39 @@
+# MIRI Configuration for RS-VIO
+# ==============================
+# MIRI is a static analyzer that detects undefined behavior.
+# Run: cargo +nightly miri test
+
+[check]
+# Types of checks to run
+dereferenceable = true
+double_free = true
+dynamic_dispatch = true
+freeze = true
+illegal_wide_ptr = true
+leak = true
+mem_replace = true
+missing_size_hint = true
+nested_tuple_struct = true
+non_canonical_enum_variant = true
+non_canonical_struct_variant = true
+out_of_bounds = true
+overwrite = true
+size_validate = true
+stacked_borrows = true
+unaligned = true
+uninit = true
+unsafe_code = true
+use_after_free = true
+validate_layouts = true
+
+[exclude]
+# Files or directories to skip
+paths = [
+    "target/",
+    "fuzz_targets/",
+]
+
+[suppress]
+# Suppress specific checks for known safe patterns
+# Format: (file, line_number, check_name)
+# Example: ("src/utils.rs", 42, "uninit")

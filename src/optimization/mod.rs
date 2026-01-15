@@ -72,7 +72,16 @@
 //! - [feature_tracker](crate::feature_tracker) - Feature observations
 
 pub mod factors;
+pub mod loop_closure;
+pub mod marginalization;
 pub mod observer;
+pub mod tight_coupling;
+
+pub use loop_closure::{
+    KeyframeDatabase, KeyframeDescriptor, LoopClosureCandidate, LoopClosureConfig,
+    LoopClosureConstraint, LoopClosureDetector,
+};
 
 #[cfg(test)]
+#[allow(clippy::all)]
 mod tests;

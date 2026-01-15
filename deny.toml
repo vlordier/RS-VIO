@@ -1,0 +1,70 @@
+# Cargo-deny configuration for RS-VIO
+# Policy enforcement for dependencies
+
+[advisories]
+vulnerability = "deny"
+unmaintained = "warn"
+notice = "warn"
+ignore = []
+# Only allow security advisories from these sources
+sources = [
+    "crates.io",
+    "rustsec.org",
+]
+
+[licenses]
+unlicensed = "deny"
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "CC0-1.0",
+]
+deny = [
+    "AGPL-1.0",
+    "AGPL-3.0",
+    "GPL-1.0",
+    "GPL-2.0",
+    "GPL-3.0",
+    "LGPL-2.0",
+    "LGPL-2.1",
+    "LGPL-3.0",
+    "MPL-1.1",
+    "MPL-2.0",
+    "OSL-2.0",
+    "OSL-3.0",
+    "SSPL-1.0",
+]
+copyleft = "deny"
+default = "deny"
+
+[bans]
+multiple-versions = "warn"
+wildcards = "allow"
+# High-value crates that can have multiple versions
+allow-duplicates = [
+    "once_cell",
+    "parking_lot",
+    "regex",
+]
+# Deny these specific crates
+deny = []
+# Skip checking these crates
+skip = [
+    # nalgebra has multiple versions due to compatibility requirements
+    { name = "nalgebra", version = "=0.33" },
+    { name = "nalgebra", version = "=0.34" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+local = "deny"
+# Allow only these registries
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+# Allow only these git sources
+allow-git = [
+    "https://github.com/charleshamesse/RS-VIO",
+    "https://github.com/amin-abouee/apex-solver",
+]

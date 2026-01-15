@@ -1,6 +1,9 @@
 use crate::{Result, VIOError};
 use serde::{Deserialize, Serialize};
 
+#[doc(inline)]
+pub use crate::optimization::marginalization::MarginalizationConfig;
+
 /// Main configuration structure for the VIO system.
 ///
 /// This struct holds all configuration parameters loaded from YAML files,
@@ -17,6 +20,9 @@ pub struct Config {
     #[serde(default)]
     pub visualization: VisualizationConfig,
     pub optimization: OptimizationConfig,
+    #[serde(rename = "marginalization")]
+    #[serde(default)]
+    pub marginalization: crate::optimization::marginalization::MarginalizationConfig,
 }
 
 /// Camera configuration including intrinsics, distortion, and extrinsics.
@@ -88,6 +94,14 @@ pub struct OptimizationConfig {
     pub bundle_adjustment_max_iterations: u32,
     #[serde(rename = "pnp_max_iterations")]
     pub pnp_max_iterations: u32,
+    #[serde(default = "default_imu_prior_enable")]
+    pub imu_prior_enable: bool,
+    #[serde(default = "default_imu_prior_weight_pos")]
+    pub imu_prior_weight_pos: f64,
+    #[serde(default = "default_imu_prior_weight_rot")]
+    pub imu_prior_weight_rot: f64,
+    #[serde(default = "default_imu_prior_huber_delta")]
+    pub imu_prior_huber_delta: f64,
 }
 
 impl Config {
@@ -153,4 +167,20 @@ fn default_log_axes() -> bool {
 
 fn default_processing_timeout_ms() -> u64 {
     100
+}
+
+fn default_imu_prior_enable() -> bool {
+    false
+}
+
+fn default_imu_prior_weight_pos() -> f64 {
+    1.0
+}
+
+fn default_imu_prior_weight_rot() -> f64 {
+    1.0
+}
+
+fn default_imu_prior_huber_delta() -> f64 {
+    0.0
 }
