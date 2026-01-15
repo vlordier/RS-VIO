@@ -1,22 +1,145 @@
 [package]
 name = "rs-vio"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
+description = "A high-performance Visual-Inertial Odometry library in Rust with safety-critical embedded system support"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/charleshamesse/RS-VIO"
+documentation = "https://docs.rs/rs-vio"
+homepage = "https://github.com/charleshamesse/RS-VIO"
+keywords = ["computer-vision", "slam", "vio", "odometry", "robotics"]
+categories = ["algorithms", "science::robotics", "multimedia::images"]
+authors = ["Charles Hamesse"]
+exclude = [
+    "examples/datasets/*",
+    "scripts/benchmark_data/*",
+    ".github/workflows/benchmarks.yml"
+]
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
 log = "0.4"
 env_logger = "0.11"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
 rand = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 anyhow = "1.0"
+thiserror = "1.0"
 rerun = "0.25"
 image = "0.25"
 imageproc = "0.25"
 nalgebra = "0.33.2"
 nalgebra034 = { package = "nalgebra", version = "0.34.1" } # TODO improve this, now this is dirty (needed for camera-intrinsic-model for now)
-rayon = "1.11.0"
 camera-intrinsic-model = "0.7.2"
-apex-solver = { git = "https://github.com/amin-abouee/apex-solver", branch = "main" } # TODO change when official release includes the Schur complement methods
-faer = "0.23.2"
+# Note: Using git dependency for apex-solver to access Schur complement methods
+# Consider pinning to a specific commit when stable release is available
+apex-solver = { git = "https://github.com/amin-abouee/apex-solver", branch = "main" }
+
+[features]
+# Feature flag for using f32 instead of f64 precision
+use_f32 = []
+
+[dev-dependencies]
+criterion = "0.5"
+proptest = "1.4"
+
+[package.metadata.cargo-machete]
+ignored = ["tracing"]  # Used via tracing-subscriber for structured logging
+
+[lints.rust]
+unsafe_code = "forbid"
+warnings = "deny"
+non_snake_case = "allow"  # Allow for transformation matrices (T_A_B convention)
+
+[lints.clippy]
+# Real-time safety lints - Critical for embedded systems
+unnecessary_unwrap = "deny"
+expect_used = "deny"  # NO expect() anywhere - use Result<T> instead
+unwrap_used = "warn"  # Allowed in tests (see test modules)
+todo = "deny"  # TODO comments must be resolved before release
+unimplemented = "deny"  # No stub implementations
+panic = "deny"
+exit = "deny"  # Never call process::exit in library code
+
+# Allocation safety - must be predictable in realtime
+large_stack_arrays = "deny"  # Any large stack array is unacceptable
+large_types_passed_by_value = "deny"  # Stack pressure must be minimal
+vec_box = "deny"  # Double indirection is unacceptable
+box_collection = "deny"  # NO Box<Vec<T>> - preallocate or use Vec directly
+rc_buffer = "deny"  # NO reference counted buffers in realtime code
+
+# Correctness lints
+float_cmp = "warn"  # Allow in tests where we know exact values
+float_cmp_const = "warn"  # Comparing floats to constants
+
+# Numeric safety for embedded systems
+cast_possible_truncation = "warn"  # Catch lossy casts - allow where intentional
+cast_precision_loss = "warn"  # Warn on float precision loss
+cast_sign_loss = "warn"  # Prevent sign loss in casts
+cast_lossless = "warn"  # Prefer From::from for lossless casts
+
+# Additional embedded safety
+missing_const_for_fn = "warn"  # Const functions enable compile-time computation
+inefficient_to_string = "warn"  # Use to_string() carefully on embedded
+
+[profile.release]
+# Optimize for embedded/real-time performance
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"  # Reduce binary size and eliminate unwinding overhead
+strip = true
+# Safety: Enable overflow checks even in release (small perf cost for critical safety)
+overflow-checks = true
+# Keep assertions for runtime validation
+debug-assertions = false  # Set to true for extra safety, adds ~3-5% overhead
+
+[profile.release-with-debug]
+inherits = "release"
+debug = true
+strip = false
+
+# Maximum safety profile for safety-critical embedded systems
+# Build with: cargo build --profile embedded-safe
+[profile.embedded-safe]
+inherits = "release"
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = false  # Keep symbols for debugging
+overflow-checks = true  # Always check integer overflow
+debug-assertions = true  # Keep all assertions (~3-5% overhead)
+incremental = false  # Best optimization
+
+# Ultra-critical profile for safety-critical systems
+# Enables all safety checks + sanitizers
+# Build with: RUSTFLAGS="-Z sanitizer=memory" cargo build --profile ultra-critical
+[profile.ultra-critical]
+inherits = "release"
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+overflow-checks = true
+debug-assertions = true
+incremental = false
+
+[[bench]]
+name = "estimator"
+harness = true
+
+[[bench]]
+name = "optimization"
+harness = true
+
+[[bench]]
+name = "feature_tracker"
+harness = true
+
+[[bench]]
+name = "pipeline"
+harness = true

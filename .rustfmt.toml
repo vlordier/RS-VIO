@@ -1,0 +1,38 @@
+# Rust formatting configuration for RS-VIO
+# See: https://rust-lang.github.io/rustfmt/
+
+# Edition
+edition = "2021"
+
+# Line length (stable)
+max_width = 100
+
+# Indentation
+hard_tabs = false
+tab_spaces = 4
+
+# Imports (stable)
+reorder_imports = true
+reorder_modules = true
+
+# Function formatting (stable)
+fn_params_layout = "Tall"
+
+# Match formatting
+match_block_trailing_comma = true
+
+# Other formatting options (stable only)
+force_explicit_abi = true
+use_try_shorthand = true
+use_field_init_shorthand = true
+use_small_heuristics = "Default"
+
+# Note: The following options require nightly and are excluded:
+# - group_imports = "StdExternalCrate" (nightly)
+# - fn_single_line = false (nightly)
+# - struct_literal_width, struct_literal_style (nightly)
+# - wrap_comments = true (nightly)
+# - trailing_comma = "Vertical" (nightly)
+# - normalize_doc_attributes = true (nightly)
+# - format_code_in_doc_comments = true (nightly)
+# - format_strings = true (nightly)

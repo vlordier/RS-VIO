@@ -1,0 +1,85 @@
+# Pre-commit hooks configuration for RS-VIO
+# Install with: pre-commit install
+# See: https://pre-commit.com/
+
+repos:
+  # Rust formatting with rustfmt
+  - repo: https://github.com/rust-lang/rustfmt
+    rev: 1.7.0
+    hooks:
+      - id: rustfmt
+        args: [--edition, 2021]
+
+  # Linting with clippy
+  - repo: https://github.com/bwasty/clippy-checks
+    rev: v1.1.0
+    hooks:
+      - id: clippy
+        args: [--all-features, --all-targets, --, -D, warnings]
+
+  # General pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      # Identify files that would conflict in merge
+      - id: check-merge-conflict
+      
+      # Prevent giant files from being committed
+      - id: check-added-large-files
+        args: ['--maxkb=5000']
+      
+      # Fix end of file newlines
+      - id: end-of-file-fixer
+      
+      # Trim trailing whitespace
+      - id: trailing-whitespace
+      
+      # Check YAML files
+      - id: check-yaml
+      
+      # Check TOML files
+      - id: check-toml
+      
+      # Validate JSON files
+      - id: check-json
+      
+      # Check that files parse as valid Python (if any)
+      - id: check-ast
+
+  # Check for secrets
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: Cargo.lock
+
+  # Conventional commit linting
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v2.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+
+  # Security audit with cargo-deny
+  - repo: local
+    hooks:
+      - id: cargo-deny
+        name: cargo deny check
+        description: Check crate dependencies for known vulnerabilities
+        entry: cargo deny check
+        language: system
+        types: [rust]
+        pass_filenames: false
+        stages: [commit]
+
+# Exclude patterns (won't run pre-commit on these)
+exclude: |
+  (?x)^(
+    Cargo.lock|
+    target/|
+    \.git/
+  )
+
+# Minimum pre-commit version
+minimum_pre_commit_version: '2.15.0'

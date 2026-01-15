@@ -1,38 +1,17 @@
 use clap::Parser;
-use env_logger::{Builder, Env};
-use log::{error, info, LevelFilter};
-use rand::SeedableRng;
+use log::{error, info};
 use rand::rngs::StdRng;
-use rs_vio::{PlayerConfig, EurocPlayer};
+use rand::SeedableRng;
+use rs_vio::datasets::player_trait::DatasetPlayer;
+use rs_vio::{EurocPlayer, PlayerConfig};
 use std::process;
 
 fn main() {
     // Set random seed for reproducibility
     let _rng = StdRng::seed_from_u64(42);
-    
-    // Initialize logger for immediate colored output
-    Builder::from_env(Env::default().default_filter_or("debug"))
-        // Silence rerun noise unless it's a warning or worse
-        .filter_module("rerun", LevelFilter::Warn)
-        .format_timestamp_millis()
-        .format(|buf, record| {
-            use std::io::Write;
-            let level = match record.level() {
-                log::Level::Error => "\x1b[31mERROR\x1b[0m",
-                log::Level::Warn => "\x1b[33mWARN\x1b[0m",
-                log::Level::Info => "\x1b[32mINFO\x1b[0m",
-                log::Level::Debug => "\x1b[34mDEBUG\x1b[0m",
-                log::Level::Trace => "\x1b[36mTRACE\x1b[0m",
-            };
-            writeln!(
-                buf,
-                "[{}] [{}] {}",
-                buf.timestamp_millis(),
-                level,
-                record.args()
-            )
-        })
-        .init();
+
+    // Initialize colored logger
+    rs_vio::init_colored_logging();
 
     // Parse command line arguments
     let args = Args::parse();
@@ -41,20 +20,26 @@ fn main() {
     let player_config = PlayerConfig {
         config_path: args.config_file.clone(),
         dataset_path: args.dataset_path.clone(),
-        enable_statistics: true,          // File statistics
-        enable_console_statistics: true,  // Console statistics
+        enable_statistics: true,         // File statistics
+        enable_console_statistics: true, // Console statistics
         step_mode: false,
+        stats_output_path: None,
     };
     // Create and run EuRoC player
     let player = EurocPlayer::new();
-    let result = player.run(player_config);
-
-    if result.success {
-        info!("[Main] processing completed successfully!");
-        process::exit(0);
-    } else {
-        error!("[Main] processing failed: {}", result.error_message);
-        process::exit(-1);
+    match player.run(player_config) {
+        Ok(result) => {
+            info!("[Main] processing completed successfully!");
+            info!(
+                "Processed {} frames with average {:.2}ms per frame",
+                result.processed_frames, result.average_processing_time_ms
+            );
+            process::exit(0);
+        },
+        Err(e) => {
+            error!("[Main] processing failed: {}", e);
+            process::exit(-1);
+        },
     }
 }
 

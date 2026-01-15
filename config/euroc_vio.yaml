@@ -1,5 +1,4 @@
-%YAML:1.0
----
+
 
 # Camera Parameters (EuRoC dataset specific)
 # Image dimensions and processing parameters
@@ -35,6 +34,7 @@ keyframe_management:
   keyframe_window_size: 10
   translation_threshold: 0.05  # Minimum translation (meters) since last keyframe to trigger new keyframe
   rotation_threshold: 0.05  # Minimum rotation (radians) since last keyframe to trigger new keyframe
+  processing_timeout_ms: 100
 
 # Feature Detection Parameters
 # Controls how corner features are detected using goodFeaturesToTrack

@@ -1,6 +1,21 @@
 #!/usr/bin/env bash
-# Default logging: quiet rerun internals, keep our crate at debug.
-export RUST_LOG="info,rs_vio=debug,rerun=warn,re_log=warn,re_sdk=warn,re_ws_comms=warn"
+set -euo pipefail
 
-cd "$(dirname "${BASH_SOURCE[0]}")/.."
-cargo run --release --bin run_euroc config/euroc_vio.yaml /home/charles/Workspace/data/euroc/MH_01_easy/  "$@"
+# Default logging: quiet rerun internals, keep our crate at debug.
+export RUST_LOG="${RUST_LOG:-info,rs_vio=debug,rerun=warn,re_log=warn,re_sdk=warn,re_ws_comms=warn}"
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd -P)"
+
+CONFIG_PATH="${CONFIG_PATH:-config/euroc_vio.yaml}"
+
+if [[ $# -lt 1 ]]; then
+	echo "Usage: $0 <euroc_dataset_path> [extra args...]" >&2
+	exit 1
+fi
+
+DATASET_PATH="$1"
+shift
+
+cd "$ROOT_DIR"
+exec cargo run --release --bin run_euroc "$CONFIG_PATH" "$DATASET_PATH" "$@"

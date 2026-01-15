@@ -1,0 +1,92 @@
+name: Generate Documentation
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'src/**'
+      - 'benches/**'
+      - 'Cargo.toml'
+      - 'BENCHMARKING.md'
+      - 'scripts/generate-docs.sh'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'src/**'
+      - 'benches/**'
+      - 'Cargo.toml'
+
+jobs:
+  docs:
+    name: Generate and validate documentation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      
+      - name: Generate Rustdoc
+        run: cargo doc --lib --no-deps --document-private-items 2>&1 | tee doc_output.log
+      
+      - name: Check for doc warnings
+        run: |
+          if grep -q "warning:" doc_output.log; then
+            echo "⚠️ Documentation warnings found:"
+            grep "warning:" doc_output.log
+            # Note: We warn but don't fail on doc warnings yet
+          fi
+      
+      - name: Validate benchmark documentation
+        run: |
+          for bench_file in benches/*.rs; do
+            if ! grep -q "^//!" "$bench_file"; then
+              echo "⚠️ Missing module documentation in $bench_file"
+            fi
+          done
+      
+      - name: Test documentation examples
+        run: cargo test --doc
+
+  # Optional: Deploy to GitHub Pages
+  deploy-docs:
+    name: Deploy documentation to GitHub Pages
+    needs: docs
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      
+      - name: Generate documentation
+        run: cargo doc --lib --no-deps --document-private-items
+      
+      - name: Add index redirect
+        run: |
+          mkdir -p target/doc
+          echo '<meta http-equiv="refresh" content="0;url=rs_vio/index.html">' > target/doc/index.html
+      
+      - name: Setup Pages
+        uses: actions/configure-pages@v3
+      
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: 'target/doc'
+      
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2

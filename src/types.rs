@@ -56,10 +56,13 @@ use std::fmt;
 /// Display implementation for Array4x4Display
 impl fmt::Display for Array4x4Display {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Array4x4:\n")?;
+        writeln!(f, "Array4x4:")?;
         for row in self.0.iter() {
-            write!(f, "  [{:8.4}, {:8.4}, {:8.4}, {:8.4}]\n", 
-                row[0], row[1], row[2], row[3])?;
+            writeln!(
+                f,
+                "  [{:8.4}, {:8.4}, {:8.4}, {:8.4}]",
+                row[0], row[1], row[2], row[3]
+            )?;
         }
         Ok(())
     }
@@ -68,10 +71,9 @@ impl fmt::Display for Array4x4Display {
 /// Display implementation for Array3x3Display
 impl fmt::Display for Array3x3Display {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Array3x3:\n")?;
+        writeln!(f, "Array3x3:")?;
         for row in self.0.iter() {
-            write!(f, "  [{:8.4}, {:8.4}, {:8.4}]\n", 
-                row[0], row[1], row[2])?;
+            writeln!(f, "  [{:8.4}, {:8.4}, {:8.4}]", row[0], row[1], row[2])?;
         }
         Ok(())
     }
@@ -91,8 +93,13 @@ pub fn format_array3x3(arr: &Array3x3) -> String {
 pub fn format_matrix4x4(mat: &Matrix4x4) -> String {
     let mut s = String::from("Matrix4x4:\n");
     for i in 0..4 {
-        s.push_str(&format!("  [{:8.4}, {:8.4}, {:8.4}, {:8.4}]\n", 
-            mat[(i, 0)], mat[(i, 1)], mat[(i, 2)], mat[(i, 3)]));
+        s.push_str(&format!(
+            "  [{:8.4}, {:8.4}, {:8.4}, {:8.4}]\n",
+            mat[(i, 0)],
+            mat[(i, 1)],
+            mat[(i, 2)],
+            mat[(i, 3)]
+        ));
     }
     s
 }
@@ -101,17 +108,20 @@ pub fn format_matrix4x4(mat: &Matrix4x4) -> String {
 pub fn format_matrix3x3(mat: &Matrix3x3) -> String {
     let mut s = String::from("Matrix3x3:\n");
     for i in 0..3 {
-        s.push_str(&format!("  [{:8.4}, {:8.4}, {:8.4}]\n", 
-            mat[(i, 0)], mat[(i, 1)], mat[(i, 2)]));
+        s.push_str(&format!(
+            "  [{:8.4}, {:8.4}, {:8.4}]\n",
+            mat[(i, 0)],
+            mat[(i, 1)],
+            mat[(i, 2)]
+        ));
     }
     s
 }
-
 // ============================================================================
-// Conversion traits: Array -> Matrix
+// Conversion traits: Array -> Matrix / Vector and back
+// (kept to respect Rust orphan rules while providing ergonomic helpers)
 // ============================================================================
 
-/// Trait for converting array types to nalgebra matrix types
 pub trait ToMatrix {
     type Output;
     fn to_matrix(&self) -> Self::Output;
@@ -121,10 +131,9 @@ impl ToMatrix for Array4x4 {
     type Output = Matrix4x4;
     fn to_matrix(&self) -> Self::Output {
         na::Matrix4::from_row_slice(&[
-            self[0][0], self[0][1], self[0][2], self[0][3],
-            self[1][0], self[1][1], self[1][2], self[1][3],
-            self[2][0], self[2][1], self[2][2], self[2][3],
-            self[3][0], self[3][1], self[3][2], self[3][3],
+            self[0][0], self[0][1], self[0][2], self[0][3], self[1][0], self[1][1], self[1][2],
+            self[1][3], self[2][0], self[2][1], self[2][2], self[2][3], self[3][0], self[3][1],
+            self[3][2], self[3][3],
         ])
     }
 }
@@ -133,15 +142,12 @@ impl ToMatrix for Array3x3 {
     type Output = Matrix3x3;
     fn to_matrix(&self) -> Self::Output {
         na::Matrix3::from_row_slice(&[
-            self[0][0], self[0][1], self[0][2],
-            self[1][0], self[1][1], self[1][2],
-            self[2][0], self[2][1], self[2][2],
+            self[0][0], self[0][1], self[0][2], self[1][0], self[1][1], self[1][2], self[2][0],
+            self[2][1], self[2][2],
         ])
     }
 }
 
-
-/// Trait for converting array types to nalgebra vector types
 pub trait ToVector {
     type Output;
     fn to_vector(&self) -> Self::Output;
@@ -161,11 +167,6 @@ impl ToVector for Array2 {
     }
 }
 
-// ============================================================================
-// Conversion traits: Matrix -> Array
-// ============================================================================
-
-/// Trait for converting nalgebra matrix types to array types
 pub trait ToArray {
     type Output;
     fn to_array(&self) -> Self::Output;
@@ -194,7 +195,6 @@ impl ToArray for Matrix3x3 {
     }
 }
 
-/// Trait for converting nalgebra vector types to array types
 pub trait ToArrayVec {
     type Output;
     fn to_array(&self) -> Self::Output;
@@ -211,5 +211,51 @@ impl ToArrayVec for Vector2 {
     type Output = Array2;
     fn to_array(&self) -> Self::Output {
         [self[0], self[1]]
+    }
+}
+
+// ============================================================================
+// Camera Factory: Centralized camera model creation
+// ============================================================================
+
+/// Factory for creating camera models from configuration
+///
+/// This factory centralizes camera creation logic, eliminating duplication
+/// across dataset players and other camera initialization sites.
+pub struct CameraFactory;
+
+impl CameraFactory {
+    /// Create an OpenCV5 camera model from intrinsic parameters
+    ///
+    /// # Arguments
+    /// * `fx`, `fy` - Focal lengths
+    /// * `cx`, `cy` - Principal point coordinates
+    /// * `k1`, `k2`, `k3` - Radial distortion coefficients
+    /// * `p1`, `p2` - Tangential distortion coefficients
+    /// * `width` - Image width in pixels
+    /// * `height` - Image height in pixels
+    ///
+    /// # Returns
+    /// A CameraModelType::OpenCV5 camera model ready for use
+    #[allow(clippy::too_many_arguments)]
+    pub fn opencv5(
+        fx: Float,
+        fy: Float,
+        cx: Float,
+        cy: Float,
+        k1: Float,
+        k2: Float,
+        k3: Float,
+        p1: Float,
+        p2: Float,
+        width: u32,
+        height: u32,
+    ) -> crate::datasets::CameraModelType {
+        use camera_intrinsic_model::models::opencv5::OpenCVModel5;
+        use nalgebra034::DVector;
+
+        let params = DVector::from_vec(vec![fx, fy, cx, cy, k1, k2, k3, p1, p2]);
+
+        crate::datasets::CameraModelType::OpenCV5(OpenCVModel5::new(&params, width, height))
     }
 }

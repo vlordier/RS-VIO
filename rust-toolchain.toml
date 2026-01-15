@@ -1,0 +1,6 @@
+[toolchain]
+# Minimum Supported Rust Version: 1.75.0
+# This is the minimum version required for all compilation and testing
+# Earlier versions may compile but are not officially supported
+channel = "1.75"
+profile = "minimal"
