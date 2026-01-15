@@ -144,8 +144,8 @@ impl<'a> Estimator<'a> {
             velocity_estimator: VelocityEstimator::new(imu_config.clone()),
             extrinsic_calibrator: ExtrinsicCalibrator::new(T_B_Cl),
             keyframe_selector: ImuAidedKeyframeSelector::new(
-                config.keyframe_management.translation_threshold as f64,
-                config.keyframe_management.rotation_threshold as f64,
+                fl!(config.keyframe_management.translation_threshold),
+                fl!(config.keyframe_management.rotation_threshold),
             ),
             current_imu_preintegration: None,
             last_imu_timestamp: None,
@@ -413,14 +413,14 @@ impl<'a> Estimator<'a> {
                     let t_rel = T_rel.fixed_view::<3, 1>(0, 3).into_owned();
                     let R_rel = T_rel.fixed_view::<3, 3>(0, 0).into_owned();
                     let rotmat = na::Rotation3::from_matrix_unchecked(R_rel);
-                    let euler: (f64, f64, f64) = rotmat.euler_angles();
+                    let euler: (Float, Float, Float) = rotmat.euler_angles();
                     let rotation_norm = (euler.0.abs() + euler.1.abs() + euler.2.abs()).abs();
 
                     // Keyframe if either visual or IMU criteria met
                     let translation_threshold =
-                        self.config.keyframe_management.translation_threshold as f64;
+                        fl!(self.config.keyframe_management.translation_threshold);
                     let rotation_threshold =
-                        self.config.keyframe_management.rotation_threshold as f64;
+                        fl!(self.config.keyframe_management.rotation_threshold);
                     let visual_keyframe =
                         t_rel.norm() > translation_threshold || rotation_norm > rotation_threshold;
 
