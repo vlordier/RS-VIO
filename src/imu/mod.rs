@@ -43,6 +43,8 @@ pub use initialization::{
 };
 
 use crate::datasets::ImuData;
+use crate::types::Float;
+use crate::fl;
 use nalgebra as na;
 
 /// Configuration for IMU processing
@@ -520,16 +522,16 @@ impl ImuBiasEstimator {
 /// Online IMU-camera extrinsic calibration
 pub struct ExtrinsicCalibrator {
     /// Current estimate of T_BC (body to camera transform)
-    pub T_BC: na::Matrix4<f64>,
+    pub T_BC: na::Matrix4<Float>,
     /// Optimization state
-    accumulated_rotations: Vec<na::UnitQuaternion<f64>>,
-    accumulated_cam_poses: Vec<na::Matrix4<f64>>,
+    accumulated_rotations: Vec<na::UnitQuaternion<Float>>,
+    accumulated_cam_poses: Vec<na::Matrix4<Float>>,
     iterations: usize,
 }
 
 impl ExtrinsicCalibrator {
     /// Create new calibrator with initial guess
-    pub fn new(initial_T_BC: na::Matrix4<f64>) -> Self {
+    pub fn new(initial_T_BC: na::Matrix4<Float>) -> Self {
         Self {
             T_BC: initial_T_BC,
             accumulated_rotations: Vec::new(),
@@ -541,8 +543,8 @@ impl ExtrinsicCalibrator {
     /// Accumulate pose measurements for calibration
     pub fn add_measurement(
         &mut self,
-        camera_pose: &na::Matrix4<f64>,
-        rotation_quaternion: na::UnitQuaternion<f64>,
+        camera_pose: &na::Matrix4<Float>,
+        rotation_quaternion: na::UnitQuaternion<Float>,
     ) {
         self.accumulated_cam_poses.push(*camera_pose);
         self.accumulated_rotations.push(rotation_quaternion);
@@ -551,9 +553,9 @@ impl ExtrinsicCalibrator {
     /// Run one iteration of extrinsic calibration
     ///
     /// Minimizes: Σ || q(BC_i) ⊗ q(CB) - q(WC_i) ⊗ q(CW_{i-1}) ||²
-    pub fn calibrate_iteration(&mut self) -> f64 {
+    pub fn calibrate_iteration(&mut self) -> Float {
         if self.accumulated_rotations.len() < 10 {
-            return 0.0;
+            return fl!(0.0);
         }
 
         // Simple iterative refinement of rotation
@@ -563,17 +565,17 @@ impl ExtrinsicCalibrator {
             let dq = self.accumulated_rotations[i - 1].inverse() * self.accumulated_rotations[i];
 
             // Extract rotation axis-angle
-            let angle = 2.0 * dq.i.atan2(dq.w);
-            let axis = na::Vector3::new(dq.i, dq.j, dq.k) / (dq.w + 1e-10).sqrt();
+            let angle = fl!(2.0) * dq.i.atan2(dq.w);
+            let axis = na::Vector3::new(dq.i, dq.j, dq.k) / (dq.w + fl!(1e-10)).sqrt();
             if angle.is_finite() {
                 total_correction += axis * angle;
             }
         }
 
-        let avg_correction = total_correction / (self.accumulated_rotations.len() as f64 - 1.0);
+        let avg_correction = total_correction / fl!(self.accumulated_rotations.len() as f64 - 1.0);
 
         // Apply small correction
-        let correction_rot = na::UnitQuaternion::new(avg_correction * 0.1);
+        let correction_rot = na::UnitQuaternion::new(avg_correction * fl!(0.1));
         let rotmat =
             na::Rotation3::from_matrix_unchecked(self.T_BC.fixed_view::<3, 3>(0, 0).into_owned());
         let current_rot = na::UnitQuaternion::from_rotation_matrix(&rotmat);
@@ -591,7 +593,7 @@ impl ExtrinsicCalibrator {
     }
 
     /// Get current extrinsic calibration
-    pub fn get_extrinsics(&self) -> na::Matrix4<f64> {
+    pub fn get_extrinsics(&self) -> na::Matrix4<Float> {
         self.T_BC
     }
 
@@ -618,24 +620,24 @@ impl ExtrinsicCalibrator {
 #[derive(Debug, Clone)]
 pub struct ImuAidedKeyframeSelector {
     /// Translation threshold for keyframe [m]
-    translation_threshold: f64,
+    translation_threshold: Float,
     /// Rotation threshold for keyframe [rad]
-    rotation_threshold: f64,
+    rotation_threshold: Float,
     /// Last keyframe timestamp
     last_keyframe_timestamp: Option<i64>,
     /// Last keyframe pose (T_W_B)
-    last_keyframe_pose: Option<na::Matrix4<f64>>,
+    last_keyframe_pose: Option<na::Matrix4<Float>>,
     /// IMU delta rotation from last keyframe
-    imu_delta_rotation: na::UnitQuaternion<f64>,
+    imu_delta_rotation: na::UnitQuaternion<Float>,
     /// IMU delta translation from last keyframe
-    imu_delta_translation: na::Vector3<f64>,
+    imu_delta_translation: na::Vector3<Float>,
     /// IMU delta time from last keyframe
-    imu_delta_time: f64,
+    imu_delta_time: Float,
 }
 
 impl ImuAidedKeyframeSelector {
     /// Create new selector with thresholds
-    pub fn new(translation_threshold: f64, rotation_threshold: f64) -> Self {
+    pub fn new(translation_threshold: Float, rotation_threshold: Float) -> Self {
         Self {
             translation_threshold,
             rotation_threshold,
@@ -643,7 +645,7 @@ impl ImuAidedKeyframeSelector {
             last_keyframe_pose: None,
             imu_delta_rotation: na::UnitQuaternion::identity(),
             imu_delta_translation: na::Vector3::zeros(),
-            imu_delta_time: 0.0,
+            imu_delta_time: fl!(0.0),
         }
     }
 
@@ -653,21 +655,21 @@ impl ImuAidedKeyframeSelector {
         self.last_keyframe_pose = None;
         self.imu_delta_rotation = na::UnitQuaternion::identity();
         self.imu_delta_translation = na::Vector3::zeros();
-        self.imu_delta_time = 0.0;
+        self.imu_delta_time = fl!(0.0);
     }
 
     /// Update with new IMU measurement
     pub fn update_imu(&mut self, imu: &ImuData) {
-        let gyro = na::Vector3::new(imu.gyro[0], imu.gyro[1], imu.gyro[2]);
-        let accel = na::Vector3::new(imu.accel[0], imu.accel[1], imu.accel[2]);
+        let gyro = na::Vector3::new(fl!(imu.gyro[0]), fl!(imu.gyro[1]), fl!(imu.gyro[2]));
+        let accel = na::Vector3::new(fl!(imu.accel[0]), fl!(imu.accel[1]), fl!(imu.accel[2]));
 
         // Integrate rotation
-        let delta_rot = na::UnitQuaternion::new(gyro * 0.01); // Approximate dt
+        let delta_rot = na::UnitQuaternion::new(gyro * fl!(0.01)); // Approximate dt
         self.imu_delta_rotation = delta_rot * self.imu_delta_rotation;
 
         // Integrate translation (simplified - assumes small motion)
-        self.imu_delta_translation += accel * 0.01 * 0.01 * 0.5;
-        self.imu_delta_time += 0.01;
+        self.imu_delta_translation += accel * fl!(0.01) * fl!(0.01) * fl!(0.5);
+        self.imu_delta_time += fl!(0.01);
     }
 
     /// Accumulate IMU measurements between frames
@@ -681,17 +683,17 @@ impl ImuAidedKeyframeSelector {
         let mut integrated_trans = na::Vector3::zeros();
 
         for imu in imu_measurements {
-            let dt = (imu.timestamp - last_ts) as f64 / 1e9;
-            if dt > 0.0 {
-                let gyro = na::Vector3::new(imu.gyro[0], imu.gyro[1], imu.gyro[2]);
-                let accel = na::Vector3::new(imu.accel[0], imu.accel[1], imu.accel[2]);
+            let dt = fl!((imu.timestamp - last_ts) as f64 / 1e9);
+            if dt > fl!(0.0) {
+                let gyro = na::Vector3::new(fl!(imu.gyro[0]), fl!(imu.gyro[1]), fl!(imu.gyro[2]));
+                let accel = na::Vector3::new(fl!(imu.accel[0]), fl!(imu.accel[1]), fl!(imu.accel[2]));
 
                 // Rotation integration
                 let delta_rot = na::UnitQuaternion::new(gyro * dt);
                 integrated_rot = delta_rot * integrated_rot;
 
                 // Translation integration (assuming constant velocity model)
-                integrated_trans += accel * dt * dt * 0.5;
+                integrated_trans += accel * dt * dt * fl!(0.5);
 
                 self.imu_delta_time += dt;
             }
@@ -713,9 +715,9 @@ impl ImuAidedKeyframeSelector {
     /// (should_be_keyframe, motion_info)
     pub fn should_be_keyframe(
         &mut self,
-        current_pose: &na::Matrix4<f64>,
+        current_pose: &na::Matrix4<Float>,
         current_timestamp: i64,
-        imu_rotation_deviation: f64,
+        imu_rotation_deviation: Float,
     ) -> (bool, String) {
         let mut is_keyframe = false;
         let mut reason = String::new();
@@ -730,7 +732,7 @@ impl ImuAidedKeyframeSelector {
             let t_rel = T_rel.fixed_view::<3, 1>(0, 3).into_owned();
             let r_rel = T_rel.fixed_view::<3, 3>(0, 0);
             let rotmat = na::Rotation3::from_matrix_unchecked(r_rel.into_owned());
-            let euler: (f64, f64, f64) = rotmat.euler_angles();
+            let euler: (Float, Float, Float) = rotmat.euler_angles();
 
             let translation_norm = t_rel.norm();
             let rotation_norm = (euler.0.abs() + euler.1.abs() + euler.2.abs()).abs();
@@ -744,11 +746,11 @@ impl ImuAidedKeyframeSelector {
             let imu_rotation_angle = self.imu_delta_rotation.angle();
 
             // If visual motion is small but IMU shows significant motion, trigger keyframe
-            let imu_motion_trigger = imu_translation_norm > self.translation_threshold * 0.5
-                || imu_rotation_angle.abs() > self.rotation_threshold * 0.5;
+            let imu_motion_trigger = imu_translation_norm > self.translation_threshold * fl!(0.5)
+                || imu_rotation_angle.abs() > self.rotation_threshold * fl!(0.5);
 
             // If IMU and visual disagree significantly,可能有跟踪问题
-            let imu_visual_disagree = imu_rotation_deviation > self.rotation_threshold * 2.0;
+            let imu_visual_disagree = imu_rotation_deviation > self.rotation_threshold * fl!(2.0);
 
             if visual_trigger || imu_motion_trigger || imu_visual_disagree {
                 is_keyframe = true;
@@ -779,7 +781,7 @@ impl ImuAidedKeyframeSelector {
             self.last_keyframe_pose = Some(*current_pose);
             self.imu_delta_rotation = na::UnitQuaternion::identity();
             self.imu_delta_translation = na::Vector3::zeros();
-            self.imu_delta_time = 0.0;
+            self.imu_delta_time = fl!(0.0);
         }
 
         (is_keyframe, reason)
