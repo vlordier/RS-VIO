@@ -94,11 +94,13 @@
 
 #![allow(clippy::module_inception)]
 
+pub mod constant_velocity_model;
 pub mod estimator;
 pub mod frame;
 pub mod sliding_window;
 pub mod state;
 
+pub use constant_velocity_model::{ConstantVelocityConfig, ConstantVelocityModel};
 pub use estimator::Estimator;
 pub use frame::Frame;
 pub use sliding_window::SlidingWindow;

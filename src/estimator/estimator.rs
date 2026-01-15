@@ -1,6 +1,7 @@
 use crate::datasets::config::Config;
 use crate::datasets::CameraModelType;
 use crate::datasets::ImuData;
+use crate::estimator::constant_velocity_model::{ConstantVelocityConfig, ConstantVelocityModel};
 use crate::estimator::Frame;
 use crate::estimator::SlidingWindow;
 use crate::feature_tracker::StereoPatchTracker;
@@ -72,6 +73,9 @@ pub struct Estimator {
     bias_estimator: ImuBiasEstimator,
     // Whether system is in initialization phase (collecting IMU for bias estimation)
     is_initializing: bool,
+    // Constant velocity motion model (fallback when IMU unavailable)
+    #[allow(dead_code)]
+    cv_motion_model: ConstantVelocityModel,
 }
 
 impl Estimator {
@@ -139,6 +143,7 @@ impl Estimator {
             velocity_estimator_initialized: false,
             bias_estimator: ImuBiasEstimator::new(imu_config.clone()),
             is_initializing: true,
+            cv_motion_model: ConstantVelocityModel::new(ConstantVelocityConfig::default()),
         }
     }
 
