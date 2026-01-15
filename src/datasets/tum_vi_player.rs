@@ -1,10 +1,10 @@
 use crate::datasets::{
-    config::Config, player_trait::DatasetPlayer, FrameContext, ImageData, ImuData, PlayerConfig,
-    PlayerResult,
+    config::Config,
+    player_trait::{self, DatasetPlayer},
+    FrameContext, ImageData, ImuData, PlayerConfig, PlayerResult,
 };
 use crate::estimator::Estimator;
 use crate::{Result, VIOError};
-use image::ImageReader;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
@@ -25,88 +25,15 @@ impl TUMVIPlayer {
 
 impl DatasetPlayer for TUMVIPlayer {
     fn run(&self, config: PlayerConfig) -> crate::Result<PlayerResult> {
-        crate::datasets::player_trait::execute(self, config, "TUMVIPlayer")
+        player_trait::execute(self, config, "TUMVIPlayer")
     }
 
     fn load_image_timestamps(&self, dataset_path: &str) -> Result<Vec<ImageData>> {
-        let data_file = Path::new(dataset_path).join("mav0/cam0/data.csv");
-        let file = File::open(&data_file).map_err(|e| {
-            VIOError::Config(format!(
-                "Cannot open data.csv file {}: {e}",
-                data_file.display()
-            ))
-        })?;
-
-        let reader = BufReader::new(file);
-        let mut image_data = Vec::new();
-
-        for (line_num, line) in reader.lines().enumerate() {
-            let line = line.map_err(|e| {
-                VIOError::Config(format!(
-                    "Failed to read data.csv line {} ({}): {e}",
-                    line_num,
-                    data_file.display()
-                ))
-            })?;
-
-            // Skip header and empty lines
-            if line_num == 0 || line.trim().is_empty() || line.trim_start().starts_with('#') {
-                continue;
-            }
-
-            let parts: Vec<&str> = line.split(',').collect();
-            if parts.len() >= 2 {
-                let timestamp_str = parts[0].trim();
-                let filename = parts[1].trim().to_string();
-
-                if let Ok(timestamp) = timestamp_str.parse::<i64>() {
-                    image_data.push(ImageData {
-                        timestamp,
-                        filename,
-                    });
-                }
-            }
-        }
-
-        log::info!("[TUMVIPlayer] Loaded {} image timestamps", image_data.len());
-        Ok(image_data)
+        player_trait::load_timestamps_from_csv(dataset_path, "TUMVIPlayer")
     }
 
     fn load_image(&self, dataset_path: &str, filename: &str, cam_id: u32) -> Result<Vec<u8>> {
-        let cam_folder = if cam_id == 0 { "cam0" } else { "cam1" };
-        let full_path = Path::new(dataset_path)
-            .join("mav0")
-            .join(cam_folder)
-            .join("data")
-            .join(filename);
-
-        if !full_path.exists() {
-            return Err(VIOError::Image(format!(
-                "Cannot load image: {}",
-                full_path.display()
-            )));
-        }
-
-        // Load image using image crate
-        let img = ImageReader::open(&full_path)
-            .map_err(|e| {
-                VIOError::Image(format!("Failed to open image {}: {e}", full_path.display()))
-            })?
-            .decode()
-            .map_err(|e| {
-                VIOError::Image(format!(
-                    "Failed to decode image {}: {e}",
-                    full_path.display()
-                ))
-            })?;
-
-        // Convert to grayscale if needed
-        let gray_img = img.to_luma8();
-
-        // Return raw pixel data as Vec<u8>
-        let pixel_data = gray_img.as_raw().to_vec();
-
-        Ok(pixel_data)
+        player_trait::load_image_from_mav0(dataset_path, filename, cam_id)
     }
 
     fn load_imu_data(

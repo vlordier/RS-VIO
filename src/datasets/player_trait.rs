@@ -453,3 +453,110 @@ pub fn save_statistics_common(result: &PlayerResult, stats_path: &Path) {
         .ok();
     }
 }
+
+/// Load image timestamps from a standard data.csv file
+///
+/// Common implementation for datasets that use the mav0/cam0/data.csv format
+/// (EuRoC, TUM-VI, 4Seasons all use this structure).
+///
+/// # Arguments
+/// * `dataset_path` - Path to the dataset root directory
+/// * `player_name` - Name of the player (for logging)
+///
+/// # Returns
+/// Vector of `ImageData` containing timestamps and filenames
+pub fn load_timestamps_from_csv(dataset_path: &str, player_name: &str) -> Result<Vec<ImageData>> {
+    use std::fs::File;
+    use std::io::{BufRead, BufReader};
+
+    let data_file = Path::new(dataset_path).join("mav0/cam0/data.csv");
+    let file = File::open(&data_file).map_err(|e| {
+        VIOError::Config(format!(
+            "Cannot open data.csv file {}: {e}",
+            data_file.display()
+        ))
+    })?;
+
+    let reader = BufReader::new(file);
+    let mut image_data = Vec::new();
+
+    for (line_num, line) in reader.lines().enumerate() {
+        let line = line.map_err(|e| {
+            VIOError::Config(format!(
+                "Failed to read data.csv line {} ({}): {e}",
+                line_num,
+                data_file.display()
+            ))
+        })?;
+
+        // Skip header and empty lines
+        if line_num == 0 || line.trim().is_empty() || line.trim_start().starts_with('#') {
+            continue;
+        }
+
+        let parts: Vec<&str> = line.split(',').collect();
+        if parts.len() >= 2 {
+            let timestamp_str = parts[0].trim();
+            let filename = parts[1].trim().to_string();
+
+            if let Ok(timestamp) = timestamp_str.parse::<i64>() {
+                image_data.push(ImageData {
+                    timestamp,
+                    filename,
+                });
+            }
+        }
+    }
+
+    log::info!(
+        "[{}] Loaded {} image timestamps",
+        player_name,
+        image_data.len()
+    );
+    Ok(image_data)
+}
+
+/// Load a single image from the standard mav0 directory structure
+///
+/// Common implementation for datasets that use mav0/cam0/data/ and mav0/cam1/data/
+/// directory layout (EuRoC, TUM-VI, 4Seasons all use this structure).
+///
+/// # Arguments
+/// * `dataset_path` - Path to the dataset root directory
+/// * `filename` - Relative filename from data.csv
+/// * `cam_id` - Camera ID (0 for left, 1 for right)
+///
+/// # Returns
+/// Raw grayscale pixel data as Vec<u8>
+pub fn load_image_from_mav0(dataset_path: &str, filename: &str, cam_id: u32) -> Result<Vec<u8>> {
+    use image::ImageReader;
+
+    let cam_folder = if cam_id == 0 { "cam0" } else { "cam1" };
+    let full_path = Path::new(dataset_path)
+        .join("mav0")
+        .join(cam_folder)
+        .join("data")
+        .join(filename);
+
+    if !full_path.exists() {
+        return Err(VIOError::Image(format!(
+            "Cannot load image: {}",
+            full_path.display()
+        )));
+    }
+
+    // Load image using image crate
+    let img = ImageReader::open(&full_path)
+        .map_err(|e| VIOError::Image(format!("Failed to open image {}: {e}", full_path.display())))?
+        .decode()
+        .map_err(|e| {
+            VIOError::Image(format!(
+                "Failed to decode image {}: {e}",
+                full_path.display()
+            ))
+        })?;
+
+    // Convert to grayscale if needed
+    let gray_img = img.to_luma8();
+    Ok(gray_img.into_raw())
+}

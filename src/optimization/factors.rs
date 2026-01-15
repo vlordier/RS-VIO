@@ -3,6 +3,9 @@ use apex_solver::manifold::se3;
 use na::{DMatrix, DVector, Matrix3, Matrix4, Matrix6, Vector2, Vector3};
 use nalgebra as na;
 
+// Import shared projection utilities to eliminate duplication
+use super::projection;
+
 /// Pinhole projection factor for optimizing 3D point positions from camera observations.
 ///
 /// This factor computes the reprojection error for a 3D point observed in a camera.
@@ -42,36 +45,6 @@ impl PinholeProjectionFactor {
     pub fn new(observation: Vector2<f64>, T_C_W: Matrix4<f64>) -> Self {
         Self { observation, T_C_W }
     }
-
-    /// Project a 3D point in camera frame to normalized coordinates (simple pinhole: x/z, y/z).
-    fn project_normalized(&self, point_3d_cam: Vector3<f64>) -> Vector2<f64> {
-        let x = point_3d_cam[0] / point_3d_cam[2];
-        let y = point_3d_cam[1] / point_3d_cam[2];
-        Vector2::new(x, y)
-    }
-
-    /// Compute Jacobian of normalized projection w.r.t. 3D point in camera frame.
-    /// For pinhole: [x/z, y/z], so ∂[x/z, y/z]/∂[x, y, z]
-    fn jacobian_proj_wrt_point(&self, point_3d_cam: Vector3<f64>) -> na::Matrix2x3<f64> {
-        let x = point_3d_cam[0];
-        let y = point_3d_cam[1];
-        let z = point_3d_cam[2];
-
-        // ∂(x/z)/∂x = 1/z, ∂(x/z)/∂y = 0, ∂(x/z)/∂z = -x/z²
-        // ∂(y/z)/∂x = 0, ∂(y/z)/∂y = 1/z, ∂(y/z)/∂z = -y/z²
-        let inv_z = 1.0 / z;
-        let inv_z_sq = inv_z * inv_z;
-
-        let mut jac = na::Matrix2x3::zeros();
-        jac[(0, 0)] = inv_z; // ∂(x/z)/∂x
-        jac[(0, 1)] = 0.0; // ∂(x/z)/∂y
-        jac[(0, 2)] = -x * inv_z_sq; // ∂(x/z)/∂z
-        jac[(1, 0)] = 0.0; // ∂(y/z)/∂x
-        jac[(1, 1)] = inv_z; // ∂(y/z)/∂y
-        jac[(1, 2)] = -y * inv_z_sq; // ∂(y/z)/∂z
-
-        jac
-    }
 }
 
 impl Factor for PinholeProjectionFactor {
@@ -96,8 +69,8 @@ impl Factor for PinholeProjectionFactor {
         //println!("t_C_W: {:?}", t_C_W.to_owned().to_string());
         let point_camera = R_C_W * point_world + t_C_W;
 
-        // Project to normalized coordinates (simple pinhole: x/z, y/z)
-        let proj = self.project_normalized(point_camera);
+        // Project to normalized coordinates using shared projection utility
+        let proj = projection::project_normalized(point_camera);
 
         // Compute residuals (2D: u, v)
         let mut residuals = DVector::zeros(2);
@@ -105,7 +78,8 @@ impl Factor for PinholeProjectionFactor {
         residuals[1] = proj[1] - self.observation[1];
 
         let jacobian_matrix = if compute_jacobian {
-            let jac_proj_wrt_point_cam = self.jacobian_proj_wrt_point(point_camera);
+            // Use shared jacobian utility
+            let jac_proj_wrt_point_cam = projection::jacobian_proj_wrt_point(point_camera);
             // Chain rule: ∂r/∂point_world = ∂proj/∂point_cam * R_world_to_camera
             let jac_wrt_point = jac_proj_wrt_point_cam * R_C_W;
 
@@ -157,36 +131,6 @@ impl BundleAdjustmentFactorTranslationOnly {
         self.fixed_position = Some(position);
         self
     }
-
-    /// Project a 3D point in camera frame to normalized coordinates (simple pinhole: x/z, y/z).
-    fn project_normalized(&self, point_3d_cam: Vector3<f64>) -> Vector2<f64> {
-        let x = point_3d_cam[0] / point_3d_cam[2];
-        let y = point_3d_cam[1] / point_3d_cam[2];
-        Vector2::new(x, y)
-    }
-
-    /// Compute Jacobian of normalized projection w.r.t. 3D point in camera frame.
-    /// For pinhole: [x/z, y/z], so ∂[x/z, y/z]/∂[x, y, z]
-    fn jacobian_r_wrt_p_C(&self, point_3d_cam: Vector3<f64>) -> na::Matrix2x3<f64> {
-        let x = point_3d_cam[0];
-        let y = point_3d_cam[1];
-        let z = point_3d_cam[2];
-
-        // ∂(x/z)/∂x = 1/z, ∂(x/z)/∂y = 0, ∂(x/z)/∂z = -x/z²
-        // ∂(y/z)/∂x = 0, ∂(y/z)/∂y = 1/z, ∂(y/z)/∂z = -y/z²
-        let inv_z = 1.0 / z;
-        let inv_z_sq = inv_z * inv_z;
-
-        let mut jac = na::Matrix2x3::zeros();
-        jac[(0, 0)] = inv_z; // ∂(x/z)/∂x
-        jac[(0, 1)] = 0.0; // ∂(x/z)/∂y
-        jac[(0, 2)] = -x * inv_z_sq; // ∂(x/z)/∂z
-        jac[(1, 0)] = 0.0; // ∂(y/z)/∂x
-        jac[(1, 1)] = inv_z; // ∂(y/z)/∂y
-        jac[(1, 2)] = -y * inv_z_sq; // ∂(y/z)/∂z
-
-        jac
-    }
 }
 
 impl Factor for BundleAdjustmentFactorTranslationOnly {
@@ -231,8 +175,8 @@ impl Factor for BundleAdjustmentFactorTranslationOnly {
         //println!("t_C_W: {:?}", t_C_W.to_owned().to_string());
         let p_C = R_C_B * (p_W + t_B_W) + t_C_B;
 
-        // Project to normalized coordinates (simple pinhole: x/z, y/z)
-        let proj = self.project_normalized(p_C);
+        // Project to normalized coordinates using shared projection utility
+        let proj = projection::project_normalized(p_C);
 
         // Compute residuals (2D: u, v)
         let mut residuals = DVector::zeros(2);
@@ -240,7 +184,7 @@ impl Factor for BundleAdjustmentFactorTranslationOnly {
         residuals[1] = proj[1] - self.observation[1];
 
         let jacobian_matrix = if compute_jacobian {
-            let jac_r_wrt_p_C = self.jacobian_r_wrt_p_C(p_C); // 2x3
+            let jac_r_wrt_p_C = projection::jacobian_proj_wrt_point(p_C); // 2x3
             let jac_r_wrt_p_W = jac_r_wrt_p_C * R_C_B; // 2x3
 
             if self.fixed_position.is_some() {
@@ -297,36 +241,6 @@ impl BundleAdjustmentFactor {
     pub fn with_fixed_pose(mut self, T_B_W: Matrix4<f64>) -> Self {
         self.fixed_pose = Some(T_B_W);
         self
-    }
-
-    /// Project a 3D point in camera frame to normalized coordinates (simple pinhole: x/z, y/z).
-    fn project_normalized(&self, point_3d_cam: Vector3<f64>) -> Vector2<f64> {
-        let x = point_3d_cam[0] / point_3d_cam[2];
-        let y = point_3d_cam[1] / point_3d_cam[2];
-        Vector2::new(x, y)
-    }
-
-    /// Compute Jacobian of normalized projection w.r.t. 3D point in camera frame.
-    /// For pinhole: [x/z, y/z], so ∂[x/z, y/z]/∂[x, y, z]
-    fn jacobian_r_wrt_p_C(&self, point_3d_cam: Vector3<f64>) -> na::Matrix2x3<f64> {
-        let x = point_3d_cam[0];
-        let y = point_3d_cam[1];
-        let z = point_3d_cam[2];
-
-        // ∂(x/z)/∂x = 1/z, ∂(x/z)/∂y = 0, ∂(x/z)/∂z = -x/z²
-        // ∂(y/z)/∂x = 0, ∂(y/z)/∂y = 1/z, ∂(y/z)/∂z = -y/z²
-        let inv_z = 1.0 / z;
-        let inv_z_sq = inv_z * inv_z;
-
-        let mut jac = na::Matrix2x3::zeros();
-        jac[(0, 0)] = inv_z; // ∂(x/z)/∂x
-        jac[(0, 1)] = 0.0; // ∂(x/z)/∂y
-        jac[(0, 2)] = -x * inv_z_sq; // ∂(x/z)/∂z
-        jac[(1, 0)] = 0.0; // ∂(y/z)/∂x
-        jac[(1, 1)] = inv_z; // ∂(y/z)/∂y
-        jac[(1, 2)] = -y * inv_z_sq; // ∂(y/z)/∂z
-
-        jac
     }
 }
 
@@ -393,15 +307,15 @@ impl Factor for BundleAdjustmentFactor {
             }
         }
 
-        // Project and compute residuals
-        let proj = self.project_normalized(p_C);
+        // Project and compute residuals using shared projection utility
+        let proj = projection::project_normalized(p_C);
         let residuals = DVector::from_vec(vec![
             proj[0] - self.observation[0],
             proj[1] - self.observation[1],
         ]);
 
         let jacobian_matrix = if compute_jacobian {
-            let jac_proj = self.jacobian_r_wrt_p_C(p_C); // 2x3
+            let jac_proj = projection::jacobian_proj_wrt_point(p_C); // 2x3
 
             // Pre-compute: jac_proj * R_C_B (reused for both translation and rotation jacobians)
             let jac_proj_R_C_B = jac_proj * R_C_B; // 2x3
@@ -462,36 +376,6 @@ impl PnPFactor {
             p_W,
         }
     }
-
-    /// Project a 3D point in camera frame to normalized coordinates (simple pinhole: x/z, y/z).
-    fn project_normalized(&self, p_C: Vector3<f64>) -> Vector2<f64> {
-        let x = p_C[0] / p_C[2];
-        let y = p_C[1] / p_C[2];
-        Vector2::new(x, y)
-    }
-
-    /// Compute Jacobian of normalized projection w.r.t. 3D point in camera frame.
-    /// For pinhole: [x/z, y/z], so ∂[x/z, y/z]/∂[x, y, z]
-    fn jacobian_r_wrt_p_C(&self, p_C: Vector3<f64>) -> na::Matrix2x3<f64> {
-        let x = p_C[0];
-        let y = p_C[1];
-        let z = p_C[2];
-
-        // ∂(x/z)/∂x = 1/z, ∂(x/z)/∂y = 0, ∂(x/z)/∂z = -x/z²
-        // ∂(y/z)/∂x = 0, ∂(y/z)/∂y = 1/z, ∂(y/z)/∂z = -y/z²
-        let inv_z = 1.0 / z;
-        let inv_z_sq = inv_z * inv_z;
-
-        let mut jac = na::Matrix2x3::zeros();
-        jac[(0, 0)] = inv_z; // ∂(x/z)/∂x
-        jac[(0, 1)] = 0.0; // ∂(x/z)/∂y
-        jac[(0, 2)] = -x * inv_z_sq; // ∂(x/z)/∂z
-        jac[(1, 0)] = 0.0; // ∂(y/z)/∂x
-        jac[(1, 1)] = inv_z; // ∂(y/z)/∂y
-        jac[(1, 2)] = -y * inv_z_sq; // ∂(y/z)/∂z
-
-        jac
-    }
 }
 
 impl Factor for PnPFactor {
@@ -519,15 +403,15 @@ impl Factor for PnPFactor {
         let p_B = R_B_W * self.p_W + t_B_W;
         let p_C = R_C_B * p_B + t_C_B;
 
-        // Project and compute residuals
-        let proj = self.project_normalized(p_C);
+        // Project and compute residuals using shared projection utility
+        let proj = projection::project_normalized(p_C);
         let residuals = DVector::from_vec(vec![
             proj[0] - self.observation[0],
             proj[1] - self.observation[1],
         ]);
 
         let jacobian_matrix = if compute_jacobian {
-            let jac_proj = self.jacobian_r_wrt_p_C(p_C); // 2x3
+            let jac_proj = projection::jacobian_proj_wrt_point(p_C); // 2x3
 
             // Pre-compute: jac_proj * R_C_B (reused for both translation and rotation jacobians)
             let jac_proj_R_C_B = jac_proj * R_C_B; // 2x3
