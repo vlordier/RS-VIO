@@ -135,8 +135,10 @@ pub struct LoopClosureCandidate {
     pub similarity_score: f64,
     /// Estimated relative pose
     pub relative_pose: na::Isometry3<f64>,
-    /// Number of inlier matches
+    /// Number of inlier matches (descriptor-level proxy)
     pub inlier_count: usize,
+    /// Inlier ratio based on overlapping features (0-1)
+    pub inlier_ratio: f64,
 }
 
 /// Loop closure constraint for optimization
@@ -157,8 +159,6 @@ pub struct KeyframeDatabase {
     config: LoopClosureConfig,
     /// Keyframes indexed by ID
     keyframes: BTreeMap<u64, KeyframeDescriptor>,
-    /// Next keyframe ID
-    next_id: u64,
 }
 
 impl KeyframeDatabase {
@@ -167,15 +167,12 @@ impl KeyframeDatabase {
         Self {
             config,
             keyframes: BTreeMap::new(),
-            next_id: 0,
         }
     }
 
     /// Add keyframe to database
     pub fn add_keyframe(&mut self, descriptor: KeyframeDescriptor) {
-        let id = self.next_id;
-        self.next_id += 1;
-
+        let id = descriptor.keyframe_id;
         self.keyframes.insert(id, descriptor);
 
         // Prune old keyframes if database is too large
@@ -199,11 +196,7 @@ impl KeyframeDatabase {
 
             // Only keep candidates above threshold
             if similarity >= self.config.descriptor_distance_threshold {
-                candidates.push((
-                    *id,
-                    similarity,
-                    keyframe.clone(),
-                ));
+                candidates.push((*id, similarity, keyframe.clone()));
             }
         }
 
@@ -218,11 +211,16 @@ impl KeyframeDatabase {
                 // Simple relative pose estimation (in practice use epipolar geometry)
                 let relative_pose = query.pose.inverse() * keyframe.pose;
 
+                let overlapping_features = query.num_features.min(keyframe.num_features).max(1);
+                let estimated_inliers = (similarity * overlapping_features as f64) as usize;
+                let inlier_ratio = estimated_inliers as f64 / overlapping_features as f64;
+
                 LoopClosureCandidate {
                     candidate_id: id,
                     similarity_score: similarity,
                     relative_pose,
-                    inlier_count: (similarity * query.num_features as f64) as usize,
+                    inlier_count: estimated_inliers,
+                    inlier_ratio,
                 }
             })
             .collect()
@@ -236,7 +234,6 @@ impl KeyframeDatabase {
     /// Clear database
     pub fn clear(&mut self) {
         self.keyframes.clear();
-        self.next_id = 0;
     }
 
     /// Get keyframe by ID
@@ -250,6 +247,7 @@ pub struct LoopClosureDetector {
     config: LoopClosureConfig,
     database: KeyframeDatabase,
     last_detection_keyframe_id: Option<u64>,
+    last_detection_timestamp: Option<i64>,
 }
 
 impl LoopClosureDetector {
@@ -260,6 +258,7 @@ impl LoopClosureDetector {
             config,
             database: KeyframeDatabase::new(config_clone),
             last_detection_keyframe_id: None,
+            last_detection_timestamp: None,
         }
     }
 
@@ -278,6 +277,18 @@ impl LoopClosureDetector {
             }
         }
 
+        if let Some(last_ts) = self.last_detection_timestamp {
+            if descriptor.timestamp > last_ts {
+                // Treat min_frame_gap as frames; approximate time using 33.3ms/frame (30 FPS default) for temporal gating.
+                let min_gap_time = (self.config.min_frame_gap as i64) * 33_333;
+                let frame_gap_estimate = descriptor.timestamp - last_ts;
+                if frame_gap_estimate < min_gap_time {
+                    self.database.add_keyframe(descriptor);
+                    return Ok(Vec::new());
+                }
+            }
+        }
+
         // Search for candidates
         let candidates = self.database.search_candidates(&descriptor);
 
@@ -285,7 +296,11 @@ impl LoopClosureDetector {
 
         // Verify each candidate
         for candidate in candidates {
-            if candidate.inlier_count >= self.config.min_inliers {
+            let passes_match_count = candidate.inlier_count >= self.config.min_matches_for_candidate;
+            let passes_ratio = candidate.inlier_ratio >= self.config.inlier_ratio_threshold;
+            let passes_min_inliers = candidate.inlier_count >= self.config.min_inliers;
+
+            if passes_match_count && passes_ratio && passes_min_inliers {
                 // Valid loop closure
                 let constraint = LoopClosureConstraint {
                     keyframe_id_1: keyframe_id,
@@ -299,8 +314,10 @@ impl LoopClosureDetector {
         }
 
         // Add keyframe to database
+        let timestamp = descriptor.timestamp;
         self.database.add_keyframe(descriptor);
         self.last_detection_keyframe_id = Some(keyframe_id);
+        self.last_detection_timestamp = Some(self.last_detection_timestamp.unwrap_or(0).max(timestamp));
 
         Ok(valid_closures)
     }
@@ -321,6 +338,7 @@ impl LoopClosureDetector {
     pub fn reset(&mut self) {
         self.database.clear();
         self.last_detection_keyframe_id = None;
+        self.last_detection_timestamp = None;
     }
 }
 
@@ -422,6 +440,85 @@ mod tests {
 
         // Should detect loop closure with frame 0
         assert!(closures.len() >= 1);
+    }
+
+    #[test]
+    fn test_min_matches_and_ratio_enforced() {
+        let config = LoopClosureConfig {
+            min_frame_gap: 0,
+            min_inliers: 50,
+            min_matches_for_candidate: 50,
+            inlier_ratio_threshold: 0.8,
+            descriptor_distance_threshold: 0.6,
+            ..Default::default()
+        };
+        let mut detector = LoopClosureDetector::new(config);
+
+        // Insert a baseline keyframe with limited features
+        let base = KeyframeDescriptor {
+            num_features: 20,
+            ..create_test_descriptor(0, 0.0)
+        };
+        let _ = detector.detect_loop_closure(0, base);
+
+        // Query is similar but with same feature count; estimated matches remain < thresholds
+        let query = KeyframeDescriptor {
+            num_features: 20,
+            ..create_test_descriptor(1, 0.0)
+        };
+        let closures = detector.detect_loop_closure(1, query).unwrap();
+
+        // Should be filtered out by min_matches/min_inliers/ratio
+        assert!(closures.is_empty());
+    }
+
+    #[test]
+    fn test_preserves_external_keyframe_ids() {
+        let config = LoopClosureConfig {
+            min_frame_gap: 0,
+            descriptor_distance_threshold: 0.5,
+            ..Default::default()
+        };
+        let mut db = KeyframeDatabase::new(config);
+
+        let mut desc = create_test_descriptor(42, 0.0);
+        desc.num_features = 50;
+        db.add_keyframe(desc.clone());
+
+        let query = KeyframeDescriptor {
+            num_features: 50,
+            ..create_test_descriptor(100, 0.0)
+        };
+
+        let candidates = db.search_candidates(&query);
+        assert!(!candidates.is_empty());
+        assert_eq!(candidates[0].candidate_id, 42);
+    }
+
+    #[test]
+    fn test_frame_gap_time_blocks_detection() {
+        let config = LoopClosureConfig {
+            min_frame_gap: 5,
+            descriptor_distance_threshold: 0.5,
+            ..Default::default()
+        };
+        let mut detector = LoopClosureDetector::new(config);
+
+        let first = KeyframeDescriptor {
+            timestamp: 0,
+            num_features: 80,
+            ..create_test_descriptor(0, 0.0)
+        };
+        let _ = detector.detect_loop_closure(0, first);
+
+        // Second frame is too close in time to pass temporal gating (~33ms per frame heuristic)
+        let second = KeyframeDescriptor {
+            timestamp: 10_000, // 10ms
+            num_features: 80,
+            ..create_test_descriptor(1, 0.0)
+        };
+        let closures = detector.detect_loop_closure(1, second).unwrap();
+        assert!(closures.is_empty());
     }
 
     #[test]
