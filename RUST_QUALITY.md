@@ -1,6 +1,6 @@
-# RS-VIO Rust Quality Pipeline
+# RS-VIO Rust Quality Pipeline - Embedded Drone Edition
 
-A comprehensive code quality system for RS-VIO, implementing 40+ tools for checking, linting, auditing, and hardening Rust code.
+A comprehensive code quality system for RS-VIO, implementing 40+ tools for checking, linting, auditing, and hardening Rust code for safety-critical embedded drone real-time systems.
 
 ## Overview
 
@@ -8,7 +8,59 @@ This quality pipeline ensures RS-VIO meets the highest standards for:
 - **Correctness** - Static analysis, fuzzing, formal verification, concurrency checking
 - **Security** - Vulnerability scanning, dependency auditing, secret detection
 - **Performance** - Binary analysis, coverage, benchmarks, flamegraphs
-- **Maintainability** - Formatting, linting, documentation, spelling
+- **Safety** - Embedded-specific checks for real-time drone VIO
+
+## Embedded Drone Safety Features
+
+### Profiles for Different Safety Levels
+
+| Profile | Purpose | Build Command |
+|---------|---------|---------------|
+| `release` | Standard release | `cargo build --release` |
+| `embedded-safe` | Safety-critical | `cargo build --profile embedded-safe` |
+| `ultra-critical` | Maximum safety | `cargo build --profile ultra-critical` |
+| `bare-metal` | STM32/PX4 | `cargo build --target thumbv7em-none-eabihf --profile bare-metal` |
+
+### Embedded-Safe Profile Features
+
+```toml
+[profile.embedded-safe]
+inherits = "release"
+opt-level = 3        # Maximum optimization
+lto = "fat"          # Link-time optimization
+codegen-units = 1    # Single codegen unit for best optimization
+panic = "abort"      # No unwinding, smaller binary
+strip = true         # Strip symbols
+overflow-checks = true   # Runtime overflow detection
+debug-assertions = true  # Keep assertions
+incremental = false  # Disable incremental for best optimization
+```
+
+### Clippy Lints for Embedded Safety
+
+```toml
+[lints.clippy]
+# SAFETY-CRITICAL (DENY)
+panic = "deny"              # No panics in production
+exit = "deny"               # No process exit
+todo = "deny"               # No TODOs
+unimplemented = "deny"      # No unimplemented code
+unnecessary_unwrap = "deny" # Prevent unwrap in production
+
+# PERFORMANCE (DENY) - Critical for real-time
+large_stack_arrays = "deny"     # Stack overflow prevention
+large_types_passed_by_value = "deny"
+vec_box = "deny"                # No heap allocation
+box_collection = "deny"         # No heap allocation
+rc_buffer = "deny"              # No reference counting
+
+# ALLOWED IN VIO CODE (mathematical operations required)
+cast_precision_loss = "allow"
+cast_sign_loss = "allow"
+float_cmp = "allow"
+unwrap_used = "allow"
+expect_used = "allow"
+```
 
 ## Quick Start
 

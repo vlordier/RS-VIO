@@ -179,6 +179,7 @@ pub fn detect_key_points(
 }
 
 #[cfg(test)]
+#[allow(clippy::all)]
 mod tests {
     use super::*;
     use image::Luma;

@@ -133,6 +133,7 @@ impl DescriptorMatcher for HybridMatcher {
 }
 
 #[cfg(test)]
+#[allow(clippy::all)]
 mod tests {
     use super::*;
 

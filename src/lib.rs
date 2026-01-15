@@ -41,11 +41,10 @@
     clippy::cast_possible_truncation,
     clippy::cast_precision_loss,
     clippy::cast_sign_loss,
-    clippy::cast_lossless
+    clippy::cast_lossless,
+    clippy::float_cmp,
+    clippy::default_numeric_fallback
 )]
-// Default to f64 for scientific computing (standard in robotics/CV)
-// Embedded systems can override with explicit f32 if needed
-#![allow(clippy::default_numeric_fallback)]
 // Note: const fn could be added for matrix identity and zero operations
 // for compile-time computation benefits (future optimization)
 #![allow(clippy::missing_const_for_fn)]

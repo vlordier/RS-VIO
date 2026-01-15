@@ -10,8 +10,6 @@ use crate::datasets::config::FeatureDetectionConfig;
 
 use super::{frame_skip, image_utilities, patch};
 
-use log::info;
-
 #[derive(Debug, Clone, Copy)]
 pub struct Feature {
     /// Unique identifier of this feature (within the current frame or globally).
@@ -56,7 +54,7 @@ impl<const LEVELS: u32> PatchTracker<LEVELS> {
         let current_image_pyramid: Vec<GrayImage> = build_image_pyramid(greyscale_image, LEVELS);
 
         if !self.previous_image_pyramid.is_empty() {
-            info!("old points {}", self.tracked_points_map.len());
+            log::trace!("old points {}", self.tracked_points_map.len());
             // track prev points
             // Default values for PatchTracker (not used in estimator)
             let defaults = FeatureDetectionConfig::default();
@@ -67,7 +65,7 @@ impl<const LEVELS: u32> PatchTracker<LEVELS> {
                 defaults.optical_flow_max_iterations as usize,
                 defaults.optical_flow_convergence_threshold as f32,
             );
-            info!("tracked old points {}", self.tracked_points_map.len());
+            log::trace!("tracked old points {}", self.tracked_points_map.len());
         }
         // add new points
         let new_points = add_points(&self.tracked_points_map, greyscale_image, self.grid_cols);
@@ -192,7 +190,7 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
                 let delta = frame_start.duration_since(last_time);
                 self.frame_skipper.record_frame_time(delta);
             }
-            log::debug!("[FeatureTracker] Frame skipped for real-time constraints");
+            log::trace!("[FeatureTracker] Frame skipped for real-time constraints");
             return;
         }
 
@@ -202,10 +200,6 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
 
         // not initialized
         if !self.previous_image_pyramid0.is_empty() {
-            log::debug!(
-                "[FeatureTracker] Number of old points in cam0: {}",
-                self.tracked_points_map_cam0.len()
-            );
             // track prev points
             self.tracked_points_map_cam0 = track_points::<LEVELS>(
                 &self.previous_image_pyramid0,
@@ -220,10 +214,6 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
                 &self.tracked_points_map_cam1,
                 self.optical_flow_max_iterations,
                 self.optical_flow_convergence_threshold,
-            );
-            log::debug!(
-                "[FeatureTracker] Number of tracked old points in cam0: {}",
-                self.tracked_points_map_cam0.len()
             );
         }
         // add new points
@@ -520,6 +510,7 @@ pub fn track_point_at_level(
 }
 
 #[cfg(test)]
+#[allow(clippy::all)]
 mod tests {
     use super::*;
     use image::Luma;

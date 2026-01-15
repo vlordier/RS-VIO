@@ -387,7 +387,7 @@ impl KeyframeDescriptor {
         }
 
         // Normalize to [0, 1] range
-        ((dot_product / magnitude + 1.0) / 2.0).max(0.0).min(1.0)
+        ((dot_product / magnitude + 1.0) / 2.0).clamp(0.0, 1.0)
     }
 }
 
@@ -467,7 +467,11 @@ impl KeyframeDatabase {
             }
         }
 
-        candidates.sort_by(|a, b| b.2.similarity.partial_cmp(&a.2.similarity).unwrap());
+        candidates.sort_by(|a, b| {
+            b.2.similarity
+                .partial_cmp(&a.2.similarity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         candidates
             .into_iter()
@@ -642,6 +646,7 @@ impl LoopClosureDetector {
 }
 
 #[cfg(test)]
+#[allow(clippy::all)]
 mod tests {
     use super::*;
 

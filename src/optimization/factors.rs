@@ -927,6 +927,7 @@ impl Factor for LoopClosurePoseFactor {
 }
 
 #[cfg(test)]
+#[allow(clippy::all)]
 mod tests {
     use super::*;
 

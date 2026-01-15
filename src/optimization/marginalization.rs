@@ -347,7 +347,7 @@ impl HessianApproximator for GaussNewtonApproximator {
             let mut H = DMatrix::zeros(jacs[0].ncols(), jacs[0].ncols());
             for J in jacs {
                 let Jt = J.transpose();
-                H = H + &Jt * J;
+                H += &Jt * J;
             }
             H
         } else {
@@ -470,7 +470,7 @@ impl HessianApproximator for LevenbergMarquardtApproximator {
         let r_mean = residuals.norm() / residuals.len() as f64;
         let damping = (r_mean * r_mean).max(1e-6) * self.damping_adaptation;
 
-        let mut H_lm = base_hessian.clone();
+        let mut H_lm = base_hessian;
         for i in 0..H_lm.nrows() {
             H_lm[(i, i)] += damping;
         }
@@ -531,7 +531,7 @@ impl HessianApproximator for ExactHessianApproximator {
             let mut H = DMatrix::zeros(jacs[0].ncols(), jacs[0].ncols());
             for J in jacs {
                 let Jt = J.transpose();
-                H = H + &Jt * J;
+                H += &Jt * J;
             }
             H
         } else {
@@ -569,7 +569,7 @@ impl GradientComputer for StandardGradientComputer {
             }
             let mut g = DVector::zeros(jacs[0].ncols());
             for J in jacs {
-                g = g + J.transpose() * residuals;
+                g += J.transpose() * residuals;
             }
             g
         } else {
@@ -808,12 +808,15 @@ impl MarginalizationManager {
         manager.apply_config_strategies();
         manager
     }
+}
 
-    /// Create with default config and strategies
-    pub fn default() -> Self {
+impl Default for MarginalizationManager {
+    fn default() -> Self {
         Self::new(MarginalizationConfig::default())
     }
+}
 
+impl MarginalizationManager {
     /// Apply strategy selection from configuration strings.
     pub fn apply_config_strategies(&mut self) {
         match self.config.hessian_approximator.as_str() {
@@ -1291,7 +1294,7 @@ impl MarginalizationManager {
         let min_sv = singulars
             .iter()
             .copied()
-            .filter(|sv| *sv > std::f64::EPSILON * max_sv)
+            .filter(|sv| *sv > f64::EPSILON * max_sv)
             .fold(f64::INFINITY, f64::min);
         if min_sv.is_finite() && min_sv > 0.0 {
             Some(max_sv / min_sv)
@@ -1565,6 +1568,7 @@ pub fn select_marginalization_candidates(
 }
 
 #[cfg(test)]
+#[allow(clippy::all)]
 mod tests {
     use super::*;
 

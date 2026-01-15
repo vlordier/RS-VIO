@@ -110,7 +110,7 @@ impl Vocabulary {
             // Convert center back to bytes
             let center_bytes: Vec<u8> = center
                 .iter()
-                .map(|&val| (val.max(0.0).min(255.0)) as u8)
+                .map(|&val| val.clamp(0.0, 255.0) as u8)
                 .collect();
 
             words.push(VisualWord {
@@ -129,7 +129,7 @@ impl Vocabulary {
             total_documents: 0,
         };
 
-        log::debug!(
+        log::trace!(
             "[Vocabulary] Built vocabulary with {} words",
             vocab.words.len()
         );
@@ -179,7 +179,7 @@ impl Vocabulary {
             // Add to inverted index
             self.inverted_index
                 .entry(word_id)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push((keyframe_id, tf));
         }
     }
@@ -225,7 +225,7 @@ impl Vocabulary {
             }
         }
 
-        for (_, score2) in hist2 {
+        for score2 in hist2.values() {
             norm2 += score2 * score2;
         }
 
@@ -299,7 +299,7 @@ impl Vocabulary {
             centers = new_centers;
 
             if max_shift < convergence_threshold {
-                log::debug!(
+                log::trace!(
                     "[Vocabulary] K-means converged after {} iterations",
                     iteration + 1
                 );
@@ -348,6 +348,7 @@ impl Vocabulary {
 }
 
 #[cfg(test)]
+#[allow(clippy::all)]
 mod tests {
     use super::*;
 

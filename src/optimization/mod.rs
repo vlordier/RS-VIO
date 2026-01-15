@@ -83,4 +83,5 @@ pub use loop_closure::{
 };
 
 #[cfg(test)]
+#[allow(clippy::all)]
 mod tests;

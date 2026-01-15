@@ -579,7 +579,7 @@ impl SlidingWindow {
                                         }
                                         None => {
                                             // Triangulation failed, use fallback
-                                            log::debug!("[SlidingWindow] Triangulation failed for feature {}, using fallback", feature_id);
+                                            log::trace!("[SlidingWindow] Triangulation failed for feature {}, using fallback", feature_id);
                                             let p_C = Vector3::new(
                                                 l_feat.undistorted_coord[0] as f64,
                                                 l_feat.undistorted_coord[1] as f64,
@@ -623,7 +623,7 @@ impl SlidingWindow {
                             let T_B_W = match frame.state.T_W_B.try_inverse() {
                                 Some(inv) => inv,
                                 None => {
-                                    log::warn!("[SlidingWindow] T_W_B matrix is singular for first frame, skipping factor");
+                                    log::trace!("[SlidingWindow] T_W_B matrix is singular for first frame, skipping factor");
                                     continue;
                                 },
                             };
@@ -718,19 +718,19 @@ impl SlidingWindow {
                         None
                     };
                     problem.add_residual_block(&[&kf_var], Box::new(factor), loss);
-                    log::debug!(
+                    log::trace!(
                         "[SlidingWindow] Added IMU prior residual on keyframe {} (pos_weight={:.2}, rot_weight={:.2}, huber_delta={:?})",
                         last_index, w_pos, w_rot, imu_huber_delta
                     );
                 } else {
-                    log::warn!("[SlidingWindow] IMU prior predicted pose inversion failed; skipping IMU residual");
+                    log::trace!("[SlidingWindow] IMU prior predicted pose inversion failed; skipping IMU residual");
                 }
             }
         }
 
         // Add marginalization prior if available
         if let Some(marg_prior) = self.marginalization_manager.get_prior() {
-            log::debug!(
+            log::trace!(
                 "[SlidingWindow] Adding marginalization prior with {} parameters, residual_dim={}",
                 marg_prior.param_ids.len(),
                 marg_prior.residual_dim
@@ -770,7 +770,7 @@ impl SlidingWindow {
         let num_residuals = problem.num_residual_blocks();
         let num_variables = initial_values.len();
 
-        log::debug!(
+        log::trace!(
             "Added SE3 and R3 variables, now {} variables total, {} residual blocks",
             num_variables,
             num_residuals
@@ -817,7 +817,7 @@ impl SlidingWindow {
 
                     match fallback_solver.optimize(&problem, &initial_values) {
                         Ok(result) => {
-                            log::debug!("[SlidingWindow] Fallback solver succeeded");
+                            log::trace!("[SlidingWindow] Fallback solver succeeded");
                             result
                         },
                         Err(e2) => {
@@ -850,7 +850,7 @@ impl SlidingWindow {
                 .marginalization_manager
                 .should_marginalize(self.keyframes.len())
             {
-                log::debug!("[SlidingWindow] Window is full, performing marginalization");
+                log::trace!("[SlidingWindow] Window is full, performing marginalization");
 
                 // Build parameter blocks for marginalization
                 let param_blocks = self.build_param_blocks_for_marginalization();
@@ -899,7 +899,7 @@ impl SlidingWindow {
                     &keep_ids,
                     &marg_ids,
                 ) {
-                    log::debug!(
+                    log::trace!(
                         "[SlidingWindow] Marginalization successful. Prior dimension: {}",
                         prior.param_ids.len()
                     );
@@ -910,7 +910,7 @@ impl SlidingWindow {
                 }
             }
 
-            log::debug!(
+            log::trace!(
                 "[SlidingWindow] Optimization successful. Initial cost: {:.3}, final cost: {:.3}",
                 opt_result.initial_cost,
                 opt_result.final_cost
@@ -1058,7 +1058,7 @@ impl SlidingWindow {
         self.map_points
             .extend(saved_map_points.iter().map(|(k, v)| (*k, *v)));
 
-        log::debug!(
+        log::trace!(
             "[SlidingWindow] Reverted {} keyframe poses and {} map points",
             saved_keyframe_poses.len(),
             saved_map_points.len()
@@ -1160,7 +1160,7 @@ impl SlidingWindow {
                         match mat.try_inverse() {
                             Some(inv) => frame.state.T_W_B = inv,
                             None => {
-                                log::warn!("[SlidingWindow] Optimized T_B_W matrix is singular for KF_{}, keeping previous pose", frame_id);
+                                log::trace!("[SlidingWindow] Optimized T_B_W matrix is singular for KF_{}, keeping previous pose", frame_id);
                             }
                         }
                     }
@@ -1295,18 +1295,18 @@ impl SlidingWindow {
                         return Ok(None);
                     },
                 };
-                log::debug!(
+                log::trace!(
                     "[SlidingWindow] Motion tracking successful. Initial cost: {:.3}, final cost: {:.3}",
                     opt_result.initial_cost,
                     opt_result.final_cost
                 );
                 Ok(Some(T_W_B_opt))
             } else {
-                log::warn!("[SlidingWindow] Motion tracking: optimized pose not found in result");
+                log::trace!("[SlidingWindow] Motion tracking: optimized pose not found in result");
                 Ok(None)
             }
         } else {
-            log::warn!(
+            log::trace!(
                 "[SlidingWindow] Motion tracking failed (status: {:?})",
                 opt_result.status
             );

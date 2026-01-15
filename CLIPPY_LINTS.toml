@@ -1,0 +1,94 @@
+[lints.clippy]
+# =============================================================================
+# STRINGENT CLIPPY LINT CONFIGURATION
+# =============================================================================
+# All lints set to "deny" will cause compile errors on violations.
+# This ensures code quality and prevents technical debt.
+
+# =============================================================================
+# SAFETY-CRITICAL (DENY)
+# =============================================================================
+# These lints are safety-critical and must NEVER be bypassed
+unnecessary_unwrap = "deny"  # unwrap() on Option/Result without handling None/Err
+expect_used = "deny"  # expect() - crashes on None/Err
+unwrap_used = "deny"  # unwrap() - crashes on None/Err
+panic = "deny"  # panic!() - never panic in library code
+exit = "deny"  # process::exit() - never exit abruptly
+todo = "deny"  # TODO comments must be resolved before merging
+unimplemented = "deny"  # unimplemented!() - stub code not allowed
+unsafe_code = "deny"  # unsafe blocks not allowed in this codebase
+
+# =============================================================================
+# CORRECTNESS (DENY)
+# =============================================================================
+# These lints catch correctness bugs
+invalid_nan_attribute = "deny"  # #[nan] attribute misuse
+invalid_regex = "deny"  # Invalid regex patterns
+missing_abi = "deny"  # Missing ABI declaration
+sorrows = "deny"  # #[must_use] on non-MustUse types
+forbidden_lint_groups = "deny"  # Using forbidden lints
+
+# =============================================================================
+# PERFORMANCE (DENY)
+# =============================================================================
+# These lints catch performance issues
+large_stack_arrays = "deny"  # Arrays > 512 bytes on stack
+large_types_passed_by_value = "deny"  # Large types passed by value
+vec_box = "deny"  # Box<Vec<T>> - double indirection
+box_collection = "deny"  # Box<Vec> allocation pattern
+rc_buffer = "deny"  # Rc<[T]> or Arc<[T]> buffers
+
+# =============================================================================
+# STYLE (WARN - but reviewed)
+# =============================================================================
+# These lints improve code style - fix or document exceptions
+cast_precision_loss = "warn"  # f64 -> f32 precision loss
+cast_sign_loss = "warn"  # unsigned -> signed sign loss  
+cast_lossless = "warn"  # lossy casts between numeric types
+cast_possible_truncation = "warn"  # casts that may truncate
+float_cmp = "warn"  # Float comparison without epsilon
+float_cmp_const = "warn"  # Float const comparison
+
+# =============================================================================
+# COMPLEXITY (WARN)
+# =============================================================================
+# These lints suggest simpler code
+manual_arithmetic = "warn"  # Manual arithmetic instead of operators
+clone_on_copy = "warn"  # Unnecessary clone on Copy types
+redundant_clone = "warn"  # Redundant clone operations
+
+# =============================================================================
+# PERMISSIBLE IN EXISTING CODE (DOCUMENTED)
+# =============================================================================
+# These are allowed with explicit #[allow()] in code
+non_snake_case = "allow"  # T_W_B, T_B_C naming convention
+iter_over_hash_types = "allow"  # Iterating over HashMap/HashSet keys
+missing_const_for_fn = "allow"  # Some functions can't be const yet
+inefficient_to_string = "allow"  # to_string() on non-primitive types
+
+# =============================================================================
+# RESTRICTED USAGE (ALLOW with justification)
+# =============================================================================
+# These require explicit justification in code
+arc_with_non_send_sync = "allow"  # Arc in non-Send/Sync contexts
+async_fn_in_trait = "allow"  # Async fn in traits (RPIT stabilization)
+dropping_copy_types = "allow"  # drop() on Copy types
+dropping_references = "allow"  # drop() on references
+explicit_auto_deref = "allow"  # Explicit deref in patterns
+fallible_implTrait = "allow"  # fallible impl Trait
+fn_params_required_mutability = "allow"  # fn params without mut
+implicit_dynamic_reborrow = "allow"  # Implicit reborrowing
+large_assignments = "allow"  # Large assignments
+manual_cloned = "allow"  # Manual .clone() instead of .cloned()
+manual_try_fold = "allow"  # Manual try_fold implementation
+map_entry = "allow"  # .entry() vs .insert()
+mut_from_ref = "allow"  # Obtaining mutable reference
+redundant_closure_call = "allow"  # Redundant closure calls
+significant_drop_in_scrutinee = "allow"  # Drop in match scrutinee
+suspicious_auto_alloc_impl = "allow"  # Auto trait impls for allocations
+type_complexity = "allow"  # Complex type signatures
+unnecessary_cast = "allow"  # Unnecessary type casts
+unnecessary_self_imports = "allow"  # unnecessary_self_imports
+unused_qualifications = "allow"  # Unnecessary qualifications
+useless_transmute = "allow"  # Useless transmute
+zero_ptr_metadata = "allow"  # Zero-sized pointer metadata

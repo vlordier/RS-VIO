@@ -146,7 +146,7 @@ impl Estimator {
             imu_measurement_count: 0,
             current_velocity: na::Vector3::zeros(),
             velocity_estimator_initialized: false,
-            bias_estimator: ImuBiasEstimator::new(imu_config.clone()),
+            bias_estimator: ImuBiasEstimator::new(imu_config),
             is_initializing: true,
             loop_closure_detector: LoopClosureDetector::new(loop_config.clone()),
             orb_extractor: if loop_config.descriptor_type == "orb" {
@@ -174,7 +174,7 @@ impl Estimator {
         self.frames_since_last_keyframe += 1;
 
         if self.enable_debug_output {
-            log::debug!(
+            log::trace!(
                 "============================== Frame {} ==============================",
                 self.frame_id_counter
             );
@@ -310,7 +310,7 @@ impl Estimator {
                 self.velocity_estimator
                     .initialize_from_imu(imu, &initial_orientation);
                 self.velocity_estimator_initialized = true;
-                log::debug!(
+                log::trace!(
                     "[Estimator] Velocity estimator initialized with {} IMU samples",
                     imu.len()
                 );
@@ -435,7 +435,7 @@ impl Estimator {
                         } else {
                             keyframe_reason
                         };
-                        log::debug!("[Estimator] Keyframe triggered: {}", reason);
+                        log::trace!("[Estimator] Keyframe triggered: {}", reason);
 
                         current_frame.is_keyframe = true;
                     } else {
@@ -454,7 +454,7 @@ impl Estimator {
             }
             _motion_tracking_time_ms = motion_tracking_start.elapsed().as_secs_f64() * 1000.0;
         } else {
-            log::debug!("[Estimator] Sliding window is not full, skipping motion tracking");
+            log::trace!("[Estimator] Sliding window is not full, skipping motion tracking");
         }
 
         // View map points and keyframe poses
@@ -518,7 +518,7 @@ impl Estimator {
 
         // Final timing summary
         let total_duration_ms = _total_start_time.elapsed().as_secs_f64() * 1000.0;
-        log::debug!(
+        log::trace!(
             "[Timing] frame_creation={:.3} ms, patch_tracking={:.3} ms, motion_tracking={:.3} ms, optimization={:.3} ms, total={:.3} ms",
             _frame_creation_time_ms,
             _patch_tracking_time_ms,
@@ -901,7 +901,7 @@ impl Estimator {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#[allow(clippy::all)]
 mod tests {
     use super::*;
     use crate::datasets::config::Config;

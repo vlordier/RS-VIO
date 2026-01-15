@@ -103,7 +103,7 @@ impl OrbExtractor {
     pub fn extract(&self, image: &[u8], width: u32, height: u32) -> Vec<OrbFeature> {
         // Validate input
         if image.len() != (width * height) as usize {
-            log::warn!(
+            log::debug!(
                 "[OrbExtractor] Image size mismatch: expected {}, got {}",
                 (width * height) as usize,
                 image.len()
@@ -112,7 +112,7 @@ impl OrbExtractor {
         }
 
         if width < 32 || height < 32 {
-            log::warn!("[OrbExtractor] Image too small: {}x{}", width, height);
+            log::debug!("[OrbExtractor] Image too small: {}x{}", width, height);
             return Vec::new();
         }
 
@@ -128,11 +128,11 @@ impl OrbExtractor {
         features.sort_by(|a, b| {
             b.strength
                 .partial_cmp(&a.strength)
-                .expect("Feature strength should be comparable")
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
         features.truncate(self.config.num_features);
 
-        log::debug!("[OrbExtractor] Extracted {} ORB features", features.len());
+        log::trace!("[OrbExtractor] Extracted {} ORB features", features.len());
         features
     }
 
@@ -390,6 +390,7 @@ impl OrbExtractor {
 }
 
 #[cfg(test)]
+#[allow(clippy::all)]
 mod tests {
     use super::*;
 

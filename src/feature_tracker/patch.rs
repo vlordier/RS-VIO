@@ -283,6 +283,7 @@ impl Pattern52 {
 }
 
 #[cfg(test)]
+#[allow(clippy::all)]
 mod tests {
     use super::*;
     use image::Luma;

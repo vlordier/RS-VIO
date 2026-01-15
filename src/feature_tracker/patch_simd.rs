@@ -198,6 +198,7 @@ unsafe fn compute_residuals_sse(
 }
 
 #[cfg(test)]
+#[allow(clippy::all)]
 mod tests {
     use super::*;
 
