@@ -53,6 +53,15 @@ impl RerunViewer {
         }
     }
 
+    /// Helper to consolidate time and sequence setting for logging operations
+    ///
+    /// Reduces boilerplate by handling the common pattern of setting both
+    /// frame sequence and timestamp before logging any entity.
+    fn set_logging_time(&self, rec: &RecordingStream) {
+        rec.set_time_sequence("frame", self.frame_id);
+        rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
+    }
+
     /// Helper function to safely convert raw image data to JPEG bytes
     fn image_to_jpeg_bytes(
         &self,
@@ -166,8 +175,7 @@ impl Viewer for RerunViewer {
         }
 
         if let Some(ref rec) = self.rec {
-            rec.set_time_sequence("frame", self.frame_id);
-            rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
+            self.set_logging_time(rec);
 
             let translation = Array3::from(t_w_b.fixed_view::<3, 1>(0, 3));
             let rotation = Matrix3x3::from(t_w_b.fixed_view::<3, 3>(0, 0));
@@ -290,8 +298,7 @@ impl Viewer for RerunViewer {
 
         // Then log features
         if let Some(ref rec) = self.rec {
-            rec.set_time_sequence("frame", self.frame_id);
-            rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
+            self.set_logging_time(rec);
 
             // Log features as 2D points
             if !features.is_empty() {
@@ -324,8 +331,7 @@ impl Viewer for RerunViewer {
 
         // Then log features with colors
         if let Some(ref rec) = self.rec {
-            rec.set_time_sequence("frame", self.frame_id);
-            rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
+            self.set_logging_time(rec);
 
             if !features.is_empty() {
                 let points: Vec<[f32; 2]> = features.iter().map(|(_, coord)| *coord).collect();

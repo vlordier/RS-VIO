@@ -454,6 +454,71 @@ pub fn save_statistics_common(result: &PlayerResult, stats_path: &Path) {
     }
 }
 
+/// Save trajectory in TUM format: timestamp x y z qx qy qz qw
+///
+/// This helper consolidates identical trajectory saving logic across all dataset players.
+/// Extracts poses from the estimator trajectory and writes them to a file in standard TUM format.
+///
+/// # Arguments
+/// * `estimator` - Reference to the estimator containing computed trajectory
+/// * `dataset_path` - Path where trajectory.txt will be saved
+/// * `player_name` - Name of the player for logging messages
+pub fn save_trajectory_common(
+    estimator: &crate::estimator::Estimator,
+    dataset_path: &str,
+    player_name: &str,
+) {
+    use nalgebra as na;
+
+    let trajectory_path = Path::new(dataset_path).join("trajectory.txt");
+
+    match std::fs::File::create(&trajectory_path) {
+        Ok(mut file) => {
+            use std::io::Write;
+            let trajectory = estimator.get_trajectory();
+            let mut count = 0;
+
+            for (timestamp_ns, pose) in trajectory.iter() {
+                let timestamp_s = *timestamp_ns as f64 / 1e9;
+
+                // Extract translation
+                let tx = pose[(0, 3)];
+                let ty = pose[(1, 3)];
+                let tz = pose[(2, 3)];
+
+                // Extract rotation as quaternion
+                let r = pose.fixed_view::<3, 3>(0, 0);
+                let rotmat = na::Rotation3::from_matrix_unchecked(r.into_owned());
+                let q = na::UnitQuaternion::from_rotation_matrix(&rotmat);
+
+                if writeln!(
+                    file,
+                    "{:.9} {:.6} {:.6} {:.6} {:.9} {:.9} {:.9} {:.9}",
+                    timestamp_s, tx, ty, tz, q.i, q.j, q.k, q.w
+                )
+                .is_ok()
+                {
+                    count += 1;
+                }
+            }
+
+            log::info!(
+                "[{}] Saved trajectory with {} poses to {}",
+                player_name,
+                count,
+                trajectory_path.display()
+            );
+        },
+        Err(e) => {
+            log::error!(
+                "[{}] Failed to create trajectory file {}: {e}",
+                player_name,
+                trajectory_path.display()
+            );
+        },
+    }
+}
+
 /// Load image timestamps from a standard data.csv file
 ///
 /// Common implementation for datasets that use the mav0/cam0/data.csv format

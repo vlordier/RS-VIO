@@ -136,51 +136,7 @@ impl DatasetPlayer for FourSeasonsPlayer {
         _context: &FrameContext,
         dataset_path: &str,
     ) {
-        let trajectory_path = Path::new(dataset_path).join("trajectory.txt");
-
-        match std::fs::File::create(&trajectory_path) {
-            Ok(mut file) => {
-                use std::io::Write;
-                let trajectory = estimator.get_trajectory();
-                let mut count = 0;
-
-                for (timestamp_ns, pose) in trajectory.iter() {
-                    let timestamp_s = *timestamp_ns as f64 / 1e9;
-
-                    // Extract translation
-                    let tx = pose[(0, 3)];
-                    let ty = pose[(1, 3)];
-                    let tz = pose[(2, 3)];
-
-                    // Extract rotation as quaternion
-                    let r = pose.fixed_view::<3, 3>(0, 0);
-                    let rotmat = nalgebra::Rotation3::from_matrix_unchecked(r.into_owned());
-                    let q = nalgebra::UnitQuaternion::from_rotation_matrix(&rotmat);
-
-                    if writeln!(
-                        file,
-                        "{:.9} {:.6} {:.6} {:.6} {:.9} {:.9} {:.9} {:.9}",
-                        timestamp_s, tx, ty, tz, q.i, q.j, q.k, q.w
-                    )
-                    .is_ok()
-                    {
-                        count += 1;
-                    }
-                }
-
-                log::info!(
-                    "[FourSeasonsPlayer] Saved trajectory with {} poses to {}",
-                    count,
-                    trajectory_path.display()
-                );
-            },
-            Err(e) => {
-                log::error!(
-                    "[FourSeasonsPlayer] Failed to create trajectory file {}: {e}",
-                    trajectory_path.display()
-                );
-            },
-        }
+        player_trait::save_trajectory_common(estimator, dataset_path, "FourSeasonsPlayer");
     }
 
     fn create_camera_models_from_config(
