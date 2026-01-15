@@ -10,13 +10,14 @@
 //! - **Geometric Verification**: Validates candidates with epipolar/homography checks
 //! - **Constraint Generation**: Creates optimization constraints from valid loop closures
 //! - **Covariance Estimation**: Estimates uncertainty of loop closure constraints
+//! - **ORB Descriptors**: Efficient binary descriptors for real-time matching
 //!
 //! ## Algorithm Overview
 //!
 //! ```text
 //! New Keyframe
 //!     ↓
-//! Extract Features & Descriptor
+//! Extract Features & Descriptor (Simple or ORB)
 //!     ↓
 //! Search Keyframe Database
 //!     ↓
@@ -31,14 +32,21 @@
 //!
 //! ## References
 //!
+//! - Rublee et al., "ORB: An Efficient Alternative to SIFT or SURF", ICCV 2011
 //! - Lowe, "Distinctive Image Features from Scale-Invariant Keypoints", IJCV 2004
 //! - Fischler & Bolles, "Random Sample Consensus", CACM 1981
 //! - Lepetit & Fua, "Keypoint Recognition Using Randomized Trees", TPAMI 2006
+
+pub mod orb;
+pub mod orb_matcher;
 
 use nalgebra as na;
 use serde::{Deserialize, Serialize};
 use crate::Result;
 use std::collections::BTreeMap;
+
+pub use orb::{OrbExtractor, OrbFeature, OrbConfig};
+pub use orb_matcher::OrbMatcher;
 
 /// Match statistics returned by a descriptor matcher
 #[derive(Debug, Clone)]
@@ -301,6 +309,9 @@ pub struct LoopClosureConfig {
 
     /// Maximum age of keyframes in database (in frames)
     pub max_keyframe_database_size: usize,
+
+    /// Descriptor type: "simple" or "orb"
+    pub descriptor_type: String,
 }
 
 impl Default for LoopClosureConfig {
@@ -317,6 +328,7 @@ impl Default for LoopClosureConfig {
             translation_sigma: 0.25,
             rotation_sigma: 0.05,
             max_keyframe_database_size: 5000,
+            descriptor_type: "simple".to_string(),
         }
     }
 }

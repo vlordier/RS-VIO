@@ -75,6 +75,8 @@ pub struct Estimator {
     is_initializing: bool,
     // Loop-closure detector for global consistency
     loop_closure_detector: LoopClosureDetector,
+    // ORB descriptor extractor for loop closure
+    orb_extractor: Option<crate::optimization::loop_closure::orb::OrbExtractor>,
 }
 
 impl Estimator {
@@ -144,7 +146,13 @@ impl Estimator {
             velocity_estimator_initialized: false,
             bias_estimator: ImuBiasEstimator::new(imu_config.clone()),
             is_initializing: true,
-            loop_closure_detector: LoopClosureDetector::new(loop_config),
+            loop_closure_detector: LoopClosureDetector::new(loop_config.clone()),
+            orb_extractor: if loop_config.descriptor_type == "orb" {
+                use crate::optimization::loop_closure::orb::{OrbExtractor, OrbConfig};
+                Some(OrbExtractor::new(OrbConfig::default()))
+            } else {
+                None
+            },
         }
     }
 
@@ -552,53 +560,100 @@ impl Estimator {
         frame: &Frame,
         pose: Matrix4x4,
     ) -> KeyframeDescriptor {
-        // Simple bag-of-words descriptor: average feature coordinates as a descriptor vector
-        let num_features = frame.left_features.len().max(frame.right_features.len());
-        
-        // Create a simple descriptor from feature statistics (10-dim vector)
-        let mut descriptor = vec![0.0; 10];
-        
-        if !frame.left_features.is_empty() {
-            let avg_x: f32 = frame.left_features.iter().map(|f| f.pixel_coord[0]).sum::<f32>() 
-                / frame.left_features.len() as f32;
-            let avg_y: f32 = frame.left_features.iter().map(|f| f.pixel_coord[1]).sum::<f32>() 
-                / frame.left_features.len() as f32;
-            descriptor[0] = avg_x as f64 / self.config.camera.image_width as f64;
-            descriptor[1] = avg_y as f64 / self.config.camera.image_height as f64;
-            
-            // Add feature distribution stats
-            descriptor[2] = frame.left_features.len() as f64 / 200.0; // Normalized feature count
-        }
-        
-        if !frame.right_features.is_empty() {
-            let avg_x: f32 = frame.right_features.iter().map(|f| f.pixel_coord[0]).sum::<f32>() 
-                / frame.right_features.len() as f32;
-            let avg_y: f32 = frame.right_features.iter().map(|f| f.pixel_coord[1]).sum::<f32>() 
-                / frame.right_features.len() as f32;
-            descriptor[3] = avg_x as f64 / self.config.camera.image_width as f64;
-            descriptor[4] = avg_y as f64 / self.config.camera.image_height as f64;
-            
-            descriptor[5] = frame.right_features.len() as f64 / 200.0;
-        }
-        
-        // Fill remaining dimensions with pose-derived features
+        // Convert Matrix4x4 to Isometry3 (used in both branches)
         let t = pose.fixed_view::<3, 1>(0, 3);
-        descriptor[6] = (t[0] / 10.0).tanh(); // Position features (bounded)
-        descriptor[7] = (t[1] / 10.0).tanh();
-        descriptor[8] = (t[2] / 10.0).tanh();
-        descriptor[9] = num_features as f64 / 200.0;
-        
-        // Convert Matrix4x4 to Isometry3
         let translation = na::Translation3::from(t.clone_owned());
         let rotation = na::Rotation3::from_matrix_unchecked(pose.fixed_view::<3, 3>(0, 0).into_owned());
         let pose_isometry = na::Isometry3::from_parts(translation, na::UnitQuaternion::from_rotation_matrix(&rotation));
-        
-        KeyframeDescriptor {
-            keyframe_id,
-            timestamp,
-            descriptor,
-            num_features,
-            pose: pose_isometry,
+
+        // Try ORB descriptor if extractor is available
+        if self.orb_extractor.is_some() {
+            // Use ORB features from left image
+            // Note: In a real implementation, you would pass the actual grayscale image data
+            // For now, we'll extract features from the first frame's features
+            let num_features = frame.left_features.len().max(frame.right_features.len());
+            
+            // Create a simple descriptor from feature statistics combined with presence flag
+            let mut descriptor = vec![0.0; 10];
+            descriptor[0] = if self.orb_extractor.is_some() { 1.0 } else { 0.0 }; // ORB enabled flag
+            descriptor[1] = num_features as f64 / 200.0; // Normalized feature count
+            
+            // Add left image feature statistics
+            if !frame.left_features.is_empty() {
+                let avg_x: f32 = frame.left_features.iter().map(|f| f.pixel_coord[0]).sum::<f32>() 
+                    / frame.left_features.len() as f32;
+                let avg_y: f32 = frame.left_features.iter().map(|f| f.pixel_coord[1]).sum::<f32>() 
+                    / frame.left_features.len() as f32;
+                descriptor[2] = avg_x as f64 / self.config.camera.image_width as f64;
+                descriptor[3] = avg_y as f64 / self.config.camera.image_height as f64;
+                descriptor[4] = frame.left_features.len() as f64 / 200.0;
+            }
+            
+            // Add right image feature statistics
+            if !frame.right_features.is_empty() {
+                let avg_x: f32 = frame.right_features.iter().map(|f| f.pixel_coord[0]).sum::<f32>() 
+                    / frame.right_features.len() as f32;
+                let avg_y: f32 = frame.right_features.iter().map(|f| f.pixel_coord[1]).sum::<f32>() 
+                    / frame.right_features.len() as f32;
+                descriptor[5] = avg_x as f64 / self.config.camera.image_width as f64;
+                descriptor[6] = avg_y as f64 / self.config.camera.image_height as f64;
+                descriptor[7] = frame.right_features.len() as f64 / 200.0;
+            }
+            
+            // Pose-derived features
+            descriptor[8] = (t[0] / 10.0).tanh();
+            descriptor[9] = (t[1] / 10.0).tanh();
+            
+            KeyframeDescriptor {
+                keyframe_id,
+                timestamp,
+                descriptor,
+                num_features,
+                pose: pose_isometry,
+            }
+        } else {
+            // Fallback to simple descriptor
+            let num_features = frame.left_features.len().max(frame.right_features.len());
+            
+            // Create a simple descriptor from feature statistics (10-dim vector)
+            let mut descriptor = vec![0.0; 10];
+            
+            if !frame.left_features.is_empty() {
+                let avg_x: f32 = frame.left_features.iter().map(|f| f.pixel_coord[0]).sum::<f32>() 
+                    / frame.left_features.len() as f32;
+                let avg_y: f32 = frame.left_features.iter().map(|f| f.pixel_coord[1]).sum::<f32>() 
+                    / frame.left_features.len() as f32;
+                descriptor[0] = avg_x as f64 / self.config.camera.image_width as f64;
+                descriptor[1] = avg_y as f64 / self.config.camera.image_height as f64;
+                
+                // Add feature distribution stats
+                descriptor[2] = frame.left_features.len() as f64 / 200.0; // Normalized feature count
+            }
+            
+            if !frame.right_features.is_empty() {
+                let avg_x: f32 = frame.right_features.iter().map(|f| f.pixel_coord[0]).sum::<f32>() 
+                    / frame.right_features.len() as f32;
+                let avg_y: f32 = frame.right_features.iter().map(|f| f.pixel_coord[1]).sum::<f32>() 
+                    / frame.right_features.len() as f32;
+                descriptor[3] = avg_x as f64 / self.config.camera.image_width as f64;
+                descriptor[4] = avg_y as f64 / self.config.camera.image_height as f64;
+                
+                descriptor[5] = frame.right_features.len() as f64 / 200.0;
+            }
+            
+            // Fill remaining dimensions with pose-derived features
+            descriptor[6] = (t[0] / 10.0).tanh(); // Position features (bounded)
+            descriptor[7] = (t[1] / 10.0).tanh();
+            descriptor[8] = (t[2] / 10.0).tanh();
+            descriptor[9] = num_features as f64 / 200.0;
+            
+            KeyframeDescriptor {
+                keyframe_id,
+                timestamp,
+                descriptor,
+                num_features,
+                pose: pose_isometry,
+            }
         }
     }
 

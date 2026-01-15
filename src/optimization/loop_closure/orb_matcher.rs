@@ -1,5 +1,6 @@
 use super::{DescriptorMatcher, MatchMetrics};
 use crate::optimization::loop_closure::KeyframeDescriptor;
+use nalgebra::Isometry3;
 
 /// ORB-based descriptor matcher using Hamming distance
 pub struct OrbMatcher {
@@ -37,7 +38,7 @@ impl OrbMatcher {
             // Convert from floating-point descriptor to binary representation
             let mut binary = [0u8; 32];
             let chunk_size = desc.len() / 32;
-
+            
             for i in 0..32 {
                 let chunk = &desc[i * chunk_size..((i + 1) * chunk_size).min(desc.len())];
                 let avg = chunk.iter().sum::<f64>() / chunk.len() as f64;
@@ -71,7 +72,7 @@ impl DescriptorMatcher for OrbMatcher {
                     match_count: 0,
                     match_ratio: 0.0,
                 };
-            },
+            }
         };
 
         let candidate_binary = match self.descriptor_to_binary(&candidate.descriptor) {
@@ -83,7 +84,7 @@ impl DescriptorMatcher for OrbMatcher {
                     match_count: 0,
                     match_ratio: 0.0,
                 };
-            },
+            }
         };
 
         // Compute Hamming distance (0 = identical, 256 = completely different)
@@ -121,10 +122,8 @@ impl DescriptorMatcher for OrbMatcher {
 }
 
 #[cfg(test)]
-#[allow(clippy::all)]
 mod tests {
     use super::*;
-    use nalgebra::Isometry3;
 
     fn create_test_descriptor(seed: u64) -> KeyframeDescriptor {
         // Create a deterministic descriptor from seed
@@ -149,10 +148,7 @@ mod tests {
         let desc2 = desc1.clone();
 
         let metrics = matcher.match_keyframes(&desc1, &desc2);
-        assert!(
-            metrics.similarity > 0.99,
-            "Identical descriptors should have ~100% similarity"
-        );
+        assert!(metrics.similarity > 0.99, "Identical descriptors should have ~100% similarity");
     }
 
     #[test]
@@ -162,10 +158,7 @@ mod tests {
         let desc2 = create_test_descriptor(100);
 
         let metrics = matcher.match_keyframes(&desc1, &desc2);
-        assert!(
-            metrics.similarity < 0.7,
-            "Different descriptors should have lower similarity"
-        );
+        assert!(metrics.similarity < 0.7, "Different descriptors should have lower similarity");
     }
 
     #[test]
@@ -178,10 +171,7 @@ mod tests {
         desc2.descriptor[0] = 1.0 - desc2.descriptor[0];
 
         let metrics = matcher.match_keyframes(&desc1, &desc2);
-        assert!(
-            metrics.similarity > 0.0,
-            "Should have some similarity even with bit flips"
-        );
+        assert!(metrics.similarity > 0.0, "Should have some similarity even with bit flips");
     }
 
     #[test]
@@ -191,10 +181,7 @@ mod tests {
         let desc2 = create_test_descriptor(100);
 
         let metrics = matcher.match_keyframes(&desc1, &desc2);
-        assert!(
-            metrics.match_count <= desc1.num_features,
-            "Match count should be ≤ num_features"
-        );
+        assert!(metrics.match_count <= desc1.num_features, "Match count should be ≤ num_features");
         assert!(metrics.match_ratio <= 1.0, "Match ratio should be ≤ 1.0");
     }
 
@@ -204,10 +191,7 @@ mod tests {
         let desc = vec![0.5; 32];
 
         let binary = matcher.descriptor_to_binary(&desc);
-        assert!(
-            binary.is_some(),
-            "Should convert 32-element float descriptor"
-        );
+        assert!(binary.is_some(), "Should convert 32-element float descriptor");
 
         if let Some(b) = binary {
             assert_eq!(b.len(), 32);
@@ -222,11 +206,7 @@ mod tests {
         for len in [16, 32, 64, 128].iter() {
             let desc = vec![0.5; *len];
             let binary = matcher.descriptor_to_binary(&desc);
-            assert!(
-                binary.is_some(),
-                "Should handle {}-element descriptors",
-                len
-            );
+            assert!(binary.is_some(), "Should handle {}-element descriptors", len);
         }
     }
 }
