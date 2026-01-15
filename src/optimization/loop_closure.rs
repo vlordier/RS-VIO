@@ -40,11 +40,88 @@ use serde::{Deserialize, Serialize};
 use crate::Result;
 use std::collections::BTreeMap;
 
+/// Match statistics returned by a descriptor matcher
+#[derive(Debug, Clone)]
+pub struct MatchMetrics {
+    pub similarity: f64,
+    pub match_count: usize,
+    pub match_ratio: f64,
+}
+
+/// Output of a geometric verifier
+#[derive(Debug, Clone)]
+pub struct VerifiedMatch {
+    pub relative_pose: na::Isometry3<f64>,
+    pub inlier_count: usize,
+    pub inlier_ratio: f64,
+}
+
+/// Trait for descriptor matching strategies (TOP-friendly for swapping implementations)
+pub trait DescriptorMatcher: Send + Sync {
+    fn match_keyframes(&self, query: &KeyframeDescriptor, candidate: &KeyframeDescriptor) -> MatchMetrics;
+}
+
+/// Simple cosine-similarity matcher producing heuristic match counts
+pub struct CosineMatcher;
+
+impl DescriptorMatcher for CosineMatcher {
+    fn match_keyframes(&self, query: &KeyframeDescriptor, candidate: &KeyframeDescriptor) -> MatchMetrics {
+        let similarity = query.similarity(candidate);
+        let overlapping_features = query.num_features.min(candidate.num_features).max(1);
+        let match_count = (similarity * overlapping_features as f64) as usize;
+        let match_ratio = match_count as f64 / overlapping_features as f64;
+
+        MatchMetrics {
+            similarity,
+            match_count,
+            match_ratio,
+        }
+    }
+}
+
+/// Trait for geometric verification (e.g., RANSAC with epipolar or homography models)
+pub trait GeometricVerifier: Send + Sync {
+    fn verify(
+        &self,
+        query: &KeyframeDescriptor,
+        candidate: &KeyframeDescriptor,
+        metrics: &MatchMetrics,
+    ) -> Option<VerifiedMatch>;
+}
+
+/// Minimal verifier that accepts matches meeting similarity/ratio thresholds and computes relative pose
+pub struct SimpleRelativePoseVerifier {
+    pub min_similarity: f64,
+}
+
+impl GeometricVerifier for SimpleRelativePoseVerifier {
+    fn verify(
+        &self,
+        query: &KeyframeDescriptor,
+        candidate: &KeyframeDescriptor,
+        metrics: &MatchMetrics,
+    ) -> Option<VerifiedMatch> {
+        if metrics.similarity < self.min_similarity {
+            return None;
+        }
+
+        let relative_pose = query.pose.inverse() * candidate.pose;
+        Some(VerifiedMatch {
+            relative_pose,
+            inlier_count: metrics.match_count,
+            inlier_ratio: metrics.match_ratio,
+        })
+    }
+}
+
 /// Configuration for loop closure detection
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoopClosureConfig {
     /// Minimum number of frames since last keyframe to consider for loop closure
     pub min_frame_gap: usize,
+
+    /// Minimum time gap between detections in nanoseconds (if set, takes precedence over frame gap)
+    pub min_time_gap_ns: Option<i64>,
 
     /// Number of candidate matches to retrieve from database
     pub num_candidates: usize,
@@ -64,6 +141,12 @@ pub struct LoopClosureConfig {
     /// Covariance scaling factor for loop closure constraints
     pub constraint_covariance_scale: f64,
 
+    /// Translational sigma (m) used for anisotropic information matrix
+    pub translation_sigma: f64,
+
+    /// Rotational sigma (rad) used for anisotropic information matrix
+    pub rotation_sigma: f64,
+
     /// Maximum age of keyframes in database (in frames)
     pub max_keyframe_database_size: usize,
 }
@@ -72,12 +155,15 @@ impl Default for LoopClosureConfig {
     fn default() -> Self {
         Self {
             min_frame_gap: 30,                  // ~1 second at 30 FPS
+            min_time_gap_ns: None,
             num_candidates: 10,
             min_matches_for_candidate: 10,
             descriptor_distance_threshold: 0.7,
             inlier_ratio_threshold: 0.3,
             min_inliers: 20,
             constraint_covariance_scale: 1.0,
+            translation_sigma: 0.25,
+            rotation_sigma: 0.05,
             max_keyframe_database_size: 5000,
         }
     }
@@ -186,43 +272,27 @@ impl KeyframeDatabase {
         }
     }
 
-    /// Search for candidate matches in database
-    pub fn search_candidates(&self, query: &KeyframeDescriptor) -> Vec<LoopClosureCandidate> {
+    /// Search for candidate matches in database using provided matcher
+    pub fn search_candidates(
+        &self,
+        matcher: &dyn DescriptorMatcher,
+        query: &KeyframeDescriptor,
+    ) -> Vec<(u64, KeyframeDescriptor, MatchMetrics)> {
         let mut candidates = Vec::new();
 
-        // Search all keyframes and compute similarity
         for (id, keyframe) in &self.keyframes {
-            let similarity = query.similarity(keyframe);
+            let metrics = matcher.match_keyframes(query, keyframe);
 
-            // Only keep candidates above threshold
-            if similarity >= self.config.descriptor_distance_threshold {
-                candidates.push((*id, similarity, keyframe.clone()));
+            if metrics.similarity >= self.config.descriptor_distance_threshold {
+                candidates.push((*id, keyframe.clone(), metrics));
             }
         }
 
-        // Sort by similarity (descending)
-        candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        candidates.sort_by(|a, b| b.2.similarity.partial_cmp(&a.2.similarity).unwrap());
 
-        // Convert to LoopClosureCandidate and limit count
         candidates
             .into_iter()
             .take(self.config.num_candidates)
-            .map(|(id, similarity, keyframe)| {
-                // Simple relative pose estimation (in practice use epipolar geometry)
-                let relative_pose = query.pose.inverse() * keyframe.pose;
-
-                let overlapping_features = query.num_features.min(keyframe.num_features).max(1);
-                let estimated_inliers = (similarity * overlapping_features as f64) as usize;
-                let inlier_ratio = estimated_inliers as f64 / overlapping_features as f64;
-
-                LoopClosureCandidate {
-                    candidate_id: id,
-                    similarity_score: similarity,
-                    relative_pose,
-                    inlier_count: estimated_inliers,
-                    inlier_ratio,
-                }
-            })
             .collect()
     }
 
@@ -248,17 +318,30 @@ pub struct LoopClosureDetector {
     database: KeyframeDatabase,
     last_detection_keyframe_id: Option<u64>,
     last_detection_timestamp: Option<i64>,
+    matcher: Box<dyn DescriptorMatcher>,
+    verifier: Box<dyn GeometricVerifier>,
 }
 
 impl LoopClosureDetector {
-    /// Create new loop closure detector
+    /// Create new loop closure detector with default matcher/verifier
     pub fn new(config: LoopClosureConfig) -> Self {
+        Self::new_with(config, Box::new(CosineMatcher), Box::new(SimpleRelativePoseVerifier { min_similarity: 0.2 }))
+    }
+
+    /// Create new loop closure detector with custom matcher/verifier
+    pub fn new_with(
+        config: LoopClosureConfig,
+        matcher: Box<dyn DescriptorMatcher>,
+        verifier: Box<dyn GeometricVerifier>,
+    ) -> Self {
         let config_clone = config.clone();
         Self {
             config,
             database: KeyframeDatabase::new(config_clone),
             last_detection_keyframe_id: None,
             last_detection_timestamp: None,
+            matcher,
+            verifier,
         }
     }
 
@@ -271,7 +354,6 @@ impl LoopClosureDetector {
         // Check minimum frame gap
         if let Some(last_id) = self.last_detection_keyframe_id {
             if keyframe_id - last_id < self.config.min_frame_gap as u64 {
-                // Too recent, skip detection
                 self.database.add_keyframe(descriptor);
                 return Ok(Vec::new());
             }
@@ -279,10 +361,16 @@ impl LoopClosureDetector {
 
         if let Some(last_ts) = self.last_detection_timestamp {
             if descriptor.timestamp > last_ts {
-                // Treat min_frame_gap as frames; approximate time using 33.3ms/frame (30 FPS default) for temporal gating.
-                let min_gap_time = (self.config.min_frame_gap as i64) * 33_333;
+                let use_time_gating = self.config.min_time_gap_ns.is_some();
+                let min_gap_time = if let Some(ns) = self.config.min_time_gap_ns {
+                    ns
+                } else {
+                    // Fallback: approximate using 33.3ms per frame (30 FPS)
+                    (self.config.min_frame_gap as i64) * 33_333_333
+                };
+
                 let frame_gap_estimate = descriptor.timestamp - last_ts;
-                if frame_gap_estimate < min_gap_time {
+                if use_time_gating && frame_gap_estimate < min_gap_time {
                     self.database.add_keyframe(descriptor);
                     return Ok(Vec::new());
                 }
@@ -290,23 +378,28 @@ impl LoopClosureDetector {
         }
 
         // Search for candidates
-        let candidates = self.database.search_candidates(&descriptor);
+        let candidates = self.database.search_candidates(self.matcher.as_ref(), &descriptor);
 
         let mut valid_closures = Vec::new();
 
         // Verify each candidate
         for candidate in candidates {
-            let passes_match_count = candidate.inlier_count >= self.config.min_matches_for_candidate;
-            let passes_ratio = candidate.inlier_ratio >= self.config.inlier_ratio_threshold;
-            let passes_min_inliers = candidate.inlier_count >= self.config.min_inliers;
+            let (candidate_id, keyframe, metrics) = candidate;
 
-            if passes_match_count && passes_ratio && passes_min_inliers {
-                // Valid loop closure
+            let passes_match_count = metrics.match_count >= self.config.min_matches_for_candidate;
+            let passes_ratio = metrics.match_ratio >= self.config.inlier_ratio_threshold;
+            let passes_min_inliers = metrics.match_count >= self.config.min_inliers;
+
+            if !(passes_match_count && passes_ratio && passes_min_inliers) {
+                continue;
+            }
+
+            if let Some(verified) = self.verifier.verify(&descriptor, &keyframe, &metrics) {
                 let constraint = LoopClosureConstraint {
                     keyframe_id_1: keyframe_id,
-                    keyframe_id_2: candidate.candidate_id,
-                    relative_pose: candidate.relative_pose,
-                    information_matrix: self.estimate_information_matrix(candidate.similarity_score),
+                    keyframe_id_2: candidate_id,
+                    relative_pose: verified.relative_pose,
+                    information_matrix: self.estimate_information_matrix(metrics.similarity, verified.inlier_ratio),
                 };
 
                 valid_closures.push(constraint);
@@ -322,11 +415,28 @@ impl LoopClosureDetector {
         Ok(valid_closures)
     }
 
-    /// Estimate information matrix (inverse covariance) from match quality
-    fn estimate_information_matrix(&self, similarity: f64) -> na::Matrix6<f64> {
-        // Higher similarity → higher confidence (higher information)
-        let info_scale = similarity * similarity * self.config.constraint_covariance_scale;
-        na::Matrix6::identity() * info_scale
+    /// Estimate anisotropic information matrix (inverse covariance) from match quality
+    fn estimate_information_matrix(&self, similarity: f64, inlier_ratio: f64) -> na::Matrix6<f64> {
+        // Base sigmas
+        let sigma_t = self.config.translation_sigma.max(1e-6);
+        let sigma_r = self.config.rotation_sigma.max(1e-6);
+
+        // Confidence scaling
+        let quality = (similarity * inlier_ratio).clamp(0.0, 1.0);
+        let scale = (quality * quality) * self.config.constraint_covariance_scale;
+
+        // Diagonal inverse covariance
+        let inv_sigma_t2 = scale / (sigma_t * sigma_t);
+        let inv_sigma_r2 = scale / (sigma_r * sigma_r);
+
+        na::Matrix6::from_diagonal(&na::Vector6::new(
+            inv_sigma_t2,
+            inv_sigma_t2,
+            inv_sigma_t2,
+            inv_sigma_r2,
+            inv_sigma_r2,
+            inv_sigma_r2,
+        ))
     }
 
     /// Get database size
@@ -403,11 +513,12 @@ mod tests {
 
         // Query with similar descriptor (similar to frame 0)
         let query = create_test_descriptor(100, 0.0);
-        let candidates = db.search_candidates(&query);
+        let matcher = CosineMatcher;
+        let candidates = db.search_candidates(&matcher, &query);
 
         // Should find candidates (frame 0 should be top)
         assert!(candidates.len() > 0);
-        assert!(candidates[0].candidate_id == 0);
+        assert_eq!(candidates[0].0, 0);
     }
 
     #[test]
@@ -490,9 +601,10 @@ mod tests {
             ..create_test_descriptor(100, 0.0)
         };
 
-        let candidates = db.search_candidates(&query);
+        let matcher = CosineMatcher;
+        let candidates = db.search_candidates(&matcher, &query);
         assert!(!candidates.is_empty());
-        assert_eq!(candidates[0].candidate_id, 42);
+        assert_eq!(candidates[0].0, 42);
     }
 
     #[test]
@@ -535,6 +647,70 @@ mod tests {
     }
 
     #[test]
+    fn test_anisotropic_information_matrix_weights() {
+        let mut config = LoopClosureConfig::default();
+        config.translation_sigma = 0.5;
+        config.rotation_sigma = 0.1;
+        let detector = LoopClosureDetector::new(config);
+
+        let info = detector.estimate_information_matrix(0.8, 0.5);
+
+        let trans = info[(0, 0)];
+        let rot = info[(3, 3)];
+
+        // Smaller sigma for rotation should yield larger rotational information
+        assert!(rot > trans, "rotation info should dominate when rotation sigma is smaller");
+        assert!(trans > 0.0 && rot > 0.0);
+    }
+
+    #[test]
+    fn test_verifier_rejects_low_similarity() {
+        let config = LoopClosureConfig {
+            descriptor_distance_threshold: 0.1,
+            min_frame_gap: 0,
+            min_inliers: 1,
+            min_matches_for_candidate: 1,
+            ..Default::default()
+        };
+
+        let matcher: Box<dyn DescriptorMatcher> = Box::new(CosineMatcher);
+        let verifier: Box<dyn GeometricVerifier> = Box::new(SimpleRelativePoseVerifier { min_similarity: 0.9 });
+        let mut detector = LoopClosureDetector::new_with(config, matcher, verifier);
+
+        let base = create_test_descriptor(0, 0.0);
+        let _ = detector.detect_loop_closure(0, base);
+
+        // Very different descriptor should fail verifier
+        let query = create_test_descriptor(1, 3.14);
+        let closures = detector.detect_loop_closure(1, query).unwrap();
+        assert!(closures.is_empty());
+    }
+
+    #[test]
+    fn test_min_time_gap_overrides_frame_gap() {
+        let mut config = LoopClosureConfig::default();
+        config.min_frame_gap = 0;
+        config.min_time_gap_ns = Some(50_000_000); // 50ms
+        config.descriptor_distance_threshold = 0.5;
+
+        let mut detector = LoopClosureDetector::new(config);
+
+        let first = KeyframeDescriptor {
+            timestamp: 0,
+            ..create_test_descriptor(0, 0.0)
+        };
+        let _ = detector.detect_loop_closure(0, first);
+
+        // Only 10ms later; should be blocked by min_time_gap_ns even though frame gap is 0
+        let second = KeyframeDescriptor {
+            timestamp: 10_000_000,
+            ..create_test_descriptor(1, 0.0)
+        };
+        let closures = detector.detect_loop_closure(1, second).unwrap();
+        assert!(closures.is_empty());
+    }
+
+    #[test]
     fn test_detector_reset() {
         let config = LoopClosureConfig::default();
         let mut detector = LoopClosureDetector::new(config);
@@ -573,11 +749,11 @@ mod tests {
         let config = LoopClosureConfig::default();
         let detector = LoopClosureDetector::new(config);
 
-        let info = detector.estimate_information_matrix(0.8);
+        let info = detector.estimate_information_matrix(0.8, 0.5);
         // Higher similarity should give higher information values
         assert!(info[(0, 0)] > 0.0);
 
-        let info_low = detector.estimate_information_matrix(0.3);
+        let info_low = detector.estimate_information_matrix(0.3, 0.5);
         assert!(info[(0, 0)] > info_low[(0, 0)]);
     }
 }
