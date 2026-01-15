@@ -3,7 +3,7 @@ use crate::datasets::CameraModelType;
 use crate::datasets::ImuData;
 use crate::estimator::Frame;
 use crate::estimator::SlidingWindow;
-use crate::feature_tracker::StereoPatchTracker;
+use crate::feature_tracker::{FeatureTracker, StereoPatchTracker};
 use crate::imu::ExtrinsicCalibrator;
 use crate::imu::ImuAidedKeyframeSelector;
 use crate::imu::ImuBiasEstimator;
@@ -33,8 +33,8 @@ pub struct Estimator {
     enable_debug_output: bool,
     /// Full configuration loaded from YAML (used to derive intrinsics, etc.).
     pub(crate) config: Config,
-    /// Patch-based stereo tracker reused across all frames.
-    stereo_patch_tracker: StereoPatchTracker<6>,
+    /// Patch-based stereo tracker reused across all frames (trait object for pluggable trackers).
+    stereo_patch_tracker: Box<dyn FeatureTracker>,
     /// Sliding window of keyframes for bundle adjustment optimization.
     sliding_window: SlidingWindow,
     /// Optional viewer used for visualization; owned by the estimator.
@@ -121,7 +121,7 @@ impl Estimator {
             frames_since_last_keyframe: 0,
             enable_debug_output: true,
             config: config.clone(),
-            stereo_patch_tracker: StereoPatchTracker::<6>::from_config(&feature_config),
+            stereo_patch_tracker: Box::new(StereoPatchTracker::<6>::from_config(&feature_config)),
             sliding_window: SlidingWindow::new(keyframe_window_size),
             viewer,
             left_cam,

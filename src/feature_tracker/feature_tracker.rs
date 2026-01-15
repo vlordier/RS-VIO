@@ -10,6 +10,17 @@ use crate::datasets::config::FeatureDetectionConfig;
 
 use super::{frame_skip, image_utilities, patch};
 
+/// Trait-oriented abstraction for stereo feature trackers.
+/// Allows swapping tracking implementations without touching the estimator.
+pub trait FeatureTracker {
+    fn process_frame(
+        &mut self,
+        greyscale_image0: &GrayImage,
+        greyscale_image1: &GrayImage,
+        frame: &mut crate::estimator::Frame,
+    );
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Feature {
     /// Unique identifier of this feature (within the current frame or globally).
@@ -273,6 +284,15 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
         self.last_frame_time = Some(frame_start);
     }
 
+    /// Clear all tracked points and cached pyramids while keeping tuning parameters.
+    pub fn reset(&mut self) {
+        self.tracked_points_map_cam0.clear();
+        self.tracked_points_map_cam1.clear();
+        self.previous_image_pyramid0.clear();
+        self.previous_image_pyramid1.clear();
+        self.last_keypoint_id = 0;
+        self.last_frame_time = None;
+    }
     /// Estimate frame-to-frame motion as heuristic for frame skipping
     fn estimate_frame_motion(&self) -> Option<f32> {
         if self.tracked_points_map_cam0.is_empty() {
@@ -313,6 +333,23 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             self.tracked_points_map_cam0.remove(id);
             self.tracked_points_map_cam1.remove(id);
         }
+    }
+}
+
+impl<const LEVELS: u32> FeatureTracker for StereoPatchTracker<LEVELS> {
+    fn process_frame(
+        &mut self,
+        greyscale_image0: &GrayImage,
+        greyscale_image1: &GrayImage,
+        frame: &mut crate::estimator::Frame,
+    ) {
+        // Delegate to the inherent implementation to keep tuning centralized.
+        StereoPatchTracker::<LEVELS>::process_frame(
+            self,
+            greyscale_image0,
+            greyscale_image1,
+            frame,
+        );
     }
 }
 

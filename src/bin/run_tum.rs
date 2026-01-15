@@ -1,47 +1,13 @@
 use clap::Parser;
-use log::{error, info};
-use rand::rngs::StdRng;
-use rand::SeedableRng;
-use rs_vio::datasets::player_trait::DatasetPlayer;
-use rs_vio::{PlayerConfig, TUMVIPlayer};
-use std::process;
+use rs_vio::bin_common;
+use rs_vio::TUMVIPlayer;
 
 fn main() {
-    // Set random seed for reproducibility
-    let _rng = StdRng::seed_from_u64(42);
-
-    // Initialize colored logger
-    rs_vio::init_colored_logging();
-
-    // Parse command line arguments
+    let _rng = bin_common::init_runtime();
     let args = Args::parse();
-
-    // Setup configuration
-    let player_config = PlayerConfig {
-        config_path: args.config_file.clone(),
-        dataset_path: args.dataset_path.clone(),
-        enable_statistics: true,         // File statistics
-        enable_console_statistics: true, // Console statistics
-        step_mode: false,
-        stats_output_path: None,
-    };
-
-    // Create and run EuRoC player
+    let config = bin_common::build_player_config(args.config_file, args.dataset_path);
     let player = TUMVIPlayer::new();
-    match player.run(player_config) {
-        Ok(result) => {
-            info!("[Main] processing completed successfully!");
-            info!(
-                "Processed {} frames with average {:.2}ms per frame",
-                result.processed_frames, result.average_processing_time_ms
-            );
-            process::exit(0);
-        },
-        Err(e) => {
-            error!("[Main] processing failed: {}", e);
-            process::exit(-1);
-        },
-    }
+    bin_common::run_and_exit(player, config, "TUM-VI");
 }
 
 #[derive(Parser, Debug)]
