@@ -9,14 +9,16 @@
 //! - ONNX Runtime for Rust: https://github.com/pykeio/ort
 //! - LightGlue-ONNX: https://github.com/fabio-sim/LightGlue-ONNX
 
-use nalgebra as na;
 #[cfg(feature = "lightglue")]
-use ndarray::{Array, Array2, Array3, Axis};
+use ndarray::Array2;
 #[cfg(feature = "lightglue")]
-use ort::{ExecutionProvider, GraphOptimizationLevel, Session, Value};
+use ort::{
+    session::{builder::GraphOptimizationLevel, Session},
+    value::Value,
+};
 use std::path::{Path, PathBuf};
 
-use super::{DescriptorMatcher, MatchMetrics, MatchResult};
+use super::{DescriptorMatcher, MatchMetrics};
 
 /// Configuration for LightGlue matcher
 #[derive(Debug, Clone)]
@@ -107,44 +109,46 @@ impl LightGlueMatcher {
             .ok_or_else(|| "ONNX session not initialized".to_string())?;
 
         // Prepare inputs: keypoints (N, 2), descriptors (N, D)
-        let kpts0 = Value::from_array(keypoints0.clone())
+        let kpts0 = Value::from_array(keypoints0.clone().into_owned())
             .map_err(|e| format!("Failed to create keypoints0 tensor: {}", e))?;
-        let kpts1 = Value::from_array(keypoints1.clone())
+        let kpts1 = Value::from_array(keypoints1.clone().into_owned())
             .map_err(|e| format!("Failed to create keypoints1 tensor: {}", e))?;
-        let desc0 = Value::from_array(descriptors0.clone())
+        let desc0 = Value::from_array(descriptors0.clone().into_owned())
             .map_err(|e| format!("Failed to create descriptors0 tensor: {}", e))?;
-        let desc1 = Value::from_array(descriptors1.clone())
+        let desc1 = Value::from_array(descriptors1.clone().into_owned())
             .map_err(|e| format!("Failed to create descriptors1 tensor: {}", e))?;
 
         // Run inference
+        let inputs = ort::inputs![
+            "keypoints0" => kpts0,
+            "keypoints1" => kpts1,
+            "descriptors0" => desc0,
+            "descriptors1" => desc1
+        ]
+        .map_err(|e| format!("Failed to create inputs: {}", e))?;
+        
         let outputs = session
-            .run(
-                ort::inputs!["keypoints0" => kpts0, "keypoints1" => kpts1, 
-                               "descriptors0" => desc0, "descriptors1" => desc1]
-                .map_err(|e| format!("Failed to create inputs: {}", e))?,
-            )
+            .run(inputs)
             .map_err(|e| format!("Inference failed: {}", e))?;
 
         // Extract matches: indices (M, 2) and scores (M,)
-        let matches_tensor = outputs[0]
+        let (matches_shape, matches_data) = outputs[0]
             .try_extract_tensor::<i64>()
             .map_err(|e| format!("Failed to extract matches: {}", e))?;
-        let scores_tensor = outputs[1]
+        let (_scores_shape, scores_data) = outputs[1]
             .try_extract_tensor::<f32>()
             .map_err(|e| format!("Failed to extract scores: {}", e))?;
-
-        let matches_view = matches_tensor.view();
-        let scores_view = scores_tensor.view();
 
         let mut matches = Vec::new();
         let mut confidences = Vec::new();
 
         // Filter by confidence threshold
-        for i in 0..matches_view.len_of(Axis(0)) {
-            let score = scores_view[[i]];
+        let num_matches = matches_shape[0] as usize;
+        for i in 0..num_matches {
+            let score = scores_data[i];
             if score >= self.config.confidence_threshold {
-                let idx0 = matches_view[[i, 0]] as usize;
-                let idx1 = matches_view[[i, 1]] as usize;
+                let idx0 = matches_data[i * 2] as usize;
+                let idx1 = matches_data[i * 2 + 1] as usize;
                 matches.push((idx0, idx1));
                 confidences.push(score);
             }
@@ -174,7 +178,7 @@ impl DescriptorMatcher for LightGlueMatcher {
         &self,
         _query: &super::KeyframeDescriptor,
         _candidate: &super::KeyframeDescriptor,
-    ) -> MatchResult {
+    ) -> MatchMetrics {
         #[cfg(feature = "lightglue")]
         {
             // In a real implementation, this would:
@@ -185,13 +189,21 @@ impl DescriptorMatcher for LightGlueMatcher {
 
             log::warn!("LightGlue matching not fully implemented - requires image data");
 
-            MatchResult::NoMatch
+            MatchMetrics {
+                similarity: 0.0,
+                match_count: 0,
+                match_ratio: 0.0,
+            }
         }
 
         #[cfg(not(feature = "lightglue"))]
         {
             log::error!("LightGlue feature not enabled. Compile with --features lightglue");
-            MatchResult::NoMatch
+            MatchMetrics {
+                similarity: 0.0,
+                match_count: 0,
+                match_ratio: 0.0,
+            }
         }
     }
 }

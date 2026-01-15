@@ -254,7 +254,11 @@ impl CameraFactory {
         use camera_intrinsic_model::models::opencv5::OpenCVModel5;
         use nalgebra034::DVector;
 
-        let params = DVector::from_vec(vec![fx, fy, cx, cy, k1, k2, k3, p1, p2]);
+        // camera-intrinsic-model requires f64, so cast if using f32
+        let params = DVector::from_vec(vec![
+            fx as f64, fy as f64, cx as f64, cy as f64,
+            k1 as f64, k2 as f64, k3 as f64, p1 as f64, p2 as f64
+        ]);
 
         crate::datasets::CameraModelType::OpenCV5(OpenCVModel5::new(&params, width, height))
     }
