@@ -42,6 +42,7 @@ pub mod orb_matcher;
 pub mod vocabulary;
 pub mod bow_retriever;
 pub mod pnp_ransac;
+pub mod enhanced_verifier;
 
 use nalgebra as na;
 use serde::{Deserialize, Serialize};
