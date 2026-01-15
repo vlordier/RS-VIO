@@ -13,9 +13,6 @@ use crate::imu::ImuMotionPrior;
 use crate::imu::ImuPreintegrator;
 use crate::imu::PreintegratedImu;
 use crate::imu::VelocityEstimator;
-use crate::optimization::loop_closure::{
-    KeyframeDescriptor, LoopClosureConfig, LoopClosureDetector,
-};
 use crate::types::{Float, Matrix4x4, Vector3};
 use crate::viewers::Viewer;
 use crate::{Result, VIOError};
@@ -75,10 +72,6 @@ pub struct Estimator {
     bias_estimator: ImuBiasEstimator,
     // Whether system is in initialization phase (collecting IMU for bias estimation)
     is_initializing: bool,
-    // Loop-closure detector for global consistency
-    loop_closure_detector: LoopClosureDetector,
-    // ORB descriptor extractor for loop closure
-    orb_extractor: Option<crate::optimization::loop_closure::orb::OrbExtractor>,
 }
 
 impl Estimator {
@@ -114,8 +107,6 @@ impl Estimator {
 
         // Initialize IMU components
         let imu_config = ImuConfig::default();
-        // Initialize loop-closure detector with default config
-        let loop_config = LoopClosureConfig::default();
         Estimator {
             frame_id_counter: 0,
             frames_since_last_keyframe: 0,
@@ -138,23 +129,16 @@ impl Estimator {
             velocity_estimator: VelocityEstimator::new(imu_config.clone()),
             extrinsic_calibrator: ExtrinsicCalibrator::new(T_B_Cl),
             keyframe_selector: ImuAidedKeyframeSelector::new(
-                config.keyframe_management.translation_threshold,
-                config.keyframe_management.rotation_threshold,
+                config.keyframe_management.translation_threshold as f64,
+                config.keyframe_management.rotation_threshold as f64,
             ),
             current_imu_preintegration: None,
             last_imu_timestamp: None,
             imu_measurement_count: 0,
             current_velocity: na::Vector3::zeros(),
             velocity_estimator_initialized: false,
-            bias_estimator: ImuBiasEstimator::new(imu_config),
+            bias_estimator: ImuBiasEstimator::new(imu_config.clone()),
             is_initializing: true,
-            loop_closure_detector: LoopClosureDetector::new(loop_config.clone()),
-            orb_extractor: if loop_config.descriptor_type == "orb" {
-                use crate::optimization::loop_closure::orb::{OrbConfig, OrbExtractor};
-                Some(OrbExtractor::new(OrbConfig::default()))
-            } else {
-                None
-            },
         }
     }
 
@@ -174,7 +158,7 @@ impl Estimator {
         self.frames_since_last_keyframe += 1;
 
         if self.enable_debug_output {
-            log::trace!(
+            log::debug!(
                 "============================== Frame {} ==============================",
                 self.frame_id_counter
             );
@@ -285,7 +269,7 @@ impl Estimator {
             }
 
             // Use motion predictor for feature tracking
-            let focal_length = self.config.camera.left_intrinsics[0];
+            let focal_length = self.config.camera.left_intrinsics[0] as f64;
             for feature in &mut current_frame.left_features {
                 let (du, dv) = self.imu_motion_predictor.predict_feature_displacement(
                     imu,
@@ -310,7 +294,7 @@ impl Estimator {
                 self.velocity_estimator
                     .initialize_from_imu(imu, &initial_orientation);
                 self.velocity_estimator_initialized = true;
-                log::trace!(
+                log::debug!(
                     "[Estimator] Velocity estimator initialized with {} IMU samples",
                     imu.len()
                 );
@@ -332,7 +316,7 @@ impl Estimator {
                         .add_measurement(&T_W_B_copy, R_W_B);
 
                     // Run calibration periodically
-                    if self.imu_measurement_count.is_multiple_of(100) {
+                    if self.imu_measurement_count % 100 == 0 {
                         // Temporarily disabled due to NaN issues
                         // let error = self.extrinsic_calibrator.calibrate_iteration();
                         // log::debug!(
@@ -419,8 +403,9 @@ impl Estimator {
 
                     // Keyframe if either visual or IMU criteria met
                     let translation_threshold =
-                        self.config.keyframe_management.translation_threshold;
-                    let rotation_threshold = self.config.keyframe_management.rotation_threshold;
+                        self.config.keyframe_management.translation_threshold as f64;
+                    let rotation_threshold =
+                        self.config.keyframe_management.rotation_threshold as f64;
                     let visual_keyframe =
                         t_rel.norm() > translation_threshold || rotation_norm > rotation_threshold;
 
@@ -435,7 +420,7 @@ impl Estimator {
                         } else {
                             keyframe_reason
                         };
-                        log::trace!("[Estimator] Keyframe triggered: {}", reason);
+                        log::debug!("[Estimator] Keyframe triggered: {}", reason);
 
                         current_frame.is_keyframe = true;
                     } else {
@@ -454,37 +439,15 @@ impl Estimator {
             }
             _motion_tracking_time_ms = motion_tracking_start.elapsed().as_secs_f64() * 1000.0;
         } else {
-            log::trace!("[Estimator] Sliding window is not full, skipping motion tracking");
+            log::debug!("[Estimator] Sliding window is not full, skipping motion tracking");
         }
 
         // View map points and keyframe poses
         // Bundle adjustment
         if current_frame.is_keyframe {
             let optimization_start = Instant::now();
-            // Save timestamp and pose before frame is moved
+            // Save timestamp before frame is moved
             let frame_timestamp = current_frame.timestamp_ns;
-            let frame_pose = current_frame.state.T_W_B;
-            let kf_id = self.frame_id_counter;
-
-            // Detect loop closures for this keyframe
-            let descriptor =
-                self.create_keyframe_descriptor(kf_id, frame_timestamp, &current_frame, frame_pose);
-
-            if let Ok(constraints) = self
-                .loop_closure_detector
-                .detect_loop_closure(kf_id, descriptor)
-            {
-                if !constraints.is_empty() {
-                    log::info!(
-                        "[Estimator] Detected {} loop closure(s) for keyframe {}",
-                        constraints.len(),
-                        kf_id
-                    );
-                    self.sliding_window
-                        .add_loop_closure_constraints(constraints);
-                }
-            }
-
             self.sliding_window.add_frame(current_frame);
             // Provide IMU motion prior to optimizer when available
             let imu_prior = if self.config.optimization.imu_prior_enable {
@@ -518,7 +481,7 @@ impl Estimator {
 
         // Final timing summary
         let total_duration_ms = _total_start_time.elapsed().as_secs_f64() * 1000.0;
-        log::trace!(
+        log::debug!(
             "[Timing] frame_creation={:.3} ms, patch_tracking={:.3} ms, motion_tracking={:.3} ms, optimization={:.3} ms, total={:.3} ms",
             _frame_creation_time_ms,
             _patch_tracking_time_ms,
@@ -555,151 +518,6 @@ impl Estimator {
     /// Test hook: number of frames processed.
     pub fn frame_count(&self) -> u64 {
         self.frame_id_counter
-    }
-
-    /// Create a keyframe descriptor for loop-closure detection
-    fn create_keyframe_descriptor(
-        &self,
-        keyframe_id: u64,
-        timestamp: i64,
-        frame: &Frame,
-        pose: Matrix4x4,
-    ) -> KeyframeDescriptor {
-        // Convert Matrix4x4 to Isometry3 (used in both branches)
-        let t = pose.fixed_view::<3, 1>(0, 3);
-        let translation = na::Translation3::from(t.clone_owned());
-        let rotation =
-            na::Rotation3::from_matrix_unchecked(pose.fixed_view::<3, 3>(0, 0).into_owned());
-        let pose_isometry = na::Isometry3::from_parts(
-            translation,
-            na::UnitQuaternion::from_rotation_matrix(&rotation),
-        );
-
-        // Try ORB descriptor if extractor is available
-        if self.orb_extractor.is_some() {
-            // Use ORB features from left image
-            // Note: In a real implementation, you would pass the actual grayscale image data
-            // For now, we'll extract features from the first frame's features
-            let num_features = frame.left_features.len().max(frame.right_features.len());
-
-            // Create a simple descriptor from feature statistics combined with presence flag
-            let mut descriptor = vec![0.0; 10];
-            descriptor[0] = if self.orb_extractor.is_some() {
-                1.0
-            } else {
-                0.0
-            }; // ORB enabled flag
-            descriptor[1] = num_features as f64 / 200.0; // Normalized feature count
-
-            // Add left image feature statistics
-            if !frame.left_features.is_empty() {
-                let avg_x: f32 = frame
-                    .left_features
-                    .iter()
-                    .map(|f| f.pixel_coord[0])
-                    .sum::<f32>()
-                    / frame.left_features.len() as f32;
-                let avg_y: f32 = frame
-                    .left_features
-                    .iter()
-                    .map(|f| f.pixel_coord[1])
-                    .sum::<f32>()
-                    / frame.left_features.len() as f32;
-                descriptor[2] = avg_x as f64 / self.config.camera.image_width as f64;
-                descriptor[3] = avg_y as f64 / self.config.camera.image_height as f64;
-                descriptor[4] = frame.left_features.len() as f64 / 200.0;
-            }
-
-            // Add right image feature statistics
-            if !frame.right_features.is_empty() {
-                let avg_x: f32 = frame
-                    .right_features
-                    .iter()
-                    .map(|f| f.pixel_coord[0])
-                    .sum::<f32>()
-                    / frame.right_features.len() as f32;
-                let avg_y: f32 = frame
-                    .right_features
-                    .iter()
-                    .map(|f| f.pixel_coord[1])
-                    .sum::<f32>()
-                    / frame.right_features.len() as f32;
-                descriptor[5] = avg_x as f64 / self.config.camera.image_width as f64;
-                descriptor[6] = avg_y as f64 / self.config.camera.image_height as f64;
-                descriptor[7] = frame.right_features.len() as f64 / 200.0;
-            }
-
-            // Pose-derived features
-            descriptor[8] = (t[0] / 10.0).tanh();
-            descriptor[9] = (t[1] / 10.0).tanh();
-
-            KeyframeDescriptor {
-                keyframe_id,
-                timestamp,
-                descriptor,
-                num_features,
-                pose: pose_isometry,
-            }
-        } else {
-            // Fallback to simple descriptor
-            let num_features = frame.left_features.len().max(frame.right_features.len());
-
-            // Create a simple descriptor from feature statistics (10-dim vector)
-            let mut descriptor = vec![0.0; 10];
-
-            if !frame.left_features.is_empty() {
-                let avg_x: f32 = frame
-                    .left_features
-                    .iter()
-                    .map(|f| f.pixel_coord[0])
-                    .sum::<f32>()
-                    / frame.left_features.len() as f32;
-                let avg_y: f32 = frame
-                    .left_features
-                    .iter()
-                    .map(|f| f.pixel_coord[1])
-                    .sum::<f32>()
-                    / frame.left_features.len() as f32;
-                descriptor[0] = avg_x as f64 / self.config.camera.image_width as f64;
-                descriptor[1] = avg_y as f64 / self.config.camera.image_height as f64;
-
-                // Add feature distribution stats
-                descriptor[2] = frame.left_features.len() as f64 / 200.0; // Normalized feature count
-            }
-
-            if !frame.right_features.is_empty() {
-                let avg_x: f32 = frame
-                    .right_features
-                    .iter()
-                    .map(|f| f.pixel_coord[0])
-                    .sum::<f32>()
-                    / frame.right_features.len() as f32;
-                let avg_y: f32 = frame
-                    .right_features
-                    .iter()
-                    .map(|f| f.pixel_coord[1])
-                    .sum::<f32>()
-                    / frame.right_features.len() as f32;
-                descriptor[3] = avg_x as f64 / self.config.camera.image_width as f64;
-                descriptor[4] = avg_y as f64 / self.config.camera.image_height as f64;
-
-                descriptor[5] = frame.right_features.len() as f64 / 200.0;
-            }
-
-            // Fill remaining dimensions with pose-derived features
-            descriptor[6] = (t[0] / 10.0).tanh(); // Position features (bounded)
-            descriptor[7] = (t[1] / 10.0).tanh();
-            descriptor[8] = (t[2] / 10.0).tanh();
-            descriptor[9] = num_features as f64 / 200.0;
-
-            KeyframeDescriptor {
-                keyframe_id,
-                timestamp,
-                descriptor,
-                num_features,
-                pose: pose_isometry,
-            }
-        }
     }
 
     /// Visualize tracking results: stereo images with tracked features.
@@ -901,7 +719,7 @@ impl Estimator {
 }
 
 #[cfg(test)]
-#[allow(clippy::all)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
     use crate::datasets::config::Config;

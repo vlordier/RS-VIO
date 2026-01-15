@@ -1,9 +1,8 @@
 use crate::estimator::Frame;
 use crate::imu::ImuMotionPrior;
 use crate::optimization::factors::{
-    BundleAdjustmentFactor, ImuPriorFactor, LoopClosurePoseFactor, PnPFactor, PriorFactor,
+    BundleAdjustmentFactor, ImuPriorFactor, PnPFactor, PriorFactor,
 };
-use crate::optimization::loop_closure::LoopClosureConstraint;
 
 use crate::types::{Matrix3x3, Matrix4x4, Vector3};
 use apex_solver::core::loss_functions::HuberLoss;
@@ -76,9 +75,6 @@ pub struct SlidingWindow {
 
     /// Marginalization manager for sliding window
     marginalization_manager: crate::optimization::marginalization::MarginalizationManager,
-
-    /// Loop-closure constraints linking keyframes inside the window
-    loop_closure_constraints: Vec<LoopClosureConstraint>,
 }
 
 impl SlidingWindow {
@@ -115,7 +111,6 @@ impl SlidingWindow {
             max_map_points: DEFAULT_MAX_MAP_POINTS,
             map_point_observations: HashMap::with_capacity(DEFAULT_MAX_MAP_POINTS),
             marginalization_manager: marg_manager,
-            loop_closure_constraints: Vec::new(),
         }
     }
 
@@ -227,10 +222,6 @@ impl SlidingWindow {
                     "[SlidingWindow] Removed oldest frame (frame_id: {}) to make room for new keyframe",
                     removed_frame.frame_id
                 );
-                // Drop loop-closure constraints that involve the removed frame
-                let removed_id = removed_frame.frame_id as u64;
-                self.loop_closure_constraints
-                    .retain(|c| c.keyframe_id_1 != removed_id && c.keyframe_id_2 != removed_id);
             }
         }
         let frame_id = frame.frame_id;
@@ -245,11 +236,6 @@ impl SlidingWindow {
         );
 
         true
-    }
-
-    /// Append loop-closure constraints discovered by the detector.
-    pub fn add_loop_closure_constraints(&mut self, constraints: Vec<LoopClosureConstraint>) {
-        self.loop_closure_constraints.extend(constraints);
     }
 
     /// Get the current number of keyframes in the window.
@@ -280,7 +266,6 @@ impl SlidingWindow {
     /// Clear all keyframes from the sliding window.
     pub fn clear(&mut self) {
         self.keyframes.clear();
-        self.loop_closure_constraints.clear();
         log::debug!("[SlidingWindow] Cleared all keyframes");
     }
 
@@ -449,14 +434,6 @@ impl SlidingWindow {
             )
         })?;
 
-        // Map global keyframe IDs to their indices inside the window
-        let frame_id_to_index: HashMap<u64, usize> = self
-            .keyframes
-            .iter()
-            .enumerate()
-            .map(|(idx, f)| (f.frame_id as u64, idx))
-            .collect();
-
         // Count observations for each landmark across all frames, separately for left and right cameras
         for frame in self.keyframes.iter() {
             // Count left camera observations
@@ -553,7 +530,7 @@ impl SlidingWindow {
                                 // Triangulate from stereo observations if available
                                 let left_feat = frame.left_features.iter().find(|f| f.feature_id == feature_id);
                                 let right_feat = frame.right_features.iter().find(|f| f.feature_id == feature_id);
-
+                                
                                 if let (Some(l_feat), Some(r_feat)) = (left_feat, right_feat) {
                                     // Perform stereo triangulation
                                     let left_obs = Vector3::new(
@@ -566,7 +543,7 @@ impl SlidingWindow {
                                         r_feat.undistorted_coord[1] as f64,
                                         1.0_f64,
                                     );
-
+                                    
                                     match Self::triangulate_stereo(
                                         left_obs,
                                         right_obs,
@@ -579,7 +556,7 @@ impl SlidingWindow {
                                         }
                                         None => {
                                             // Triangulation failed, use fallback
-                                            log::trace!("[SlidingWindow] Triangulation failed for feature {}, using fallback", feature_id);
+                                            log::debug!("[SlidingWindow] Triangulation failed for feature {}, using fallback", feature_id);
                                             let p_C = Vector3::new(
                                                 l_feat.undistorted_coord[0] as f64,
                                                 l_feat.undistorted_coord[1] as f64,
@@ -623,7 +600,7 @@ impl SlidingWindow {
                             let T_B_W = match frame.state.T_W_B.try_inverse() {
                                 Some(inv) => inv,
                                 None => {
-                                    log::trace!("[SlidingWindow] T_W_B matrix is singular for first frame, skipping factor");
+                                    log::warn!("[SlidingWindow] T_W_B matrix is singular for first frame, skipping factor");
                                     continue;
                                 },
                             };
@@ -653,36 +630,6 @@ impl SlidingWindow {
                 }
             }
         }
-
-        // Add loop-closure relative pose constraints between keyframes in the window
-        let mut retained_constraints = Vec::new();
-        for constraint in self.loop_closure_constraints.iter() {
-            if let (Some(&idx1), Some(&idx2)) = (
-                frame_id_to_index.get(&constraint.keyframe_id_1),
-                frame_id_to_index.get(&constraint.keyframe_id_2),
-            ) {
-                let kf1_var = format!("KF_{}", idx1);
-                let kf2_var = format!("KF_{}", idx2);
-
-                if !(initial_values.contains_key(&kf1_var) && initial_values.contains_key(&kf2_var))
-                {
-                    continue;
-                }
-
-                let factor = LoopClosurePoseFactor::new(
-                    constraint.relative_pose.to_homogeneous(),
-                    constraint.information_matrix,
-                );
-
-                let loss = HuberLoss::new(1.0).ok().map(|l| {
-                    Box::new(l) as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>
-                });
-
-                problem.add_residual_block(&[&kf1_var, &kf2_var], Box::new(factor), loss);
-                retained_constraints.push(constraint.clone());
-            }
-        }
-        self.loop_closure_constraints = retained_constraints;
 
         // If IMU prior is available, add a residual on the latest keyframe pose
         if let Some(prior) = imu_prior {
@@ -718,19 +665,19 @@ impl SlidingWindow {
                         None
                     };
                     problem.add_residual_block(&[&kf_var], Box::new(factor), loss);
-                    log::trace!(
+                    log::debug!(
                         "[SlidingWindow] Added IMU prior residual on keyframe {} (pos_weight={:.2}, rot_weight={:.2}, huber_delta={:?})",
                         last_index, w_pos, w_rot, imu_huber_delta
                     );
                 } else {
-                    log::trace!("[SlidingWindow] IMU prior predicted pose inversion failed; skipping IMU residual");
+                    log::warn!("[SlidingWindow] IMU prior predicted pose inversion failed; skipping IMU residual");
                 }
             }
         }
 
         // Add marginalization prior if available
         if let Some(marg_prior) = self.marginalization_manager.get_prior() {
-            log::trace!(
+            log::debug!(
                 "[SlidingWindow] Adding marginalization prior with {} parameters, residual_dim={}",
                 marg_prior.param_ids.len(),
                 marg_prior.residual_dim
@@ -770,7 +717,7 @@ impl SlidingWindow {
         let num_residuals = problem.num_residual_blocks();
         let num_variables = initial_values.len();
 
-        log::trace!(
+        log::debug!(
             "Added SE3 and R3 variables, now {} variables total, {} residual blocks",
             num_variables,
             num_residuals
@@ -817,7 +764,7 @@ impl SlidingWindow {
 
                     match fallback_solver.optimize(&problem, &initial_values) {
                         Ok(result) => {
-                            log::trace!("[SlidingWindow] Fallback solver succeeded");
+                            log::debug!("[SlidingWindow] Fallback solver succeeded");
                             result
                         },
                         Err(e2) => {
@@ -850,7 +797,7 @@ impl SlidingWindow {
                 .marginalization_manager
                 .should_marginalize(self.keyframes.len())
             {
-                log::trace!("[SlidingWindow] Window is full, performing marginalization");
+                log::debug!("[SlidingWindow] Window is full, performing marginalization");
 
                 // Build parameter blocks for marginalization
                 let param_blocks = self.build_param_blocks_for_marginalization();
@@ -867,7 +814,7 @@ impl SlidingWindow {
                 // Identify which parameters to keep and which to marginalize
                 // Keep all current keyframes and landmarks, marginalize oldest
                 let n_keyframes = self.keyframes.len();
-                let _n_keep_keyframes = n_keyframes.saturating_sub(1);
+                let _n_keep_keyframes = if n_keyframes > 1 { n_keyframes - 1 } else { 0 };
                 let marg_keyframe_idx = 0; // Marginalize oldest keyframe
 
                 let mut keep_ids = Vec::new();
@@ -885,7 +832,7 @@ impl SlidingWindow {
                 ));
 
                 // All landmarks to keep (we'll marginalize old ones later based on age)
-                for fid in self.map_points.keys() {
+                for (fid, _) in &self.map_points {
                     keep_ids.push(crate::optimization::marginalization::ParamId::Landmark(
                         *fid,
                     ));
@@ -899,7 +846,7 @@ impl SlidingWindow {
                     &keep_ids,
                     &marg_ids,
                 ) {
-                    log::trace!(
+                    log::debug!(
                         "[SlidingWindow] Marginalization successful. Prior dimension: {}",
                         prior.param_ids.len()
                     );
@@ -910,7 +857,7 @@ impl SlidingWindow {
                 }
             }
 
-            log::trace!(
+            log::debug!(
                 "[SlidingWindow] Optimization successful. Initial cost: {:.3}, final cost: {:.3}",
                 opt_result.initial_cost,
                 opt_result.final_cost
@@ -1058,7 +1005,7 @@ impl SlidingWindow {
         self.map_points
             .extend(saved_map_points.iter().map(|(k, v)| (*k, *v)));
 
-        log::trace!(
+        log::debug!(
             "[SlidingWindow] Reverted {} keyframe poses and {} map points",
             saved_keyframe_poses.len(),
             saved_map_points.len()
@@ -1160,7 +1107,7 @@ impl SlidingWindow {
                         match mat.try_inverse() {
                             Some(inv) => frame.state.T_W_B = inv,
                             None => {
-                                log::trace!("[SlidingWindow] Optimized T_B_W matrix is singular for KF_{}, keeping previous pose", frame_id);
+                                log::warn!("[SlidingWindow] Optimized T_B_W matrix is singular for KF_{}, keeping previous pose", frame_id);
                             }
                         }
                     }
@@ -1295,18 +1242,18 @@ impl SlidingWindow {
                         return Ok(None);
                     },
                 };
-                log::trace!(
+                log::debug!(
                     "[SlidingWindow] Motion tracking successful. Initial cost: {:.3}, final cost: {:.3}",
                     opt_result.initial_cost,
                     opt_result.final_cost
                 );
                 Ok(Some(T_W_B_opt))
             } else {
-                log::trace!("[SlidingWindow] Motion tracking: optimized pose not found in result");
+                log::warn!("[SlidingWindow] Motion tracking: optimized pose not found in result");
                 Ok(None)
             }
         } else {
-            log::trace!(
+            log::warn!(
                 "[SlidingWindow] Motion tracking failed (status: {:?})",
                 opt_result.status
             );

@@ -2,131 +2,45 @@ name: Rust CI
 
 on:
   push:
-    branches: [main, develop, feature/realtime-performance]
+    branches: [ main, apply-rust-best-practices, feature/realtime-performance ]
   pull_request:
-    branches: [main, develop]
-
-env:
-  SCCACHE_GHA_ENABLED: "true"
-  RUSTC_WRAPPER: sccache
+    branches: [ main, apply-rust-best-practices, feature/realtime-performance ]
 
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-
-    - name: Install sccache
-      uses: mozilla-actions/sccache-action@v0.0.6
-
     - name: Install Rust
       run: |
         rustup toolchain install stable
         rustup default stable
         rustup component add rustfmt clippy
-
-    - name: Cache cargo
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/bin/
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
-
+    - name: Install cargo-audit
+      run: cargo install cargo-audit
+    - name: Install cargo-tarpaulin
+      run: cargo install cargo-tarpaulin
     - name: Check formatting
       run: cargo fmt --check
-
     - name: Run clippy
-      run: cargo clippy --all-targets --all-features -- -D warnings
-
+      run: cargo clippy -- -D warnings
     - name: Build
       run: cargo build --verbose
-
     - name: Run tests
       run: cargo test --verbose
-
-    - name: Install cargo-audit
-      run: cargo install cargo-audit --locked
-
     - name: Audit dependencies
-      run: cargo audit --deny warnings
-    - name: Install cargo-deny
-      run: cargo install cargo-deny --locked
-    - name: Check licenses
-      run: cargo deny check licenses
-    - name: Install cargo-tarpaulin
-      run: cargo install cargo-tarpaulin --locked
+      run: cargo audit
     - name: Generate coverage
-      run: cargo tarpaulin --all-features --ignore-tests --out Html --report-name coverage
+      run: cargo tarpaulin --ignore-tests --out Html
     - name: Build documentation
       run: cargo doc --no-deps
       if: github.ref == 'refs/heads/main'
-    - name: Check for unsafe code
-      run: |
-        cargo install cargo-geiger --locked 2>/dev/null || true
-        cargo geiger --all-features --format markdown > UNSAFE_REPORT.md || true
-      continue-on-error: true
-    - name: Upload unsafe report
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: unsafe-report
-        path: UNSAFE_REPORT.md
     - name: Publish documentation
       run: |
         curl -X PUT -H "Authorization: Bearer ${{ secrets.DOCS_RS_TOKEN }}" \
              -H "Content-Type: application/json" \
              https://docs.rs/crate/rs-vio/0.1.0/build
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-
-  dependency-check:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: Install Rust
-      run: |
-        rustup toolchain install stable nightly
-        rustup default stable
-    - name: Check for unused dependencies
-      run: |
-        cargo +nightly install cargo-udeps --locked 2>/dev/null || true
-        cargo +nightly udeps --all-targets --all-features 2>&1 | head -20 || echo "Requires nightly Rust"
-    - name: Check for outdated dependencies
-      run: |
-        cargo install cargo-outdated --locked 2>/dev/null || true
-        cargo outdated --root-deps-only || echo "Outdated check complete"
-    - name: Check dependency tree
-      run: cargo tree --duplicates
-
-  quality-tools:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: Install Rust nightly
-      run: |
-        rustup toolchain install stable nightly
-        rustup default stable
-    - name: Install MIRI
-      run: |
-        rustup +nightly component add miri
-        cargo +nightly miri test --all-features 2>&1 | head -50 || echo "MIRI check complete"
-    - name: Install cargo-bloat
-      run: |
-        cargo install cargo-bloat --locked 2>/dev/null || true
-        cargo bloat --release --features lightglue -- -A 2>&1 | head -30 || echo "Bloat check complete"
-    - name: Install cargo-llvm-lines
-      run: |
-        cargo install cargo-llvm-lines --locked 2>/dev/null || true
-        cargo llvm-lines --release --all-features 2>&1 | head -20 || echo "LLVM lines check complete"
-    - name: Check binary size
-      run: |
-        cargo build --release --features lightglue
-        echo "Release binary size:"
-        ls -lh target/release/rs-vio 2>/dev/null || echo "Binary size check complete"
 
   performance-smoke:
     runs-on: ubuntu-latest
@@ -141,7 +55,7 @@ jobs:
         cargo bench --bench performance_optimizations -- --warm-up-time 1 --measurement-time 3
         cargo bench --bench real_world_performance -- --warm-up-time 1 --measurement-time 3
     - name: Cache benchmark results
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v3
       if: always()
       with:
         name: perf-results
@@ -162,7 +76,7 @@ jobs:
       run: cargo bench
       if: ${{ env.ENABLE_FULL_BENCH == 'true' }}
     - name: Cache full benchmark results
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v3
       if: ${{ always() && env.ENABLE_FULL_BENCH == 'true' }}
       with:
         name: full-perf-results

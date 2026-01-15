@@ -16,15 +16,18 @@ use nalgebra as na;
 use nalgebra::{DMatrix, DVector};
 use std::f64::consts::PI;
 
+/// ============================================================================
+/// 1. GRAVITY MODELING (SOTA)
+/// ============================================================================
+
 /// Gravity vector in world frame (fixed during optimization in most cases)
 ///
 /// Recommended approach:
 /// - Fix gravity magnitude and direction (down) during initial BA
 /// - Optionally estimate roll/pitch during initialization if needed
-///
+#[derive(Debug, Clone, Copy)]
 /// World frame Z-axis points up (opposite to gravity direction)
 /// Gravity = [0, 0, -g] in world frame (right-hand Z-up convention)
-#[derive(Debug, Clone, Copy)]
 pub struct GravityModel {
     /// Gravity acceleration magnitude (m/s²), typically ~9.81
     pub magnitude: f64,
@@ -49,6 +52,7 @@ impl GravityModel {
 /// ============================================================================
 /// 2. INTER-KEYFRAME IMU PREINTEGRATION FACTOR (SOTA)
 /// ============================================================================
+
 /// Inter-keyframe IMU factor for tight coupling
 ///
 /// This factor models the IMU preintegration constraint between two keyframes.
@@ -134,9 +138,9 @@ impl InterKeyframeImuFactor {
         let information = cov.try_inverse().unwrap_or(na::Matrix6::identity());
 
         // Jacobians w.r.t. biases (for online refinement)
-        let jacobian_pos_bias = preintegration.cov_p_ba;
-        let jacobian_vel_bias = preintegration.cov_v_ba;
-        let jacobian_rot_bias = preintegration.cov_R_bw;
+        let jacobian_pos_bias = preintegration.cov_p_ba.clone();
+        let jacobian_vel_bias = preintegration.cov_v_ba.clone();
+        let jacobian_rot_bias = preintegration.cov_R_bw.clone();
 
         Self {
             dt,
@@ -155,7 +159,6 @@ impl InterKeyframeImuFactor {
     /// Residuals (6D):
     /// - r_p (3D): position prediction error
     /// - r_v (3D): velocity prediction error
-    #[allow(clippy::too_many_arguments)]
     pub fn compute_residual(
         &self,
         T_W_B_i: Matrix4x4, // Pose at keyframe i
@@ -229,12 +232,6 @@ pub struct BiasRefinement {
     /// Bias uncertainty threshold (meters/s² and rad/s)
     pub max_accel_bias: f64, // Typically 0.5 m/s²
     pub max_gyro_bias: f64, // Typically 0.1 rad/s
-}
-
-impl Default for BiasRefinement {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl BiasRefinement {
@@ -407,7 +404,6 @@ impl Factor for InterKeyframeImuFactor {
 // ============================================================================
 
 /// Convert rotation matrix to axis-angle representation (3D vector)
-#[allow(clippy::expect_used)]
 fn matrix_to_axis_angle(R: &na::Matrix3<f64>) -> Vector3 {
     // Use Rodrigues' formula inverse
     let trace = R[(0, 0)] + R[(1, 1)] + R[(2, 2)];
@@ -426,9 +422,9 @@ fn matrix_to_axis_angle(R: &na::Matrix3<f64>) -> Vector3 {
         let idx = diag
             .iter()
             .enumerate()
-            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(idx, _)| idx)
-            .expect("Diag should not be empty");
+            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+            .unwrap()
+            .0;
 
         let mut v = Vector3::zeros();
         match idx {
@@ -460,7 +456,6 @@ fn matrix_to_axis_angle(R: &na::Matrix3<f64>) -> Vector3 {
 }
 
 #[cfg(test)]
-#[allow(clippy::all)]
 mod tests {
     use super::*;
 
