@@ -107,8 +107,23 @@ impl Estimator {
         let feature_config = config.feature_detection.clone();
 
         // Compute the transformation from left to right (T_C1_C0) as in compute_stereo.
-        let T_B_Cl = na::Matrix4::from_row_slice(&config.camera.T_B_Cl);
-        let T_B_Cr = na::Matrix4::from_row_slice(&config.camera.T_B_Cr);
+        // Cast f64 config values to Float for f32/f64 compatibility
+        let T_B_Cl = na::Matrix4::from_row_slice(
+            &config
+                .camera
+                .T_B_Cl
+                .iter()
+                .map(|&x| x as Float)
+                .collect::<Vec<_>>(),
+        );
+        let T_B_Cr = na::Matrix4::from_row_slice(
+            &config
+                .camera
+                .T_B_Cr
+                .iter()
+                .map(|&x| x as Float)
+                .collect::<Vec<_>>(),
+        );
         let keyframe_window_size = config.keyframe_management.keyframe_window_size as usize;
         let processing_timeout_ms = config.keyframe_management.processing_timeout_ms;
 

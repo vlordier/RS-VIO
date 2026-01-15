@@ -34,6 +34,14 @@ pub mod float_const {
     pub const EPSILON: Float = 1e-10 as Float;
 }
 
+/// Macro to cast literals to Float type (f32 or f64)
+#[macro_export]
+macro_rules! fl {
+    ($val:expr) => {
+        $val as $crate::types::Float
+    };
+}
+
 // Re-export nalgebra types with the configured float precision
 use nalgebra as na;
 pub type Matrix4x4 = na::Matrix4<Float>;
