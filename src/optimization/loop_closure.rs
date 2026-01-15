@@ -10,14 +10,13 @@
 //! - **Geometric Verification**: Validates candidates with epipolar/homography checks
 //! - **Constraint Generation**: Creates optimization constraints from valid loop closures
 //! - **Covariance Estimation**: Estimates uncertainty of loop closure constraints
-//! - **ORB Descriptors**: Efficient binary descriptors for real-time matching
 //!
 //! ## Algorithm Overview
 //!
 //! ```text
 //! New Keyframe
 //!     ↓
-//! Extract Features & Descriptor (Simple or ORB)
+//! Extract Features & Descriptor
 //!     ↓
 //! Search Keyframe Database
 //!     ↓
@@ -32,27 +31,14 @@
 //!
 //! ## References
 //!
-//! - Rublee et al., "ORB: An Efficient Alternative to SIFT or SURF", ICCV 2011
 //! - Lowe, "Distinctive Image Features from Scale-Invariant Keypoints", IJCV 2004
 //! - Fischler & Bolles, "Random Sample Consensus", CACM 1981
 //! - Lepetit & Fua, "Keypoint Recognition Using Randomized Trees", TPAMI 2006
 
-pub mod bow_retriever;
-pub mod enhanced_verifier;
-#[cfg(feature = "lightglue")]
-pub mod lightglue;
-pub mod orb;
-pub mod orb_matcher;
-pub mod pnp_ransac;
-pub mod vocabulary;
-
-use crate::Result;
 use nalgebra as na;
 use serde::{Deserialize, Serialize};
+use crate::Result;
 use std::collections::BTreeMap;
-
-pub use orb::{OrbConfig, OrbExtractor, OrbFeature};
-pub use orb_matcher::OrbMatcher;
 
 /// Match statistics returned by a descriptor matcher
 #[derive(Debug, Clone)]
@@ -72,22 +58,14 @@ pub struct VerifiedMatch {
 
 /// Trait for descriptor matching strategies (TOP-friendly for swapping implementations)
 pub trait DescriptorMatcher: Send + Sync {
-    fn match_keyframes(
-        &self,
-        query: &KeyframeDescriptor,
-        candidate: &KeyframeDescriptor,
-    ) -> MatchMetrics;
+    fn match_keyframes(&self, query: &KeyframeDescriptor, candidate: &KeyframeDescriptor) -> MatchMetrics;
 }
 
 /// Simple cosine-similarity matcher producing heuristic match counts
 pub struct CosineMatcher;
 
 impl DescriptorMatcher for CosineMatcher {
-    fn match_keyframes(
-        &self,
-        query: &KeyframeDescriptor,
-        candidate: &KeyframeDescriptor,
-    ) -> MatchMetrics {
+    fn match_keyframes(&self, query: &KeyframeDescriptor, candidate: &KeyframeDescriptor) -> MatchMetrics {
         let similarity = query.similarity(candidate);
         let overlapping_features = query.num_features.min(candidate.num_features).max(1);
         let match_count = (similarity * overlapping_features as f64) as usize;
@@ -166,8 +144,11 @@ impl GeometricVerifier for RansacEpipolarVerifier {
         }
 
         // Simulate correspondence generation (in practice, use actual feature matches)
-        let correspondences =
-            generate_synthetic_correspondences(query, candidate, metrics.match_count);
+        let correspondences = generate_synthetic_correspondences(
+            query,
+            candidate,
+            metrics.match_count,
+        );
 
         // RANSAC loop
         let mut best_inliers = 0;
@@ -214,18 +195,14 @@ impl Default for HammingMatcher {
 }
 
 impl DescriptorMatcher for HammingMatcher {
-    fn match_keyframes(
-        &self,
-        query: &KeyframeDescriptor,
-        candidate: &KeyframeDescriptor,
-    ) -> MatchMetrics {
+    fn match_keyframes(&self, query: &KeyframeDescriptor, candidate: &KeyframeDescriptor) -> MatchMetrics {
         // Convert f64 descriptors to binary for Hamming (simplified - in practice use actual binary descriptors)
         let hamming_dist = compute_hamming_distance(&query.descriptor, &candidate.descriptor);
-
+        
         // Convert Hamming distance to similarity (0-1)
         let max_bits = query.descriptor.len() * 64;
         let similarity = 1.0 - (hamming_dist as f64 / max_bits as f64);
-
+        
         let overlapping_features = query.num_features.min(candidate.num_features).max(1);
         let match_count = (similarity * overlapping_features as f64) as usize;
         let match_ratio = match_count as f64 / overlapping_features as f64;
@@ -324,15 +301,12 @@ pub struct LoopClosureConfig {
 
     /// Maximum age of keyframes in database (in frames)
     pub max_keyframe_database_size: usize,
-
-    /// Descriptor type: "simple" or "orb"
-    pub descriptor_type: String,
 }
 
 impl Default for LoopClosureConfig {
     fn default() -> Self {
         Self {
-            min_frame_gap: 30, // ~1 second at 30 FPS
+            min_frame_gap: 30,                  // ~1 second at 30 FPS
             min_time_gap_ns: None,
             num_candidates: 10,
             min_matches_for_candidate: 10,
@@ -343,7 +317,6 @@ impl Default for LoopClosureConfig {
             translation_sigma: 0.25,
             rotation_sigma: 0.05,
             max_keyframe_database_size: 5000,
-            descriptor_type: "simple".to_string(),
         }
     }
 }
@@ -387,7 +360,7 @@ impl KeyframeDescriptor {
         }
 
         // Normalize to [0, 1] range
-        ((dot_product / magnitude + 1.0) / 2.0).clamp(0.0, 1.0)
+        ((dot_product / magnitude + 1.0) / 2.0).max(0.0).min(1.0)
     }
 }
 
@@ -467,11 +440,7 @@ impl KeyframeDatabase {
             }
         }
 
-        candidates.sort_by(|a, b| {
-            b.2.similarity
-                .partial_cmp(&a.2.similarity)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        candidates.sort_by(|a, b| b.2.similarity.partial_cmp(&a.2.similarity).unwrap());
 
         candidates
             .into_iter()
@@ -508,13 +477,7 @@ pub struct LoopClosureDetector {
 impl LoopClosureDetector {
     /// Create new loop closure detector with default matcher/verifier
     pub fn new(config: LoopClosureConfig) -> Self {
-        Self::new_with(
-            config,
-            Box::new(CosineMatcher),
-            Box::new(SimpleRelativePoseVerifier {
-                min_similarity: 0.2,
-            }),
-        )
+        Self::new_with(config, Box::new(CosineMatcher), Box::new(SimpleRelativePoseVerifier { min_similarity: 0.2 }))
     }
 
     /// Create new loop closure detector with custom matcher/verifier
@@ -567,9 +530,7 @@ impl LoopClosureDetector {
         }
 
         // Search for candidates
-        let candidates = self
-            .database
-            .search_candidates(self.matcher.as_ref(), &descriptor);
+        let candidates = self.database.search_candidates(self.matcher.as_ref(), &descriptor);
 
         let mut valid_closures = Vec::new();
 
@@ -590,8 +551,7 @@ impl LoopClosureDetector {
                     keyframe_id_1: keyframe_id,
                     keyframe_id_2: candidate_id,
                     relative_pose: verified.relative_pose,
-                    information_matrix: self
-                        .estimate_information_matrix(metrics.similarity, verified.inlier_ratio),
+                    information_matrix: self.estimate_information_matrix(metrics.similarity, verified.inlier_ratio),
                 };
 
                 valid_closures.push(constraint);
@@ -602,8 +562,7 @@ impl LoopClosureDetector {
         let timestamp = descriptor.timestamp;
         self.database.add_keyframe(descriptor);
         self.last_detection_keyframe_id = Some(keyframe_id);
-        self.last_detection_timestamp =
-            Some(self.last_detection_timestamp.unwrap_or(0).max(timestamp));
+        self.last_detection_timestamp = Some(self.last_detection_timestamp.unwrap_or(0).max(timestamp));
 
         Ok(valid_closures)
     }
@@ -646,7 +605,6 @@ impl LoopClosureDetector {
 }
 
 #[cfg(test)]
-#[allow(clippy::all)]
 mod tests {
     use super::*;
 
@@ -654,7 +612,9 @@ mod tests {
         KeyframeDescriptor {
             keyframe_id: id,
             timestamp: (id as i64) * 1_000_000,
-            descriptor: (0..10).map(|i| (i as f64 * 0.1 + offset).sin()).collect(),
+            descriptor: (0..10)
+                .map(|i| (i as f64 * 0.1 + offset).sin())
+                .collect(),
             num_features: 100,
             pose: na::Isometry3::new(
                 na::Vector3::new(id as f64 * 0.5, 0.0, 0.0),
@@ -851,10 +811,7 @@ mod tests {
         let rot = info[(3, 3)];
 
         // Smaller sigma for rotation should yield larger rotational information
-        assert!(
-            rot > trans,
-            "rotation info should dominate when rotation sigma is smaller"
-        );
+        assert!(rot > trans, "rotation info should dominate when rotation sigma is smaller");
         assert!(trans > 0.0 && rot > 0.0);
     }
 
@@ -869,9 +826,7 @@ mod tests {
         };
 
         let matcher: Box<dyn DescriptorMatcher> = Box::new(CosineMatcher);
-        let verifier: Box<dyn GeometricVerifier> = Box::new(SimpleRelativePoseVerifier {
-            min_similarity: 0.9,
-        });
+        let verifier: Box<dyn GeometricVerifier> = Box::new(SimpleRelativePoseVerifier { min_similarity: 0.9 });
         let mut detector = LoopClosureDetector::new_with(config, matcher, verifier);
 
         let base = create_test_descriptor(0, 0.0);
@@ -1008,9 +963,7 @@ mod tests {
         };
 
         let matcher: Box<dyn DescriptorMatcher> = Box::new(HammingMatcher::default());
-        let verifier: Box<dyn GeometricVerifier> = Box::new(SimpleRelativePoseVerifier {
-            min_similarity: 0.2,
-        });
+        let verifier: Box<dyn GeometricVerifier> = Box::new(SimpleRelativePoseVerifier { min_similarity: 0.2 });
         let mut detector = LoopClosureDetector::new_with(config, matcher, verifier);
 
         // Add initial keyframes
