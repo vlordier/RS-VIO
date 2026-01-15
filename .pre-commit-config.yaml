@@ -1,58 +1,100 @@
 # Pre-commit hooks configuration for RS-VIO
 # Install with: pre-commit install
 # See: https://pre-commit.com/
+#
+# This configuration is aligned with the GitHub Actions CI in .github/workflows/
+# Run quality pipeline locally: ./scripts/run_quality.sh --quick
 
 repos:
+  # ========================================================================
+  # RUST TOOLS
+  # ========================================================================
+
   # Rust formatting with rustfmt
   - repo: https://github.com/rust-lang/rustfmt
     rev: 1.7.0
     hooks:
       - id: rustfmt
-        args: [--edition, 2021]
+        args: [--edition, 2021, --check]
+        files: ^src/
+        stages: [commit]
 
   # Linting with clippy
   - repo: https://github.com/bwasty/clippy-checks
     rev: v1.1.0
     hooks:
       - id: clippy
-        args: [--all-features, --all-targets, --, -D, warnings]
+        args: [--all-features, --all-targets, --, -D warnings]
+        files: ^src/
+        stages: [commit]
 
-  # General pre-commit hooks
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+  # Check Cargo.toml sorting (cargo-sort)
+  - repo: local
     hooks:
-      # Identify files that would conflict in merge
-      - id: check-merge-conflict
-      
-      # Prevent giant files from being committed
-      - id: check-added-large-files
-        args: ['--maxkb=5000']
-      
-      # Fix end of file newlines
-      - id: end-of-file-fixer
-      
-      # Trim trailing whitespace
-      - id: trailing-whitespace
-      
-      # Check YAML files
-      - id: check-yaml
-      
-      # Check TOML files
-      - id: check-toml
-      
-      # Validate JSON files
-      - id: check-json
-      
-      # Check that files parse as valid Python (if any)
-      - id: check-ast
+      - id: cargo-sort
+        name: cargo sort check
+        description: Check Cargo.toml ordering
+        entry: cargo sort --check Cargo.toml
+        language: system
+        types: [toml]
+        stages: [commit]
 
-  # Check for secrets
+  # ========================================================================
+  # SECURITY TOOLS
+  # ========================================================================
+
+  # Security audit with cargo-deny
+  - repo: local
+    hooks:
+      - id: cargo-deny-audit
+        name: cargo deny check
+        description: Check crate dependencies for known vulnerabilities
+        entry: cargo deny check
+        language: system
+        types: [rust]
+        pass_filenames: false
+        stages: [pre-push]
+
+  # Detect secrets
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.4.0
     hooks:
       - id: detect-secrets
         args: ['--baseline', '.secrets.baseline']
         exclude: Cargo.lock
+        stages: [pre-push]
+
+  # ========================================================================
+  # GENERAL PRE-COMMIT HOOKS
+  # ========================================================================
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      # Identify files that would conflict in merge
+      - id: check-merge-conflict
+
+      # Prevent giant files from being committed
+      - id: check-added-large-files
+        args: ['--maxkb=5000']
+
+      # Fix end of file newlines
+      - id: end-of-file-fixer
+
+      # Trim trailing whitespace
+      - id: trailing-whitespace
+
+      # Check YAML files
+      - id: check-yaml
+
+      # Check TOML files
+      - id: check-toml
+
+      # Validate JSON files
+      - id: check-json
+
+      # Check that files parse as valid Python (if any)
+      - id: check-ast
 
   # Conventional commit linting
   - repo: https://github.com/compilerla/conventional-pre-commit
@@ -61,25 +103,31 @@ repos:
       - id: conventional-pre-commit
         stages: [commit-msg]
 
-  # Security audit with cargo-deny
-  - repo: local
-    hooks:
-      - id: cargo-deny
-        name: cargo deny check
-        description: Check crate dependencies for known vulnerabilities
-        entry: cargo deny check
-        language: system
-        types: [rust]
-        pass_filenames: false
-        stages: [commit]
-
 # Exclude patterns (won't run pre-commit on these)
 exclude: |
   (?x)^(
     Cargo.lock|
     target/|
-    \.git/
+    \.git/|
+    fuzz_targets/|
+    benches/.*
   )
 
 # Minimum pre-commit version
 minimum_pre_commit_version: '2.15.0'
+
+# ========================================================================
+# HOOK STAGES EXPLANATION
+# ========================================================================
+#
+# stages: [commit]      - Runs on every commit (fast: fmt, clippy, basic checks)
+# stages: [commit-msg]  - Runs on commit messages (conventional commits)
+# stages: [pre-push]    - Runs before pushing (security audits)
+#
+# For full quality pipeline, run manually:
+#   ./scripts/run_quality.sh
+#
+# CIequivalent:
+#   .github/workflows/rust.yml   - Core CI (every PR)
+#   .github/workflows/quality.yml - Full quality (weekly/scheduled)
+# ========================================================================
