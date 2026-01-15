@@ -1,3 +1,19 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::float_cmp,
+    clippy::cast_precision_loss,
+    clippy::needless_range_loop,
+    clippy::len_zero,
+    clippy::cast_lossless,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::unnecessary_cast,
+    clippy::assign_op_pattern,
+    clippy::field_reassign_with_default,
+    clippy::redundant_pattern_matching
+)]
+
 use image::{GrayImage, Luma};
 use nalgebra as na;
 /// End-to-end VIO pipeline integration tests

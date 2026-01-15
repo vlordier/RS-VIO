@@ -1,3 +1,10 @@
+#![allow(
+    clippy::cast_precision_loss,
+    clippy::needless_range_loop,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
+
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use image::{GrayImage, Luma};
 use rs_vio::datasets::config::FeatureDetectionConfig;

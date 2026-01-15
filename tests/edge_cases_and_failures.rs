@@ -1,3 +1,15 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::float_cmp,
+    clippy::len_zero,
+    clippy::cast_lossless,
+    clippy::cast_precision_loss,
+    clippy::unnecessary_cast,
+    clippy::assign_op_pattern,
+    clippy::field_reassign_with_default
+)]
+
 //! Edge case and failure tests for API drift fixes
 //!
 //! Validates error handling, boundary conditions, and failure scenarios

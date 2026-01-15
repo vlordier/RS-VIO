@@ -20,9 +20,10 @@
 //!
 //! ## Live Camera Usage
 //!
-//! ```rust
-//! use rs_vio::datasets::{LiveCameraPlayer, PlayerConfig, Config};
+//! ```no_run
+//! use rs_vio::datasets::{LiveCameraPlayer, Config};
 //!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let config = Config::load("config/euroc_vio.yaml")?;
 //! let player = LiveCameraPlayer::new(rs_vio::datasets::LiveCameraConfig {
 //!     camera_index_left: 0,
@@ -30,12 +31,8 @@
 //!     frame_rate: 30,
 //!     ..Default::default()
 //! });
-//!
-//! let result = player.run(PlayerConfig {
-//!     config_path: "config/euroc_vio.yaml".to_string(),
-//!     dataset_path: "/dev/video".to_string(),
-//!     ..Default::default()
-//! })?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ## Dataset Formats
@@ -88,7 +85,7 @@ pub use fourseasons_player::FourSeasonsPlayer;
 pub use live_camera_player::{LiveCameraConfig, LiveCameraPlayer};
 pub use tum_vi_player::TUMVIPlayer;
 
-use crate::datasets::config::Config;
+pub use crate::datasets::config::Config;
 use camera_intrinsic_model::generic_model::CameraModel;
 use camera_intrinsic_model::models::opencv5::OpenCVModel5;
 use camera_intrinsic_model::models::EUCM;
