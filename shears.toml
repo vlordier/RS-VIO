@@ -1,0 +1,20 @@
+# Cargo-shears configuration for RS-VIO
+# Detects unused feature flags that silently rot
+
+[shears]
+# Ignore these features (they're intentionally used conditionally)
+ignore = [
+    "use_f32",        # Float precision toggle
+    "lightglue",      # ONNX-based matching (optional)
+]
+
+# Features that must be documented
+documented_features = [
+    "use_f32",
+    "lightglue",
+]
+
+# Check that features don't conflict
+feature_conflicts = [
+    # Add known feature conflicts here
+]

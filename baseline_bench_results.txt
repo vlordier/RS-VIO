@@ -1,0 +1,50 @@
+   Compiling rs-vio v0.2.0 (/Users/vincent/Work/RS-VIO)
+    Finished `bench` profile [optimized] target(s) in 57.57s
+     Running benches/feature_tracker.rs (target/release/deps/feature_tracker-4718113501d0902e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running benches/imu_bench.rs (target/release/deps/imu_bench-fda79df321459629)
+=== IMU Benchmark Suite ===
+
+1. IMU Preintegration Benchmark
+   Processing IMU samples and computing preintegrated measurements
+
+       10 Hz frame rate: 0.10 μs/sample (10289 kHz throughput)
+       20 Hz frame rate: 0.06 μs/sample (16892 kHz throughput)
+       50 Hz frame rate: 0.05 μs/sample (21966 kHz throughput)
+      100 Hz frame rate: 0.04 μs/sample (25406 kHz throughput)
+      200 Hz frame rate: 0.04 μs/sample (28284 kHz throughput)
+     1000 Hz frame rate: 0.03 μs/sample (34382 kHz throughput)
+
+2. IMU Motion Prediction Benchmark
+   Predicting feature displacement from gyroscope
+
+       10 Hz frame rate: 0.00 μs/call (631313 kHz throughput)
+       20 Hz frame rate: 0.00 μs/call (352983 kHz throughput)
+       50 Hz frame rate: 0.01 μs/call (195122 kHz throughput)
+      100 Hz frame rate: 0.01 μs/call (73616 kHz throughput)
+      200 Hz frame rate: 0.02 μs/call (46874 kHz throughput)
+     1000 Hz frame rate: 0.11 μs/call (8905 kHz throughput)
+
+3. IMU Bias Estimation Benchmark
+   Estimating gyro and accelerometer biases from samples
+
+         100+0.5ms init: 0.02 μs/sample
+
+4. IMU Bias Correction Benchmark
+   Applying bias correction to IMU measurements
+
+        bias correction: 0.00 μs/call (2439024390 kHz throughput)
+
+=== Benchmark Summary ===
+All IMU processing modes benchmarked at various frame rates.
+Key metrics:
+  - Preintegration: fast per-sample processing
+  - Motion prediction: fast per-call processing
+  - Bias estimation: {<}10 μs per-sample
+  - Bias correction: fast per-call processing
+
+Real-time capable up to 200Hz with margin for all modes.

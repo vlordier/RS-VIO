@@ -1,0 +1,118 @@
+   Compiling rs-vio v0.2.0 (/Users/vincent/Work/RS-VIO)
+    Finished `bench` profile [optimized] target(s) in 18.04s
+     Running benches/performance_optimizations.rs (target/release/deps/performance_optimizations-b31caee5739e2d56)
+Gnuplot not found, using plotters backend
+Benchmarking residuals_scalar
+Benchmarking residuals_scalar: Warming up for 3.0000 s
+Benchmarking residuals_scalar: Collecting 100 samples in estimated 5.0001 s (175M iterations)
+Benchmarking residuals_scalar: Analyzing
+residuals_scalar        time:   [28.535 ns 28.624 ns 28.733 ns]
+Found 6 outliers among 100 measurements (6.00%)
+  2 (2.00%) low mild
+  2 (2.00%) high mild
+  2 (2.00%) high severe
+
+Benchmarking residuals_simd
+Benchmarking residuals_simd: Warming up for 3.0000 s
+Benchmarking residuals_simd: Collecting 100 samples in estimated 5.0001 s (161M iterations)
+Benchmarking residuals_simd: Analyzing
+residuals_simd          time:   [30.888 ns 30.953 ns 31.025 ns]
+Found 4 outliers among 100 measurements (4.00%)
+  1 (1.00%) low mild
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking stats_scalar
+Benchmarking stats_scalar: Warming up for 3.0000 s
+Benchmarking stats_scalar: Collecting 100 samples in estimated 5.0004 s (62M iterations)
+Benchmarking stats_scalar: Analyzing
+stats_scalar            time:   [80.674 ns 80.860 ns 81.107 ns]
+Found 7 outliers among 100 measurements (7.00%)
+  3 (3.00%) high mild
+  4 (4.00%) high severe
+
+Benchmarking stats_simd
+Benchmarking stats_simd: Warming up for 3.0000 s
+Benchmarking stats_simd: Collecting 100 samples in estimated 5.0002 s (62M iterations)
+Benchmarking stats_simd: Analyzing
+stats_simd              time:   [80.604 ns 80.813 ns 81.097 ns]
+Found 12 outliers among 100 measurements (12.00%)
+  4 (4.00%) high mild
+  8 (8.00%) high severe
+
+Benchmarking patch_operations/residuals_scalar/10
+Benchmarking patch_operations/residuals_scalar/10: Warming up for 3.0000 s
+Benchmarking patch_operations/residuals_scalar/10: Collecting 100 samples in estimated 5.0001 s (176M iterations)
+Benchmarking patch_operations/residuals_scalar/10: Analyzing
+patch_operations/residuals_scalar/10
+                        time:   [28.320 ns 28.370 ns 28.430 ns]
+Found 7 outliers among 100 measurements (7.00%)
+  2 (2.00%) low severe
+  2 (2.00%) low mild
+  3 (3.00%) high mild
+Benchmarking patch_operations/residuals_simd/10
+Benchmarking patch_operations/residuals_simd/10: Warming up for 3.0000 s
+Benchmarking patch_operations/residuals_simd/10: Collecting 100 samples in estimated 5.0001 s (164M iterations)
+Benchmarking patch_operations/residuals_simd/10: Analyzing
+patch_operations/residuals_simd/10
+                        time:   [30.687 ns 30.777 ns 30.882 ns]
+Found 8 outliers among 100 measurements (8.00%)
+  1 (1.00%) low mild
+  4 (4.00%) high mild
+  3 (3.00%) high severe
+Benchmarking patch_operations/residuals_scalar/20
+Benchmarking patch_operations/residuals_scalar/20: Warming up for 3.0000 s
+Benchmarking patch_operations/residuals_scalar/20: Collecting 100 samples in estimated 5.0001 s (176M iterations)
+Benchmarking patch_operations/residuals_scalar/20: Analyzing
+patch_operations/residuals_scalar/20
+                        time:   [28.357 ns 28.422 ns 28.494 ns]
+Found 7 outliers among 100 measurements (7.00%)
+  4 (4.00%) low mild
+  3 (3.00%) high mild
+Benchmarking patch_operations/residuals_simd/20
+Benchmarking patch_operations/residuals_simd/20: Warming up for 3.0000 s
+Benchmarking patch_operations/residuals_simd/20: Collecting 100 samples in estimated 5.0001 s (163M iterations)
+Benchmarking patch_operations/residuals_simd/20: Analyzing
+patch_operations/residuals_simd/20
+                        time:   [30.613 ns 30.747 ns 30.899 ns]
+Found 8 outliers among 100 measurements (8.00%)
+  5 (5.00%) low mild
+  3 (3.00%) high severe
+Benchmarking patch_operations/residuals_scalar/50
+Benchmarking patch_operations/residuals_scalar/50: Warming up for 3.0000 s
+Benchmarking patch_operations/residuals_scalar/50: Collecting 100 samples in estimated 5.0000 s (176M iterations)
+Benchmarking patch_operations/residuals_scalar/50: Analyzing
+patch_operations/residuals_scalar/50
+                        time:   [28.392 ns 28.507 ns 28.636 ns]
+Found 6 outliers among 100 measurements (6.00%)
+  2 (2.00%) low mild
+  2 (2.00%) high mild
+  2 (2.00%) high severe
+Benchmarking patch_operations/residuals_simd/50
+Benchmarking patch_operations/residuals_simd/50: Warming up for 3.0000 s
+Benchmarking patch_operations/residuals_simd/50: Collecting 100 samples in estimated 5.0000 s (162M iterations)
+Benchmarking patch_operations/residuals_simd/50: Analyzing
+patch_operations/residuals_simd/50
+                        time:   [30.645 ns 30.725 ns 30.819 ns]
+Found 6 outliers among 100 measurements (6.00%)
+  1 (1.00%) low severe
+  3 (3.00%) low mild
+  2 (2.00%) high severe
+Benchmarking patch_operations/residuals_scalar/100
+Benchmarking patch_operations/residuals_scalar/100: Warming up for 3.0000 s
+Benchmarking patch_operations/residuals_scalar/100: Collecting 100 samples in estimated 5.0000 s (175M iterations)
+Benchmarking patch_operations/residuals_scalar/100: Analyzing
+patch_operations/residuals_scalar/100
+                        time:   [28.331 ns 28.376 ns 28.424 ns]
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) low mild
+Benchmarking patch_operations/residuals_simd/100
+Benchmarking patch_operations/residuals_simd/100: Warming up for 3.0000 s
+Benchmarking patch_operations/residuals_simd/100: Collecting 100 samples in estimated 5.0001 s (162M iterations)
+Benchmarking patch_operations/residuals_simd/100: Analyzing
+patch_operations/residuals_simd/100
+                        time:   [30.621 ns 30.676 ns 30.733 ns]
+Found 4 outliers among 100 measurements (4.00%)
+  3 (3.00%) low mild
+  1 (1.00%) high mild
+

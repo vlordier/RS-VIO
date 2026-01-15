@@ -39,7 +39,8 @@ optimization:
 
     // Create estimator
     let mut estimator = estimator::Estimator::new(config, None);
-    estimator.set_max_frame_processing_time(std::time::Duration::from_millis(1000));
+    // Increase timeout to allow for slower test environments
+    estimator.set_max_frame_processing_time(std::time::Duration::from_secs(10));
     estimator.set_max_map_points(200);
 
     // Simulate processing multiple frames

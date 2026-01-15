@@ -1,0 +1,48 @@
+# Rustfmt configuration for RS-VIO
+# Ensures consistent code style across the codebase
+
+# Basic formatting
+edition = "2021"
+group_imports = "StdExternalCrate"
+imports_granularity = "Crate"
+reorder_imports = true
+reorder_modules = true
+
+# Indentation and spacing
+indent_style = "visual"
+tab_spaces = 4
+hard_tabs = false
+
+# Line width
+max_width = 100
+ideal_width = 100
+struct_lit_width = "NextLineBreak"
+fn_single_line = false
+
+# Blank lines
+blank_lines_upper_bound = 2
+blank_lines_lower_bound = 1
+
+# Comments
+comment_width = 100
+wrap_comments = true
+normalize_doc_attributes = true
+
+# Imports
+force_multiline_blocks = true
+merge_derives = true
+use_try_shorthand = false
+use_field_init_shorthand = true
+
+# Patterns
+pattern_width = "Break"
+force_explicit_abi = false
+
+# Arrays
+trailing_comma = "Vertical"
+fn_args_layout = "Compressed"
+
+# Where clauses
+where_indent = "Indent"
+where_pred_indent = "Indent"
+single_line_if_else = false

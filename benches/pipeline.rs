@@ -20,14 +20,17 @@
     clippy::unwrap_used,
     clippy::expect_used,
     clippy::panic,
-    clippy::missing_const_for_fn
+    clippy::missing_const_for_fn,
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_lossless,
+    clippy::cast_sign_loss,
+    clippy::implicit_saturating_sub
 )]
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use nalgebra as na;
 use rs_vio::datasets::config::Config;
 use rs_vio::estimator::Estimator;
-use std::time::Duration;
 
 fn create_stereo_pair(width: usize, height: usize, offset: usize) -> (Vec<u8>, Vec<u8>) {
     let mut left = vec![0u8; width * height];
@@ -101,7 +104,7 @@ fn bench_vio_pipeline_latency(c: &mut Criterion) {
                 let (left, right) = black_box(create_stereo_pair(width, height, 5));
 
                 b.iter(|| {
-                    let _result = estimator.process_frame(&left, &right, 1000000000u64, None);
+                    let _result = estimator.process_frame(&left, &right, 1000000000i64, None);
                 });
             },
         );
@@ -126,7 +129,7 @@ fn bench_vio_stream_throughput(c: &mut Criterion) {
                     let mut estimator = Estimator::new(config.clone(), None);
 
                     for frame_id in 0..num_frames {
-                        let timestamp_ns = (frame_id as u64) * 33333333; // ~30 FPS
+                        let timestamp_ns = (frame_id as i64) * 33333333; // ~30 FPS
                         let _result = estimator.process_frame(&left, &right, timestamp_ns, None);
                     }
                 });
@@ -149,7 +152,7 @@ fn bench_vio_initialization_phase(c: &mut Criterion) {
             let mut estimator = Estimator::new(black_box(config.clone()), None);
 
             for frame_id in 0..5 {
-                let timestamp_ns = (frame_id as u64) * 33333333;
+                let timestamp_ns = (frame_id as i64) * 33333333;
                 let _result = estimator.process_frame(
                     black_box(&left),
                     black_box(&right),
@@ -180,7 +183,7 @@ fn bench_memory_overhead(c: &mut Criterion) {
                     let mut estimator = Estimator::new(config.clone(), None);
 
                     for frame_id in 0..num_frames {
-                        let timestamp_ns = (frame_id as u64) * 33333333;
+                        let timestamp_ns = (frame_id as i64) * 33333333;
                         let _result = estimator.process_frame(&left, &right, timestamp_ns, None);
                     }
                     // The state should be inspected for memory usage
@@ -197,17 +200,17 @@ fn bench_realtime_deadline_compliance(c: &mut Criterion) {
 
     // Typical embedded VIO needs to process within 33ms (30 FPS) or 16ms (60 FPS)
     for target_fps in &[30, 60] {
-        let deadline_ms = 1000 / target_fps;
+        let _deadline_ms = 1000 / target_fps;
         group.bench_with_input(
             BenchmarkId::new("target_fps", target_fps),
             target_fps,
-            |b, &target_fps| {
+            |b, &_target_fps| {
                 let config = black_box(create_vio_config(640, 480));
                 let mut estimator = Estimator::new(config, None);
                 let (left, right) = black_box(create_stereo_pair(640, 480, 5));
 
                 b.iter(|| {
-                    let _result = estimator.process_frame(&left, &right, 1000000000u64, None);
+                    let _result = estimator.process_frame(&left, &right, 1000000000i64, None);
                 });
             },
         );
