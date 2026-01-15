@@ -39,6 +39,8 @@
 
 pub mod orb;
 pub mod orb_matcher;
+pub mod vocabulary;
+pub mod bow_retriever;
 
 use nalgebra as na;
 use serde::{Deserialize, Serialize};
