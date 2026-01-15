@@ -43,8 +43,8 @@ pub use initialization::{
 };
 
 use crate::datasets::ImuData;
-use crate::types::Float;
 use crate::fl;
+use crate::types::Float;
 use nalgebra as na;
 
 /// Configuration for IMU processing
@@ -686,7 +686,8 @@ impl ImuAidedKeyframeSelector {
             let dt = fl!((imu.timestamp - last_ts) as f64 / 1e9);
             if dt > fl!(0.0) {
                 let gyro = na::Vector3::new(fl!(imu.gyro[0]), fl!(imu.gyro[1]), fl!(imu.gyro[2]));
-                let accel = na::Vector3::new(fl!(imu.accel[0]), fl!(imu.accel[1]), fl!(imu.accel[2]));
+                let accel =
+                    na::Vector3::new(fl!(imu.accel[0]), fl!(imu.accel[1]), fl!(imu.accel[2]));
 
                 // Rotation integration
                 let delta_rot = na::UnitQuaternion::new(gyro * dt);

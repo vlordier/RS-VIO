@@ -10,8 +10,8 @@
 // - Forster et al. (2016): "On-Manifold Preintegration for Real-Time Visual-Inertial Odometry"
 // - Lowe et al. (2020): "Direct Visual-Inertial Odometry with Stereo Cameras"
 
-use crate::types::{Float, Matrix4x4, Vector3};
 use crate::fl;
+use crate::types::{Float, Matrix4x4, Vector3};
 use apex_solver::factors::Factor;
 use nalgebra as na;
 use nalgebra::{DMatrix, DVector};
@@ -42,7 +42,9 @@ impl GravityModel {
 
     /// Standard Earth gravity (9.81 m/s²)
     pub fn earth() -> Self {
-        Self { magnitude: fl!(9.81) }
+        Self {
+            magnitude: fl!(9.81),
+        }
     }
 
     /// Get gravity vector in world frame
@@ -415,7 +417,9 @@ impl Factor for InterKeyframeImuFactor {
 fn matrix_to_axis_angle(R: &na::Matrix3<Float>) -> Vector3 {
     // Use Rodrigues' formula inverse
     let trace = R[(0, 0)] + R[(1, 1)] + R[(2, 2)];
-    let angle = ((trace - fl!(1.0)) / fl!(2.0)).clamp(fl!(-1.0), fl!(1.0)).acos();
+    let angle = ((trace - fl!(1.0)) / fl!(2.0))
+        .clamp(fl!(-1.0), fl!(1.0))
+        .acos();
 
     if angle.abs() < fl!(1e-6) {
         // Small angle: use skew-symmetric part
@@ -426,11 +430,15 @@ fn matrix_to_axis_angle(R: &na::Matrix3<Float>) -> Vector3 {
         ) * fl!(0.5)
     } else if (angle - fl!(PI)).abs() < fl!(1e-6) {
         // Angle close to π: extract from diagonal
-        let diag = [R[(0, 0)] + fl!(1.0), R[(1, 1)] + fl!(1.0), R[(2, 2)] + fl!(1.0)];
+        let diag = [
+            R[(0, 0)] + fl!(1.0),
+            R[(1, 1)] + fl!(1.0),
+            R[(2, 2)] + fl!(1.0),
+        ];
         let idx = diag
             .iter()
             .enumerate()
-            .max_by(|a, b| a.total_cmp(b))
+            .max_by(|a, b| a.1.total_cmp(b.1))
             .map(|(i, _)| i)
             .unwrap_or(0);
 
