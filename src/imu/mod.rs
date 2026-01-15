@@ -8,6 +8,8 @@
 //!   using accumulated IMU measurements
 //! - **Motion Prediction**: Uses gyroscope to predict feature displacement
 //! - **Velocity Estimation**: Derives velocity from accelerometer integration
+//! - **Robust Initialization**: Bias estimation and gravity alignment
+//! - **Adaptive Noise**: Quality-based measurement noise estimation
 //!
 //! ## Algorithm
 //!
@@ -32,6 +34,12 @@
 //!   Visual-Inertial SLAM", RSS 2017
 //! - Lupton & Sukkarieh, "Visual-Inertial-Aided Navigation for
 //!   High-Dynamic Motion in GPS-Denied Environments", 2011
+
+pub mod initialization;
+
+pub use initialization::{
+    AdaptiveNoiseEstimator, BiasEstimate, ImuInitializationConfig, ImuInitializer, InitializationState,
+};
 
 use crate::datasets::ImuData;
 use nalgebra as na;
