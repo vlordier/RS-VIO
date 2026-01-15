@@ -560,3 +560,66 @@ pub fn load_image_from_mav0(dataset_path: &str, filename: &str, cam_id: u32) -> 
     let gray_img = img.to_luma8();
     Ok(gray_img.into_raw())
 }
+
+/// Parse a line of IMU data from CSV or whitespace-delimited format
+///
+/// This helper function eliminates duplicate IMU parsing code across
+/// EuRoC, TUM-VI, and 4Seasons dataset players.
+///
+/// # Arguments
+/// * `line` - The line to parse
+/// * `delimiter` - The delimiter character (',' for CSV, ' ' for whitespace)
+///
+/// # Returns
+/// A `Result` containing the parsed `ImuData` or an error message
+///
+/// # Format
+/// Expected format: `timestamp gyro_x gyro_y gyro_z accel_x accel_y accel_z`
+/// - timestamp: nanoseconds (i64)
+/// - gyro: rad/s (3x f64)
+/// - accel: m/s² (3x f64)
+pub fn parse_imu_line(line: &str, delimiter: char) -> Result<ImuData> {
+    let parts: Vec<&str> = if delimiter == ' ' {
+        line.split_whitespace().collect()
+    } else {
+        line.split(delimiter).collect()
+    };
+
+    if parts.len() < 7 {
+        return Err(VIOError::Parse(format!(
+            "IMU line has insufficient fields (expected 7, got {}): {}",
+            parts.len(),
+            line
+        )));
+    }
+
+    let timestamp = parts[0].parse::<i64>().map_err(|e| {
+        VIOError::Parse(format!("Failed to parse IMU timestamp '{}': {}", parts[0], e))
+    })?;
+
+    let gyro_x = parts[1].parse::<f64>().map_err(|e| {
+        VIOError::Parse(format!("Failed to parse gyro_x '{}': {}", parts[1], e))
+    })?;
+    let gyro_y = parts[2].parse::<f64>().map_err(|e| {
+        VIOError::Parse(format!("Failed to parse gyro_y '{}': {}", parts[2], e))
+    })?;
+    let gyro_z = parts[3].parse::<f64>().map_err(|e| {
+        VIOError::Parse(format!("Failed to parse gyro_z '{}': {}", parts[3], e))
+    })?;
+
+    let accel_x = parts[4].parse::<f64>().map_err(|e| {
+        VIOError::Parse(format!("Failed to parse accel_x '{}': {}", parts[4], e))
+    })?;
+    let accel_y = parts[5].parse::<f64>().map_err(|e| {
+        VIOError::Parse(format!("Failed to parse accel_y '{}': {}", parts[5], e))
+    })?;
+    let accel_z = parts[6].parse::<f64>().map_err(|e| {
+        VIOError::Parse(format!("Failed to parse accel_z '{}': {}", parts[6], e))
+    })?;
+
+    Ok(ImuData {
+        timestamp,
+        gyro: [gyro_x, gyro_y, gyro_z],
+        accel: [accel_x, accel_y, accel_z],
+    })
+}

@@ -75,29 +75,10 @@ impl DatasetPlayer for FourSeasonsPlayer {
             })?;
 
             // 4Seasons IMU format: timestamp_w_nanoseconds omega_x omega_y omega_z alpha_x alpha_y alpha_z
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() < 7 {
-                continue;
+            match crate::datasets::player_trait::parse_imu_line(&line, ' ') {
+                Ok(imu) => imu_data_vec.push(imu),
+                Err(e) => log::warn!("Failed to parse IMU line {}: {}", line_num, e),
             }
-
-            // Parse timestamp (nanoseconds)
-            let timestamp: i64 = parts[0].trim().parse().unwrap_or(0);
-
-            // Parse gyroscope (rad/s)
-            let gyro_x: f64 = parts[1].trim().parse().unwrap_or(0.0);
-            let gyro_y: f64 = parts[2].trim().parse().unwrap_or(0.0);
-            let gyro_z: f64 = parts[3].trim().parse().unwrap_or(0.0);
-
-            // Parse accelerometer (m/s^2)
-            let accel_x: f64 = parts[4].trim().parse().unwrap_or(0.0);
-            let accel_y: f64 = parts[5].trim().parse().unwrap_or(0.0);
-            let accel_z: f64 = parts[6].trim().parse().unwrap_or(0.0);
-
-            imu_data_vec.push(ImuData {
-                timestamp,
-                gyro: [gyro_x, gyro_y, gyro_z],
-                accel: [accel_x, accel_y, accel_z],
-            });
         }
 
         // Store in cache
