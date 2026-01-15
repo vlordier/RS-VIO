@@ -1,8 +1,9 @@
 use crate::estimator::Frame;
 use crate::imu::ImuMotionPrior;
 use crate::optimization::factors::{
-    BundleAdjustmentFactor, ImuPriorFactor, PnPFactor, PriorFactor,
+    BundleAdjustmentFactor, ImuPriorFactor, LoopClosurePoseFactor, PnPFactor, PriorFactor,
 };
+use crate::optimization::loop_closure::LoopClosureConstraint;
 
 use crate::types::{Matrix3x3, Matrix4x4, Vector3};
 use apex_solver::core::loss_functions::HuberLoss;
@@ -75,6 +76,9 @@ pub struct SlidingWindow {
 
     /// Marginalization manager for sliding window
     marginalization_manager: crate::optimization::marginalization::MarginalizationManager,
+
+    /// Loop-closure constraints linking keyframes inside the window
+    loop_closure_constraints: Vec<LoopClosureConstraint>,
 }
 
 impl SlidingWindow {
@@ -111,6 +115,7 @@ impl SlidingWindow {
             max_map_points: DEFAULT_MAX_MAP_POINTS,
             map_point_observations: HashMap::with_capacity(DEFAULT_MAX_MAP_POINTS),
             marginalization_manager: marg_manager,
+            loop_closure_constraints: Vec::new(),
         }
     }
 
@@ -222,6 +227,10 @@ impl SlidingWindow {
                     "[SlidingWindow] Removed oldest frame (frame_id: {}) to make room for new keyframe",
                     removed_frame.frame_id
                 );
+                // Drop loop-closure constraints that involve the removed frame
+                let removed_id = removed_frame.frame_id as u64;
+                self.loop_closure_constraints
+                    .retain(|c| c.keyframe_id_1 != removed_id && c.keyframe_id_2 != removed_id);
             }
         }
         let frame_id = frame.frame_id;
@@ -236,6 +245,11 @@ impl SlidingWindow {
         );
 
         true
+    }
+
+    /// Append loop-closure constraints discovered by the detector.
+    pub fn add_loop_closure_constraints(&mut self, constraints: Vec<LoopClosureConstraint>) {
+        self.loop_closure_constraints.extend(constraints);
     }
 
     /// Get the current number of keyframes in the window.
@@ -266,6 +280,7 @@ impl SlidingWindow {
     /// Clear all keyframes from the sliding window.
     pub fn clear(&mut self) {
         self.keyframes.clear();
+        self.loop_closure_constraints.clear();
         log::debug!("[SlidingWindow] Cleared all keyframes");
     }
 
@@ -433,6 +448,14 @@ impl SlidingWindow {
                 "T_B_Cr camera transform is not invertible - check calibration",
             )
         })?;
+
+        // Map global keyframe IDs to their indices inside the window
+        let frame_id_to_index: HashMap<u64, usize> = self
+            .keyframes
+            .iter()
+            .enumerate()
+            .map(|(idx, f)| (f.frame_id as u64, idx))
+            .collect();
 
         // Count observations for each landmark across all frames, separately for left and right cameras
         for frame in self.keyframes.iter() {
@@ -630,6 +653,35 @@ impl SlidingWindow {
                 }
             }
         }
+
+        // Add loop-closure relative pose constraints between keyframes in the window
+        let mut retained_constraints = Vec::new();
+        for constraint in self.loop_closure_constraints.iter() {
+            if let (Some(&idx1), Some(&idx2)) = (
+                frame_id_to_index.get(&constraint.keyframe_id_1),
+                frame_id_to_index.get(&constraint.keyframe_id_2),
+            ) {
+                let kf1_var = format!("KF_{}", idx1);
+                let kf2_var = format!("KF_{}", idx2);
+
+                if !(initial_values.contains_key(&kf1_var) && initial_values.contains_key(&kf2_var)) {
+                    continue;
+                }
+
+                let factor = LoopClosurePoseFactor::new(
+                    constraint.relative_pose.to_homogeneous(),
+                    constraint.information_matrix.clone(),
+                );
+
+                let loss = HuberLoss::new(1.0)
+                    .ok()
+                    .map(|l| Box::new(l) as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>);
+
+                problem.add_residual_block(&[&kf1_var, &kf2_var], Box::new(factor), loss);
+                retained_constraints.push(constraint.clone());
+            }
+        }
+        self.loop_closure_constraints = retained_constraints;
 
         // If IMU prior is available, add a residual on the latest keyframe pose
         if let Some(prior) = imu_prior {

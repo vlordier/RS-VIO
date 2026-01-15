@@ -1,7 +1,6 @@
 use crate::datasets::config::Config;
 use crate::datasets::CameraModelType;
 use crate::datasets::ImuData;
-use crate::estimator::constant_velocity_model::{ConstantVelocityConfig, ConstantVelocityModel};
 use crate::estimator::Frame;
 use crate::estimator::SlidingWindow;
 use crate::feature_tracker::StereoPatchTracker;
@@ -14,6 +13,7 @@ use crate::imu::ImuMotionPrior;
 use crate::imu::ImuPreintegrator;
 use crate::imu::PreintegratedImu;
 use crate::imu::VelocityEstimator;
+use crate::optimization::loop_closure::{LoopClosureDetector, LoopClosureConfig, KeyframeDescriptor};
 use crate::types::{Float, Matrix4x4, Vector3};
 use crate::viewers::Viewer;
 use crate::{Result, VIOError};
@@ -73,9 +73,8 @@ pub struct Estimator {
     bias_estimator: ImuBiasEstimator,
     // Whether system is in initialization phase (collecting IMU for bias estimation)
     is_initializing: bool,
-    // Constant velocity motion model (fallback when IMU unavailable)
-    #[allow(dead_code)]
-    cv_motion_model: ConstantVelocityModel,
+    // Loop-closure detector for global consistency
+    loop_closure_detector: LoopClosureDetector,
 }
 
 impl Estimator {
@@ -111,6 +110,8 @@ impl Estimator {
 
         // Initialize IMU components
         let imu_config = ImuConfig::default();
+        // Initialize loop-closure detector with default config
+        let loop_config = LoopClosureConfig::default();
         Estimator {
             frame_id_counter: 0,
             frames_since_last_keyframe: 0,
@@ -143,7 +144,7 @@ impl Estimator {
             velocity_estimator_initialized: false,
             bias_estimator: ImuBiasEstimator::new(imu_config.clone()),
             is_initializing: true,
-            cv_motion_model: ConstantVelocityModel::new(ConstantVelocityConfig::default()),
+            loop_closure_detector: LoopClosureDetector::new(loop_config),
         }
     }
 
@@ -451,8 +452,26 @@ impl Estimator {
         // Bundle adjustment
         if current_frame.is_keyframe {
             let optimization_start = Instant::now();
-            // Save timestamp before frame is moved
+            // Save timestamp and pose before frame is moved
             let frame_timestamp = current_frame.timestamp_ns;
+            let frame_pose = current_frame.state.T_W_B;
+            let kf_id = self.frame_id_counter;
+            
+            // Detect loop closures for this keyframe
+            let descriptor = self.create_keyframe_descriptor(
+                kf_id,
+                frame_timestamp,
+                &current_frame,
+                frame_pose,
+            );
+            
+            if let Ok(constraints) = self.loop_closure_detector.detect_loop_closure(kf_id, descriptor) {
+                if !constraints.is_empty() {
+                    log::info!("[Estimator] Detected {} loop closure(s) for keyframe {}", constraints.len(), kf_id);
+                    self.sliding_window.add_loop_closure_constraints(constraints);
+                }
+            }
+            
             self.sliding_window.add_frame(current_frame);
             // Provide IMU motion prior to optimizer when available
             let imu_prior = if self.config.optimization.imu_prior_enable {
@@ -523,6 +542,64 @@ impl Estimator {
     /// Test hook: number of frames processed.
     pub fn frame_count(&self) -> u64 {
         self.frame_id_counter
+    }
+
+    /// Create a keyframe descriptor for loop-closure detection
+    fn create_keyframe_descriptor(
+        &self,
+        keyframe_id: u64,
+        timestamp: i64,
+        frame: &Frame,
+        pose: Matrix4x4,
+    ) -> KeyframeDescriptor {
+        // Simple bag-of-words descriptor: average feature coordinates as a descriptor vector
+        let num_features = frame.left_features.len().max(frame.right_features.len());
+        
+        // Create a simple descriptor from feature statistics (10-dim vector)
+        let mut descriptor = vec![0.0; 10];
+        
+        if !frame.left_features.is_empty() {
+            let avg_x: f32 = frame.left_features.iter().map(|f| f.pixel_coord[0]).sum::<f32>() 
+                / frame.left_features.len() as f32;
+            let avg_y: f32 = frame.left_features.iter().map(|f| f.pixel_coord[1]).sum::<f32>() 
+                / frame.left_features.len() as f32;
+            descriptor[0] = avg_x as f64 / self.config.camera.image_width as f64;
+            descriptor[1] = avg_y as f64 / self.config.camera.image_height as f64;
+            
+            // Add feature distribution stats
+            descriptor[2] = frame.left_features.len() as f64 / 200.0; // Normalized feature count
+        }
+        
+        if !frame.right_features.is_empty() {
+            let avg_x: f32 = frame.right_features.iter().map(|f| f.pixel_coord[0]).sum::<f32>() 
+                / frame.right_features.len() as f32;
+            let avg_y: f32 = frame.right_features.iter().map(|f| f.pixel_coord[1]).sum::<f32>() 
+                / frame.right_features.len() as f32;
+            descriptor[3] = avg_x as f64 / self.config.camera.image_width as f64;
+            descriptor[4] = avg_y as f64 / self.config.camera.image_height as f64;
+            
+            descriptor[5] = frame.right_features.len() as f64 / 200.0;
+        }
+        
+        // Fill remaining dimensions with pose-derived features
+        let t = pose.fixed_view::<3, 1>(0, 3);
+        descriptor[6] = (t[0] / 10.0).tanh(); // Position features (bounded)
+        descriptor[7] = (t[1] / 10.0).tanh();
+        descriptor[8] = (t[2] / 10.0).tanh();
+        descriptor[9] = num_features as f64 / 200.0;
+        
+        // Convert Matrix4x4 to Isometry3
+        let translation = na::Translation3::from(t.clone_owned());
+        let rotation = na::Rotation3::from_matrix_unchecked(pose.fixed_view::<3, 3>(0, 0).into_owned());
+        let pose_isometry = na::Isometry3::from_parts(translation, na::UnitQuaternion::from_rotation_matrix(&rotation));
+        
+        KeyframeDescriptor {
+            keyframe_id,
+            timestamp,
+            descriptor,
+            num_features,
+            pose: pose_isometry,
+        }
     }
 
     /// Visualize tracking results: stereo images with tracked features.
