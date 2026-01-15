@@ -40,6 +40,19 @@ repos:
         stages: [commit]
 
   # ========================================================================
+  # TYPOS CHECKER
+  # ========================================================================
+
+  # Spelling check with typos
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.42.0
+    hooks:
+      - id: typos
+        args: [--format, brief]
+        files: ^src/
+        stages: [commit]
+
+  # ========================================================================
   # SECURITY TOOLS
   # ========================================================================
 
@@ -110,7 +123,9 @@ exclude: |
     target/|
     \.git/|
     fuzz_targets/|
-    benches/.*
+    benches/.*|
+    models/.*|
+    data/.*
   )
 
 # Minimum pre-commit version
@@ -120,14 +135,14 @@ minimum_pre_commit_version: '2.15.0'
 # HOOK STAGES EXPLANATION
 # ========================================================================
 #
-# stages: [commit]      - Runs on every commit (fast: fmt, clippy, basic checks)
+# stages: [commit]      - Runs on every commit (fast: fmt, clippy, typos, basic checks)
 # stages: [commit-msg]  - Runs on commit messages (conventional commits)
 # stages: [pre-push]    - Runs before pushing (security audits)
 #
 # For full quality pipeline, run manually:
 #   ./scripts/run_quality.sh
 #
-# CIequivalent:
+# CI equivalent:
 #   .github/workflows/rust.yml   - Core CI (every PR)
 #   .github/workflows/quality.yml - Full quality (weekly/scheduled)
 # ========================================================================

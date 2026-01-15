@@ -1,14 +1,14 @@
 # RS-VIO Rust Quality Pipeline
 
-A comprehensive code quality system for RS-VIO, implementing 35+ tools for checking, linting, auditing, and hardening Rust code.
+A comprehensive code quality system for RS-VIO, implementing 40+ tools for checking, linting, auditing, and hardening Rust code.
 
 ## Overview
 
 This quality pipeline ensures RS-VIO meets the highest standards for:
-- **Correctness** - Static analysis, fuzzing, formal verification
-- **Security** - Vulnerability scanning, dependency auditing
-- **Performance** - Binary analysis, coverage, benchmarks
-- **Maintainability** - Formatting, linting, documentation
+- **Correctness** - Static analysis, fuzzing, formal verification, concurrency checking
+- **Security** - Vulnerability scanning, dependency auditing, secret detection
+- **Performance** - Binary analysis, coverage, benchmarks, flamegraphs
+- **Maintainability** - Formatting, linting, documentation, spelling
 
 ## Quick Start
 
@@ -27,12 +27,14 @@ This quality pipeline ensures RS-VIO meets the highest standards for:
 
 ## Tool Categories
 
-### Tier 1: Core Linting (Run on Every PR)
+### Tier 1: Core Linting (Run on Every Commit)
 | Tool | Purpose | Command |
 |------|---------|---------|
-| rustfmt | Code formatting | `cargo fmt --all` |
+| rustfmt | Code formatting | `cargo fmt --all --check` |
 | Clippy | Linter | `cargo clippy --all-targets --all-features -- -D warnings` |
 | cargo check | Compiler checks | `cargo check --all-targets` |
+| cargo-sort | TOML ordering | `cargo sort --check Cargo.toml` |
+| typos | Spelling checker | `typos --format brief` |
 
 ### Tier 2: Security & Dependencies (Every Commit)
 | Tool | Purpose | Command |
@@ -42,7 +44,7 @@ This quality pipeline ensures RS-VIO meets the highest standards for:
 | cargo-udeps | Unused dependencies | `cargo +nightly udeps` |
 | cargo-outdated | Stale deps | `cargo outdated` |
 | cargo-tree | Dependency graph | `cargo tree --duplicates` |
-| cargo-sort | TOML ordering | `cargo sort --check Cargo.toml` |
+| detect-secrets | Secret detection | `detect-secrets scan` |
 
 ### Tier 3: Static Analysis (Daily)
 | Tool | Purpose | Command |
@@ -59,12 +61,15 @@ This quality pipeline ensures RS-VIO meets the highest standards for:
 | cargo-tarpaulin | Coverage | `cargo tarpaulin --all-features --out Html` |
 | cargo-mutants | Mutation testing | `cargo mutants --all-features` |
 | cargo-hack | Feature matrix | `cargo hack --each-feature --no-dev-deps check` |
+| loom | Concurrency checker | `cargo test --features loom` |
 
-### Tier 5: Binary Analysis (Weekly)
+### Tier 5: Performance Profiling (Weekly)
 | Tool | Purpose | Command |
 |------|---------|---------|
+| cargo-flamegraph | CPU hot-path profiler | `cargo flamegraph --bench estimator` |
 | cargo-bloat | Size profiler | `cargo bloat --release --features lightglue` |
 | cargo-llvm-lines | Codegen analysis | `cargo llvm-lines --release --all-features` |
+| perf/ Instruments | CPU profiling | OS-specific |
 
 ### Tier 6: Fuzzing (Weekly/Nightly)
 | Tool | Purpose | Command |
@@ -77,8 +82,9 @@ This quality pipeline ensures RS-VIO meets the highest standards for:
 |------|---------|---------|
 | cargo-valgrind | Memory profiler | `cargo valgrind test --lib` |
 | valgrind/heaptrack | Leak detection | `valgrind ./target/debug/rs-vio` |
+| dhat | Heap analysis | `cargo test --features dhat` |
 
-### Tier 8: Formal Verification (Advanced)
+### Tier 8: Formal Verification (Monthly)
 | Tool | Purpose | Command |
 |------|---------|---------|
 | kani-verifier | Bounded model checking | `kani` |
@@ -90,8 +96,16 @@ This quality pipeline ensures RS-VIO meets the highest standards for:
 | cargo-doc | Doc generation | `cargo doc --all-features --no-deps` |
 | cargo-deadlinks | Link checker | `cargo deadlinks --dir target/doc` |
 | rustdoc-json | API extraction | `rustdoc-json target/doc` |
+| cargo-spellcheck | Docs spelling | `cargo spellcheck check` |
 
-### Tier 10: Async/Runtime (Every PR)
+### Tier 10: Build & CI (Every PR)
+| Tool | Purpose | Command |
+|------|---------|---------|
+| cross | Cross-platform builds | `cross build --target armv7-unknown-linux-gnueabihf` |
+| sccache | Build caching | `sccache --start-server` |
+| cargo-cache | Cache management | `cargo cache` |
+
+### Tier 11: Async/Runtime (Every PR)
 | Tool | Purpose | Command |
 |------|---------|---------|
 | tokio-console | Async debugging | `cargo run --example tracing` |

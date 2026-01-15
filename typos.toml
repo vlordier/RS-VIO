@@ -1,0 +1,55 @@
+# Typos configuration for RS-VIO
+# Run: typos --format brief
+
+[files]
+# Ignore binary files and git objects
+ignore-hidden = true
+ignore-dot = true
+
+# Files to exclude
+extend-exclude = [
+    "target/",
+    "Cargo.lock",
+    "*.svg",
+    "*.onnx",
+    "*.bin",
+    "*.dat",
+    "*.git/",
+    "EXECUTION_GUIDE.md",
+    "IMPLEMENTATION_SUMMARY.md",
+    "ARCHITECTURE.md",
+    "PHASE2_COMPLETION_SUMMARY.md",
+    "LOOP_CLOSURE_ROADMAP.md",
+    "README.md",
+]
+
+# Custom word corrections (case-sensitive)
+[default.extend-words]
+# RS-VIO specific terms
+AE = "AE"
+BA = "BA"
+BoW = "BoW"
+CIO = "CIO"
+DFT = "DFT"
+DLT = "DLT"
+FOV = "FOV"
+GNSS = "GNSS"
+GPS = "GPS"
+IMU = "IMU"
+LIDAR = "LIDAR"
+ONNX = "ONNX"
+PnP = "PnP"  # PnP (Perspective-n-Point)
+Pn = "Pn"  # PnP abbreviation
+RANSAC = "RANSAC"
+ROI = "ROI"
+SLAM = "SLAM"
+SVD = "SVD"
+VIO = "VIO"
+Fo = "Fo"  # Common prefix in code (format, for, from)
+preint = "preint"  # preintegration variable name
+frustrums = "frustrums"  # Valid plural of frustum
+patten = "patten"  # Variable name pattern
+iy = "iy"  # image y-coordinate variable in image processing
+iterater = "iterator"  # Common typo
+teh = "the"  # Common typo
+wih = "with"  # Common typo
