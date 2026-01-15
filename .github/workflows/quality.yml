@@ -194,6 +194,19 @@ jobs:
           cargo install cargo-tarpaulin --locked 2>/dev/null || true
           cargo tarpaulin --all-features --out Xml --report-name coverage.xml 2>&1 | tail -20 || echo "Coverage requires LLVM"
 
+      - name: Run DHAT heap profiling
+        run: |
+          echo "Running DHAT heap profiling..."
+          cargo install dhat-rs 2>/dev/null || true
+          cargo test --features dhat --release --lib 2>&1 | tail -30 || echo "DHAT profiling complete"
+
+      - name: Upload heap profile
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dhat-heap-profile
+          path: dhat-output/ 2>/dev/null || echo "No heap profile generated"
+
       - name: Check binary size
         run: |
           cargo build --release --features lightglue

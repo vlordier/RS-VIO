@@ -135,6 +135,12 @@ cargo install cargo-fuzz
 cargo install cargo-valgrind
 cargo install cargo-msrv
 cargo install cargo-semver
+cargo install dhat-rs
+cargo install flamegraph
+
+# For DHAT with jemalloc (better accuracy)
+# On macOS: brew install jemalloc
+# On Linux: sudo apt install libjemalloc-dev
 
 # Nightly tools
 rustup toolchain install nightly
@@ -170,6 +176,53 @@ cargo fuzz reproduce feature_tracker_fuzz <crash_file>
 | `feature_tracker_fuzz` | Feature tracking robustness |
 | `optimization_fuzz` | Optimizer edge cases |
 | `math_utils_fuzz` | Math operations safety |
+
+## DHAT Heap Profiling
+
+RS-VIO includes DHAT integration for heap profiling:
+
+```bash
+# Run DHAT profiling
+./scripts/run_dhat.sh
+
+# Profile only library tests
+./scripts/run_dhat.sh --lib
+
+# Profile with jemalloc (more accurate)
+./scripts/run_dhat.sh --lib
+
+# Or directly
+cargo test --features dhat --release --lib
+
+# View results (JSON file in dhat-output/)
+open dhat-output/*.json
+```
+
+### DHAT Configuration
+
+```toml
+# In Cargo.toml
+[dev-dependencies]
+dhat-rs = "0.3"
+
+[profile.dhat]
+inherits = "release"
+debug-assertions = true
+overflow-checks = true
+opt-level = 1
+```
+
+### Interpreting DHAT Results
+
+DHAT reports sorted by:
+1. **Bytes allocated** (excluding deallocations) - Primary metric
+2. **Number of allocations** - Frequency of allocations
+3. **Peak live bytes** - Maximum memory at any point
+
+Look for:
+- Functions allocating large amounts (>1MB)
+- Functions allocating frequently (>1000 times)
+- Memory not being freed (high "retained" bytes)
 
 ## Configuration Files
 

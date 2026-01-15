@@ -95,6 +95,26 @@ test-nextest:
 		cargo test --all-features; \
 	fi
 
+# Run DHAT heap profiling
+# Requires: cargo install dhat-rs or jemalloc
+dhat:
+	@echo "Running DHAT heap profiling..."
+	@if command -v dhat &> /dev/null; then \
+		cargo test --features dhat --release --lib 2>&1 | tail -30; \
+		echo "Heap profile saved to dhat-output/"; \
+	else \
+		echo "Install: cargo install dhat-rs"; \
+		echo "Or use jalloc: RUSTFLAGS='-fmalloc=jemalloc' cargo test"; \
+	fi
+
+# Generate heap profile with jemalloc
+dhat-jemalloc:
+	@echo "Running DHAT with jemalloc..."
+	@export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so && \
+	export HEAPPROFILE=/tmp/dhat-heap && \
+	cargo test --features dhat --release --lib 2>&1 | tail -30
+	@echo "Heap profile: /tmp/dhat-heap" 
+
 # Generate coverage report
 coverage:
 	@echo "Generating coverage report..."

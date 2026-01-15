@@ -40,12 +40,18 @@ apex-solver = { git = "https://github.com/amin-abouee/apex-solver", branch = "ma
 # ONNX Runtime for LightGlue inference (optional feature) - requires manual setup
 ort = { version = "2.0.0-rc.11", optional = true }
 ndarray = { version = "0.16", optional = true }
+# DHAT heap profiling (optional)
+dhat = { version = "0.3.3", optional = true }
 
 [features]
 # Feature flag for using f32 instead of f64 precision
 use_f32 = []
 # Feature flag for LightGlue ONNX-based verification
 lightglue = ["ort", "ndarray"]
+# Feature flag for heap profiling with DHAT
+# Run: cargo test --features dhat -- --test-threads=1
+# View results: cat dhat-output.json
+dhat = ["dep:dhat"]
 
 [dev-dependencies]
 criterion = "0.5"
@@ -134,6 +140,18 @@ strip = true
 overflow-checks = true
 debug-assertions = true
 incremental = false
+
+# Heap profiling profile for DHAT analysis
+# Run: cargo test --profile dhat --features dhat
+# View: open dhat-output/*.json
+[profile.dhat]
+inherits = "release"
+debug-assertions = true
+overflow-checks = true
+# Disable optimizations that might confuse DHAT
+opt-level = 1
+lto = "thin"
+codegen-units = 4
 
 [[bench]]
 name = "estimator"
