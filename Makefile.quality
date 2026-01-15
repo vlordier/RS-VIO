@@ -2,7 +2,7 @@
 # ================================
 # Run: make quality or make <target>
 
-.PHONY: quality format lint check security audit deps test coverage doc all
+.PHONY: quality format lint check security audit deps test coverage doc all quality-quick pre-commit
 
 # Default target
 all: format check test
@@ -284,3 +284,29 @@ quick:
 # CI quality check (without time-consuming tests)
 ci-quality: format check lint audit
 	@echo "CI quality check complete!"
+
+# Quick quality check (recommended before commits) - NEW
+quality-quick:
+	@echo "════════════════════════════════════════════════════════════════"
+	@echo "  RS-VIO Quick Quality Check"
+	@echo "════════════════════════════════════════════════════════════════"
+	@echo ""
+	@echo "1. Running tests..."
+	@cargo test --all
+	@echo ""
+	@echo "2. Running clippy..."
+	@cargo clippy --all --all-targets -- -D warnings
+	@echo ""
+	@echo "3. Checking formatting..."
+	@cargo fmt --all -- --check
+	@echo ""
+	@echo "✅ Quick quality check passed!"
+
+# Pre-commit hook (fast, auto-fixes formatting) - NEW
+pre-commit:
+	@echo "Running pre-commit checks..."
+	@cargo fmt --all
+	@cargo clippy --all -- -D warnings
+	@cargo test --all --quiet
+	@echo "✅ Pre-commit checks passed!"
+
