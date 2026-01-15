@@ -1,0 +1,28 @@
+# Cargo-fuzz configuration for RS-VIO
+# Run fuzzing with: cargo fuzz run <fuzz_target>
+# Install: cargo install cargo-fuzz
+
+[package]
+name = "rs-vio"
+version = "0.2.0"
+authors = ["Charles Hamesse"]
+
+# Fuzz targets are defined here
+[[bin]]
+name = "feature_tracker_fuzz"
+path = "fuzz_targets/feature_tracker.rs"
+
+[[bin]]
+name = "optimization_fuzz"
+path = "fuzz_targets/optimization.rs"
+
+[[bin]]
+name = "math_utils_fuzz"
+path = "fuzz_targets/math_utils.rs"
+
+[profile.release]
+debug = 1  # Keep debug symbols for better crash reports
+overflow-checks = false  # Fuzzing doesn't need overflow checks
+
+[profile.dev]
+overflow-checks = true

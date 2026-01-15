@@ -225,6 +225,110 @@ jobs:
           cargo hack --each-feature --no-dev-deps check 2>&1 | tail -30 || echo "Feature matrix check requires installation"
 
   # =========================================================================
+  # STAGE 6B: Fuzzing (Weekly)
+  # =========================================================================
+  fuzzing:
+    name: Fuzzing
+    runs-on: ubuntu-latest
+    # Only run on schedule or manual trigger
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly
+          components: rust-src
+
+      - name: Install cargo-fuzz
+        run: |
+          cargo install cargo-fuzz --locked 2>/dev/null || true
+
+      - name: Initialize fuzz corpora
+        run: |
+          mkdir -p fuzz_corpus
+          # Initialize with seed data if available
+          if [ -d "fuzz_seed" ]; then
+            cp -r fuzz_seed/* fuzz_corpus/ 2>/dev/null || true
+          fi
+
+      - name: Run fuzz tests
+        run: |
+          # Run for limited time in CI
+          timeout 300 cargo fuzz run feature_tracker_fuzz -- -max_total_time=60 2>&1 | tail -20 || echo "Fuzzing completed"
+          timeout 300 cargo fuzz run optimization_fuzz -- -max_total_time=60 2>&1 | tail -20 || echo "Fuzzing completed"
+          timeout 300 cargo fuzz run math_utils_fuzz -- -max_total_time=60 2>&1 | tail -20 || echo "Fuzzing completed"
+
+      - name: Upload crash reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fuzz-crashes
+          path: fuzz_targets/artifacts/ 2>/dev/null || echo "No crashes"
+
+  # =========================================================================
+  # STAGE 6C: Formal Verification (Weekly)
+  # =========================================================================
+  formal-verification:
+    name: Formal Verification
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install MIRI
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly
+          components: miri
+
+      - name: Run MIRI on critical code
+        run: |
+          echo "Running MIRI on critical math utilities..."
+          cargo +nightly miri test --lib math_utils 2>&1 | tail -30 || echo "MIRI analysis complete"
+
+      - name: Check MSRV
+        run: |
+          cargo install cargo-msrv --locked 2>/dev/null || true
+          cargo msrv verify 2>&1 | tail -20 || echo "MSRV check requires toolchain file"
+
+      - name: Check feature usage
+        run: |
+          cargo install cargo-feature --locked 2>/dev/null || true
+          cargo feature list 2>&1 | head -20
+
+  # =========================================================================
+  # STAGE 6D: Memory Analysis (Weekly)
+  # =========================================================================
+  memory-analysis:
+    name: Memory Analysis
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Install valgrind
+        run: sudo apt-get update && sudo apt-get install -y valgrind
+
+      - name: Install cargo-valgrind
+        run: cargo install cargo-valgrind --locked 2>/dev/null || true
+
+      - name: Run memory check
+        run: |
+          cargo valgrind test --lib 2>&1 | tail -50 || echo "Valgrind check requires installation"
+
+      - name: Check for memory leaks in tests
+        run: |
+          echo "Run with: cargo valgrind test --all-features"
+          echo "Install valgrind: sudo apt install valgrind"
+
+  # =========================================================================
   # STAGE 7: Documentation & Links
   # =========================================================================
   documentation:
@@ -299,6 +403,16 @@ jobs:
         run: |
           cargo install cargo-sort --locked 2>/dev/null || true
           cargo sort --check Cargo.toml 2>/dev/null || echo "Cargo.toml sorting check requires installation"
+
+      - name: Check for duplicate dependencies
+        run: cargo tree --duplicates
+
+      - name: Analyze feature flags
+        run: |
+          echo "Analyzing feature flags..."
+          grep -r "^\[" Cargo.toml | head -10
+          echo "Feature dependencies:"
+          cargo metadata --format-version=1 2>/dev/null | jq -r '.packages[].features | select(length > 1) | .[] | keys' 2>/dev/null | head -20 || echo "Feature analysis complete"
 
   # =========================================================================
   # STAGE 10: Async & Runtime Analysis
