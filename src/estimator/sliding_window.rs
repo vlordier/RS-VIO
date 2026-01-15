@@ -101,62 +101,8 @@ impl SlidingWindow {
     ) -> Self {
         const DEFAULT_MAX_MAP_POINTS: usize = 2000;
 
-        let mut marg_manager =
+        let marg_manager =
             crate::optimization::marginalization::MarginalizationManager::new(marg_config);
-
-        match marg_manager.hessian_approximator_name().as_ref() {
-            "Diagonal" => {
-                marg_manager.set_hessian_approximator(Box::new(
-                    crate::optimization::marginalization::DiagonalApproximator::default(),
-                ));
-            },
-            "LevenbergMarquardt" => {
-                marg_manager.set_hessian_approximator(Box::new(
-                    crate::optimization::marginalization::LevenbergMarquardtApproximator::default(),
-                ));
-            },
-            "Identity" => {
-                marg_manager.set_hessian_approximator(Box::new(
-                    crate::optimization::marginalization::IdentityApproximator,
-                ));
-            },
-            "Exact" => {
-                marg_manager.set_hessian_approximator(Box::new(
-                    crate::optimization::marginalization::ExactHessianApproximator,
-                ));
-            },
-            _ => {
-                marg_manager.set_hessian_approximator(Box::new(
-                    crate::optimization::marginalization::GaussNewtonApproximator::default(),
-                ));
-            },
-        }
-
-        match marg_manager.gradient_computer_name().as_ref() {
-            "Zero" => {
-                marg_manager.set_gradient_computer(Box::new(
-                    crate::optimization::marginalization::ZeroGradientComputer,
-                ));
-            },
-            _ => {
-                marg_manager.set_gradient_computer(Box::new(
-                    crate::optimization::marginalization::StandardGradientComputer,
-                ));
-            },
-        }
-
-        match marg_manager.prior_constructor_name().as_ref() {
-            "Regularized" => {
-                marg_manager.set_prior_constructor(Box::new(
-                    crate::optimization::marginalization::RegularizedPriorConstructor::default(),
-                ));
-            },
-            _ => {
-                marg_manager.set_prior_constructor(Box::new(
-                    crate::optimization::marginalization::StandardPriorConstructor,
-                ));
-            },
-        }
 
         Self {
             max_frames,
@@ -181,8 +127,7 @@ impl SlidingWindow {
             num_marginalize_per_step: config.marginalization.num_marginalize_per_step,
             min_landmark_observations: config.marginalization.min_landmark_observations,
             landmark_age_limit: config.marginalization.landmark_age_limit,
-            prior_weight: config.marginalization.prior_weight,
-            prior_info_scaling: config.marginalization.prior_info_scaling,
+            prior_info_scale: config.marginalization.prior_info_scale,
             hessian_approximator: config.marginalization.hessian_approximator.clone(),
             gradient_computer: config.marginalization.gradient_computer.clone(),
             prior_constructor: config.marginalization.prior_constructor.clone(),

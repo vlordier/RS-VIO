@@ -193,7 +193,9 @@ impl DatasetPlayer for TUMVIPlayer {
             .map(|cache| {
                 cache
                     .iter()
-                    .filter(|imu| imu.timestamp > previous_timestamp && imu.timestamp <= current_timestamp)
+                    .filter(|imu| {
+                        imu.timestamp > previous_timestamp && imu.timestamp <= current_timestamp
+                    })
                     .cloned()
                     .collect()
             })

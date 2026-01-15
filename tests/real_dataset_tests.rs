@@ -1,8 +1,4 @@
-#![allow(
-    clippy::expect_used,
-    clippy::len_zero,
-    clippy::cast_precision_loss
-)]
+#![allow(clippy::expect_used, clippy::len_zero, clippy::cast_precision_loss)]
 
 //! Real dataset smoke tests (EuRoC)
 //! These tests use a few real frames and IMU samples when the environment provides a dataset path.

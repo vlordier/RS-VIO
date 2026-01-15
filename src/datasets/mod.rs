@@ -8,13 +8,35 @@
 //! - **EuRoC**: Micro Aerial Vehicle dataset with IMU
 //! - **TUM-VI**: TUM Visual-Inertial dataset
 //! - **4Seasons**: Large-scale long-term dataset with appearance changes
+//! - **LiveCamera**: Real-time stereo camera capture
 //!
 //! ## Components
 //!
 //! - [`EurocPlayer`](crate::datasets::euroc_player::EurocPlayer) - EuRoC dataset loader
 //! - [`TUMVIPlayer`](crate::datasets::tum_vi_player::TUMVIPlayer) - TUM-VI dataset loader
 //! - [`FourSeasonsPlayer`](crate::datasets::fourseasons_player::FourSeasonsPlayer) - 4Seasons dataset loader
+//! - [`LiveCameraPlayer`](crate::datasets::live_camera_player::LiveCameraPlayer) - Live stereo camera
 //! - [`Config`] - VIO system configuration (YAML)
+//!
+//! ## Live Camera Usage
+//!
+//! ```rust
+//! use rs_vio::datasets::{LiveCameraPlayer, PlayerConfig, Config};
+//!
+//! let config = Config::load("config/euroc_vio.yaml")?;
+//! let player = LiveCameraPlayer::new(rs_vio::datasets::LiveCameraConfig {
+//!     camera_index_left: 0,
+//!     camera_index_right: 1,
+//!     frame_rate: 30,
+//!     ..Default::default()
+//! });
+//!
+//! let result = player.run(PlayerConfig {
+//!     config_path: "config/euroc_vio.yaml".to_string(),
+//!     dataset_path: "/dev/video".to_string(),
+//!     ..Default::default()
+//! })?;
+//! ```
 //!
 //! ## Dataset Formats
 //!
@@ -46,6 +68,7 @@
 //! - **EuRoC**: Fast (~10-11 min sequences)
 //! - **TUM-VI**: Medium (~5-10 min sequences)
 //! - **4Seasons**: Large (~1.5 hour sequences)
+//! - **LiveCamera**: Real-time processing at configured frame rate
 //!
 //! ## See Also
 //! - [`crate::datasets::config::Config`] - Configuration loading
@@ -55,12 +78,14 @@ pub mod config;
 pub mod euroc_player;
 pub mod fourseasons_player;
 pub mod frame_processor_trait;
+pub mod live_camera_player;
 pub mod player_trait;
 pub mod tum_vi_player;
 
 // Re-export player types for convenience
 pub use euroc_player::EurocPlayer;
 pub use fourseasons_player::FourSeasonsPlayer;
+pub use live_camera_player::{LiveCameraConfig, LiveCameraPlayer};
 pub use tum_vi_player::TUMVIPlayer;
 
 use crate::datasets::config::Config;

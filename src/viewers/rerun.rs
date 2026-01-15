@@ -160,7 +160,7 @@ impl Viewer for RerunViewer {
         Ok(())
     }
 
-    fn log_pose(&mut self, T_W_B: Matrix4x4, entity_path: &str) {
+    fn log_pose(&mut self, t_w_b: Matrix4x4, entity_path: &str) {
         if !self.initialized {
             return;
         }
@@ -169,8 +169,8 @@ impl Viewer for RerunViewer {
             rec.set_time_sequence("frame", self.frame_id);
             rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
 
-            let translation = Array3::from(T_W_B.fixed_view::<3, 1>(0, 3));
-            let rotation = Matrix3x3::from(T_W_B.fixed_view::<3, 3>(0, 0));
+            let translation = Array3::from(t_w_b.fixed_view::<3, 1>(0, 3));
+            let rotation = Matrix3x3::from(t_w_b.fixed_view::<3, 3>(0, 0));
 
             // Convert rotation matrix to quaternion
             let quat = matrix_to_quaternion(rotation.to_array());

@@ -147,11 +147,7 @@ impl ImuPreintegrator {
     /// Process a single IMU measurement and update preintegration
     pub fn propagate(&mut self, imu: &ImuData, dt: f64) {
         let gyro = na::Vector3::new(imu.gyro[0], imu.gyro[1], imu.gyro[2]);
-        let accel = na::Vector3::new(
-            imu.accel[0],
-            imu.accel[1],
-            imu.accel[2],
-        );
+        let accel = na::Vector3::new(imu.accel[0], imu.accel[1], imu.accel[2]);
 
         self.propagate_raw(gyro, accel, dt);
     }
@@ -259,11 +255,8 @@ impl ImuMotionPredictor {
         for imu in imu_measurements {
             let dt = (imu.timestamp - last_ts) as f64 / 1e9;
             if dt > 0.0 {
-                total_rotation += na::Vector3::new(
-                    imu.gyro[0] * dt,
-                    imu.gyro[1] * dt,
-                    imu.gyro[2] * dt,
-                );
+                total_rotation +=
+                    na::Vector3::new(imu.gyro[0] * dt, imu.gyro[1] * dt, imu.gyro[2] * dt);
             }
             last_ts = imu.timestamp;
         }
@@ -340,11 +333,7 @@ impl VelocityEstimator {
         for imu in imu_measurements.iter().skip(1) {
             let dt = (imu.timestamp - last_ts) as f64 / 1e9;
             if dt > 0.0 {
-                let accel = na::Vector3::new(
-                    imu.accel[0],
-                    imu.accel[1],
-                    imu.accel[2],
-                );
+                let accel = na::Vector3::new(imu.accel[0], imu.accel[1], imu.accel[2]);
                 // Rotate to world frame and remove gravity
                 let accel_world = initial_orientation * accel - gravity;
                 delta_v += accel_world * dt;
@@ -375,11 +364,7 @@ impl VelocityEstimator {
 
         // Integrate accelerometer
         for imu in imu_measurements {
-            let accel = na::Vector3::new(
-                imu.accel[0],
-                imu.accel[1],
-                imu.accel[2],
-            );
+            let accel = na::Vector3::new(imu.accel[0], imu.accel[1], imu.accel[2]);
             // Assume current orientation is approximately identity
             let accel_world = accel - gravity;
             self.velocity += accel_world * dt;
@@ -665,11 +650,7 @@ impl ImuAidedKeyframeSelector {
     /// Update with new IMU measurement
     pub fn update_imu(&mut self, imu: &ImuData) {
         let gyro = na::Vector3::new(imu.gyro[0], imu.gyro[1], imu.gyro[2]);
-        let accel = na::Vector3::new(
-            imu.accel[0],
-            imu.accel[1],
-            imu.accel[2],
-        );
+        let accel = na::Vector3::new(imu.accel[0], imu.accel[1], imu.accel[2]);
 
         // Integrate rotation
         let delta_rot = na::UnitQuaternion::new(gyro * 0.01); // Approximate dt
@@ -694,11 +675,7 @@ impl ImuAidedKeyframeSelector {
             let dt = (imu.timestamp - last_ts) as f64 / 1e9;
             if dt > 0.0 {
                 let gyro = na::Vector3::new(imu.gyro[0], imu.gyro[1], imu.gyro[2]);
-                let accel = na::Vector3::new(
-                    imu.accel[0],
-                    imu.accel[1],
-                    imu.accel[2],
-                );
+                let accel = na::Vector3::new(imu.accel[0], imu.accel[1], imu.accel[2]);
 
                 // Rotation integration
                 let delta_rot = na::UnitQuaternion::new(gyro * dt);

@@ -1,8 +1,8 @@
 #![allow(
-  clippy::unwrap_used,
-  clippy::expect_used,
-  clippy::panic,
-  clippy::float_cmp
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::float_cmp
 )]
 
 use rs_vio::datasets::euroc_player::EurocPlayer;
@@ -431,7 +431,9 @@ optimization:
         let estimator = estimator::Estimator::new(config, None);
 
         let trajectory = estimator.get_trajectory();
-        let _: &Vec<Matrix4x4> = trajectory;
+        // trajectory is Vec<(i64, Matrix4x4)>, extract just the poses
+        let poses: Vec<Matrix4x4> = trajectory.iter().map(|(_, pose)| *pose).collect();
+        let _: Vec<Matrix4x4> = poses;
     }
 }
 

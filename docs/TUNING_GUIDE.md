@@ -219,6 +219,15 @@ Iteration 5:  Cost=180   |  Δ_cost=-20     |  Converged
    - Test on multiple sequences
    - Measure generalization performance
 
+## Marginalization configuration quick reference
+
+- **Enable/disable**: `marginalization.enabled=false` skips prior construction (useful when bisecting instability).
+- **Hessian approximator**: `GaussNewton` (accurate), `LevenbergMarquardt` (adds damping), `Diagonal` (fast/rough), `Identity` (debug), `Exact` (uses provided Jacobians).
+- **Gradient computer**: `Standard` (Jᵀr) or `Zero` (debug only).
+- **Prior constructor**: `Standard` keeps Schur info; `Regularized` clamps diagonals for ill-conditioned problems.
+- **FEJ toggle**: `use_fej=true` reuses cached linearization points; `false` relinearizes at the current state.
+- **Damping/scaling**: `damping` adds diagonal jitter before Schur solves; `prior_info_scaling` and `prior_weight` scale the resulting information matrix.
+
 ## Robustness Tuning
 
 ### Handling Outliers
