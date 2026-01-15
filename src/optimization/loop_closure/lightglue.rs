@@ -9,14 +9,14 @@
 //! - ONNX Runtime for Rust: https://github.com/pykeio/ort
 //! - LightGlue-ONNX: https://github.com/fabio-sim/LightGlue-ONNX
 
-#[cfg(feature = "lightglue")]
-use ort::{Session, Value, GraphOptimizationLevel, ExecutionProvider};
+use nalgebra as na;
 #[cfg(feature = "lightglue")]
 use ndarray::{Array, Array2, Array3, Axis};
+#[cfg(feature = "lightglue")]
+use ort::{ExecutionProvider, GraphOptimizationLevel, Session, Value};
 use std::path::{Path, PathBuf};
-use nalgebra as na;
 
-use super::{DescriptorMatcher, MatchResult, MatchMetrics};
+use super::{DescriptorMatcher, MatchMetrics, MatchResult};
 
 /// Configuration for LightGlue matcher
 #[derive(Debug, Clone)]
@@ -63,7 +63,7 @@ impl LightGlueMatcher {
                 session: Some(session),
             })
         }
-        
+
         #[cfg(not(feature = "lightglue"))]
         {
             log::warn!("LightGlue feature not enabled. Compile with --features lightglue");
@@ -101,7 +101,9 @@ impl LightGlueMatcher {
         descriptors0: &Array2<f32>,
         descriptors1: &Array2<f32>,
     ) -> Result<(Vec<(usize, usize)>, Vec<f32>), String> {
-        let session = self.session.as_ref()
+        let session = self
+            .session
+            .as_ref()
             .ok_or_else(|| "ONNX session not initialized".to_string())?;
 
         // Prepare inputs: keypoints (N, 2), descriptors (N, D)
@@ -116,15 +118,19 @@ impl LightGlueMatcher {
 
         // Run inference
         let outputs = session
-            .run(ort::inputs!["keypoints0" => kpts0, "keypoints1" => kpts1, 
+            .run(
+                ort::inputs!["keypoints0" => kpts0, "keypoints1" => kpts1, 
                                "descriptors0" => desc0, "descriptors1" => desc1]
-                .map_err(|e| format!("Failed to create inputs: {}", e))?)
+                .map_err(|e| format!("Failed to create inputs: {}", e))?,
+            )
             .map_err(|e| format!("Inference failed: {}", e))?;
 
         // Extract matches: indices (M, 2) and scores (M,)
-        let matches_tensor = outputs[0].try_extract_tensor::<i64>()
+        let matches_tensor = outputs[0]
+            .try_extract_tensor::<i64>()
             .map_err(|e| format!("Failed to extract matches: {}", e))?;
-        let scores_tensor = outputs[1].try_extract_tensor::<f32>()
+        let scores_tensor = outputs[1]
+            .try_extract_tensor::<f32>()
             .map_err(|e| format!("Failed to extract scores: {}", e))?;
 
         let matches_view = matches_tensor.view();
@@ -152,7 +158,7 @@ impl LightGlueMatcher {
     fn descriptors_to_f32(descriptors: &[Vec<u8>]) -> Array2<f32> {
         let n = descriptors.len();
         let d = descriptors[0].len();
-        
+
         let mut array = Array2::zeros((n, d));
         for (i, desc) in descriptors.iter().enumerate() {
             for (j, &byte) in desc.iter().enumerate() {
@@ -176,9 +182,9 @@ impl DescriptorMatcher for LightGlueMatcher {
             // 2. Convert to ONNX-compatible tensors
             // 3. Run LightGlue inference
             // 4. Return match metrics
-            
+
             log::warn!("LightGlue matching not fully implemented - requires image data");
-            
+
             MatchResult::NoMatch
         }
 
@@ -253,10 +259,7 @@ mod tests {
 
     #[test]
     fn test_descriptor_conversion() {
-        let descriptors = vec![
-            vec![0, 128, 255],
-            vec![64, 192, 32],
-        ];
+        let descriptors = vec![vec![0, 128, 255], vec![64, 192, 32]];
 
         let array = LightGlueMatcher::descriptors_to_f32(&descriptors);
         assert_eq!(array.shape(), &[2, 3]);

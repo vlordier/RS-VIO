@@ -553,7 +553,7 @@ impl SlidingWindow {
                                 // Triangulate from stereo observations if available
                                 let left_feat = frame.left_features.iter().find(|f| f.feature_id == feature_id);
                                 let right_feat = frame.right_features.iter().find(|f| f.feature_id == feature_id);
-                                
+
                                 if let (Some(l_feat), Some(r_feat)) = (left_feat, right_feat) {
                                     // Perform stereo triangulation
                                     let left_obs = Vector3::new(
@@ -566,7 +566,7 @@ impl SlidingWindow {
                                         r_feat.undistorted_coord[1] as f64,
                                         1.0_f64,
                                     );
-                                    
+
                                     match Self::triangulate_stereo(
                                         left_obs,
                                         right_obs,

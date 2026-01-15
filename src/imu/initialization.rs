@@ -62,13 +62,13 @@ impl Default for ImuInitializationConfig {
     fn default() -> Self {
         Self {
             min_initialization_samples: 100,
-            gyro_norm_threshold: 0.05,            // 0.05 rad/s ≈ 3 deg/s
-            accel_variance_threshold: 0.1,        // 0.1 m/s² standard deviation
-            initial_gyro_bias_std: 0.01,          // 0.01 rad/s
-            initial_accel_bias_std: 0.1,          // 0.1 m/s²
-            gravity_magnitude: 9.81,              // standard gravity
-            bias_convergence_threshold: 0.001,    // 0.1% change
-            bias_stability_window: 1.0,           // 1 second stability window
+            gyro_norm_threshold: 0.05,         // 0.05 rad/s ≈ 3 deg/s
+            accel_variance_threshold: 0.1,     // 0.1 m/s² standard deviation
+            initial_gyro_bias_std: 0.01,       // 0.01 rad/s
+            initial_accel_bias_std: 0.1,       // 0.1 m/s²
+            gravity_magnitude: 9.81,           // standard gravity
+            bias_convergence_threshold: 0.001, // 0.1% change
+            bias_stability_window: 1.0,        // 1 second stability window
         }
     }
 }
@@ -178,7 +178,9 @@ impl ImuInitializer {
     /// Estimate gyroscope and accelerometer biases
     fn estimate_biases(&mut self) -> Result<()> {
         if self.measurements.is_empty() {
-            return Err(VIOError::Config("No measurements for bias estimation".to_string()));
+            return Err(VIOError::Config(
+                "No measurements for bias estimation".to_string(),
+            ));
         }
 
         // Gyroscope bias: mean of all gyroscope measurements (assuming static)
@@ -214,8 +216,14 @@ impl ImuInitializer {
         self.bias_estimate.accel_bias = accel_mean;
 
         // Update standard deviations based on measurement variance
-        self.bias_estimate.gyro_bias_std = self.gyro_variance.sqrt().max(self.config.initial_gyro_bias_std);
-        self.bias_estimate.accel_bias_std = self.accel_variance.sqrt().max(self.config.initial_accel_bias_std);
+        self.bias_estimate.gyro_bias_std = self
+            .gyro_variance
+            .sqrt()
+            .max(self.config.initial_gyro_bias_std);
+        self.bias_estimate.accel_bias_std = self
+            .accel_variance
+            .sqrt()
+            .max(self.config.initial_accel_bias_std);
 
         Ok(())
     }
@@ -223,7 +231,9 @@ impl ImuInitializer {
     /// Estimate gravity direction from accelerometer measurements
     fn estimate_gravity(&mut self) -> Result<()> {
         if self.measurements.is_empty() {
-            return Err(VIOError::Config("No measurements for gravity estimation".to_string()));
+            return Err(VIOError::Config(
+                "No measurements for gravity estimation".to_string(),
+            ));
         }
 
         // Average accelerometer reading
@@ -238,7 +248,9 @@ impl ImuInitializer {
         let accel_magnitude = accel_mean.norm();
 
         if accel_magnitude < 1e-6 {
-            return Err(VIOError::Config("Accelerometer readings too small for gravity estimation".to_string()));
+            return Err(VIOError::Config(
+                "Accelerometer readings too small for gravity estimation".to_string(),
+            ));
         }
 
         // Normalize to expected gravity magnitude
@@ -454,7 +466,7 @@ mod tests {
         for i in 0..10 {
             let imu = ImuData {
                 timestamp: i as i64 * 10_000_000, // 10ms intervals
-                accel: [0.1, 0.2, -9.81],        // Small bias
+                accel: [0.1, 0.2, -9.81],         // Small bias
                 gyro: [0.01, -0.02, 0.005],
             };
             let _ = initializer.add_measurement(&imu);

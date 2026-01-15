@@ -38,7 +38,8 @@
 pub mod initialization;
 
 pub use initialization::{
-    AdaptiveNoiseEstimator, BiasEstimate, ImuInitializationConfig, ImuInitializer, InitializationState,
+    AdaptiveNoiseEstimator, BiasEstimate, ImuInitializationConfig, ImuInitializer,
+    InitializationState,
 };
 
 use crate::datasets::ImuData;
