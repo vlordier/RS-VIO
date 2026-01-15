@@ -659,28 +659,31 @@ pub fn parse_imu_line(line: &str, delimiter: char) -> Result<ImuData> {
     }
 
     let timestamp = parts[0].parse::<i64>().map_err(|e| {
-        VIOError::Parse(format!("Failed to parse IMU timestamp '{}': {}", parts[0], e))
+        VIOError::Parse(format!(
+            "Failed to parse IMU timestamp '{}': {}",
+            parts[0], e
+        ))
     })?;
 
-    let gyro_x = parts[1].parse::<f64>().map_err(|e| {
-        VIOError::Parse(format!("Failed to parse gyro_x '{}': {}", parts[1], e))
-    })?;
-    let gyro_y = parts[2].parse::<f64>().map_err(|e| {
-        VIOError::Parse(format!("Failed to parse gyro_y '{}': {}", parts[2], e))
-    })?;
-    let gyro_z = parts[3].parse::<f64>().map_err(|e| {
-        VIOError::Parse(format!("Failed to parse gyro_z '{}': {}", parts[3], e))
-    })?;
+    let gyro_x = parts[1]
+        .parse::<f64>()
+        .map_err(|e| VIOError::Parse(format!("Failed to parse gyro_x '{}': {}", parts[1], e)))?;
+    let gyro_y = parts[2]
+        .parse::<f64>()
+        .map_err(|e| VIOError::Parse(format!("Failed to parse gyro_y '{}': {}", parts[2], e)))?;
+    let gyro_z = parts[3]
+        .parse::<f64>()
+        .map_err(|e| VIOError::Parse(format!("Failed to parse gyro_z '{}': {}", parts[3], e)))?;
 
-    let accel_x = parts[4].parse::<f64>().map_err(|e| {
-        VIOError::Parse(format!("Failed to parse accel_x '{}': {}", parts[4], e))
-    })?;
-    let accel_y = parts[5].parse::<f64>().map_err(|e| {
-        VIOError::Parse(format!("Failed to parse accel_y '{}': {}", parts[5], e))
-    })?;
-    let accel_z = parts[6].parse::<f64>().map_err(|e| {
-        VIOError::Parse(format!("Failed to parse accel_z '{}': {}", parts[6], e))
-    })?;
+    let accel_x = parts[4]
+        .parse::<f64>()
+        .map_err(|e| VIOError::Parse(format!("Failed to parse accel_x '{}': {}", parts[4], e)))?;
+    let accel_y = parts[5]
+        .parse::<f64>()
+        .map_err(|e| VIOError::Parse(format!("Failed to parse accel_y '{}': {}", parts[5], e)))?;
+    let accel_z = parts[6]
+        .parse::<f64>()
+        .map_err(|e| VIOError::Parse(format!("Failed to parse accel_z '{}': {}", parts[6], e)))?;
 
     Ok(ImuData {
         timestamp,
