@@ -153,7 +153,7 @@ impl LightGlueModelDownloader {
 }
 
 #[cfg(test)]
-#![allow(clippy::all)]
+#[allow(clippy::all)]
 mod tests {
     use super::*;
 

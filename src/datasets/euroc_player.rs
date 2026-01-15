@@ -1,10 +1,10 @@
 use crate::datasets::{
-    config::Config, player_trait::DatasetPlayer, FrameContext, ImageData, ImuData, PlayerConfig,
-    PlayerResult,
+    config::Config,
+    player_trait::{self, DatasetPlayer},
+    FrameContext, ImageData, ImuData, PlayerConfig, PlayerResult,
 };
 use crate::estimator::Estimator;
 use crate::{Result, VIOError};
-use image::ImageReader;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
@@ -25,88 +25,15 @@ impl EurocPlayer {
 
 impl DatasetPlayer for EurocPlayer {
     fn run(&self, config: PlayerConfig) -> crate::Result<PlayerResult> {
-        crate::datasets::player_trait::execute(self, config, "EurocPlayer")
+        player_trait::execute(self, config, "EurocPlayer")
     }
 
     fn load_image_timestamps(&self, dataset_path: &str) -> Result<Vec<ImageData>> {
-        let data_file = Path::new(dataset_path).join("mav0/cam0/data.csv");
-        let file = File::open(&data_file).map_err(|e| {
-            VIOError::Config(format!(
-                "Cannot open data.csv file {}: {e}",
-                data_file.display()
-            ))
-        })?;
-
-        let reader = BufReader::new(file);
-        let mut image_data = Vec::new();
-
-        for (line_num, line) in reader.lines().enumerate() {
-            let line = line.map_err(|e| {
-                VIOError::Config(format!(
-                    "Failed to read data.csv line {} ({}): {e}",
-                    line_num,
-                    data_file.display()
-                ))
-            })?;
-
-            // Skip header and empty lines
-            if line_num == 0 || line.trim().is_empty() || line.trim_start().starts_with('#') {
-                continue;
-            }
-
-            let parts: Vec<&str> = line.split(',').collect();
-            if parts.len() >= 2 {
-                let timestamp_str = parts[0].trim();
-                let filename = parts[1].trim().to_string();
-
-                if let Ok(timestamp) = timestamp_str.parse::<i64>() {
-                    image_data.push(ImageData {
-                        timestamp,
-                        filename,
-                    });
-                }
-            }
-        }
-
-        log::info!("[EurocPlayer] Loaded {} image timestamps", image_data.len());
-        Ok(image_data)
+        player_trait::load_timestamps_from_csv(dataset_path, "EurocPlayer")
     }
 
     fn load_image(&self, dataset_path: &str, filename: &str, cam_id: u32) -> Result<Vec<u8>> {
-        let cam_folder = if cam_id == 0 { "cam0" } else { "cam1" };
-        let full_path = Path::new(dataset_path)
-            .join("mav0")
-            .join(cam_folder)
-            .join("data")
-            .join(filename);
-
-        if !full_path.exists() {
-            return Err(VIOError::Image(format!(
-                "Cannot load image: {}",
-                full_path.display()
-            )));
-        }
-
-        // Load image using image crate
-        let img = ImageReader::open(&full_path)
-            .map_err(|e| {
-                VIOError::Image(format!("Failed to open image {}: {e}", full_path.display()))
-            })?
-            .decode()
-            .map_err(|e| {
-                VIOError::Image(format!(
-                    "Failed to decode image {}: {e}",
-                    full_path.display()
-                ))
-            })?;
-
-        // Convert to grayscale if needed (EuRoC images are typically grayscale)
-        let gray_img = img.to_luma8();
-
-        // Return raw pixel data as Vec<u8>
-        let pixel_data = gray_img.as_raw().to_vec();
-
-        Ok(pixel_data)
+        player_trait::load_image_from_mav0(dataset_path, filename, cam_id)
     }
 
     fn load_imu_data(
@@ -141,29 +68,10 @@ impl DatasetPlayer for EurocPlayer {
             }
 
             // EuRoC IMU CSV format: timestamp,omega_x,omega_y,omega_z,alpha_x,alpha_y,alpha_z
-            let parts: Vec<&str> = line.split(',').collect();
-            if parts.len() < 7 {
-                continue;
+            match crate::datasets::player_trait::parse_imu_line(&line, ',') {
+                Ok(imu) => imu_data_vec.push(imu),
+                Err(e) => log::warn!("Failed to parse IMU line {}: {}", line_num, e),
             }
-
-            // Parse timestamp (nanoseconds)
-            let timestamp: i64 = parts[0].trim().parse().unwrap_or(0);
-
-            // Parse gyroscope (rad/s)
-            let gyro_x: f64 = parts[1].trim().parse().unwrap_or(0.0);
-            let gyro_y: f64 = parts[2].trim().parse().unwrap_or(0.0);
-            let gyro_z: f64 = parts[3].trim().parse().unwrap_or(0.0);
-
-            // Parse accelerometer (m/s^2)
-            let accel_x: f64 = parts[4].trim().parse().unwrap_or(0.0);
-            let accel_y: f64 = parts[5].trim().parse().unwrap_or(0.0);
-            let accel_z: f64 = parts[6].trim().parse().unwrap_or(0.0);
-
-            imu_data_vec.push(ImuData {
-                timestamp,
-                gyro: [gyro_x, gyro_y, gyro_z],
-                accel: [accel_x, accel_y, accel_z],
-            });
         }
 
         // Store in cache
@@ -217,52 +125,7 @@ impl DatasetPlayer for EurocPlayer {
         _context: &FrameContext,
         dataset_path: &str,
     ) {
-        // Save trajectory in TUM format: timestamp x y z qx qy qz qw
-        let trajectory_path = Path::new(dataset_path).join("trajectory.txt");
-
-        match std::fs::File::create(&trajectory_path) {
-            Ok(mut file) => {
-                use std::io::Write;
-                let trajectory = estimator.get_trajectory();
-                let mut count = 0;
-
-                for (timestamp_ns, pose) in trajectory.iter() {
-                    // Extract translation
-                    let tx = pose[(0, 3)];
-                    let ty = pose[(1, 3)];
-                    let tz = pose[(2, 3)];
-
-                    // Extract rotation as quaternion
-                    let r = pose.fixed_view::<3, 3>(0, 0);
-                    let rotmat = nalgebra::Rotation3::from_matrix_unchecked(r.into_owned());
-                    let q = nalgebra::UnitQuaternion::from_rotation_matrix(&rotmat);
-
-                    let timestamp_s = *timestamp_ns as f64 / 1e9;
-
-                    if writeln!(
-                        file,
-                        "{:.9} {:.6} {:.6} {:.6} {:.9} {:.9} {:.9} {:.9}",
-                        timestamp_s, tx, ty, tz, q.i, q.j, q.k, q.w
-                    )
-                    .is_ok()
-                    {
-                        count += 1;
-                    }
-                }
-
-                log::info!(
-                    "[EurocPlayer] Saved trajectory with {} poses to {}",
-                    count,
-                    trajectory_path.display()
-                );
-            },
-            Err(e) => {
-                log::error!(
-                    "[EurocPlayer] Failed to create trajectory file {}: {e}",
-                    trajectory_path.display()
-                );
-            },
-        }
+        player_trait::save_trajectory_common(estimator, dataset_path, "EurocPlayer");
     }
 
     fn save_statistics(&self, result: &PlayerResult, stats_path: &Path) {

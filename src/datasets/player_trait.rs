@@ -453,3 +453,241 @@ pub fn save_statistics_common(result: &PlayerResult, stats_path: &Path) {
         .ok();
     }
 }
+
+/// Save trajectory in TUM format: timestamp x y z qx qy qz qw
+///
+/// This helper consolidates identical trajectory saving logic across all dataset players.
+/// Extracts poses from the estimator trajectory and writes them to a file in standard TUM format.
+///
+/// # Arguments
+/// * `estimator` - Reference to the estimator containing computed trajectory
+/// * `dataset_path` - Path where trajectory.txt will be saved
+/// * `player_name` - Name of the player for logging messages
+pub fn save_trajectory_common(
+    estimator: &crate::estimator::Estimator,
+    dataset_path: &str,
+    player_name: &str,
+) {
+    use nalgebra as na;
+
+    let trajectory_path = Path::new(dataset_path).join("trajectory.txt");
+
+    match std::fs::File::create(&trajectory_path) {
+        Ok(mut file) => {
+            use std::io::Write;
+            let trajectory = estimator.get_trajectory();
+            let mut count = 0;
+
+            for (timestamp_ns, pose) in trajectory.iter() {
+                let timestamp_s = *timestamp_ns as f64 / 1e9;
+
+                // Extract translation
+                let tx = pose[(0, 3)];
+                let ty = pose[(1, 3)];
+                let tz = pose[(2, 3)];
+
+                // Extract rotation as quaternion
+                let r = pose.fixed_view::<3, 3>(0, 0);
+                let rotmat = na::Rotation3::from_matrix_unchecked(r.into_owned());
+                let q = na::UnitQuaternion::from_rotation_matrix(&rotmat);
+
+                if writeln!(
+                    file,
+                    "{:.9} {:.6} {:.6} {:.6} {:.9} {:.9} {:.9} {:.9}",
+                    timestamp_s, tx, ty, tz, q.i, q.j, q.k, q.w
+                )
+                .is_ok()
+                {
+                    count += 1;
+                }
+            }
+
+            log::info!(
+                "[{}] Saved trajectory with {} poses to {}",
+                player_name,
+                count,
+                trajectory_path.display()
+            );
+        },
+        Err(e) => {
+            log::error!(
+                "[{}] Failed to create trajectory file {}: {e}",
+                player_name,
+                trajectory_path.display()
+            );
+        },
+    }
+}
+
+/// Load image timestamps from a standard data.csv file
+///
+/// Common implementation for datasets that use the mav0/cam0/data.csv format
+/// (EuRoC, TUM-VI, 4Seasons all use this structure).
+///
+/// # Arguments
+/// * `dataset_path` - Path to the dataset root directory
+/// * `player_name` - Name of the player (for logging)
+///
+/// # Returns
+/// Vector of `ImageData` containing timestamps and filenames
+pub fn load_timestamps_from_csv(dataset_path: &str, player_name: &str) -> Result<Vec<ImageData>> {
+    use std::fs::File;
+    use std::io::{BufRead, BufReader};
+
+    let data_file = Path::new(dataset_path).join("mav0/cam0/data.csv");
+    let file = File::open(&data_file).map_err(|e| {
+        VIOError::Config(format!(
+            "Cannot open data.csv file {}: {e}",
+            data_file.display()
+        ))
+    })?;
+
+    let reader = BufReader::new(file);
+    let mut image_data = Vec::new();
+
+    for (line_num, line) in reader.lines().enumerate() {
+        let line = line.map_err(|e| {
+            VIOError::Config(format!(
+                "Failed to read data.csv line {} ({}): {e}",
+                line_num,
+                data_file.display()
+            ))
+        })?;
+
+        // Skip header and empty lines
+        if line_num == 0 || line.trim().is_empty() || line.trim_start().starts_with('#') {
+            continue;
+        }
+
+        let parts: Vec<&str> = line.split(',').collect();
+        if parts.len() >= 2 {
+            let timestamp_str = parts[0].trim();
+            let filename = parts[1].trim().to_string();
+
+            if let Ok(timestamp) = timestamp_str.parse::<i64>() {
+                image_data.push(ImageData {
+                    timestamp,
+                    filename,
+                });
+            }
+        }
+    }
+
+    log::info!(
+        "[{}] Loaded {} image timestamps",
+        player_name,
+        image_data.len()
+    );
+    Ok(image_data)
+}
+
+/// Load a single image from the standard mav0 directory structure
+///
+/// Common implementation for datasets that use mav0/cam0/data/ and mav0/cam1/data/
+/// directory layout (EuRoC, TUM-VI, 4Seasons all use this structure).
+///
+/// # Arguments
+/// * `dataset_path` - Path to the dataset root directory
+/// * `filename` - Relative filename from data.csv
+/// * `cam_id` - Camera ID (0 for left, 1 for right)
+///
+/// # Returns
+/// Raw grayscale pixel data as Vec<u8>
+pub fn load_image_from_mav0(dataset_path: &str, filename: &str, cam_id: u32) -> Result<Vec<u8>> {
+    use image::ImageReader;
+
+    let cam_folder = if cam_id == 0 { "cam0" } else { "cam1" };
+    let full_path = Path::new(dataset_path)
+        .join("mav0")
+        .join(cam_folder)
+        .join("data")
+        .join(filename);
+
+    if !full_path.exists() {
+        return Err(VIOError::Image(format!(
+            "Cannot load image: {}",
+            full_path.display()
+        )));
+    }
+
+    // Load image using image crate
+    let img = ImageReader::open(&full_path)
+        .map_err(|e| VIOError::Image(format!("Failed to open image {}: {e}", full_path.display())))?
+        .decode()
+        .map_err(|e| {
+            VIOError::Image(format!(
+                "Failed to decode image {}: {e}",
+                full_path.display()
+            ))
+        })?;
+
+    // Convert to grayscale if needed
+    let gray_img = img.to_luma8();
+    Ok(gray_img.into_raw())
+}
+
+/// Parse a line of IMU data from CSV or whitespace-delimited format
+///
+/// This helper function eliminates duplicate IMU parsing code across
+/// EuRoC, TUM-VI, and 4Seasons dataset players.
+///
+/// # Arguments
+/// * `line` - The line to parse
+/// * `delimiter` - The delimiter character (',' for CSV, ' ' for whitespace)
+///
+/// # Returns
+/// A `Result` containing the parsed `ImuData` or an error message
+///
+/// # Format
+/// Expected format: `timestamp gyro_x gyro_y gyro_z accel_x accel_y accel_z`
+/// - timestamp: nanoseconds (i64)
+/// - gyro: rad/s (3x f64)
+/// - accel: m/s² (3x f64)
+pub fn parse_imu_line(line: &str, delimiter: char) -> Result<ImuData> {
+    let parts: Vec<&str> = if delimiter == ' ' {
+        line.split_whitespace().collect()
+    } else {
+        line.split(delimiter).collect()
+    };
+
+    if parts.len() < 7 {
+        return Err(VIOError::Parse(format!(
+            "IMU line has insufficient fields (expected 7, got {}): {}",
+            parts.len(),
+            line
+        )));
+    }
+
+    let timestamp = parts[0].parse::<i64>().map_err(|e| {
+        VIOError::Parse(format!(
+            "Failed to parse IMU timestamp '{}': {}",
+            parts[0], e
+        ))
+    })?;
+
+    let gyro_x = parts[1]
+        .parse::<f64>()
+        .map_err(|e| VIOError::Parse(format!("Failed to parse gyro_x '{}': {}", parts[1], e)))?;
+    let gyro_y = parts[2]
+        .parse::<f64>()
+        .map_err(|e| VIOError::Parse(format!("Failed to parse gyro_y '{}': {}", parts[2], e)))?;
+    let gyro_z = parts[3]
+        .parse::<f64>()
+        .map_err(|e| VIOError::Parse(format!("Failed to parse gyro_z '{}': {}", parts[3], e)))?;
+
+    let accel_x = parts[4]
+        .parse::<f64>()
+        .map_err(|e| VIOError::Parse(format!("Failed to parse accel_x '{}': {}", parts[4], e)))?;
+    let accel_y = parts[5]
+        .parse::<f64>()
+        .map_err(|e| VIOError::Parse(format!("Failed to parse accel_y '{}': {}", parts[5], e)))?;
+    let accel_z = parts[6]
+        .parse::<f64>()
+        .map_err(|e| VIOError::Parse(format!("Failed to parse accel_z '{}': {}", parts[6], e)))?;
+
+    Ok(ImuData {
+        timestamp,
+        gyro: [gyro_x, gyro_y, gyro_z],
+        accel: [accel_x, accel_y, accel_z],
+    })
+}

@@ -149,6 +149,92 @@ clippy-fix:
 	@echo "$(COLOR_GREEN)Auto-fixing clippy warnings...$(NC)"
 	cargo clippy --fix --all-targets --all-features --allow-dirty
 
+# Quick quality check (recommended before commits)
+quality-quick:
+	@echo "$(COLOR_BLUE)════════════════════════════════════════════════════════════$(NC)"
+	@echo "$(COLOR_BLUE)  RS-VIO Quick Quality Check$(NC)"
+	@echo "$(COLOR_BLUE)════════════════════════════════════════════════════════════$(NC)"
+	@echo ""
+	@echo "$(COLOR_YELLOW)1. Running tests...$(NC)"
+	@cargo test --lib --bins
+	@echo ""
+	@echo "$(COLOR_YELLOW)2. Running clippy...$(NC)"
+	@cargo clippy --all --all-targets -- -D warnings
+	@echo ""
+	@echo "$(COLOR_YELLOW)3. Checking formatting...$(NC)"
+	@cargo fmt --all -- --check
+	@echo ""
+	@echo "$(COLOR_GREEN)✅ Quick quality check passed!$(NC)"
+
+# Pre-commit hook (fast, auto-fixes formatting)
+pre-commit:
+	@echo "$(COLOR_YELLOW)Running pre-commit checks...$(NC)"
+	@cargo fmt --all
+	@cargo clippy --all -- -D warnings
+	@cargo test --all --quiet
+	@echo "$(COLOR_GREEN)✅ Pre-commit checks passed!$(NC)"
+
+# Full quality check (includes security audit)
+quality-full: quality-quick
+	@echo ""
+	@echo "$(COLOR_YELLOW)4. Running security audit...$(NC)"
+	@cargo audit --deny warnings --ignore RUSTSEC-2025-0141 || echo "$(COLOR_YELLOW)Note: Install cargo-audit for security checks$(NC)"
+	@echo ""
+	@echo "$(COLOR_GREEN)✅ Full quality check complete!$(NC)"
+
+# ============================================================================
+# Performance Profiling Targets
+# ============================================================================
+
+# Generate flamegraph for hotspot analysis
+flamegraph:
+	@echo "$(COLOR_YELLOW)Generating flamegraph...$(NC)"
+	@if command -v cargo-flamegraph >/dev/null 2>&1; then \
+		cargo flamegraph --bin run_euroc -- config/euroc_vio.yaml /tmp/dataset/; \
+		echo "$(COLOR_GREEN)✅ Flamegraph saved to flamegraph.svg$(NC)"; \
+	else \
+		echo "$(COLOR_RED)Install: cargo install flamegraph$(NC)"; \
+	fi
+
+# Profile memory allocations with DHAT
+profile-allocations:
+	@echo "$(COLOR_YELLOW)Profiling memory allocations...$(NC)"
+	@echo "$(COLOR_YELLOW)Note: Build with dhat feature enabled$(NC)"
+	@cargo build --release --features dhat
+	@echo "$(COLOR_GREEN)Run your binary to generate dhat-heap.json$(NC)"
+
+# Run benchmarks and save baseline
+benchmark-baseline:
+	@echo "$(COLOR_YELLOW)Running benchmarks and saving baseline...$(NC)"
+	@mkdir -p metrics/benchmarks
+	@cargo bench --all | tee metrics/benchmarks/baseline_$$(date +%Y%m%d_%H%M%S).txt
+	@cp metrics/benchmarks/baseline_$$(date +%Y%m%d_%H%M%S).txt metrics/benchmarks/baseline_latest.txt 2>/dev/null || true
+	@echo "$(COLOR_GREEN)✅ Baseline saved to metrics/benchmarks/$(NC)"
+
+# Compare current benchmarks against baseline
+benchmark-compare:
+	@echo "$(COLOR_YELLOW)Comparing benchmarks against baseline...$(NC)"
+	@./scripts/benchmark_comparison.sh
+
+# Profile with perf (Linux only)
+perf-record:
+	@echo "$(COLOR_YELLOW)Recording perf data...$(NC)"
+	@if command -v perf >/dev/null 2>&1; then \
+		cargo build --release; \
+		perf record -F 99 -g ./target/release/run_euroc config/euroc_vio.yaml /tmp/dataset/; \
+		echo "$(COLOR_GREEN)✅ Run 'perf report' to view results$(NC)"; \
+	else \
+		echo "$(COLOR_YELLOW)perf not available (Linux only)$(NC)"; \
+	fi
+
+# Quick performance check (runs key benchmarks)
+perf-quick:
+	@echo "$(COLOR_YELLOW)Running quick performance benchmarks...$(NC)"
+	@cargo bench --bench feature_tracker --bench optimization
+	@echo "$(COLOR_GREEN)✅ Performance check complete!$(NC)"
+
+# ============================================================================
+
 audit:
 	@echo "$(COLOR_GREEN)Running security audit...$(NC)"
 	cargo audit

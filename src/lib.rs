@@ -152,6 +152,9 @@ pub mod types;
 pub mod validation;
 pub mod viewers;
 
+// Binary utilities module (shared logic for dataset runners)
+pub mod bin_common;
+
 // Re-export commonly used types for convenience
 pub use datasets::config::Config;
 pub use datasets::euroc_player::EurocPlayer;

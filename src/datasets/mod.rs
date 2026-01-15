@@ -172,83 +172,91 @@ impl CameraModelType {
     }
 }
 
+/// Helper: Extract intrinsic parameters with defaults
+fn extract_intrinsics(intrinsics: &[f64]) -> (f64, f64, f64, f64) {
+    let fx = intrinsics.first().copied().unwrap_or(500.0);
+    let fy = intrinsics.get(1).copied().unwrap_or(500.0);
+    let cx = intrinsics.get(2).copied().unwrap_or(320.0);
+    let cy = intrinsics.get(3).copied().unwrap_or(240.0);
+    (fx, fy, cx, cy)
+}
+
+/// Helper: Create OpenCV5 camera model from config
+fn create_opencv5_model(
+    intrinsics: &[f64],
+    distortion: &[f64],
+    width: u32,
+    height: u32,
+) -> CameraModelType {
+    let (fx, fy, cx, cy) = extract_intrinsics(intrinsics);
+    let k1 = distortion.first().copied().unwrap_or(0.0);
+    let k2 = distortion.get(1).copied().unwrap_or(0.0);
+    let p1 = distortion.get(2).copied().unwrap_or(0.0);
+    let p2 = distortion.get(3).copied().unwrap_or(0.0);
+    let k3 = distortion.get(4).copied().unwrap_or(0.0);
+
+    let params_vec = vec![fx, fy, cx, cy, k1, k2, p1, p2, k3];
+    let params = nalgebra034::DVector::from_vec(params_vec);
+    CameraModelType::OpenCV5(OpenCVModel5::new(&params, width, height))
+}
+
+/// Helper: Create EUCM camera model from config
+fn create_eucm_model(
+    intrinsics: &[f64],
+    distortion: &[f64],
+    width: u32,
+    height: u32,
+) -> CameraModelType {
+    let (fx, fy, cx, cy) = extract_intrinsics(intrinsics);
+    let alpha = distortion.first().copied().unwrap_or(0.5);
+    let beta = distortion.get(1).copied().unwrap_or(1.0);
+
+    let params_vec = vec![fx, fy, cx, cy, alpha, beta];
+    let params = nalgebra034::DVector::from_vec(params_vec);
+    CameraModelType::EUCM(EUCM::new(&params, width, height))
+}
+
+/// Helper: Create a single camera model based on model type string
+fn create_camera_model(
+    model_str: &str,
+    intrinsics: &[f64],
+    distortion: &[f64],
+    width: u32,
+    height: u32,
+) -> CameraModelType {
+    if model_str.eq_ignore_ascii_case("eucm") {
+        create_eucm_model(intrinsics, distortion, width, height)
+    } else {
+        create_opencv5_model(intrinsics, distortion, width, height)
+    }
+}
+
 /// Create camera models from config.
 /// This helper function creates camera models from the configuration
 /// for both left and right cameras. Supports OpenCVModel5 and EUCM models.
 pub fn create_camera_models_from_config(config: &Config) -> (CameraModelType, CameraModelType) {
     let cam = &config.camera;
 
-    // Determine camera model type (assuming same for left and right)
-    // TODO make this code more generic (and elegant)
-    // Using unwrap_or doesn't make sense here, if we can't get the params, we should error out
+    // Determine camera model types
     let left_model_str = cam.left_model.as_deref().unwrap_or("pinhole-radtan");
-
-    // Create left camera model
-    let left_cam = if left_model_str == "EUCM" || left_model_str == "eucm" {
-        // EUCM model: [fx, fy, cx, cy, alpha, beta]
-        let eucm_params_vec: Vec<f64> = vec![
-            cam.left_intrinsics.first().copied().unwrap_or(500.0), // fx
-            cam.left_intrinsics.get(1).copied().unwrap_or(500.0),  // fy
-            cam.left_intrinsics.get(2).copied().unwrap_or(320.0),  // cx
-            cam.left_intrinsics.get(3).copied().unwrap_or(240.0),  // cy
-            cam.left_distortion.first().copied().unwrap_or(0.5),   // alpha
-            cam.left_distortion.get(1).copied().unwrap_or(1.0),    // beta
-        ];
-        let eucm_params = nalgebra034::DVector::from_vec(eucm_params_vec);
-        CameraModelType::EUCM(EUCM::new(&eucm_params, cam.image_width, cam.image_height))
-    } else {
-        let left_opencv_params_vec = vec![
-            cam.left_intrinsics.first().copied().unwrap_or(500.0), // fx
-            cam.left_intrinsics.get(1).copied().unwrap_or(500.0),  // fy
-            cam.left_intrinsics.get(2).copied().unwrap_or(320.0),  // cx
-            cam.left_intrinsics.get(3).copied().unwrap_or(240.0),  // cy
-            cam.left_distortion.first().copied().unwrap_or(0.0),   // k1
-            cam.left_distortion.get(1).copied().unwrap_or(0.0),    // k2
-            cam.left_distortion.get(2).copied().unwrap_or(0.0),    // p1
-            cam.left_distortion.get(3).copied().unwrap_or(0.0),    // p2
-            cam.left_distortion.get(4).copied().unwrap_or(0.0),    // k3
-        ];
-        let left_params = nalgebra034::DVector::from_vec(left_opencv_params_vec);
-        CameraModelType::OpenCV5(OpenCVModel5::new(
-            &left_params,
-            cam.image_width,
-            cam.image_height,
-        ))
-    };
-
-    // Create right camera model (assuming same model type as left)
     let right_model_str = cam.right_model.as_deref().unwrap_or(left_model_str);
-    let right_cam = if right_model_str == "EUCM" || right_model_str == "eucm" {
-        // EUCM model: [fx, fy, cx, cy, alpha, beta]
-        let eucm_params_vec: Vec<f64> = vec![
-            cam.right_intrinsics.first().copied().unwrap_or(500.0), // fx
-            cam.right_intrinsics.get(1).copied().unwrap_or(500.0),  // fy
-            cam.right_intrinsics.get(2).copied().unwrap_or(320.0),  // cx
-            cam.right_intrinsics.get(3).copied().unwrap_or(240.0),  // cy
-            cam.right_distortion.first().copied().unwrap_or(0.5),   // alpha
-            cam.right_distortion.get(1).copied().unwrap_or(1.0),    // beta
-        ];
-        let eucm_params = nalgebra034::DVector::from_vec(eucm_params_vec);
-        CameraModelType::EUCM(EUCM::new(&eucm_params, cam.image_width, cam.image_height))
-    } else {
-        let right_opencv_params_vec = vec![
-            cam.right_intrinsics.first().copied().unwrap_or(500.0), // fx
-            cam.right_intrinsics.get(1).copied().unwrap_or(500.0),  // fy
-            cam.right_intrinsics.get(2).copied().unwrap_or(320.0),  // cx
-            cam.right_intrinsics.get(3).copied().unwrap_or(240.0),  // cy
-            cam.right_distortion.first().copied().unwrap_or(0.0),   // k1
-            cam.right_distortion.get(1).copied().unwrap_or(0.0),    // k2
-            cam.right_distortion.get(2).copied().unwrap_or(0.0),    // p1
-            cam.right_distortion.get(3).copied().unwrap_or(0.0),    // p2
-            cam.right_distortion.get(4).copied().unwrap_or(0.0),    // k3
-        ];
-        let right_params = nalgebra034::DVector::from_vec(right_opencv_params_vec);
-        CameraModelType::OpenCV5(OpenCVModel5::new(
-            &right_params,
-            cam.image_width,
-            cam.image_height,
-        ))
-    };
+
+    // Create both camera models using helper
+    let left_cam = create_camera_model(
+        left_model_str,
+        &cam.left_intrinsics,
+        &cam.left_distortion,
+        cam.image_width,
+        cam.image_height,
+    );
+
+    let right_cam = create_camera_model(
+        right_model_str,
+        &cam.right_intrinsics,
+        &cam.right_distortion,
+        cam.image_width,
+        cam.image_height,
+    );
 
     (left_cam, right_cam)
 }

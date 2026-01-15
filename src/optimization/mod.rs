@@ -75,6 +75,7 @@ pub mod factors;
 pub mod loop_closure;
 pub mod marginalization;
 pub mod observer;
+pub mod projection;
 pub mod tight_coupling;
 
 pub use loop_closure::{
