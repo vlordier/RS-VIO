@@ -3,9 +3,9 @@
 //! This module provides fast candidate retrieval using Bag-of-Words histograms
 //! instead of exhaustive descriptor comparisons.
 
-use std::collections::BTreeMap;
 use super::vocabulary::Vocabulary;
 use super::{DescriptorMatcher, MatchMetrics};
+use std::collections::BTreeMap;
 
 /// BoW-based retriever for fast loop closure candidate detection
 pub struct BowRetriever {
@@ -77,12 +77,16 @@ impl BowRetriever {
 
     /// Compute BoW histogram for descriptor list
     pub fn compute_histogram(&self, words: Vec<usize>) -> Option<BTreeMap<usize, f64>> {
-        self.vocabulary.as_ref().map(|vocab| vocab.compute_histogram(words))
+        self.vocabulary
+            .as_ref()
+            .map(|vocab| vocab.compute_histogram(words))
     }
 
     /// Quantize descriptor using vocabulary
     pub fn quantize_descriptor(&self, descriptor: &[u8]) -> Option<usize> {
-        self.vocabulary.as_ref().map(|vocab| vocab.quantize(descriptor))
+        self.vocabulary
+            .as_ref()
+            .map(|vocab| vocab.quantize(descriptor))
     }
 }
 
@@ -123,7 +127,8 @@ impl DescriptorMatcher for HybridMatcher {
     ) -> MatchMetrics {
         // If BoW vocabulary is available, we could add pre-filtering here
         // For now, delegate to the underlying descriptor matcher
-        self.descriptor_matcher.match_keyframes(descriptor1, descriptor2)
+        self.descriptor_matcher
+            .match_keyframes(descriptor1, descriptor2)
     }
 }
 

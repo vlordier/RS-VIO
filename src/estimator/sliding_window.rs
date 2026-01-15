@@ -664,7 +664,8 @@ impl SlidingWindow {
                 let kf1_var = format!("KF_{}", idx1);
                 let kf2_var = format!("KF_{}", idx2);
 
-                if !(initial_values.contains_key(&kf1_var) && initial_values.contains_key(&kf2_var)) {
+                if !(initial_values.contains_key(&kf1_var) && initial_values.contains_key(&kf2_var))
+                {
                     continue;
                 }
 
@@ -673,9 +674,9 @@ impl SlidingWindow {
                     constraint.information_matrix.clone(),
                 );
 
-                let loss = HuberLoss::new(1.0)
-                    .ok()
-                    .map(|l| Box::new(l) as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>);
+                let loss = HuberLoss::new(1.0).ok().map(|l| {
+                    Box::new(l) as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>
+                });
 
                 problem.add_residual_block(&[&kf1_var, &kf2_var], Box::new(factor), loss);
                 retained_constraints.push(constraint.clone());

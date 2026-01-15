@@ -78,8 +78,8 @@ pub mod observer;
 pub mod tight_coupling;
 
 pub use loop_closure::{
-    LoopClosureDetector, LoopClosureConfig, LoopClosureConstraint,
-    KeyframeDatabase, KeyframeDescriptor, LoopClosureCandidate,
+    KeyframeDatabase, KeyframeDescriptor, LoopClosureCandidate, LoopClosureConfig,
+    LoopClosureConstraint, LoopClosureDetector,
 };
 
 #[cfg(test)]

@@ -9,8 +9,8 @@
 //! - OpenCV's solvePnPRansac implementation
 //! - Lindenberger et al., "LightGlue: Local Feature Matching at Light Speed", ICCV 2023
 
-use super::{GeometricVerifier, VerifiedMatch, KeyframeDescriptor, MatchMetrics};
-use super::pnp_ransac::{PnPRansacSolver, PnPRansacConfig, Correspondence};
+use super::pnp_ransac::{Correspondence, PnPRansacConfig, PnPRansacSolver};
+use super::{GeometricVerifier, KeyframeDescriptor, MatchMetrics, VerifiedMatch};
 use nalgebra as na;
 
 /// Configuration for enhanced geometric verifier
@@ -55,22 +55,22 @@ impl EnhancedGeometricVerifier {
         // In a real implementation, this would extract actual feature coordinates
         // For now, use descriptor components as pseudo-coordinates
         let mut points = Vec::new();
-        
+
         // Use first few components of descriptor as 2D point coordinates
         for i in (0..descriptor.descriptor.len()).step_by(2) {
             if i + 1 < descriptor.descriptor.len() {
                 points.push(na::Vector2::new(
-                    descriptor.descriptor[i] * 640.0,  // Normalize to image width
+                    descriptor.descriptor[i] * 640.0,     // Normalize to image width
                     descriptor.descriptor[i + 1] * 480.0, // Normalize to image height
                 ));
             }
         }
-        
+
         if points.is_empty() {
             // Fallback: generate pseudo-points from descriptor
             points.push(na::Vector2::new(320.0, 240.0));
         }
-        
+
         points
     }
 
@@ -79,15 +79,15 @@ impl EnhancedGeometricVerifier {
         // In a real implementation, this would extract 3D points from the keyframe's map
         // For now, create pseudo-3D points from pose
         let mut points = Vec::new();
-        
+
         let translation = descriptor.pose.translation.vector;
-        
+
         // Generate points around the keyframe position
         for i in 0..4 {
             let offset = 0.1 * ((i as f64) - 1.5);
             points.push(translation + na::Vector3::new(offset, offset, 0.5));
         }
-        
+
         points
     }
 }
@@ -118,14 +118,14 @@ impl GeometricVerifier for EnhancedGeometricVerifier {
         if self.config.use_pnp_ransac {
             // Extract 2D points from query descriptor
             let points_2d_query = self.extract_2d_points(query);
-            
+
             // Extract 3D points from candidate keyframe
             let points_3d_candidate = self.extract_3d_points(candidate);
-            
+
             // Build correspondences
             let mut correspondences = Vec::new();
             let max_corr = points_2d_query.len().min(points_3d_candidate.len());
-            
+
             for i in 0..max_corr {
                 correspondences.push(Correspondence {
                     point_3d: points_3d_candidate[i],
@@ -135,9 +135,9 @@ impl GeometricVerifier for EnhancedGeometricVerifier {
 
             // Create default camera intrinsics (will be passed from estimator in real impl)
             let camera_intrinsics = na::Matrix3::new(
-                500.0, 0.0, 320.0,  // fx, 0, cx
-                0.0, 500.0, 240.0,  // 0, fy, cy
-                0.0, 0.0, 1.0,      // 0, 0, 1
+                500.0, 0.0, 320.0, // fx, 0, cx
+                0.0, 500.0, 240.0, // 0, fy, cy
+                0.0, 0.0, 1.0, // 0, 0, 1
             );
 
             match self.pnp_solver.solve(correspondences, &camera_intrinsics) {
@@ -156,20 +156,15 @@ impl GeometricVerifier for EnhancedGeometricVerifier {
                         inlier_count: result.num_inliers,
                         inlier_ratio: result.inlier_ratio,
                     })
-                }
+                },
                 Err(e) => {
-                    log::debug!(
-                        "[EnhancedVerifier] PnP-RANSAC failed: {}",
-                        e
-                    );
+                    log::debug!("[EnhancedVerifier] PnP-RANSAC failed: {}", e);
                     None
-                }
+                },
             }
         } else {
             // Fallback: accept based on similarity only
-            log::debug!(
-                "[EnhancedVerifier] No PnP verification, accepting based on similarity"
-            );
+            log::debug!("[EnhancedVerifier] No PnP verification, accepting based on similarity");
 
             let relative_pose = candidate.pose.inverse() * query.pose;
 
@@ -184,27 +179,28 @@ impl GeometricVerifier for EnhancedGeometricVerifier {
 
 impl EnhancedGeometricVerifier {
     /// Compute information matrix from inlier ratio and reprojection error
+    #[allow(dead_code)]
     fn compute_information_matrix(inlier_ratio: f64, reprojection_error: f64) -> na::Matrix6<f64> {
         // Scale information by inlier ratio
         let scale = inlier_ratio * (1.0 / (1.0 + reprojection_error));
-        
+
         // Create anisotropic information matrix
         let mut info = na::Matrix6::zeros();
-        
+
         // Position uncertainty (mm)
         let pos_sigma = 250.0 * (1.0 - inlier_ratio);
         let pos_weight = 1.0 / (pos_sigma * pos_sigma);
-        
+
         // Rotation uncertainty (rad)
         let rot_sigma = 0.05 * (1.0 - inlier_ratio);
         let rot_weight = 1.0 / (rot_sigma * rot_sigma);
-        
+
         // Diagonal information matrix
         for i in 0..3 {
             info[(i, i)] = scale * pos_weight;
             info[(i + 3, i + 3)] = scale * rot_weight;
         }
-        
+
         info
     }
 }
@@ -229,10 +225,10 @@ mod tests {
     #[test]
     fn information_matrix_computation() {
         let matrix = EnhancedGeometricVerifier::compute_information_matrix(0.8, 1.0);
-        
+
         // Should be positive semi-definite and symmetric
         assert_eq!(matrix.clone(), matrix.transpose());
-        
+
         // All diagonal elements should be positive
         for i in 0..6 {
             assert!(matrix[(i, i)] > 0.0);
@@ -278,7 +274,7 @@ mod tests {
     #[test]
     fn candidate_acceptance_above_threshold() {
         let config = EnhancedVerifierConfig {
-            use_pnp_ransac: false,  // Disable PnP for this test
+            use_pnp_ransac: false, // Disable PnP for this test
             min_pre_filter_similarity: 0.3,
             ..Default::default()
         };
