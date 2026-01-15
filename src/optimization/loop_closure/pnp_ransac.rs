@@ -234,7 +234,7 @@ impl PnPRansacSolver {
 
         // Solve using SVD
         let svd = A.svd(true, true);
-        let V = svd.u.unwrap(); // Last column of V (or U for our case)
+        let V = svd.u.expect("SVD should compute U matrix"); // Last column of V (or U for our case)
         let solution = V.column(11);
 
         // Extract pose from solution
@@ -306,6 +306,7 @@ impl PnPRansacSolver {
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
 

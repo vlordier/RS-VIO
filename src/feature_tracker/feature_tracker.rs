@@ -520,6 +520,7 @@ pub fn track_point_at_level(
 }
 
 #[cfg(test)]
+#[allow(clippy::manual_clamp)]
 mod tests {
     use super::*;
     use image::Luma;

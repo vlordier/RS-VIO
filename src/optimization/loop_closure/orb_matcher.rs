@@ -121,6 +121,7 @@ impl DescriptorMatcher for OrbMatcher {
 }
 
 #[cfg(test)]
+#[allow(clippy::needless_range_loop)]
 mod tests {
     use super::*;
     use nalgebra::Isometry3;

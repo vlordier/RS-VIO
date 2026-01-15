@@ -1291,7 +1291,7 @@ impl MarginalizationManager {
         let min_sv = singulars
             .iter()
             .copied()
-            .filter(|sv| *sv > std::f64::EPSILON * max_sv)
+            .filter(|sv| *sv > f64::EPSILON * max_sv)
             .fold(f64::INFINITY, f64::min);
         if min_sv.is_finite() && min_sv > 0.0 {
             Some(max_sv / min_sv)
@@ -1565,6 +1565,13 @@ pub fn select_marginalization_candidates(
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::float_cmp,
+    clippy::bool_assert_comparison,
+    clippy::field_reassign_with_default
+)]
 mod tests {
     use super::*;
 

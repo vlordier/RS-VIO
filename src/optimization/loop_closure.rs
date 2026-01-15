@@ -467,7 +467,7 @@ impl KeyframeDatabase {
             }
         }
 
-        candidates.sort_by(|a, b| b.2.similarity.partial_cmp(&a.2.similarity).unwrap());
+        candidates.sort_by(|a, b| b.2.similarity.total_cmp(&a.2.similarity));
 
         candidates
             .into_iter()
@@ -642,6 +642,14 @@ impl LoopClosureDetector {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::float_cmp,
+    clippy::approx_constant,
+    clippy::len_zero,
+    clippy::field_reassign_with_default
+)]
 mod tests {
     use super::*;
 

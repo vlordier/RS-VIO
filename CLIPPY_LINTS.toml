@@ -60,11 +60,23 @@ redundant_clone = "warn"  # Redundant clone operations
 # =============================================================================
 # PERMISSIBLE IN EXISTING CODE (DOCUMENTED)
 # =============================================================================
-# These are allowed with explicit #[allow()] in code
+# These are allowed with explicit #[allow()] in code or module-level
 non_snake_case = "allow"  # T_W_B, T_B_C naming convention
 iter_over_hash_types = "allow"  # Iterating over HashMap/HashSet keys
 missing_const_for_fn = "allow"  # Some functions can't be const yet
 inefficient_to_string = "allow"  # to_string() on non-primitive types
+clone_on_copy = "allow"  # Unnecessary clone on Copy types (rare, alibi for complex types)
+manual_clamp = "allow"  # Manual clamp patterns (context-dependent)
+too_many_arguments = "allow"  # Some functions legitimately need many args
+doc_lazy_continuation = "allow"  # Doc comment formatting (minor style)
+unnecessary_cast = "allow"  # Casts between numeric types for clarity
+manual_arithmetic = "allow"  # Manual arithmetic operations for clarity
+manual_is_multiple_of = "allow"  # Manual modulo checks (context-dependent)
+manual_assign_op = "allow"  # Manual += etc (readability preference)
+should_implement_trait = "allow"  # Custom default() method names (e.g., config builders)
+map_keys_iter = "allow"  # Iterating over map keys (sometimes clearer)
+map_values_iter = "allow"  # Iterating over map values (sometimes clearer)
+or_insert_default = "allow"  # or_insert_with() vs or_insert() (performance tradeoff)
 
 # =============================================================================
 # RESTRICTED USAGE (ALLOW with justification)

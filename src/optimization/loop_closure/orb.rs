@@ -124,8 +124,8 @@ impl OrbExtractor {
             self.extract_single_scale(image, width, height, 0)
         };
 
-        // Sort by strength and keep top N
-        features.sort_by(|a, b| b.strength.partial_cmp(&a.strength).unwrap());
+        // Sort by strength and keep top N (using total_cmp for NaN safety)
+        features.sort_by(|a, b| b.strength.total_cmp(&a.strength));
         features.truncate(self.config.num_features);
 
         log::debug!("[OrbExtractor] Extracted {} ORB features", features.len());
@@ -386,6 +386,11 @@ impl OrbExtractor {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::field_reassign_with_default
+)]
 mod tests {
     use super::*;
 

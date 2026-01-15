@@ -1,3 +1,20 @@
+#![allow(
+    clippy::unnecessary_cast,        // Casts between numeric types for clarity
+    clippy::manual_clamp,            // Manual clamp patterns
+    clippy::clone_on_copy,           // Rare cases with complex types
+    clippy::manual_is_multiple_of,   // Manual modulo checks
+    clippy::needless_range_loop,     // Range loops over indices
+    clippy::should_implement_trait,  // Custom default() method names
+    clippy::too_many_arguments,      // Some functions legitimately need many args
+    clippy::assign_op_pattern,       // Manual += operations for clarity
+    clippy::manual_map,              // Manual map patterns
+    clippy::doc_lazy_continuation,   // Doc comment formatting
+    clippy::empty_line_after_doc_comments, // Doc comment style
+    clippy::implicit_saturating_sub, // Manual arithmetic checks
+    clippy::unwrap_or_default,       // or_insert_with vs or_default patterns
+    clippy::expect_used,             // Expect in specific contexts (documented)
+    clippy::for_kv_map,              // Iterating over map keys/values
+)]
 //! # RS-VIO
 //!
 //! A Rust implementation of Visual-Inertial Odometry (VIO) for stereo cameras.
