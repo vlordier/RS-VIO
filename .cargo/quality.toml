@@ -1,0 +1,27 @@
+# RS-VIO Rust Quality Pipeline Configuration
+# ============================================
+# This file documents the comprehensive quality tools integrated into RS-VIO.
+# Run quality checks with: make quality or ./scripts/run_quality.sh
+
+[tool.cargo-udeps]
+# Find unused dependencies
+# Run: cargo +nightly udeps --all-targets --all-features
+# Note: Requires nightly Rust
+ignore_runtime = ["proptest", "tempfile", "criterion"]
+
+[tool.cargo-outdated]
+# Check for outdated dependencies
+# Run: cargo outdated --root-deps-only
+root-deps = true
+
+[tool.cargo-bloat]
+# Binary size analysis
+# Run: cargo bloat --release -- -A
+release = true
+features = ["lightglue"]
+
+[tool.cargo-tarpaulin]
+# Code coverage
+# Run: cargo tarpaulin --all-features --out Xml
+all-features = true
+output-dir = "coverage"

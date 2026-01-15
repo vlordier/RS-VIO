@@ -1,0 +1,266 @@
+# RS-VIO Quality Pipeline Makefile
+# ================================
+# Run: make quality or make <target>
+
+.PHONY: quality format lint check security audit deps test coverage doc all
+
+# Default target
+all: format check test
+
+# ---------------------------------------------------------------------------
+# STAGE 1: Core Linting
+# ---------------------------------------------------------------------------
+
+# Format all code
+format:
+	@echo "Running rustfmt..."
+	cargo fmt --all
+
+# Run clippy linter
+lint:
+	@echo "Running clippy..."
+	cargo clippy --all-targets --all-features -- -D warnings
+
+# Run all checks
+check:
+	@echo "Running cargo check..."
+	cargo check --all-targets --all-features
+	cargo check --all-features --manifest-path Cargo.toml
+
+# ---------------------------------------------------------------------------
+# STAGE 2: Security
+# ---------------------------------------------------------------------------
+
+# Security audit
+audit:
+	@echo "Running cargo audit..."
+	cargo audit --deny warnings
+
+# Dependency policy check
+security: audit deps-license
+
+# ---------------------------------------------------------------------------
+# STAGE 3: Dependencies
+# ---------------------------------------------------------------------------
+
+# Check for unused dependencies
+deps-unused:
+	@echo "Checking for unused dependencies (requires nightly)..."
+	@if command -v cargo &> /dev/null; then \
+		cargo +nightly udeps --all-targets --all-features 2>/dev/null || echo "Install nightly: rustup install nightly"; \
+	fi
+
+# Check for outdated dependencies
+deps-outdated:
+	@echo "Checking for outdated dependencies..."
+	@if command -v cargo-outdated &> /dev/null; then \
+		cargo outdated --root-deps-only; \
+	else \
+		echo "Install: cargo install cargo-outdated"; \
+	fi
+
+# Check dependency licenses
+deps-license:
+	@echo "Checking license compliance..."
+	@if command -v cargo-deny &> /dev/null; then \
+		cargo deny check licenses; \
+	else \
+		echo "Install: cargo install cargo-deny"; \
+	fi
+
+# Check duplicate dependencies
+deps-dup:
+	@echo "Checking for duplicate dependencies..."
+	cargo tree --duplicates
+
+# All dependency checks
+deps: deps-unused deps-outdated deps-license deps-dup
+
+# ---------------------------------------------------------------------------
+# STAGE 4: Tests & Coverage
+# ---------------------------------------------------------------------------
+
+# Run all tests
+test:
+	@echo "Running tests..."
+	cargo test --all-features
+
+# Run tests with nextest (faster)
+test-nextest:
+	@echo "Running tests with nextest..."
+	@if command -v cargo-nextest &> /dev/null; then \
+		cargo nextest run --all-features; \
+	else \
+		echo "Install: cargo install cargo-nextest"; \
+		cargo test --all-features; \
+	fi
+
+# Generate coverage report
+coverage:
+	@echo "Generating coverage report..."
+	@if command -v cargo-tarpaulin &> /dev/null; then \
+		cargo tarpaulin --all-features --out Html --report-name coverage; \
+		echo "Coverage report: target/tarpaulin/tarpaulin.html"; \
+	else \
+		echo "Install: cargo install cargo-tarpaulin"; \
+	fi
+
+# ---------------------------------------------------------------------------
+# STAGE 5: Documentation
+# ---------------------------------------------------------------------------
+
+# Generate documentation
+doc:
+	@echo "Generating documentation..."
+	cargo doc --all-features --no-deps
+	@echo "Documentation: target/doc/index.html"
+
+# Check documentation links
+doc-links:
+	@echo "Checking documentation links..."
+	@if command -v cargo-deadlinks &> /dev/null; then \
+		cargo deadlinks --dir target/doc; \
+	else \
+		echo "Install: cargo install cargo-deadlinks"; \
+	fi
+
+# ---------------------------------------------------------------------------
+# STAGE 6: Static Analysis
+# ---------------------------------------------------------------------------
+
+# Run MIRI
+miri:
+	@echo "Running MIRI (requires nightly)..."
+	@if command -v cargo +nightly &> /dev/null; then \
+		cargo +nightly miri test --all-features 2>&1 | head -100; \
+	else \
+		echo "Install nightly: rustup install nightly"; \
+	fi
+
+# Check unsafe code usage
+unsafe:
+	@echo "Analyzing unsafe code usage..."
+	@if command -v cargo-geiger &> /dev/null; then \
+		cargo geiger --all-features --format markdown; \
+	else \
+		echo "Install: cargo install cargo-geiger"; \
+	fi
+
+# ---------------------------------------------------------------------------
+# STAGE 7: Advanced Testing
+# ---------------------------------------------------------------------------
+
+# Mutation testing
+mutants:
+	@echo "Running mutation testing..."
+	@if command -v cargo-mutants &> /dev/null; then \
+		cargo mutants --all-features; \
+	else \
+		echo "Install: cargo install cargo-mutants"; \
+	fi
+
+# Feature matrix testing
+features:
+	@echo "Testing all feature combinations..."
+	@if command -v cargo-hack &> /dev/null; then \
+		cargo hack --each-feature --no-dev-deps check; \
+	else \
+		echo "Install: cargo install cargo-hack"; \
+	fi
+
+# ---------------------------------------------------------------------------
+# STAGE 8: Binary Analysis
+# ---------------------------------------------------------------------------
+
+# Binary size analysis
+bloat:
+	@echo "Analyzing binary size..."
+	@if command -v cargo-bloat &> /dev/null; then \
+		cargo bloat --release --features lightglue -- -A | head -50; \
+	else \
+		echo "Install: cargo install cargo-bloat"; \
+	fi
+
+# LLVM line count analysis
+llvm-lines:
+	@echo "Analyzing LLVM output..."
+	@if command -v cargo-llvm-lines &> /dev/null; then \
+		cargo llvm-lines --release --all-features | head -30; \
+	else \
+		echo "Install: cargo install cargo-llvm-lines"; \
+	fi
+
+# ---------------------------------------------------------------------------
+# STAGE 9: Compatibility
+# ---------------------------------------------------------------------------
+
+# Semver checks
+semver:
+	@echo "Checking semantic versioning..."
+	@if command -v cargo-semver &> /dev/null; then \
+		cargo semver-checks; \
+	else \
+		echo "Install: cargo install cargo-semver"; \
+	fi
+
+# MSRV verification
+msrv:
+	@echo "Checking Minimum Supported Rust Version..."
+	@if command -v cargo-msrv &> /dev/null; then \
+		cargo msrv verify; \
+	else \
+		echo "Install: cargo install cargo-msrv"; \
+	fi
+
+# ---------------------------------------------------------------------------
+# STAGE 10: Complete Quality Pipeline
+# ---------------------------------------------------------------------------
+
+# Run complete quality pipeline
+quality: format check lint audit deps test doc
+	@echo ""
+	@echo "=========================================="
+	@echo "✅ Quality pipeline completed!"
+	@echo "=========================================="
+	@echo ""
+	@echo "To run additional checks:"
+	@echo "  make coverage      - Generate coverage report"
+	@echo "  make miri          - Run MIRI static analysis"
+	@echo "  make unsafe        - Analyze unsafe code"
+	@echo "  make mutants       - Run mutation testing"
+	@echo "  make bloat         - Analyze binary size"
+	@echo "  make semver        - Check semantic versioning"
+	@echo ""
+	@echo "To install tools:"
+	@echo "  make install-tools"
+	@echo ""
+
+# Install all quality tools
+install-tools:
+	@echo "Installing quality tools..."
+	cargo install cargo-audit --locked
+	cargo install cargo-deny --locked
+	cargo install cargo-udeps --locked
+	cargo install cargo-outdated --locked
+	cargo install cargo-nextest --locked
+	cargo install cargo-tarpaulin --locked
+	cargo install cargo-geiger --locked
+	cargo install cargo-bloat --locked
+	cargo install cargo-llvm-lines --locked
+	cargo install cargo-mutants --locked
+	cargo install cargo-hack --locked
+	cargo install cargo-sort --locked
+	cargo install cargo-deadlinks --locked
+	@echo "All tools installed!"
+
+# Quick check (for CI)
+quick:
+	@echo "Running quick quality check..."
+	cargo fmt --all --check
+	cargo clippy --all-targets --all-features -- -D warnings
+	cargo test --all-features --lib
+	@echo "Quick check complete!"
+
+# CI quality check (without time-consuming tests)
+ci-quality: format check lint audit
+	@echo "CI quality check complete!"

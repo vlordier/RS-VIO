@@ -16,8 +16,8 @@
 //! 3. **Descriptor Extraction**: Rotated BRIEF pattern
 //! 4. **Matching**: Hamming distance with ratio test
 
-use nalgebra as na;
 use na::Vector2;
+use nalgebra as na;
 use std::f64::consts::PI;
 
 /// ORB descriptor configuration
@@ -100,16 +100,14 @@ impl OrbExtractor {
     ///
     /// # Returns
     /// Vector of ORB features (up to `config.num_features`)
-    pub fn extract(
-        &self,
-        image: &[u8],
-        width: u32,
-        height: u32,
-    ) -> Vec<OrbFeature> {
+    pub fn extract(&self, image: &[u8], width: u32, height: u32) -> Vec<OrbFeature> {
         // Validate input
         if image.len() != (width * height) as usize {
-            log::warn!("[OrbExtractor] Image size mismatch: expected {}, got {}", 
-                       (width * height) as usize, image.len());
+            log::warn!(
+                "[OrbExtractor] Image size mismatch: expected {}, got {}",
+                (width * height) as usize,
+                image.len()
+            );
             return Vec::new();
         }
 
@@ -162,11 +160,14 @@ impl OrbExtractor {
 
                 for y in y_start..y_end {
                     for x in x_start..x_end {
-                        if let Some(strength) = self.fast_corner_score(image, x, y, width as usize) {
+                        if let Some(strength) = self.fast_corner_score(image, x, y, width as usize)
+                        {
                             if strength > 50.0 {
                                 // Valid FAST corner
-                                let orientation = self.compute_orientation(image, x, y, width as usize);
-                                let descriptor = self.extract_brief(image, x, y, width as usize, orientation);
+                                let orientation =
+                                    self.compute_orientation(image, x, y, width as usize);
+                                let descriptor =
+                                    self.extract_brief(image, x, y, width as usize, orientation);
 
                                 let feature = OrbFeature {
                                     position: Vector2::new(x as f64, y as f64),
@@ -184,7 +185,7 @@ impl OrbExtractor {
                                         } else {
                                             Some(best)
                                         }
-                                    }
+                                    },
                                 };
                             }
                         }
@@ -201,19 +202,15 @@ impl OrbExtractor {
     }
 
     /// Extract ORB features from image pyramid
-    fn extract_pyramid(
-        &self,
-        image: &[u8],
-        width: u32,
-        height: u32,
-    ) -> Vec<OrbFeature> {
+    fn extract_pyramid(&self, image: &[u8], width: u32, height: u32) -> Vec<OrbFeature> {
         let mut all_features = Vec::new();
         let mut current_image = image.to_vec();
         let mut current_width = width;
         let mut current_height = height;
 
         for level in 0..self.config.num_levels {
-            let features = self.extract_single_scale(&current_image, current_width, current_height, level);
+            let features =
+                self.extract_single_scale(&current_image, current_width, current_height, level);
             all_features.extend(features);
 
             // Downsample for next level
@@ -225,8 +222,13 @@ impl OrbExtractor {
                     break;
                 }
 
-                current_image = self.downsample(&current_image, current_width as usize, current_height as usize,
-                                               next_width as usize, next_height as usize);
+                current_image = self.downsample(
+                    &current_image,
+                    current_width as usize,
+                    current_height as usize,
+                    next_width as usize,
+                    next_height as usize,
+                );
                 current_width = next_width;
                 current_height = next_height;
             }
@@ -270,8 +272,14 @@ impl OrbExtractor {
 
         // Sample 8 neighbors in circle
         let offsets = [
-            (-1, -3), (-2, -2), (-3, -1), (-3, 0),
-            (-3, 1), (-2, 2), (-1, 3), (0, 3),
+            (-1, -3),
+            (-2, -2),
+            (-3, -1),
+            (-3, 0),
+            (-3, 1),
+            (-2, 2),
+            (-1, 3),
+            (0, 3),
         ];
 
         let mut high_count = 0;
@@ -322,12 +330,23 @@ impl OrbExtractor {
         }
 
         let angle = m01.atan2(m10);
-        if angle < 0.0 { angle + 2.0 * PI } else { angle }
+        if angle < 0.0 {
+            angle + 2.0 * PI
+        } else {
+            angle
+        }
     }
 
     /// Extract BRIEF descriptor (simplified)
     /// In practice, use pre-defined BRIEF pattern; here we use pseudo-random tests
-    fn extract_brief(&self, image: &[u8], x: usize, y: usize, width: usize, orientation: f64) -> [u8; 32] {
+    fn extract_brief(
+        &self,
+        image: &[u8],
+        x: usize,
+        y: usize,
+        width: usize,
+        orientation: f64,
+    ) -> [u8; 32] {
         let mut descriptor = [0u8; 32];
         let height = image.len() / width;
         let cos_angle = orientation.cos();
@@ -378,7 +397,7 @@ mod tests {
         for y in 90..110 {
             for x in 90..110 {
                 if x < width && y < height {
-                    image[y * width + x] = 200;  // Bright region
+                    image[y * width + x] = 200; // Bright region
                 }
             }
         }
@@ -408,7 +427,7 @@ mod tests {
     #[test]
     fn orb_extraction_returns_features() {
         let mut config = OrbConfig::default();
-        config.use_pyramid = false;  // Use single-scale for test
+        config.use_pyramid = false; // Use single-scale for test
         let extractor = OrbExtractor::new(config);
         let image = create_test_image(640, 480);
 
@@ -428,7 +447,7 @@ mod tests {
         if let Some(feature) = features.first() {
             // Descriptor should be 32 bytes (256 bits)
             assert_eq!(feature.descriptor.len(), 32);
-            // Verify descriptor is valid (all bytes are u8, which is always true, 
+            // Verify descriptor is valid (all bytes are u8, which is always true,
             // but this ensures the descriptor is properly formed)
             assert!(!feature.descriptor.is_empty());
         }
@@ -476,7 +495,10 @@ mod tests {
         let features = extractor.extract(&image, 640, 480);
         for feature in features {
             // Orientation should be in [0, 2π)
-            assert!(feature.orientation >= 0.0, "Orientation must be non-negative");
+            assert!(
+                feature.orientation >= 0.0,
+                "Orientation must be non-negative"
+            );
             assert!(feature.orientation < 2.0 * PI, "Orientation must be < 2π");
         }
     }
@@ -489,7 +511,10 @@ mod tests {
         // Too small image
         let small_image = vec![128u8; 16 * 16];
         let features = extractor.extract(&small_image, 16, 16);
-        assert!(features.is_empty(), "Should reject image smaller than 32x32");
+        assert!(
+            features.is_empty(),
+            "Should reject image smaller than 32x32"
+        );
 
         // Size mismatch
         let image = vec![128u8; 100];

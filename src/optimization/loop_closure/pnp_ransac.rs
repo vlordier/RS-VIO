@@ -10,9 +10,9 @@
 //! - Lepetit & Fua, "Keypoint Recognition Using Randomized Trees", TPAMI 2006
 //! - OpenCV's solvePnPRansac implementation
 
+use crate::Result;
 use nalgebra as na;
 use rand::seq::SliceRandom;
-use crate::Result;
 
 /// Configuration for PnP-RANSAC verification
 #[derive(Debug, Clone)]
@@ -173,7 +173,8 @@ impl PnPRansacSolver {
             .map(|&idx| correspondences[idx].clone())
             .collect();
 
-        let (_, mean_error) = self.count_inliers(&inlier_correspondences, &best_pose, camera_intrinsics);
+        let (_, mean_error) =
+            self.count_inliers(&inlier_correspondences, &best_pose, camera_intrinsics);
 
         Ok(PnPRansacResult {
             pose: best_pose,
@@ -233,14 +234,20 @@ impl PnPRansacSolver {
 
         // Solve using SVD
         let svd = A.svd(true, true);
-        let V = svd.u.unwrap();  // Last column of V (or U for our case)
+        let V = svd.u.unwrap(); // Last column of V (or U for our case)
         let solution = V.column(11);
 
         // Extract pose from solution
         let R = na::Matrix3::from_row_slice(&[
-            solution[0], solution[1], solution[2],
-            solution[4], solution[5], solution[6],
-            solution[8], solution[9], solution[10],
+            solution[0],
+            solution[1],
+            solution[2],
+            solution[4],
+            solution[5],
+            solution[6],
+            solution[8],
+            solution[9],
+            solution[10],
         ]);
 
         let t = na::Vector3::new(solution[3], solution[7], solution[11]);

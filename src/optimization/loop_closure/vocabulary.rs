@@ -9,8 +9,8 @@
 //! - DBoW2: Appearance-based SLAM with bag of visual words (Rubio et al., 2012)
 //! - FBoW: Fast Bag of Words (Galvez-Lopez & Tardos, 2018)
 
-use std::collections::{HashMap, BTreeMap};
 use crate::Result;
+use std::collections::{BTreeMap, HashMap};
 
 /// Configuration for BoW vocabulary
 #[derive(Debug, Clone)]
@@ -92,11 +92,7 @@ impl Vocabulary {
         // Convert byte descriptors to float for clustering
         let float_descriptors: Vec<Vec<f64>> = descriptors
             .iter()
-            .map(|desc| {
-                desc.iter()
-                    .map(|&byte| byte as f64)
-                    .collect()
-            })
+            .map(|desc| desc.iter().map(|&byte| byte as f64).collect())
             .collect();
 
         // Run k-means clustering
@@ -133,7 +129,10 @@ impl Vocabulary {
             total_documents: 0,
         };
 
-        log::debug!("[Vocabulary] Built vocabulary with {} words", vocab.words.len());
+        log::debug!(
+            "[Vocabulary] Built vocabulary with {} words",
+            vocab.words.len()
+        );
         Ok(vocab)
     }
 
@@ -143,19 +142,13 @@ impl Vocabulary {
             return 0;
         }
 
-        let desc_float: Vec<f64> = descriptor
-            .iter()
-            .map(|&byte| byte as f64)
-            .collect();
+        let desc_float: Vec<f64> = descriptor.iter().map(|&byte| byte as f64).collect();
 
         let mut best_word = 0;
         let mut best_distance = f64::INFINITY;
 
         for (word_id, word) in self.words.iter().enumerate() {
-            let word_float: Vec<f64> = word.center
-                .iter()
-                .map(|&byte| byte as f64)
-                .collect();
+            let word_float: Vec<f64> = word.center.iter().map(|&byte| byte as f64).collect();
             let distance = Self::hamming_distance_float(&desc_float, &word_float);
             if distance < best_distance {
                 best_distance = distance;
@@ -219,10 +212,7 @@ impl Vocabulary {
     }
 
     /// Compute similarity between two BoW histograms using L2 norm
-    pub fn histogram_similarity(
-        hist1: &BTreeMap<usize, f64>,
-        hist2: &BTreeMap<usize, f64>,
-    ) -> f64 {
+    pub fn histogram_similarity(hist1: &BTreeMap<usize, f64>, hist2: &BTreeMap<usize, f64>) -> f64 {
         let mut dot_product = 0.0;
         let mut norm1 = 0.0;
         let mut norm2 = 0.0;
@@ -343,10 +333,7 @@ impl Vocabulary {
 
     /// Compute Hamming distance between two float descriptors
     fn hamming_distance_float(a: &[f64], b: &[f64]) -> f64 {
-        a.iter()
-            .zip(b.iter())
-            .map(|(x, y)| (x - y).abs())
-            .sum()
+        a.iter().zip(b.iter()).map(|(x, y)| (x - y).abs()).sum()
     }
 
     /// Get number of words in vocabulary
@@ -365,11 +352,7 @@ mod tests {
     use super::*;
 
     fn create_test_descriptors(count: usize) -> Vec<Vec<u8>> {
-        (0..count)
-            .map(|i| {
-                vec![(i % 256) as u8; 32]
-            })
-            .collect()
+        (0..count).map(|i| vec![(i % 256) as u8; 32]).collect()
     }
 
     #[test]
@@ -406,7 +389,10 @@ mod tests {
         hist1.insert(1, 0.5);
 
         let sim = Vocabulary::histogram_similarity(&hist1, &hist1);
-        assert!((sim - 1.0).abs() < 1e-6, "Identical histograms should have similarity 1.0");
+        assert!(
+            (sim - 1.0).abs() < 1e-6,
+            "Identical histograms should have similarity 1.0"
+        );
     }
 
     #[test]
@@ -418,7 +404,10 @@ mod tests {
         hist2.insert(1, 1.0);
 
         let sim = Vocabulary::histogram_similarity(&hist1, &hist2);
-        assert!(sim < 1e-6, "Orthogonal histograms should have near-zero similarity");
+        assert!(
+            sim < 1e-6,
+            "Orthogonal histograms should have near-zero similarity"
+        );
     }
 
     #[test]

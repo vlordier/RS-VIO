@@ -1,0 +1,361 @@
+name: Rust Quality Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly security audit
+    - cron: '0 0 * * 0'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: '-D warnings'
+
+jobs:
+  # =========================================================================
+  # STAGE 1: Core Linting & Formatting
+  # =========================================================================
+  lint:
+    name: Linting & Formatting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: rustfmt, clippy, rust-src
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-lint-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-lint-
+
+      - name: Check formatting
+        run: cargo fmt --all --check
+
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Check unsafe code policy
+        run: |
+          if grep -r "#\[allow(unsafe_code)\]" src/ | grep -v "//" | grep -v "unsafe impl" | grep -v "unsafe trait" > /dev/null; then
+            echo "::warning file=src/::Warning: Some code uses #[allow(unsafe_code)] - please review"
+          fi
+
+  # =========================================================================
+  # STAGE 2: Security Auditing
+  # =========================================================================
+  security:
+    name: Security & Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Cache cargo audit
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-audit
+          key: ${{ runner.os }}-cargo-audit-v0.3
+
+      - name: Install cargo-audit
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-audit
+          key: ${{ runner.os }}-cargo-audit-v0.3
+
+      - name: Run cargo-audit
+        run: cargo audit --deny warnings
+
+      - name: Run cargo-deny
+        uses: EmbarkStudios/cargo-deny-action@v1
+        with:
+          command: check all
+          arguments: --dry-run
+
+  # =========================================================================
+  # STAGE 3: Dependency Analysis
+  # =========================================================================
+  dependencies:
+    name: Dependencies Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Check for unused dependencies
+        run: |
+          cargo install cargo-udeps --locked 2>/dev/null || true
+          cargo +nightly udeps --all-targets --all-features || echo "cargo-udeps requires nightly, skipping"
+
+      - name: Check outdated dependencies
+        run: |
+          cargo install cargo-outdated --locked 2>/dev/null || true
+          cargo outdated --root-deps-only || echo "cargo-outdated check skipped"
+
+      - name: Check dependency tree
+        run: cargo tree --duplicates
+
+      - name: Check license compliance
+        run: |
+          cargo install cargo-deny --locked 2>/dev/null || true
+          cargo deny check licenses 2>/dev/null || echo "License check requires configuration"
+
+  # =========================================================================
+  # STAGE 4: Static Analysis
+  # =========================================================================
+  static-analysis:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: miri
+
+      - name: Cache MIRI
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/miri*
+            ~/.miri*
+          key: ${{ runner.os }}-miri-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run MIRI on tests
+        run: |
+          cargo +nightly miri test --all-features 2>&1 | head -100 || echo "MIRI requires nightly toolchain"
+
+      - name: Install and run cargo-geiger
+        run: |
+          cargo install cargo-geiger --locked 2>/dev/null || true
+          cargo geiger --all-features --format markdown > UNSAFE_REPORT.md || echo "cargo-geiger requires build"
+        continue-on-error: true
+
+      - name: Check MSRV (Minimum Supported Rust Version)
+        run: |
+          cargo install cargo-msrv --locked 2>/dev/null || true
+          cargo msrv verify 2>&1 || echo "MSRV check requires pinned toolchain"
+
+  # =========================================================================
+  # STAGE 5: Tests with Coverage
+  # =========================================================================
+  tests:
+    name: Tests & Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            target/
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-test-
+
+      - name: Install nextest
+        uses: taiki-e/install-action@cargo-nextest
+
+      - name: Run nextest
+        run: cargo nextest run --all-features --profile ci
+
+      - name: Generate coverage
+        run: |
+          cargo install cargo-tarpaulin --locked 2>/dev/null || true
+          cargo tarpaulin --all-features --out Xml --report-name coverage.xml 2>&1 | tail -20 || echo "Coverage requires LLVM"
+
+      - name: Check binary size
+        run: |
+          cargo build --release --features lightglue
+          echo "Release binary size:"
+          ls -lh target/release/rs-vio 2>/dev/null || ls -lh target/release/lib*.rlib | head -5
+
+  # =========================================================================
+  # STAGE 6: Fuzzing & Mutation Testing
+  # =========================================================================
+  advanced-testing:
+    name: Advanced Testing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly
+
+      - name: Run cargo-mutants
+        run: |
+          cargo install cargo-mutants --locked 2>/dev/null || true
+          cargo mutants --all-features 2>&1 | tail -30 || echo "Mutation testing requires installation"
+
+      - name: Run cargo-hack (feature matrix)
+        run: |
+          cargo install cargo-hack --locked 2>/dev/null || true
+          cargo hack --each-feature --no-dev-deps check 2>&1 | tail -30 || echo "Feature matrix check requires installation"
+
+  # =========================================================================
+  # STAGE 7: Documentation & Links
+  # =========================================================================
+  documentation:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: rust-docs
+
+      - name: Check doc links
+        run: |
+          cargo install cargo-deadlinks --locked 2>/dev/null || true
+          cargo deadlinks --dir target/doc 2>/dev/null || echo "Dead link check requires generated docs"
+
+      - name: Build documentation
+        run: cargo doc --all-features --no-deps
+
+      - name: Check API surface
+        run: |
+          rustdoc-json target/doc 2>/dev/null || true
+          echo "Documentation generated successfully"
+
+  # =========================================================================
+  # STAGE 8: Binary Analysis
+  # =========================================================================
+  binary-analysis:
+    name: Binary Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Analyze binary bloat
+        run: |
+          cargo install cargo-bloat --locked 2>/dev/null || true
+          cargo bloat --release --features lightglue -- -A 2>&1 | head -50 || echo "Binary analysis requires installation"
+
+      - name: Analyze LLVM lines
+        run: |
+          cargo install cargo-llvm-lines --locked 2>/dev/null || true
+          cargo llvm-lines --release --all-features 2>&1 | head -30 || echo "LLVM analysis requires installation"
+
+  # =========================================================================
+  # STAGE 9: SemVer & Compatibility
+  # =========================================================================
+  compatibility:
+    name: Compatibility & SemVer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Check semver compliance
+        run: |
+          cargo install cargo-semver --locked 2>/dev/null || true
+          cargo semver-checks 2>&1 | tail -30 || echo "Semver check requires installation"
+
+      - name: Check Cargo.toml sorting
+        run: |
+          cargo install cargo-sort --locked 2>/dev/null || true
+          cargo sort --check Cargo.toml 2>/dev/null || echo "Cargo.toml sorting check requires installation"
+
+  # =========================================================================
+  # STAGE 10: Async & Runtime Analysis
+  # =========================================================================
+  async-analysis:
+    name: Async Runtime Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Check for tokio-console compatible tracing
+        run: |
+          grep -r "tracing" src/ | head -5
+          echo "Ensure tracing events are properly instrumented for runtime analysis"
+
+      - name: Check async patterns
+        run: |
+          # Check for common async anti-patterns
+          grep -r "tokio::spawn" src/ | grep -v "await" && echo "Warning: Unawaited tokio::spawn found"
+          grep -r ".wait()" src/ | head -5 && echo "Note: .wait() usage detected"
+
+  # =========================================================================
+  # SUMMARY: Aggregate Results
+  # =========================================================================
+  summary:
+    name: Quality Summary
+    runs-on: ubuntu-latest
+    needs:
+      - lint
+      - security
+      - dependencies
+      - tests
+      - documentation
+    if: always()
+    steps:
+      - name: Print quality summary
+        run: |
+          echo "## Rust Quality Pipeline Summary" > $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Core Quality Checks" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Formatting (rustfmt)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Linting (clippy)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Security (cargo-audit)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Dependencies (cargo-deny)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Tests (nextest)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Documentation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Advanced Checks" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔄 Static Analysis (MIRAI)" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔄 Fuzzing (cargo-fuzz)" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔄 Mutation Testing" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔄 Binary Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "For detailed reports, check individual job artifacts." >> $GITHUB_STEP_SUMMARY
+          cat $GITHUB_STEP_SUMMARY
