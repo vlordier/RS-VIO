@@ -126,7 +126,7 @@ impl LightGlueMatcher {
             "descriptors1" => desc1
         ]
         .map_err(|e| format!("Failed to create inputs: {}", e))?;
-        
+
         let outputs = session
             .run(inputs)
             .map_err(|e| format!("Inference failed: {}", e))?;

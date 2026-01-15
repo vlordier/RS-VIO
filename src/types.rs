@@ -22,6 +22,18 @@ pub type Float = f32;
 /// Float type for SLAM computations (f64 precision, default)
 pub type Float = f64;
 
+/// Float constants that work with both f32 and f64
+pub mod float_const {
+    use super::Float;
+
+    pub const ZERO: Float = 0.0;
+    pub const ONE: Float = 1.0;
+    pub const TWO: Float = 2.0;
+    pub const HALF: Float = 0.5;
+    pub const PI: Float = std::f64::consts::PI as Float;
+    pub const EPSILON: Float = 1e-10 as Float;
+}
+
 // Re-export nalgebra types with the configured float precision
 use nalgebra as na;
 pub type Matrix4x4 = na::Matrix4<Float>;
@@ -256,8 +268,8 @@ impl CameraFactory {
 
         // camera-intrinsic-model requires f64, so cast if using f32
         let params = DVector::from_vec(vec![
-            fx as f64, fy as f64, cx as f64, cy as f64,
-            k1 as f64, k2 as f64, k3 as f64, p1 as f64, p2 as f64
+            fx as f64, fy as f64, cx as f64, cy as f64, k1 as f64, k2 as f64, k3 as f64, p1 as f64,
+            p2 as f64,
         ]);
 
         crate::datasets::CameraModelType::OpenCV5(OpenCVModel5::new(&params, width, height))
