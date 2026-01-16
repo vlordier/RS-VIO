@@ -219,9 +219,9 @@ impl CalibrationVerifier {
 
         // Simplified intrinsics validation
         let focal_length_error = (fx - fy).abs() / fx.max(fy); // Should be similar
-        let principal_point_error = ((cx - camera.image_width as f64 / 2.0).abs()
-            + (cy - camera.image_height as f64 / 2.0).abs())
-            / (camera.image_width as f64 + camera.image_height as f64)
+        let principal_point_error = ((cx - f64::from(camera.image_width) / 2.0).abs()
+            + (cy - f64::from(camera.image_height) / 2.0).abs())
+            / (f64::from(camera.image_width) + f64::from(camera.image_height))
             * 2.0;
 
         // Check distortion coefficients are reasonable
@@ -230,6 +230,7 @@ impl CalibrationVerifier {
         } else {
             &camera.right_distortion
         };
+        #[allow(clippy::cast_precision_loss)]
         let distortion_error =
             distortion.iter().map(|&c| c.abs()).sum::<f64>() / distortion.len().max(1) as f64;
 
@@ -421,7 +422,7 @@ impl CalibrationVerifier {
         sync: &SyncReport,
         rectification: &RectificationReport,
     ) -> String {
-        let statuses = vec![
+        let statuses = [
             &intrinsics.status,
             &stereo.status,
             &imu.status,
