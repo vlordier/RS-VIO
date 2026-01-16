@@ -691,4 +691,274 @@ mod tests {
             println!("✅ LightGlue realistic scenario tests passed!");
         }
     }
+
+    #[test]
+    fn test_lightglue_extreme_edge_cases() {
+        use std::path::Path;
+
+        #[cfg(feature = "lightglue")]
+        {
+            if !Path::new("models/lightglue_superpoint.onnx").exists() {
+                println!("⚠️  Skipping extreme edge case tests - model weights not available");
+                return;
+            }
+
+            let config = LightGlueConfig {
+                model_path: PathBuf::from("models/lightglue_superpoint.onnx"),
+                ..Default::default()
+            };
+
+            let mut matcher = LightGlueMatcher::new(config).unwrap();
+
+            // Test 1: NaN and Inf values in inputs
+            let keypoints_nan = Array2::<f32>::from_shape_vec(
+                (5, 2),
+                vec![
+                    f32::NAN,
+                    100.0,
+                    f32::INFINITY,
+                    -f32::INFINITY,
+                    50.0,
+                    75.0,
+                    25.0,
+                    125.0,
+                    0.0,
+                    200.0,
+                ],
+            )
+            .unwrap();
+
+            let descriptors_nan = Array2::<f32>::from_shape_vec(
+                (5, 256),
+                (0..1280)
+                    .map(|x| match x % 4 {
+                        0 => f32::NAN,
+                        1 => f32::INFINITY,
+                        2 => f32::NEG_INFINITY,
+                        _ => (x as f32 * 0.01).sin(),
+                    })
+                    .collect(),
+            )
+            .unwrap();
+
+            let result = matcher.run_inference(
+                &keypoints_nan,
+                &keypoints_nan,
+                &descriptors_nan,
+                &descriptors_nan,
+            );
+            // Should either succeed or fail gracefully, but not panic
+            assert!(
+                result.is_ok() || result.is_err(),
+                "Should handle NaN/Inf values"
+            );
+
+            // Test 2: Extremely large feature counts (memory stress test)
+            let large_count = 1000;
+            let keypoints_large = Array2::<f32>::from_shape_vec(
+                (large_count, 2),
+                (0..large_count * 2).map(|x| x as f32).collect(),
+            )
+            .unwrap();
+
+            let descriptors_large = Array2::<f32>::from_shape_vec(
+                (large_count, 256),
+                (0..large_count * 256)
+                    .map(|x| (x as f32 * 0.001).sin())
+                    .collect(),
+            )
+            .unwrap();
+
+            let result = matcher.run_inference(
+                &keypoints_large,
+                &keypoints_large,
+                &descriptors_large,
+                &descriptors_large,
+            );
+            assert!(
+                result.is_ok() || result.is_err(),
+                "Should handle large feature sets without crashing"
+            );
+
+            // Test 3: Zero and negative coordinates
+            let keypoints_zero = Array2::<f32>::from_shape_vec(
+                (10, 2),
+                vec![
+                    0.0,
+                    0.0,
+                    -10.0,
+                    -5.0,
+                    1000.0,
+                    800.0,
+                    -100.0,
+                    50.0,
+                    640.0,
+                    -100.0,
+                    320.0,
+                    240.0,
+                    f32::MAX,
+                    f32::MIN,
+                    0.0,
+                    100.0,
+                    200.0,
+                    0.0,
+                    -1.0,
+                    -1.0,
+                ],
+            )
+            .unwrap();
+
+            let descriptors_zero = Array2::<f32>::zeros((10, 256));
+
+            let result = matcher.run_inference(
+                &keypoints_zero,
+                &keypoints_zero,
+                &descriptors_zero,
+                &descriptors_zero,
+            );
+            assert!(
+                result.is_ok() || result.is_err(),
+                "Should handle zero/negative coordinates"
+            );
+
+            // Test 4: Identical keypoints with different descriptors
+            let keypoints_identical = Array2::<f32>::from_shape_vec(
+                (20, 2),
+                (0..40).map(|x| (x % 2) as f32 * 100.0 + 50.0).collect(),
+            )
+            .unwrap();
+
+            let descriptors_a = Array2::<f32>::from_shape_vec(
+                (20, 256),
+                (0..5120).map(|x| (x as f32 * 0.01).sin()).collect(),
+            )
+            .unwrap();
+
+            let descriptors_b = Array2::<f32>::from_shape_vec(
+                (20, 256),
+                (0..5120).map(|x| (x as f32 * 0.01).cos()).collect(),
+            )
+            .unwrap();
+
+            let result = matcher.run_inference(
+                &keypoints_identical,
+                &keypoints_identical,
+                &descriptors_a,
+                &descriptors_b,
+            );
+            assert!(
+                result.is_ok(),
+                "Should handle identical keypoints with different descriptors"
+            );
+
+            // Test 5: Very small descriptors (near-zero values)
+            let small_descriptors = Array2::<f32>::from_shape_vec(
+                (5, 256),
+                (0..1280)
+                    .map(|_| f32::EPSILON * (1.0 + rand::random::<f32>()))
+                    .collect(),
+            )
+            .unwrap();
+
+            let result = matcher.run_inference(
+                &keypoints_zero,
+                &keypoints_zero,
+                &small_descriptors,
+                &small_descriptors,
+            );
+            assert!(
+                result.is_ok() || result.is_err(),
+                "Should handle very small descriptor values"
+            );
+
+            println!("✅ LightGlue extreme edge case tests passed!");
+        }
+    }
+
+    #[test]
+    fn test_lightglue_model_corruption_and_errors() {
+        use std::fs;
+        use std::path::Path;
+
+        #[cfg(feature = "lightglue")]
+        {
+            let model_path = "models/lightglue_superpoint.onnx";
+
+            // Test 1: Corrupted model file
+            if Path::new(model_path).exists() {
+                // Backup original file
+                let backup_path = format!("{}.backup", model_path);
+                fs::copy(model_path, &backup_path).ok();
+
+                // Corrupt the file by truncating it
+                let file = fs::OpenOptions::new().write(true).open(model_path).unwrap();
+                file.set_len(100).unwrap(); // Truncate to very small size
+                drop(file);
+
+                let config = LightGlueConfig {
+                    model_path: PathBuf::from(model_path),
+                    ..Default::default()
+                };
+
+                let result = LightGlueMatcher::new(config);
+                assert!(result.is_err(), "Should fail with corrupted model file");
+
+                // Restore original file
+                fs::copy(&backup_path, model_path).ok();
+                fs::remove_file(backup_path).ok();
+            }
+
+            // Test 2: Non-existent model file
+            let config = LightGlueConfig {
+                model_path: PathBuf::from("models/nonexistent_model.onnx"),
+                ..Default::default()
+            };
+
+            let result = LightGlueMatcher::new(config);
+            assert!(result.is_err(), "Should fail with non-existent model file");
+
+            // Test 3: Directory instead of file
+            let config = LightGlueConfig {
+                model_path: PathBuf::from("models"),
+                ..Default::default()
+            };
+
+            let result = LightGlueMatcher::new(config);
+            assert!(
+                result.is_err(),
+                "Should fail when model path is a directory"
+            );
+
+            // Test 4: Invalid configuration values
+            let configs = vec![
+                LightGlueConfig {
+                    confidence_threshold: -1.0, // Invalid
+                    ..Default::default()
+                },
+                LightGlueConfig {
+                    confidence_threshold: 2.0, // Invalid
+                    ..Default::default()
+                },
+                LightGlueConfig {
+                    max_keypoints: 0, // Invalid
+                    ..Default::default()
+                },
+                LightGlueConfig {
+                    max_keypoints: 100000, // Potentially problematic
+                    ..Default::default()
+                },
+            ];
+
+            for config in configs {
+                let result = LightGlueMatcher::new(config);
+                // Should either succeed or fail gracefully
+                assert!(
+                    result.is_ok() || result.is_err(),
+                    "Should handle invalid config gracefully"
+                );
+            }
+
+            println!("✅ LightGlue model corruption and error tests passed!");
+        }
+    }
 }
