@@ -36,13 +36,13 @@
 //!   High-Dynamic Motion in GPS-Denied Environments", 2011
 
 pub mod initialization;
-// pub mod vibration; // TODO: Re-enable when vibration module is fixed
+pub mod learned_vibration;
 
 pub use initialization::{
     AdaptiveNoiseEstimator, BiasEstimate, ImuInitializationConfig, ImuInitializer,
     InitializationState,
 };
-// pub use vibration::{VibrationMetrics, VibrationMonitor, VibrationConfig}; // TODO: Re-enable
+pub use learned_vibration::{LearnedVibrationScheduler, RuleBasedVibrationScheduler, VibrationInputs, VibrationOutputs};
 
 use crate::datasets::ImuData;
 use crate::fl;
