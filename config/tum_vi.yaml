@@ -1,27 +1,37 @@
 
+# Debug / Feature Toggle Flags
+# Set to false to disable features for debugging
+debug:
+  use_imu: false                   # Enable IMU integration (try false if having issues)
+  use_feature_tracking: true       # Enable stereo feature tracking
+  use_triangulation: true          # Enable stereo triangulation
+  use_fallback_depth: false        # Use fallback depth when triangulation fails
+  min_stereo_matches: 2            # Minimum matching features for triangulation
+  log_stereo_undistorted: true     # Log undistorted coordinates for debugging
 
-# Camera Parameters (EuRoC dataset specific)
-# Image dimensions and processing parameters
+# Camera Parameters (TUM-VI dataset - from dso/camchain.yaml)
+# TUM-VI uses pinhole camera model with equidistant distortion
 camera:
-  image_width: 512            # Image width in pixels (EuRoC standard)
-  image_height: 512           # Image height in pixels (EuRoC standard)  
-  
-  # Left camera (cam0) intrinsics
-  left_intrinsics: [191.75556798912652, 191.74816751185256, 254.9226487139376, 256.8780365577954]
-  left_distortion: [0.6246288732884442, 1.0598071085569876]  # [alpha, beta]
-  left_model: "EUCM"
+  image_width: 512            # Image width in pixels
+  image_height: 512           # Image height in pixels
+
+  # Left camera (cam0) intrinsics - from TUM-VI calibration
+  # Using OpenCV5 model to approximate equidistant distortion
+  left_intrinsics: [190.97847715128717, 190.9733070521226, 254.93170605935475, 256.8974428996504]
+  left_distortion: [0.0034823894022493434, 0.0007150348452162257, -0.0020532361418706202, 0.00020293673591811182, 0.0]
+  left_model: "opencv5"
 
 
-  # Right camera (cam1) intrinsics 
-  right_intrinsics: [ 191.12575044002125, 191.1082274072055, 252.55828522469696, 255.0183218515494]  # [fx, fy, cx, cy]
-  right_distortion: [0.6246035984060496, 1.0565986975905006]  # [alpha, beta]
-  right_model: "EUCM"
+  # Right camera (cam1) intrinsics - from TUM-VI calibration
+  right_intrinsics: [190.44236969414825, 190.4344384721956, 252.59949716835982, 254.91723064636983]
+  right_distortion: [0.0034003170790442797, 0.001766278153469831, -0.00266312569781606, 0.0003299517423931039, 0.0]
+  right_model: "opencv5"
 
-  # Left camera extrinsics (T_BC - camera to body transform)
-  T_B_Cl: [-0.99954072 , 0.00741901 ,-0.02938199 , 0.04644611,   0.02910045, -0.03556579, -0.99894356, -0.07105542,  -0.00845616, -0.9993398 ,  0.03533356 ,-0.04342594, 0.        ,  0. ,         0.  ,        1. ]
-  
-  # Right camera extrinsics (T_BC - camera to body transform)
-  T_B_Cr: [-0.99953336,  0.00802045, -0.02947447, -0.054498, 0.02956376,  0.01125166, -0.99949957, -0.06910442,-0.0076848 , -0.99990453, -0.01148352, -0.04518668,0.,0., 0.,   1.]
+  # Left camera extrinsics (T_B_Cl = inverse of T_cam0_imu from DSO camchain.yaml)
+  T_B_Cl: [-0.99952504, 0.00750192, -0.02989013, 0.04557484, 0.02961534, -0.03439736, -0.99896935, -0.07116180, -0.00852233, -0.99938008, 0.03415885, -0.04468125, 0.0, 0.0, 0.0, 1.0]
+
+  # Right camera extrinsics (T_B_Cr = inverse of T_cam1_imu from DSO camchain.yaml)
+  T_B_Cr: [-0.99951105, 0.00810408, -0.03019914, -0.05545634, 0.03029912, 0.01251164, -0.99946257, -0.06925002, -0.00772188, -0.99988889, -0.01275107, -0.04745286, 0.0, 0.0, 0.0, 1.0]
 
 # Keyframe and Windowing Parameters
 # Controls keyframe selection and sliding window management
@@ -64,7 +74,7 @@ marginalization:
   use_fej: true                     # Use First-Estimate Jacobian for consistency
   damping: 1e-7                     # Damping factor for numerical stability
   prior_weight: 1.0                 # Weight for marginalization prior
-  prior_info_scaling: 1.0           # Scaling factor for information matrix
+  prior_info_scale: 1.0           # Scaling factor for information matrix
   hessian_approximator: "GaussNewton"  # Strategy: GaussNewton, Diagonal, LevenbergMarquardt, Exact, Identity
   gradient_computer: "Standard"     # Strategy: Standard, Zero
   prior_constructor: "Standard"     # Strategy: Standard, Regularized

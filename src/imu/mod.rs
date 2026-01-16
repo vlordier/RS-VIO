@@ -37,12 +37,18 @@
 
 pub mod initialization;
 pub mod learned_vibration;
+pub mod vibration_filter;
 
 pub use initialization::{
     AdaptiveNoiseEstimator, BiasEstimate, ImuInitializationConfig, ImuInitializer,
     InitializationState,
 };
-pub use learned_vibration::{LearnedVibrationScheduler, RuleBasedVibrationScheduler, VibrationInputs, VibrationOutputs};
+pub use learned_vibration::{
+    LearnedVibrationScheduler, RuleBasedVibrationScheduler, VibrationInputs, VibrationOutputs,
+};
+pub use vibration_filter::{
+    NotchFilter, VibrationFilterConfig, VibrationNotchFilter, VibrationPeak,
+};
 
 use crate::datasets::ImuData;
 use crate::fl;

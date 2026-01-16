@@ -241,7 +241,7 @@ impl MagsacPlusPlus {
             .collect();
 
         // Sort distances for quantile estimation
-        distances.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        distances.sort_by(|a, b| a.total_cmp(b));
 
         // Estimate sigma using quantile (sigma consensus)
         let quantile_idx = (distances.len() as f32 * Self::SIGMA_QUANTILE) as usize;

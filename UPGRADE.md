@@ -382,13 +382,6 @@ Loop closure and pose graph never directly affect control. They only correct:
 
 > The system combines a real-time, tightly coupled VIO front-end with an asynchronous SLAM back-end that performs loop closure and global optimization, ensuring local stability for control and long-term global consistency for mapping.
 
-If you want next, I can:
-
-- convert this into a vector diagram (draw.io / Mermaid)
-- produce a minimal version for a paper or README
-- annotate it with data rates and CPU budgets
-
----
 
 ## Priority if time-limited
 

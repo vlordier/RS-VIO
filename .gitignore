@@ -44,6 +44,9 @@ flame-graph.svg
 *.profiling
 .tarpaulin-report.html
 
+# Dataset samples
+rs-vio-samples/
+
 # OS files
 Thumbs.db
 .AppleDouble

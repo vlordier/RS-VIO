@@ -222,6 +222,7 @@ impl Frame {
                     feature.pixel_coord[0] as f64,
                     feature.pixel_coord[1] as f64,
                 ));
+
         feature.undistorted_coord = [undist_coord[0] as f32, undist_coord[1] as f32];
         self.left_features.push(feature);
     }
@@ -241,6 +242,7 @@ impl Frame {
                     feature.pixel_coord[0] as f64,
                     feature.pixel_coord[1] as f64,
                 ));
+
         feature.undistorted_coord = [undist_coord[0] as f32, undist_coord[1] as f32];
         self.right_features.push(feature);
     }

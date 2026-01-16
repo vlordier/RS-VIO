@@ -374,8 +374,8 @@ impl SlidingWindow {
         let dir_L = left_obs.normalize();
         let dir_R = R_Cl_Cr * right_obs.normalize();
 
-        // Vector between camera origins
-        let w = p_R_in_L - p_L;
+        // Vector between camera origins (from right to left camera)
+        let w = p_L - p_R_in_L;
 
         // Compute scalar t for closest point on left ray
         let a = dir_L.dot(&dir_L);
@@ -386,10 +386,14 @@ impl SlidingWindow {
 
         let denom = a * c - b_val * b_val;
         if denom.abs() < 1e-8 {
+            log::debug!(
+                "[SlidingWindow] Triangulation failed for feature: parallel rays (denom={:.6})",
+                denom
+            );
             return None; // Rays are parallel
         }
 
-        let t_L = (b_val * e - c * d) / denom;
+        let t_L = (b_val * e - b_val * d) / denom;
         let t_R = (a * e - b_val * d) / denom;
 
         // Get closest point on each ray
@@ -401,6 +405,10 @@ impl SlidingWindow {
 
         // Filter invalid depths (behind camera)
         if p_Cl.z <= 0.05 {
+            log::debug!(
+                "[SlidingWindow] Triangulation failed: invalid depth {:.3}m",
+                p_Cl.z
+            );
             return None;
         }
 
@@ -579,6 +587,10 @@ impl SlidingWindow {
                                         r_feat.undistorted_coord[1] as f64,
                                         1.0,
                                     );
+
+                                    // Debug: log observation coordinates
+                                    log::debug!("[SlidingWindow] Feature {}: left=({:.1}, {:.1}), right=({:.1}, {:.1})",
+                                        feature_id, left_obs[0], left_obs[1], right_obs[0], right_obs[1]);
 
                                     match Self::triangulate_stereo(
                                         left_obs,

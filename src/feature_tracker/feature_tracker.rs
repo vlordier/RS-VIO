@@ -324,6 +324,10 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             self.optical_flow_convergence_threshold,
         );
 
+        // Collect NEW feature IDs (from stereo matching this frame) BEFORE the for loop consumes them
+        let new_ids: std::collections::HashSet<usize> =
+            tmp_tracked_points0.keys().copied().collect();
+
         for (key0, pt0) in tmp_tracked_points0 {
             if let Some(pt1) = tmp_tracked_points1.get(&key0) {
                 self.tracked_points_map_cam0
@@ -344,16 +348,72 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
         self.previous_image_pyramid0 = current_image_pyramid0;
         self.previous_image_pyramid1 = current_image_pyramid1;
 
-        // Populate the frame's feature lists from the stereo tracks
+        // Get tracked points from both cameras
         let [tracked_left, tracked_right] = self.get_track_points();
-        for (id, (x, y)) in tracked_left {
-            let f = Feature::new(id, [x, y]);
-            frame.add_left_feature(f);
+
+        // Debug: log a few sample points to see raw pixel coordinates
+        if !tracked_left.is_empty() {
+            let sample_left = tracked_left.iter().next().unwrap();
+            let sample_id = sample_left.0;
+            let left_coord = sample_left.1;
+            let right_coord = tracked_right.get(sample_id).unwrap_or(&(-999.0, -999.0));
+            log::debug!(
+                "[FeatureTracker] Sample feature {}: left=({}, {}), right=({}, {})",
+                sample_id,
+                left_coord.0,
+                left_coord.1,
+                right_coord.0,
+                right_coord.1
+            );
         }
 
-        for (id, (x, y)) in tracked_right {
-            let f = Feature::new(id, [x, y]);
-            frame.add_right_feature(f);
+        // For stereo triangulation to work, we need left/right features with the SAME ID
+        // AND corresponding pixel positions. OLD tracked points have different IDs in each camera
+        // (tracked independently), so only NEW stereo-matched points are reliable for triangulation.
+
+        // Find intersection of common IDs with new IDs
+        let left_ids: std::collections::HashSet<usize> = tracked_left.keys().copied().collect();
+        let right_ids: std::collections::HashSet<usize> = tracked_right.keys().copied().collect();
+        let common_ids: std::collections::HashSet<usize> =
+            left_ids.intersection(&right_ids).copied().collect();
+
+        // Only use IDs that were stereo-matched this frame (new points)
+        let valid_ids: std::collections::HashSet<usize> =
+            common_ids.intersection(&new_ids).copied().collect();
+
+        log::debug!(
+            "[FeatureTracker] Left: {}, Right: {}, Common: {}, New stereo-matched: {}",
+            tracked_left.len(),
+            tracked_right.len(),
+            common_ids.len(),
+            valid_ids.len()
+        );
+
+        // Synchronize tracked_points_map to only keep valid IDs
+        for id in left_ids.iter() {
+            if !valid_ids.contains(id) {
+                self.tracked_points_map_cam0.remove(id);
+            }
+        }
+        for id in right_ids.iter() {
+            if !valid_ids.contains(id) {
+                self.tracked_points_map_cam1.remove(id);
+            }
+        }
+
+        // Populate the frame's feature lists with ONLY new stereo-matched features
+        for (&id, &(x, y)) in tracked_left.iter() {
+            if valid_ids.contains(&id) {
+                let f = Feature::new(id, [x, y]);
+                frame.add_left_feature(f);
+            }
+        }
+
+        for (&id, &(x, y)) in tracked_right.iter() {
+            if valid_ids.contains(&id) {
+                let f = Feature::new(id, [x, y]);
+                frame.add_right_feature(f);
+            }
         }
 
         // Record processing time for adaptive frame skipping
@@ -534,12 +594,6 @@ fn add_points(
         &current_corners,
         num_points_in_cell,
     )
-    // let mut prev_points =
-    // Eigen::aligned_vector<Eigen::Vector2d> pts0;
-
-    // for (const auto &kv : observations.at(0)) {
-    //   pts0.emplace_back(kv.second.translation().template cast<double>());
-    // }
 }
 fn track_points<const LEVELS: u32>(
     image_pyramid0: &[GrayImage],

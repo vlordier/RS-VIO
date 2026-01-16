@@ -490,6 +490,336 @@ impl Viewer for RerunViewer {
             }
         }
     }
+
+    /// Visualize PROSAC/MAGSAC++ geometric verification results
+    fn log_robustness_verification(
+        &mut self,
+        inliers: &[(f32, f32)],
+        outliers: &[(f32, f32)],
+        entity_path: &str,
+    ) {
+        if !self.initialized {
+            return;
+        }
+
+        if let Some(ref rec) = self.rec {
+            rec.set_time_sequence("frame", self.frame_id);
+            rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
+
+            // Log inliers as green points
+            if !inliers.is_empty() {
+                let inlier_positions: Vec<[f32; 3]> =
+                    inliers.iter().map(|(x, y)| [*x, *y, 0.0]).collect();
+
+                let inlier_colors = vec![Color::from_rgb(0, 255, 0); inliers.len()]; // Green
+
+                if let Err(e) = rec.log(
+                    format!("{}/inliers", entity_path),
+                    &rerun::Points3D::new(inlier_positions)
+                        .with_colors(inlier_colors)
+                        .with_radii([2.0]),
+                ) {
+                    log::warn!("[RerunViewer] Failed to log inliers: {}", e);
+                }
+            }
+
+            // Log outliers as red points
+            if !outliers.is_empty() {
+                let outlier_positions: Vec<[f32; 3]> =
+                    outliers.iter().map(|(x, y)| [*x, *y, 0.0]).collect();
+
+                let outlier_colors = vec![Color::from_rgb(255, 0, 0); outliers.len()]; // Red
+
+                if let Err(e) = rec.log(
+                    format!("{}/outliers", entity_path),
+                    &rerun::Points3D::new(outlier_positions)
+                        .with_colors(outlier_colors)
+                        .with_radii([2.0]),
+                ) {
+                    log::warn!("[RerunViewer] Failed to log outliers: {}", e);
+                }
+            }
+
+            // Log verification statistics
+            let stats = format!("Inliers: {}, Outliers: {}", inliers.len(), outliers.len());
+            if let Err(e) = rec.log(
+                format!("{}/stats", entity_path),
+                &rerun::TextDocument::new(stats),
+            ) {
+                log::warn!("[RerunViewer] Failed to log verification stats: {}", e);
+            }
+        }
+    }
+
+    /// Visualize vibration metrics and adaptive covariance
+    fn log_vibration_metrics(
+        &mut self,
+        gyro_rms: f32,
+        accel_rms: f32,
+        covariance_scale: f32,
+        entity_path: &str,
+    ) {
+        if !self.initialized {
+            return;
+        }
+
+        if let Some(ref rec) = self.rec {
+            rec.set_time_sequence("frame", self.frame_id);
+            rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
+
+            // Log vibration levels as a bar chart
+            let vibration_data = vec![
+                ("Gyro RMS", gyro_rms as f64),
+                ("Accel RMS", accel_rms as f64),
+                ("Covariance Scale", covariance_scale as f64),
+            ];
+
+            let bars: Vec<f64> = vibration_data.iter().map(|(_, v)| *v).collect();
+
+            if let Err(e) = rec.log(entity_path, &rerun::BarChart::new(bars)) {
+                log::warn!("[RerunViewer] Failed to log vibration metrics: {}", e);
+            }
+
+            // Log vibration level indicator
+            let vibration_level = (gyro_rms + accel_rms) / 2.0;
+            let _color = if vibration_level > 0.3 {
+                Color::from_rgb(255, 0, 0) // Red for high vibration
+            } else if vibration_level > 0.1 {
+                Color::from_rgb(255, 165, 0) // Orange for medium
+            } else {
+                Color::from_rgb(0, 255, 0) // Green for low
+            };
+
+            let indicator_text = format!("Vibration Level: {:.3}", vibration_level);
+            if let Err(e) = rec.log(
+                format!("{}/indicator", entity_path),
+                &rerun::TextDocument::new(indicator_text),
+            ) {
+                log::warn!("[RerunViewer] Failed to log vibration indicator: {}", e);
+            }
+        }
+    }
+
+    /// Visualize feature quality metrics
+    fn log_feature_quality(
+        &mut self,
+        features: &[crate::feature_tracker::Feature],
+        entity_path: &str,
+    ) {
+        if !self.initialized || features.is_empty() {
+            return;
+        }
+
+        if let Some(ref rec) = self.rec {
+            rec.set_time_sequence("frame", self.frame_id);
+            rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
+
+            // Count features by quality level
+            let high_quality = features
+                .iter()
+                .filter(|f| f.quality.confidence > 0.8)
+                .count();
+            let medium_quality = features
+                .iter()
+                .filter(|f| f.quality.confidence > 0.5)
+                .count();
+            let low_quality = features
+                .iter()
+                .filter(|f| f.quality.confidence <= 0.5)
+                .count();
+            let reliable = features.iter().filter(|f| f.quality.is_reliable).count();
+
+            // Create quality distribution chart
+            let quality_data = vec![
+                ("High Quality", high_quality as f64),
+                ("Medium Quality", medium_quality as f64),
+                ("Low Quality", low_quality as f64),
+                ("Reliable", reliable as f64),
+            ];
+
+            let bars: Vec<f64> = quality_data.iter().map(|(_, v)| *v).collect();
+
+            if let Err(e) = rec.log(
+                format!("{}/distribution", entity_path),
+                &rerun::BarChart::new(bars),
+            ) {
+                log::warn!("[RerunViewer] Failed to log quality distribution: {}", e);
+            }
+
+            // Log feature positions colored by quality
+            let positions: Vec<[f32; 3]> = features
+                .iter()
+                .map(|f| [f.pixel_coord[0], f.pixel_coord[1], 0.0])
+                .collect();
+
+            let colors: Vec<Color> = features
+                .iter()
+                .map(|f| {
+                    if f.quality.confidence > 0.8 {
+                        Color::from_rgb(0, 255, 0) // Green - high quality
+                    } else if f.quality.confidence > 0.5 {
+                        Color::from_rgb(255, 165, 0) // Orange - medium quality
+                    } else {
+                        Color::from_rgb(255, 0, 0) // Red - low quality
+                    }
+                })
+                .collect();
+
+            if let Err(e) = rec.log(
+                format!("{}/positions", entity_path),
+                &rerun::Points2D::new(positions.iter().map(|p| [p[0] as f32, p[1] as f32]))
+                    .with_colors(colors)
+                    .with_radii([3.0]),
+            ) {
+                log::warn!("[RerunViewer] Failed to log feature positions: {}", e);
+            }
+
+            // Log quality statistics
+            let stats = format!(
+                "Features: {} | High: {} | Medium: {} | Low: {} | Reliable: {}",
+                features.len(),
+                high_quality,
+                medium_quality,
+                low_quality,
+                reliable
+            );
+            if let Err(e) = rec.log(
+                format!("{}/stats", entity_path),
+                &rerun::TextDocument::new(stats),
+            ) {
+                log::warn!("[RerunViewer] Failed to log quality stats: {}", e);
+            }
+        }
+    }
+
+    /// Visualize loop closure constraints and verification
+    fn log_loop_closure(
+        &mut self,
+        constraints: &[crate::optimization::loop_closure::LoopClosureConstraint],
+        entity_path: &str,
+    ) {
+        if !self.initialized || constraints.is_empty() {
+            return;
+        }
+
+        if let Some(ref rec) = self.rec {
+            rec.set_time_sequence("frame", self.frame_id);
+            rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
+
+            // Visualize loop closure edges as lines between keyframes
+            let mut lines = Vec::new();
+
+            for constraint in constraints {
+                // Create a line from keyframe 1 to keyframe 2
+                // In a real implementation, you'd need keyframe poses to get actual positions
+                // For now, just visualize the constraint strength
+                let start_point = [constraint.keyframe_id_1 as f32 * 0.1, 0.0, 0.0];
+                let end_point = [constraint.keyframe_id_2 as f32 * 0.1, 0.0, 0.0];
+                lines.push([start_point, end_point]);
+            }
+
+            if !lines.is_empty() {
+                let line_strips =
+                    LineStrips3D::new(lines).with_colors([Color::from_rgb(255, 0, 255)]); // Magenta for loop closures
+
+                if let Err(e) = rec.log(entity_path, &line_strips) {
+                    log::warn!("[RerunViewer] Failed to log loop closures: {}", e);
+                }
+            }
+
+            // Log loop closure statistics
+            let stats = format!(
+                "Loop Closures: {} | Avg Info: {:.2}",
+                constraints.len(),
+                constraints
+                    .iter()
+                    .map(|c| c.information_matrix.trace())
+                    .sum::<f64>()
+                    / constraints.len() as f64
+            );
+            if let Err(e) = rec.log(
+                format!("{}/stats", entity_path),
+                &rerun::TextDocument::new(stats),
+            ) {
+                log::warn!("[RerunViewer] Failed to log loop closure stats: {}", e);
+            }
+        }
+    }
+
+    /// Comprehensive robustness dashboard
+    fn log_robustness_dashboard(
+        &mut self,
+        prosac_inliers: usize,
+        prosac_outliers: usize,
+        vibration_level: f32,
+        covariance_scale: f32,
+        feature_count: usize,
+        high_quality_features: usize,
+        loop_closures: usize,
+        entity_path: &str,
+    ) {
+        if !self.initialized {
+            return;
+        }
+
+        if let Some(ref rec) = self.rec {
+            rec.set_time_sequence("frame", self.frame_id);
+            rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
+
+            // Create comprehensive robustness metrics dashboard
+            let metrics = vec![
+                ("PROSAC Inliers", prosac_inliers as f64),
+                ("PROSAC Outliers", prosac_outliers as f64),
+                ("Vibration Level", vibration_level as f64),
+                ("Covariance Scale", covariance_scale as f64),
+                ("Total Features", feature_count as f64),
+                ("High Quality Features", high_quality_features as f64),
+                ("Loop Closures", loop_closures as f64),
+            ];
+
+            let values: Vec<f64> = metrics.iter().map(|(_, v)| *v).collect();
+
+            if let Err(e) = rec.log(
+                format!("{}/dashboard", entity_path),
+                &rerun::BarChart::new(values),
+            ) {
+                log::warn!("[RerunViewer] Failed to log robustness dashboard: {}", e);
+            }
+
+            // Calculate robustness score (0-100)
+            let robustness_score = if prosac_inliers + prosac_outliers > 0 {
+                let inlier_ratio =
+                    prosac_inliers as f32 / (prosac_inliers + prosac_outliers) as f32;
+                let quality_ratio = if feature_count > 0 {
+                    high_quality_features as f32 / feature_count as f32
+                } else {
+                    0.0
+                };
+                let vibration_penalty = (1.0 - vibration_level.min(1.0)).max(0.0);
+
+                ((inlier_ratio * 0.4 + quality_ratio * 0.4 + vibration_penalty * 0.2) * 100.0)
+                    as u32
+            } else {
+                0
+            };
+
+            let score_text = format!("Robustness Score: {}/100", robustness_score);
+            let _score_color = if robustness_score > 80 {
+                Color::from_rgb(0, 255, 0) // Green - excellent
+            } else if robustness_score > 60 {
+                Color::from_rgb(255, 165, 0) // Orange - good
+            } else {
+                Color::from_rgb(255, 0, 0) // Red - needs improvement
+            };
+
+            if let Err(e) = rec.log(
+                format!("{}/score", entity_path),
+                &rerun::TextDocument::new(score_text),
+            ) {
+                log::warn!("[RerunViewer] Failed to log robustness score: {}", e);
+            }
+        }
+    }
 }
 
 // Helper function to convert 3x3 rotation matrix to quaternion [x, y, z, w]

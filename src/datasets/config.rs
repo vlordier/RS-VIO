@@ -19,6 +19,8 @@ pub struct Config {
     pub feature_detection: FeatureDetectionConfig,
     #[serde(default)]
     pub visualization: VisualizationConfig,
+    #[serde(default)]
+    pub debug: DebugConfig,
     pub optimization: OptimizationConfig,
     #[serde(rename = "marginalization")]
     #[serde(default)]
@@ -144,6 +146,36 @@ pub struct VisualizationConfig {
     pub log_axes: bool,
     #[serde(default)]
     pub statistics_path: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DebugConfig {
+    #[serde(default = "default_use_imu")]
+    pub use_imu: bool,
+    #[serde(default = "default_use_feature_tracking")]
+    pub use_feature_tracking: bool,
+    #[serde(default = "default_use_triangulation")]
+    pub use_triangulation: bool,
+    #[serde(default = "default_use_fallback_depth")]
+    pub use_fallback_depth: bool,
+    #[serde(default = "default_min_stereo_matches")]
+    pub min_stereo_matches: usize,
+}
+
+fn default_use_imu() -> bool {
+    true
+}
+fn default_use_feature_tracking() -> bool {
+    true
+}
+fn default_use_triangulation() -> bool {
+    true
+}
+fn default_use_fallback_depth() -> bool {
+    false
+}
+fn default_min_stereo_matches() -> usize {
+    2
 }
 
 impl Default for VisualizationConfig {

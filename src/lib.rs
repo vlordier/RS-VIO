@@ -160,6 +160,7 @@ pub fn init_logging() {
         .init();
 }
 
+pub mod camera;
 pub mod datasets;
 pub mod error_handling;
 pub mod estimator;

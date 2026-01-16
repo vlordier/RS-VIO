@@ -62,4 +62,58 @@ pub trait Viewer: Send {
     /// Log trajectory path as a continuous 3D line
     /// trajectory: vector of 4x4 transformation matrices, extracts translation (position) from each
     fn log_trajectory(&mut self, trajectory: &[Matrix4x4], entity_path: &str);
+
+    /// Comprehensive robustness dashboard
+    fn log_robustness_dashboard(
+        &mut self,
+        _prosac_inliers: usize,
+        _prosac_outliers: usize,
+        _vibration_level: f32,
+        _covariance_scale: f32,
+        _feature_count: usize,
+        _high_quality_features: usize,
+        _loop_closures: usize,
+        _entity_path: &str,
+    ) {
+        // Default implementation - no-op for viewers that don't support robustness visualization
+    }
+
+    /// Visualize vibration metrics and adaptive covariance
+    fn log_vibration_metrics(
+        &mut self,
+        _gyro_rms: f32,
+        _accel_rms: f32,
+        _covariance_scale: f32,
+        _entity_path: &str,
+    ) {
+        // Default implementation - no-op
+    }
+
+    /// Visualize feature quality metrics
+    fn log_feature_quality(
+        &mut self,
+        _features: &[crate::feature_tracker::Feature],
+        _entity_path: &str,
+    ) {
+        // Default implementation - no-op
+    }
+
+    /// Visualize loop closure constraints
+    fn log_loop_closure(
+        &mut self,
+        _constraints: &[crate::optimization::loop_closure::LoopClosureConstraint],
+        _entity_path: &str,
+    ) {
+        // Default implementation - no-op
+    }
+
+    /// Visualize PROSAC/MAGSAC++ geometric verification results
+    fn log_robustness_verification(
+        &mut self,
+        _inliers: &[(f32, f32)],
+        _outliers: &[(f32, f32)],
+        _entity_path: &str,
+    ) {
+        // Default implementation - no-op
+    }
 }

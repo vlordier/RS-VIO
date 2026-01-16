@@ -253,51 +253,56 @@ impl Estimator {
 
         // Process IMU measurements
         if let Some(imu) = imu_data {
-            // Attach IMU measurements to frame
-            current_frame.imu_from_last_frame = imu.to_vec();
+            // Check if IMU is enabled in debug config
+            if self.config.debug.use_imu {
+                // Attach IMU measurements to frame
+                current_frame.imu_from_last_frame = imu.to_vec();
 
-            // During initialization, collect IMU samples for bias estimation
-            if self.is_initializing {
-                for imu_sample in imu {
-                    self.bias_estimator.add_sample(imu_sample, true);
-                }
+                // During initialization, collect IMU samples for bias estimation
+                if self.is_initializing {
+                    for imu_sample in imu {
+                        self.bias_estimator.add_sample(imu_sample, true);
+                    }
 
-                // Check if bias estimation is complete (need enough samples)
-                if self.bias_estimator.sample_count() >= 100 {
-                    self.is_initializing = false;
-                    log::info!(
-                        "[Estimator] IMU initialization complete. Gyro bias: [{:.4}, {:.4}, {:.4}] rad/s, Accel bias: [{:.4}, {:.4}, {:.4}] m/s²",
-                        self.bias_estimator.gyro_bias[0],
-                        self.bias_estimator.gyro_bias[1],
-                        self.bias_estimator.gyro_bias[2],
-                        self.bias_estimator.accel_bias[0],
-                        self.bias_estimator.accel_bias[1],
-                        self.bias_estimator.accel_bias[2]
-                    );
-                }
-            }
-
-            // Propagate IMU preintegrator with bias-corrected measurements
-            for imu_sample in imu {
-                if let Some(last_ts) = self.last_imu_timestamp {
-                    let dt = (imu_sample.timestamp - last_ts) as f64 / 1e9;
-                    if dt > 0.0 {
-                        // Apply bias correction if available
-                        if self.bias_estimator.is_initialized {
-                            let gyro_corrected = self.bias_estimator.correct_gyro(imu_sample);
-                            let accel_corrected = self.bias_estimator.correct_accel(imu_sample);
-                            self.imu_preintegrator.propagate_corrected(
-                                gyro_corrected,
-                                accel_corrected,
-                                dt,
-                            );
-                        } else {
-                            self.imu_preintegrator.propagate(imu_sample, dt);
-                        }
+                    // Check if bias estimation is complete (need enough samples)
+                    if self.bias_estimator.sample_count() >= 100 {
+                        self.is_initializing = false;
+                        log::info!(
+                            "[Estimator] IMU initialization complete. Gyro bias: [{:.4}, {:.4}, {:.4}] rad/s, Accel bias: [{:.4}, {:.4}, {:.4}] m/s²",
+                            self.bias_estimator.gyro_bias[0],
+                            self.bias_estimator.gyro_bias[1],
+                            self.bias_estimator.gyro_bias[2],
+                            self.bias_estimator.accel_bias[0],
+                            self.bias_estimator.accel_bias[1],
+                            self.bias_estimator.accel_bias[2]
+                        );
                     }
                 }
-                self.last_imu_timestamp = Some(imu_sample.timestamp);
-                self.imu_measurement_count += 1;
+
+                // Propagate IMU preintegrator with bias-corrected measurements
+                for imu_sample in imu {
+                    if let Some(last_ts) = self.last_imu_timestamp {
+                        let dt = (imu_sample.timestamp - last_ts) as f64 / 1e9;
+                        if dt > 0.0 {
+                            // Apply bias correction if available
+                            if self.bias_estimator.is_initialized {
+                                let gyro_corrected = self.bias_estimator.correct_gyro(imu_sample);
+                                let accel_corrected = self.bias_estimator.correct_accel(imu_sample);
+                                self.imu_preintegrator.propagate_corrected(
+                                    gyro_corrected,
+                                    accel_corrected,
+                                    dt,
+                                );
+                            } else {
+                                self.imu_preintegrator.propagate(imu_sample, dt);
+                            }
+                        }
+                    }
+                    self.last_imu_timestamp = Some(imu_sample.timestamp);
+                    self.imu_measurement_count += 1;
+                }
+            } else {
+                log::debug!("[Estimator] IMU disabled via debug config");
             }
 
             // Use motion predictor for feature tracking
