@@ -1,0 +1,53 @@
+{
+  "timestamp": "1768570384",
+  "overall_status": "FAIL",
+  "intrinsics_check": {
+    "status": "FAIL",
+    "left_camera": {
+      "focal_length_error": 0.0,
+      "principal_point_error": 0.0,
+      "distortion_error": 0.030400000000000003,
+      "reprojection_rms": 0.5,
+      "status": "FAIL"
+    },
+    "right_camera": {
+      "focal_length_error": 0.0,
+      "principal_point_error": 0.0,
+      "distortion_error": 0.030400000000000003,
+      "reprojection_rms": 0.5,
+      "status": "FAIL"
+    }
+  },
+  "stereo_extrinsics_check": {
+    "status": "PASS",
+    "baseline_error": 0.001,
+    "rotation_error_deg": 0.1,
+    "translation_error": 0.002,
+    "epipolar_error_px": 0.2,
+    "rectification_quality": 0.95
+  },
+  "imu_extrinsics_check": {
+    "status": "PASS",
+    "imu_to_left_camera_error": 0.005,
+    "imu_to_right_camera_error": 0.005,
+    "gravity_alignment_error_deg": 0.2,
+    "scale_consistency": 0.98
+  },
+  "sync_check": {
+    "status": "PASS",
+    "mean_offset_ms": 0.5,
+    "std_offset_ms": 0.2,
+    "max_offset_ms": 1.5,
+    "timestamp_monotonicity": true,
+    "dropped_frames": 0
+  },
+  "rectification_check": {
+    "status": "PASS",
+    "epipolar_lines_straightness": 0.95,
+    "rectification_error_px": 0.15,
+    "vertical_disparity_px": 0.05
+  },
+  "recommendations": [
+    "Re-run camera intrinsics calibration with more calibration images"
+  ]
+}

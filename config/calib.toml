@@ -1,0 +1,42 @@
+# Sample VIO Calibration Configuration
+# This file contains calibration parameters for stereo VIO system
+
+[camera]
+# Camera dimensions
+image_width = 640
+image_height = 480
+
+# Left camera intrinsics [fx, fy, cx, cy]
+left_intrinsics = [380.0, 380.0, 320.0, 240.0]
+left_distortion = [0.1, -0.05, 0.001, 0.001, 0.0]
+
+# Right camera intrinsics [fx, fy, cx, cy]
+right_intrinsics = [380.0, 380.0, 320.0, 240.0]
+right_distortion = [0.1, -0.05, 0.001, 0.001, 0.0]
+
+# IMU to camera transforms (16-element vectors: 4x4 matrix in row-major order)
+# Identity matrix for now (IMU aligned with left camera)
+T_B_Cl = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+T_B_Cr = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+
+[keyframe_management]
+keyframe_window_size = 10
+translation_threshold = 0.1
+rotation_threshold = 0.1
+
+[feature_detection]
+grid_size = 30
+max_features_per_grid = 200
+optical_flow_max_iterations = 30
+optical_flow_convergence_threshold = 0.005
+
+[visualization]
+enabled = false
+
+[optimization]
+bundle_adjustment_max_iterations = 10
+pnp_max_iterations = 50
+imu_prior_enable = true
+imu_prior_weight_pos = 1.0
+imu_prior_weight_rot = 1.0
+imu_prior_huber_delta = 1.0
