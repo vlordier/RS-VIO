@@ -607,6 +607,9 @@ fn test_feature_detection_parameter_robustness() {
                 max_features_per_grid: 3,
                 optical_flow_max_iterations: 25,
                 optical_flow_convergence_threshold: 0.01,
+                subpixel_enable: true,
+                subpixel_iterations: 15,
+                subpixel_threshold: 0.0005,
             },
         ),
     ];

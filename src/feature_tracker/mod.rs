@@ -74,6 +74,7 @@ pub mod frame_skip;
 pub mod image_utilities;
 pub mod patch;
 pub mod patch_simd;
+pub mod ransac;
 
 pub use feature_tracker::*;
 pub use frame_skip::AdaptiveFrameSkipper;
