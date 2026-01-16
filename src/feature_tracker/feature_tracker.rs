@@ -119,11 +119,11 @@ impl<const LEVELS: u32> PatchTracker<LEVELS> {
         }
         // add new points
         let new_points = add_points(&self.tracked_points_map, greyscale_image, self.grid_cols);
-        for point in &new_points {
+        for (x, y, _score) in &new_points {
             let mut v = na::Affine2::<f32>::identity();
 
-            v.matrix_mut_unchecked().m13 = point.x as f32;
-            v.matrix_mut_unchecked().m23 = point.y as f32;
+            v.matrix_mut_unchecked().m13 = *x;
+            v.matrix_mut_unchecked().m23 = *y;
             self.tracked_points_map.insert(self.last_keypoint_id, v);
             self.last_keypoint_id += 1;
         }
@@ -283,10 +283,10 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
         let tmp_tracked_points0: HashMap<usize, _> = new_points0
             .iter()
             .enumerate()
-            .map(|(i, point)| {
+            .map(|(i, (x, y, _score))| {
                 let mut v = na::Affine2::<f32>::identity();
-                v.matrix_mut_unchecked().m13 = point.x as f32;
-                v.matrix_mut_unchecked().m23 = point.y as f32;
+                v.matrix_mut_unchecked().m13 = *x;
+                v.matrix_mut_unchecked().m23 = *y;
                 (i, v)
             })
             .collect();
@@ -393,7 +393,7 @@ fn add_points(
     tracked_points_map: &HashMap<usize, na::Affine2<f32>>,
     grayscale_image: &GrayImage,
     grid_size: u32,
-) -> Vec<Corner> {
+) -> Vec<(f32, f32, f32)> {
     let num_points_in_cell = 1;
     let current_corners: Vec<Corner> = tracked_points_map
         .values()

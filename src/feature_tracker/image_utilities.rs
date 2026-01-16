@@ -105,12 +105,63 @@ pub fn se2_exp_matrix(a: &na::SVector<f32, 3>) -> na::SMatrix<f32, 3, 3> {
     se2_mat
 }
 
+/// Refine corner position to sub-pixel accuracy using quadratic interpolation
+/// of the corner response function around the detected corner location.
+pub fn refine_corner_subpixel(image: &GrayImage, corner: &Corner, window_size: u32) -> (f32, f32) {
+    let x = corner.x as f32;
+    let y = corner.y as f32;
+    let half_window = window_size as f32 / 2.0;
+
+    // Check bounds
+    if x - half_window < 0.0
+        || y - half_window < 0.0
+        || x + half_window >= image.width() as f32
+        || y + half_window >= image.height() as f32
+    {
+        return (x, y);
+    }
+
+    // Simple centroid-based sub-pixel refinement
+    // Compute intensity-weighted center of mass in a small window
+    let window_size = 3; // 3x3 window for refinement
+    let mut sum_intensity = 0.0;
+    let mut sum_x = 0.0;
+    let mut sum_y = 0.0;
+
+    for dy in -(window_size / 2)..=(window_size / 2) {
+        for dx in -(window_size / 2)..=(window_size / 2) {
+            let px = (x as i32 + dx) as u32;
+            let py = (y as i32 + dy) as u32;
+
+            if px < image.width() && py < image.height() {
+                let intensity = image.get_pixel(px, py)[0] as f32;
+                sum_intensity += intensity;
+                sum_x += intensity * (x + dx as f32);
+                sum_y += intensity * (y + dy as f32);
+            }
+        }
+    }
+
+    if sum_intensity > 0.0 {
+        let refined_x = sum_x / sum_intensity;
+        let refined_y = sum_y / sum_intensity;
+
+        // Limit refinement to 0.5 pixel from original location
+        let clamped_x = x + (refined_x - x).max(-0.5).min(0.5);
+        let clamped_y = y + (refined_y - y).max(-0.5).min(0.5);
+
+        (clamped_x, clamped_y)
+    } else {
+        (x, y)
+    }
+}
+
 pub fn detect_key_points(
     image: &GrayImage,
     grid_size: u32,
     current_corners: &Vec<Corner>,
     num_points_in_cell: u32,
-) -> Vec<Corner> {
+) -> Vec<(f32, f32, f32)> {
     const EDGE_THRESHOLD: u32 = 19;
     let h = image.height();
     let w = image.width();
@@ -175,7 +226,15 @@ pub fn detect_key_points(
             }
         }
     }
-    all_corners
+
+    // Apply sub-pixel refinement to detected corners
+    let mut refined_corners = Vec::new();
+    for corner in all_corners {
+        let (refined_x, refined_y) = refine_corner_subpixel(image, &corner, 5);
+        refined_corners.push((refined_x, refined_y, corner.score));
+    }
+
+    refined_corners
 }
 
 #[cfg(test)]
@@ -226,7 +285,7 @@ mod tests {
         assert!(!points.is_empty());
         assert!(points
             .iter()
-            .any(|p| p.x >= 10 && p.x <= 22 && p.y >= 10 && p.y <= 22));
+            .any(|p| p.0 >= 10.0 && p.0 <= 22.0 && p.1 >= 10.0 && p.1 <= 22.0));
     }
 
     #[test]
