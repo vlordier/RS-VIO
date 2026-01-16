@@ -303,7 +303,7 @@ impl ImuMotionPredictor {
 /// Velocity estimator using accelerometer
 pub struct VelocityEstimator {
     config: ImuConfig,
-    velocity: na::Vector3<f64>,
+    velocity: na::Vector3<Float>,
     initialized: bool,
 }
 
@@ -352,12 +352,12 @@ impl VelocityEstimator {
             last_ts = imu.timestamp;
         }
 
-        self.velocity = delta_v;
+        self.velocity = delta_v.cast::<Float>();
         self.initialized = true;
     }
 
     /// Get current velocity estimate
-    pub fn get_velocity(&self) -> na::Vector3<f64> {
+    pub fn get_velocity(&self) -> na::Vector3<Float> {
         self.velocity
     }
 
@@ -367,18 +367,23 @@ impl VelocityEstimator {
             return;
         }
 
+        let dt_float = dt as Float;
         let gravity = na::Vector3::new(
-            self.config.gravity[0],
-            self.config.gravity[1],
-            self.config.gravity[2],
+            self.config.gravity[0] as Float,
+            self.config.gravity[1] as Float,
+            self.config.gravity[2] as Float,
         );
 
         // Integrate accelerometer
         for imu in imu_measurements {
-            let accel = na::Vector3::new(imu.accel[0], imu.accel[1], imu.accel[2]);
+            let accel = na::Vector3::new(
+                imu.accel[0] as Float,
+                imu.accel[1] as Float,
+                imu.accel[2] as Float,
+            );
             // Assume current orientation is approximately identity
             let accel_world = accel - gravity;
-            self.velocity += accel_world * dt;
+            self.velocity += accel_world * dt_float;
         }
     }
 
@@ -803,34 +808,34 @@ impl ImuAidedKeyframeSelector {
 #[derive(Debug, Clone)]
 pub struct ImuMotionPrior {
     /// Preintegrated rotation from i to j
-    pub delta_rotation: na::UnitQuaternion<f64>,
+    pub delta_rotation: na::UnitQuaternion<Float>,
     /// Preintegrated velocity change from i to j
-    pub delta_velocity: na::Vector3<f64>,
+    pub delta_velocity: na::Vector3<Float>,
     /// Preintegrated position change from i to j
-    pub delta_position: na::Vector3<f64>,
+    pub delta_position: na::Vector3<Float>,
     /// Time interval
-    pub delta_time: f64,
+    pub delta_time: Float,
     /// Initial pose at time i
-    pub initial_pose: na::Matrix4<f64>,
+    pub initial_pose: na::Matrix4<Float>,
     /// Initial velocity at time i
-    pub initial_velocity: na::Vector3<f64>,
+    pub initial_velocity: na::Vector3<Float>,
     /// Gravity vector in world frame
-    pub gravity: na::Vector3<f64>,
+    pub gravity: na::Vector3<Float>,
 }
 
 impl ImuMotionPrior {
     /// Create from preintegrated measurements
     pub fn from_preintegration(
         preint: &PreintegratedImu,
-        initial_pose: na::Matrix4<f64>,
-        initial_velocity: na::Vector3<f64>,
-        gravity: na::Vector3<f64>,
+        initial_pose: na::Matrix4<Float>,
+        initial_velocity: na::Vector3<Float>,
+        gravity: na::Vector3<Float>,
     ) -> Self {
         Self {
-            delta_rotation: preint.delta_rotation,
-            delta_velocity: preint.delta_velocity,
-            delta_position: preint.delta_position,
-            delta_time: preint.delta_time,
+            delta_rotation: preint.delta_rotation.cast::<Float>(),
+            delta_velocity: preint.delta_velocity.cast::<Float>(),
+            delta_position: preint.delta_position.cast::<Float>(),
+            delta_time: preint.delta_time as Float,
             initial_pose,
             initial_velocity,
             gravity,
@@ -858,13 +863,13 @@ impl ImuMotionPrior {
             + self.delta_position;
 
         // Compose pose matrix
-        let mut T_W_Bj = na::Matrix4::identity();
+        let mut T_W_Bj = na::Matrix4::<Float>::identity();
         T_W_Bj
             .fixed_view_mut::<3, 3>(0, 0)
             .copy_from(&R_W_Bj.into_inner());
         T_W_Bj.fixed_view_mut::<3, 1>(0, 3).copy_from(&p_W_Bj);
 
-        (T_W_Bj, v_W_Bj)
+        (T_W_Bj.cast::<f64>(), v_W_Bj.cast::<f64>())
     }
 
     /// Compute innovation (prediction error) given observed pose
@@ -872,18 +877,24 @@ impl ImuMotionPrior {
     /// Returns (position_error, rotation_error, velocity_error)
     pub fn compute_innovation(
         &self,
-        observed_pose: &na::Matrix4<f64>,
-        observed_velocity: &na::Vector3<f64>,
+        observed_pose: &na::Matrix4<Float>,
+        observed_velocity: &na::Vector3<Float>,
     ) -> (na::Vector3<f64>, f64, na::Vector3<f64>) {
         let (predicted_pose, predicted_velocity) = self.predict_state();
 
         // Position innovation
-        let pos_error = observed_pose.fixed_view::<3, 1>(0, 3).into_owned()
+        let pos_error = observed_pose
+            .cast::<f64>()
+            .fixed_view::<3, 1>(0, 3)
+            .into_owned()
             - predicted_pose.fixed_view::<3, 1>(0, 3).into_owned();
 
         // Rotation innovation (angle-axis)
         let R_obs = na::Rotation3::from_matrix_unchecked(
-            observed_pose.fixed_view::<3, 3>(0, 0).into_owned(),
+            observed_pose
+                .cast::<f64>()
+                .fixed_view::<3, 3>(0, 0)
+                .into_owned(),
         );
         let R_pred = na::Rotation3::from_matrix_unchecked(
             predicted_pose.fixed_view::<3, 3>(0, 0).into_owned(),
@@ -892,7 +903,7 @@ impl ImuMotionPrior {
         let rot_error = dq.angle();
 
         // Velocity innovation
-        let vel_error = observed_velocity - predicted_velocity;
+        let vel_error = observed_velocity.cast::<f64>() - predicted_velocity;
 
         (pos_error, rot_error, vel_error)
     }
@@ -927,16 +938,16 @@ mod tests {
     #[test]
     fn test_imu_motion_prior() {
         let preint = PreintegratedImu::new();
-        let pose = na::Matrix4::identity();
-        let velocity = na::Vector3::zeros();
-        let gravity = na::Vector3::new(0.0, 0.0, -9.81);
+        let pose = na::Matrix4::<Float>::identity();
+        let velocity = na::Vector3::<Float>::zeros();
+        let gravity = na::Vector3::new(fl!(0.0), fl!(0.0), fl!(-9.81));
 
         let prior = ImuMotionPrior::from_preintegration(&preint, pose, velocity, gravity);
         let (pred_pose, pred_vel) = prior.predict_state();
 
         // Should be close to initial for zero IMU motion
-        assert!((pred_pose - pose).abs().sum() < 1e-10);
-        assert!((pred_vel - velocity).norm() < 1e-10);
+        assert!((pred_pose - pose.cast::<f64>()).abs().sum() < 1e-10);
+        assert!((pred_vel - velocity.cast::<f64>()).norm() < 1e-10);
     }
 
     #[test]

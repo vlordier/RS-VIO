@@ -15,6 +15,7 @@
 use super::lightglue::{LightGlueConfig, LightGlueMatcher};
 use super::pnp_ransac::{Correspondence, PnPRansacConfig, PnPRansacSolver};
 use super::{GeometricVerifier, KeyframeDescriptor, MatchMetrics, VerifiedMatch};
+use crate::types::Float;
 use nalgebra as na;
 
 /// Configuration for enhanced geometric verifier
@@ -102,8 +103,8 @@ impl EnhancedGeometricVerifier {
         for i in (0..descriptor.descriptor.len()).step_by(2) {
             if i + 1 < descriptor.descriptor.len() {
                 points.push(na::Vector2::new(
-                    descriptor.descriptor[i] * 640.0,     // Normalize to image width
-                    descriptor.descriptor[i + 1] * 480.0, // Normalize to image height
+                    descriptor.descriptor[i] as f64 * 640.0, // Normalize to image width
+                    descriptor.descriptor[i + 1] as f64 * 480.0, // Normalize to image height
                 ));
             }
         }
@@ -122,7 +123,7 @@ impl EnhancedGeometricVerifier {
         // For now, create pseudo-3D points from pose
         let mut points = Vec::new();
 
-        let translation = descriptor.pose.translation.vector;
+        let translation = descriptor.pose.translation.vector.cast::<f64>();
 
         // Generate points around the keyframe position
         for i in 0..4 {
@@ -142,7 +143,7 @@ impl GeometricVerifier for EnhancedGeometricVerifier {
         metrics: &MatchMetrics,
     ) -> Option<VerifiedMatch> {
         // Pre-filter based on similarity
-        if metrics.similarity < self.config.min_pre_filter_similarity {
+        if (metrics.similarity as f64) < self.config.min_pre_filter_similarity {
             log::debug!(
                 "[EnhancedVerifier] Rejected candidate (similarity: {:.3} < {:.3})",
                 metrics.similarity,
@@ -191,12 +192,12 @@ impl GeometricVerifier for EnhancedGeometricVerifier {
                     );
 
                     // Compute relative pose
-                    let relative_pose = candidate.pose.inverse() * result.pose;
+                    let relative_pose = candidate.pose.inverse() * result.pose.cast::<Float>();
 
                     Some(VerifiedMatch {
                         relative_pose,
                         inlier_count: result.num_inliers,
-                        inlier_ratio: result.inlier_ratio,
+                        inlier_ratio: result.inlier_ratio as Float,
                     })
                 },
                 Err(e) => {

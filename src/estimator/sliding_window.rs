@@ -5,7 +5,10 @@ use crate::optimization::factors::{
 };
 use crate::optimization::loop_closure::LoopClosureConstraint;
 
-use crate::types::{Matrix3x3, Matrix4x4, Vector3};
+use crate::{
+    fl,
+    types::{Float, Matrix3x3, Matrix4x4, Vector3},
+};
 use apex_solver::core::loss_functions::HuberLoss;
 use apex_solver::core::problem::{Problem, VariableEnum};
 use apex_solver::linalg::{LinearSolverType, SchurPreconditioner, SchurVariant};
@@ -321,7 +324,17 @@ impl SlidingWindow {
     /// Helper function to create skew-symmetric (cross-product) matrix from 3D vector
     #[allow(dead_code)]
     fn skew_symmetric(v: &Vector3) -> Matrix3x3 {
-        na::Matrix3::<f64>::new(0.0, -v.z, v.y, v.z, 0.0, -v.x, -v.y, v.x, 0.0)
+        na::Matrix3::<Float>::new(
+            fl!(0.0),
+            -v.z,
+            v.y,
+            v.z,
+            fl!(0.0),
+            -v.x,
+            -v.y,
+            v.x,
+            fl!(0.0),
+        )
     }
 
     /// Triangulate a 3D point from stereo observations in a single frame
@@ -557,14 +570,14 @@ impl SlidingWindow {
                                 if let (Some(l_feat), Some(r_feat)) = (left_feat, right_feat) {
                                     // Perform stereo triangulation
                                     let left_obs = Vector3::new(
-                                        l_feat.undistorted_coord[0] as f64,
-                                        l_feat.undistorted_coord[1] as f64,
-                                        1.0_f64,
+                                        l_feat.undistorted_coord[0],
+                                        l_feat.undistorted_coord[1],
+                                        fl!(1.0),
                                     );
                                     let right_obs = Vector3::new(
-                                        r_feat.undistorted_coord[0] as f64,
-                                        r_feat.undistorted_coord[1] as f64,
-                                        1.0_f64,
+                                        r_feat.undistorted_coord[0],
+                                        r_feat.undistorted_coord[1],
+                                        fl!(1.0),
                                     );
 
                                     match Self::triangulate_stereo(
@@ -575,15 +588,15 @@ impl SlidingWindow {
                                         frame.state.T_B_Cr,
                                     ) {
                                         Some(p_W) => {
-                                            DVector::from_vec(vec![p_W.x, p_W.y, p_W.z])
+                                            DVector::from_vec(vec![p_W.x as f64, p_W.y as f64, p_W.z as f64])
                                         }
                                         None => {
                                             // Triangulation failed, use fallback
                                             log::debug!("[SlidingWindow] Triangulation failed for feature {}, using fallback", feature_id);
                                             let p_C = Vector3::new(
-                                                l_feat.undistorted_coord[0] as f64,
-                                                l_feat.undistorted_coord[1] as f64,
-                                                2.0_f64,
+                                                l_feat.undistorted_coord[0],
+                                                l_feat.undistorted_coord[1],
+                                                fl!(2.0),
                                             );
                                             let (R_W_B, t_W_B) = (
                                                 frame.state.T_W_B.fixed_view::<3, 3>(0, 0).into_owned(),
@@ -596,7 +609,7 @@ impl SlidingWindow {
                                                         T_B_C.fixed_view::<3, 1>(0, 3).into_owned(),
                                                     );
                                                     let p_W = R_W_B * (R_B_C * p_C + t_B_C) + t_W_B;
-                                                    DVector::from_vec(vec![p_W.x, p_W.y, p_W.z])
+                                                    DVector::from_vec(vec![p_W.x as f64, p_W.y as f64, p_W.z as f64])
                                                 }
                                                 None => DVector::from_vec(vec![0.0, 0.0, 2.0])
                                             }
@@ -614,7 +627,7 @@ impl SlidingWindow {
                         let mut factor = BundleAdjustmentFactor::new(
                             na::Vector2::new(feat.undistorted_coord[0], feat.undistorted_coord[1])
                                 .cast::<f64>(),
-                            *T_C_B,
+                            T_C_B.cast::<f64>(),
                         );
 
                         // Fix pose for first frame
@@ -627,7 +640,7 @@ impl SlidingWindow {
                                     continue;
                                 },
                             };
-                            factor = factor.with_fixed_pose(T_B_W);
+                            factor = factor.with_fixed_pose(T_B_W.cast::<f64>());
                         }
 
                         // Determine variable names based on frame
@@ -670,8 +683,8 @@ impl SlidingWindow {
                 }
 
                 let factor = LoopClosurePoseFactor::new(
-                    constraint.relative_pose.to_homogeneous(),
-                    constraint.information_matrix.clone(),
+                    constraint.relative_pose.to_homogeneous().cast::<f64>(),
+                    constraint.information_matrix.cast::<f64>(),
                 );
 
                 let loss = HuberLoss::new(1.0).ok().map(|l| {
@@ -985,13 +998,13 @@ impl SlidingWindow {
             let q = na::UnitQuaternion::from_matrix(&R_W_B);
 
             let linearization_point = na::DVector::from_vec(vec![
-                t_W_B_vec.x,
-                t_W_B_vec.y,
-                t_W_B_vec.z,
-                q.w,
-                q.i,
-                q.j,
-                q.k,
+                t_W_B_vec.x as f64,
+                t_W_B_vec.y as f64,
+                t_W_B_vec.z as f64,
+                q.w as f64,
+                q.i as f64,
+                q.j as f64,
+                q.k as f64,
             ]);
 
             param_blocks.insert(
@@ -1158,7 +1171,7 @@ impl SlidingWindow {
                     // println!("KF_{} optimized pose: {:?}", frame_id, mat);
                     if let Some(frame) = self.keyframes.get_mut(frame_id as usize) {
                         match mat.try_inverse() {
-                            Some(inv) => frame.state.T_W_B = inv,
+                            Some(inv) => frame.state.T_W_B = inv.cast::<Float>(),
                             None => {
                                 log::warn!("[SlidingWindow] Optimized T_B_W matrix is singular for KF_{}, keeping previous pose", frame_id);
                             }
@@ -1248,7 +1261,7 @@ impl SlidingWindow {
                         let factor = PnPFactor::new(
                             na::Vector2::new(feat.undistorted_coord[0], feat.undistorted_coord[1])
                                 .cast::<f64>(),
-                            *T_C_B,
+                            T_C_B.cast::<f64>(),
                             na::Vector3::new(point[0] as f64, point[1] as f64, point[2] as f64),
                         );
                         // Add residual block with Huber loss
@@ -1300,7 +1313,7 @@ impl SlidingWindow {
                     opt_result.initial_cost,
                     opt_result.final_cost
                 );
-                Ok(Some(T_W_B_opt))
+                Ok(Some(T_W_B_opt.cast::<Float>()))
             } else {
                 log::warn!("[SlidingWindow] Motion tracking: optimized pose not found in result");
                 Ok(None)

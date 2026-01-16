@@ -1,4 +1,4 @@
-use crate::types::{Matrix4x4, Vector3};
+use crate::types::{Float, Matrix4x4, Vector3};
 
 /// Trait for state operations.
 ///
@@ -103,7 +103,9 @@ impl StateOperations for State {
     }
 
     fn interpolate(&self, other: &Self, alpha: f64) -> Self {
-        let translation = self.translation() + (other.translation() - self.translation()) * alpha;
+        let alpha_float = alpha as Float;
+        let translation =
+            self.translation() + (other.translation() - self.translation()) * alpha_float;
 
         let mut pose = Matrix4x4::identity();
         pose[(0, 3)] = translation.x;
@@ -114,7 +116,7 @@ impl StateOperations for State {
             T_W_B: pose,
             T_B_Cl: self.T_B_Cl,
             T_B_Cr: self.T_B_Cr,
-            velocity: self.velocity + (other.velocity - self.velocity) * alpha,
+            velocity: self.velocity + (other.velocity - self.velocity) * alpha_float,
             accel_bias: self.accel_bias,
             gyro_bias: self.gyro_bias,
         }

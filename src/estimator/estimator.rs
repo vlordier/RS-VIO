@@ -69,7 +69,7 @@ pub struct Estimator {
     // Number of IMU measurements processed
     imu_measurement_count: usize,
     // Current body velocity estimate
-    current_velocity: na::Vector3<f64>,
+    current_velocity: na::Vector3<Float>,
     // Whether velocity estimator has been initialized
     velocity_estimator_initialized: bool,
     // IMU bias estimator for initialization
@@ -160,7 +160,7 @@ impl Estimator {
             current_imu_preintegration: None,
             last_imu_timestamp: None,
             imu_measurement_count: 0,
-            current_velocity: na::Vector3::zeros(),
+            current_velocity: na::Vector3::<Float>::zeros(),
             velocity_estimator_initialized: false,
             bias_estimator: ImuBiasEstimator::new(imu_config.clone()),
             is_initializing: true,
@@ -600,13 +600,13 @@ impl Estimator {
             let num_features = frame.left_features.len().max(frame.right_features.len());
 
             // Create a simple descriptor from feature statistics combined with presence flag
-            let mut descriptor = vec![0.0; 10];
+            let mut descriptor = vec![fl!(0.0); 10];
             descriptor[0] = if self.orb_extractor.is_some() {
-                1.0
+                fl!(1.0)
             } else {
-                0.0
+                fl!(0.0)
             }; // ORB enabled flag
-            descriptor[1] = num_features as f64 / 200.0; // Normalized feature count
+            descriptor[1] = num_features as Float / fl!(200.0); // Normalized feature count
 
             // Add left image feature statistics
             if !frame.left_features.is_empty() {
@@ -622,9 +622,9 @@ impl Estimator {
                     .map(|f| f.pixel_coord[1])
                     .sum::<f32>()
                     / frame.left_features.len() as f32;
-                descriptor[2] = avg_x as f64 / self.config.camera.image_width as f64;
-                descriptor[3] = avg_y as f64 / self.config.camera.image_height as f64;
-                descriptor[4] = frame.left_features.len() as f64 / 200.0;
+                descriptor[2] = avg_x as Float / self.config.camera.image_width as Float;
+                descriptor[3] = avg_y as Float / self.config.camera.image_height as Float;
+                descriptor[4] = frame.left_features.len() as Float / fl!(200.0);
             }
 
             // Add right image feature statistics
@@ -641,14 +641,14 @@ impl Estimator {
                     .map(|f| f.pixel_coord[1])
                     .sum::<f32>()
                     / frame.right_features.len() as f32;
-                descriptor[5] = avg_x as f64 / self.config.camera.image_width as f64;
-                descriptor[6] = avg_y as f64 / self.config.camera.image_height as f64;
-                descriptor[7] = frame.right_features.len() as f64 / 200.0;
+                descriptor[5] = avg_x as Float / self.config.camera.image_width as Float;
+                descriptor[6] = avg_y as Float / self.config.camera.image_height as Float;
+                descriptor[7] = frame.right_features.len() as Float / fl!(200.0);
             }
 
             // Pose-derived features
-            descriptor[8] = (t[0] / 10.0).tanh();
-            descriptor[9] = (t[1] / 10.0).tanh();
+            descriptor[8] = (t[0] / fl!(10.0)).tanh();
+            descriptor[9] = (t[1] / fl!(10.0)).tanh();
 
             KeyframeDescriptor {
                 keyframe_id,
@@ -662,7 +662,7 @@ impl Estimator {
             let num_features = frame.left_features.len().max(frame.right_features.len());
 
             // Create a simple descriptor from feature statistics (10-dim vector)
-            let mut descriptor = vec![0.0; 10];
+            let mut descriptor = vec![fl!(0.0); 10];
 
             if !frame.left_features.is_empty() {
                 let avg_x: f32 = frame
@@ -677,11 +677,12 @@ impl Estimator {
                     .map(|f| f.pixel_coord[1])
                     .sum::<f32>()
                     / frame.left_features.len() as f32;
-                descriptor[0] = avg_x as f64 / self.config.camera.image_width as f64;
-                descriptor[1] = avg_y as f64 / self.config.camera.image_height as f64;
+                descriptor[0] = avg_x as Float / self.config.camera.image_width as Float;
+                descriptor[1] = avg_y as Float / self.config.camera.image_height as Float;
 
                 // Add feature distribution stats
-                descriptor[2] = frame.left_features.len() as f64 / 200.0; // Normalized feature count
+                descriptor[2] = frame.left_features.len() as Float / fl!(200.0);
+                // Normalized feature count
             }
 
             if !frame.right_features.is_empty() {
@@ -697,17 +698,17 @@ impl Estimator {
                     .map(|f| f.pixel_coord[1])
                     .sum::<f32>()
                     / frame.right_features.len() as f32;
-                descriptor[3] = avg_x as f64 / self.config.camera.image_width as f64;
-                descriptor[4] = avg_y as f64 / self.config.camera.image_height as f64;
+                descriptor[3] = avg_x as Float / self.config.camera.image_width as Float;
+                descriptor[4] = avg_y as Float / self.config.camera.image_height as Float;
 
-                descriptor[5] = frame.right_features.len() as f64 / 200.0;
+                descriptor[5] = frame.right_features.len() as Float / fl!(200.0);
             }
 
             // Fill remaining dimensions with pose-derived features
-            descriptor[6] = (t[0] / 10.0).tanh(); // Position features (bounded)
-            descriptor[7] = (t[1] / 10.0).tanh();
-            descriptor[8] = (t[2] / 10.0).tanh();
-            descriptor[9] = num_features as f64 / 200.0;
+            descriptor[6] = (t[0] / fl!(10.0)).tanh(); // Position features (bounded)
+            descriptor[7] = (t[1] / fl!(10.0)).tanh();
+            descriptor[8] = (t[2] / fl!(10.0)).tanh();
+            descriptor[9] = num_features as Float / fl!(200.0);
 
             KeyframeDescriptor {
                 keyframe_id,
@@ -892,7 +893,7 @@ impl Estimator {
             self.current_velocity
         };
 
-        let gravity = na::Vector3::new(0.0, 0.0, -9.81);
+        let gravity = na::Vector3::new(fl!(0.0), fl!(0.0), fl!(-9.81));
 
         Some(ImuMotionPrior::from_preintegration(
             preint,

@@ -97,7 +97,7 @@ impl LightGlueMatcher {
 
     #[cfg(feature = "lightglue")]
     fn run_inference(
-        &self,
+        &mut self,
         keypoints0: &Array2<f32>,
         keypoints1: &Array2<f32>,
         descriptors0: &Array2<f32>,
@@ -105,18 +105,31 @@ impl LightGlueMatcher {
     ) -> Result<(Vec<(usize, usize)>, Vec<f32>), String> {
         let session = self
             .session
-            .as_ref()
+            .as_mut()
             .ok_or_else(|| "ONNX session not initialized".to_string())?;
 
         // Prepare inputs: keypoints (N, 2), descriptors (N, D)
-        let kpts0 = Value::from_array(keypoints0.clone().into_owned())
-            .map_err(|e| format!("Failed to create keypoints0 tensor: {}", e))?;
-        let kpts1 = Value::from_array(keypoints1.clone().into_owned())
-            .map_err(|e| format!("Failed to create keypoints1 tensor: {}", e))?;
-        let desc0 = Value::from_array(descriptors0.clone().into_owned())
-            .map_err(|e| format!("Failed to create descriptors0 tensor: {}", e))?;
-        let desc1 = Value::from_array(descriptors1.clone().into_owned())
-            .map_err(|e| format!("Failed to create descriptors1 tensor: {}", e))?;
+        let kpts0_shape = vec![keypoints0.nrows() as i64, keypoints0.ncols() as i64];
+        let kpts1_shape = vec![keypoints1.nrows() as i64, keypoints1.ncols() as i64];
+        let desc0_shape = vec![descriptors0.nrows() as i64, descriptors0.ncols() as i64];
+        let desc1_shape = vec![descriptors1.nrows() as i64, descriptors1.ncols() as i64];
+
+        let kpts0 =
+            Value::from_array((kpts0_shape, keypoints0.clone().into_raw_vec_and_offset().0))
+                .map_err(|e| format!("Failed to create keypoints0 tensor: {}", e))?;
+        let kpts1 =
+            Value::from_array((kpts1_shape, keypoints1.clone().into_raw_vec_and_offset().0))
+                .map_err(|e| format!("Failed to create keypoints1 tensor: {}", e))?;
+        let desc0 = Value::from_array((
+            desc0_shape,
+            descriptors0.clone().into_raw_vec_and_offset().0,
+        ))
+        .map_err(|e| format!("Failed to create descriptors0 tensor: {}", e))?;
+        let desc1 = Value::from_array((
+            desc1_shape,
+            descriptors1.clone().into_raw_vec_and_offset().0,
+        ))
+        .map_err(|e| format!("Failed to create descriptors1 tensor: {}", e))?;
 
         // Run inference
         let inputs = ort::inputs![
@@ -124,8 +137,7 @@ impl LightGlueMatcher {
             "keypoints1" => kpts1,
             "descriptors0" => desc0,
             "descriptors1" => desc1
-        ]
-        .map_err(|e| format!("Failed to create inputs: {}", e))?;
+        ];
 
         let outputs = session
             .run(inputs)

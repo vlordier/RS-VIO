@@ -1,5 +1,6 @@
 use super::{DescriptorMatcher, MatchMetrics};
 use crate::optimization::loop_closure::KeyframeDescriptor;
+use crate::types::Float;
 
 /// ORB-based descriptor matcher using Hamming distance
 pub struct OrbMatcher {
@@ -25,12 +26,12 @@ impl OrbMatcher {
     /// Assumes descriptor is either:
     /// - 32 bytes (256-bit binary ORB): directly usable
     /// - Or needs conversion from floating-point representation
-    fn descriptor_to_binary(&self, desc: &[f64]) -> Option<[u8; 32]> {
+    fn descriptor_to_binary(&self, desc: &[Float]) -> Option<[u8; 32]> {
         if desc.len() == 32 {
             // Already in binary format (32 bytes)
             let mut binary = [0u8; 32];
             for (i, &val) in desc.iter().enumerate() {
-                binary[i] = (val * 255.0).min(255.0) as u8;
+                binary[i] = (val as f64 * 255.0).min(255.0) as u8;
             }
             Some(binary)
         } else if desc.len() >= 4 {
@@ -40,7 +41,7 @@ impl OrbMatcher {
 
             for i in 0..32 {
                 let chunk = &desc[i * chunk_size..((i + 1) * chunk_size).min(desc.len())];
-                let avg = chunk.iter().sum::<f64>() / chunk.len() as f64;
+                let avg = chunk.iter().map(|&x| x as f64).sum::<f64>() / chunk.len() as f64;
                 binary[i] = (avg * 255.0).min(255.0) as u8;
             }
             Some(binary)
@@ -113,9 +114,9 @@ impl DescriptorMatcher for OrbMatcher {
         };
 
         MatchMetrics {
-            similarity,
+            similarity: similarity as Float,
             match_count,
-            match_ratio,
+            match_ratio: match_ratio as Float,
         }
     }
 }
@@ -124,13 +125,14 @@ impl DescriptorMatcher for OrbMatcher {
 #[allow(clippy::needless_range_loop)]
 mod tests {
     use super::*;
+    use crate::fl;
     use nalgebra::Isometry3;
 
     fn create_test_descriptor(seed: u64) -> KeyframeDescriptor {
         // Create a deterministic descriptor from seed
-        let mut desc = vec![0.0f64; 32];
+        let mut desc = vec![fl!(0.0); 32];
         for i in 0..32 {
-            desc[i] = ((seed as f64 * (i as f64 + 1.0)).sin() + 1.0) / 2.0;
+            desc[i] = ((seed as Float * (i as Float + fl!(1.0))).sin() + fl!(1.0)) / fl!(2.0);
         }
 
         KeyframeDescriptor {

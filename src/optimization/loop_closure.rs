@@ -46,7 +46,7 @@ pub mod orb_matcher;
 pub mod pnp_ransac;
 pub mod vocabulary;
 
-use crate::Result;
+use crate::{fl, types::Float, Result};
 use nalgebra as na;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -57,17 +57,20 @@ pub use orb_matcher::OrbMatcher;
 /// Match statistics returned by a descriptor matcher
 #[derive(Debug, Clone)]
 pub struct MatchMetrics {
-    pub similarity: f64,
+    /// Number of matches found
     pub match_count: usize,
-    pub match_ratio: f64,
+    /// Similarity score (0.0-1.0)
+    pub similarity: Float,
+    /// Ratio of matches to total features
+    pub match_ratio: Float,
 }
 
 /// Output of a geometric verifier
 #[derive(Debug, Clone)]
 pub struct VerifiedMatch {
-    pub relative_pose: na::Isometry3<f64>,
+    pub relative_pose: na::Isometry3<Float>,
     pub inlier_count: usize,
-    pub inlier_ratio: f64,
+    pub inlier_ratio: Float,
 }
 
 /// Trait for descriptor matching strategies (TOP-friendly for swapping implementations)
@@ -90,8 +93,8 @@ impl DescriptorMatcher for CosineMatcher {
     ) -> MatchMetrics {
         let similarity = query.similarity(candidate);
         let overlapping_features = query.num_features.min(candidate.num_features).max(1);
-        let match_count = (similarity * overlapping_features as f64) as usize;
-        let match_ratio = match_count as f64 / overlapping_features as f64;
+        let match_count = (similarity * overlapping_features as Float) as usize;
+        let match_ratio = match_count as Float / overlapping_features as Float;
 
         MatchMetrics {
             similarity,
@@ -113,7 +116,7 @@ pub trait GeometricVerifier: Send + Sync {
 
 /// Minimal verifier that accepts matches meeting similarity/ratio thresholds and computes relative pose
 pub struct SimpleRelativePoseVerifier {
-    pub min_similarity: f64,
+    pub min_similarity: Float,
 }
 
 impl GeometricVerifier for SimpleRelativePoseVerifier {
@@ -139,16 +142,16 @@ impl GeometricVerifier for SimpleRelativePoseVerifier {
 /// RANSAC-based epipolar geometry verifier using essential matrix decomposition
 pub struct RansacEpipolarVerifier {
     pub max_iterations: usize,
-    pub inlier_threshold: f64,
-    pub min_inlier_ratio: f64,
+    pub inlier_threshold: Float,
+    pub min_inlier_ratio: Float,
 }
 
 impl Default for RansacEpipolarVerifier {
     fn default() -> Self {
         Self {
             max_iterations: 1000,
-            inlier_threshold: 1e-3,
-            min_inlier_ratio: 0.3,
+            inlier_threshold: fl!(1e-3),
+            min_inlier_ratio: fl!(0.2),
         }
     }
 }
@@ -187,7 +190,7 @@ impl GeometricVerifier for RansacEpipolarVerifier {
             }
         }
 
-        let inlier_ratio = best_inliers as f64 / metrics.match_count as f64;
+        let inlier_ratio = best_inliers as Float / metrics.match_count as Float;
         if inlier_ratio < self.min_inlier_ratio {
             return None;
         }
@@ -224,11 +227,11 @@ impl DescriptorMatcher for HammingMatcher {
 
         // Convert Hamming distance to similarity (0-1)
         let max_bits = query.descriptor.len() * 64;
-        let similarity = 1.0 - (hamming_dist as f64 / max_bits as f64);
+        let similarity = fl!(1.0) - (hamming_dist as Float / max_bits as Float);
 
         let overlapping_features = query.num_features.min(candidate.num_features).max(1);
-        let match_count = (similarity * overlapping_features as f64) as usize;
-        let match_ratio = match_count as f64 / overlapping_features as f64;
+        let match_count = (similarity * overlapping_features as Float) as usize;
+        let match_ratio = match_count as Float / overlapping_features as Float;
 
         MatchMetrics {
             similarity,
@@ -245,12 +248,12 @@ fn generate_synthetic_correspondences(
     query: &KeyframeDescriptor,
     candidate: &KeyframeDescriptor,
     count: usize,
-) -> Vec<(na::Point3<f64>, na::Point3<f64>)> {
+) -> Vec<(na::Point3<Float>, na::Point3<Float>)> {
     // Generate random 3D points for testing
     let mut correspondences = Vec::new();
     for i in 0..count.min(100) {
-        let angle = (i as f64) * 0.1;
-        let p1 = na::Point3::new(angle.cos(), angle.sin(), 1.0);
+        let angle = (i as Float) * fl!(0.1);
+        let p1 = na::Point3::new(angle.cos(), angle.sin(), fl!(1.0));
         let p2 = candidate.pose * (query.pose.inverse() * p1);
         correspondences.push((p1, p2));
     }
@@ -259,9 +262,9 @@ fn generate_synthetic_correspondences(
 
 /// Count inliers based on reprojection error threshold
 fn count_inliers(
-    correspondences: &[(na::Point3<f64>, na::Point3<f64>)],
-    pose: &na::Isometry3<f64>,
-    threshold: f64,
+    correspondences: &[(na::Point3<Float>, na::Point3<Float>)],
+    pose: &na::Isometry3<Float>,
+    threshold: Float,
 ) -> usize {
     correspondences
         .iter()
@@ -274,7 +277,7 @@ fn count_inliers(
 }
 
 /// Compute Hamming distance between two descriptor vectors (simplified)
-fn compute_hamming_distance(desc1: &[f64], desc2: &[f64]) -> u32 {
+fn compute_hamming_distance(desc1: &[Float], desc2: &[Float]) -> u32 {
     if desc1.len() != desc2.len() {
         return u32::MAX;
     }
@@ -305,22 +308,22 @@ pub struct LoopClosureConfig {
     pub min_matches_for_candidate: usize,
 
     /// Descriptor distance threshold for matching (0-1 normalized)
-    pub descriptor_distance_threshold: f64,
+    pub descriptor_distance_threshold: Float,
 
     /// Inlier ratio threshold for geometric verification
-    pub inlier_ratio_threshold: f64,
+    pub inlier_ratio_threshold: Float,
 
     /// Minimum number of inliers for valid loop closure
     pub min_inliers: usize,
 
     /// Covariance scaling factor for loop closure constraints
-    pub constraint_covariance_scale: f64,
+    pub constraint_covariance_scale: Float,
 
     /// Translational sigma (m) used for anisotropic information matrix
-    pub translation_sigma: f64,
+    pub translation_sigma: Float,
 
     /// Rotational sigma (rad) used for anisotropic information matrix
-    pub rotation_sigma: f64,
+    pub rotation_sigma: Float,
 
     /// Maximum age of keyframes in database (in frames)
     pub max_keyframe_database_size: usize,
@@ -356,16 +359,16 @@ pub struct KeyframeDescriptor {
     /// Timestamp [ns]
     pub timestamp: i64,
     /// Feature descriptor (simplified as vector of bytes)
-    pub descriptor: Vec<f64>,
+    pub descriptor: Vec<Float>,
     /// Number of features in frame
     pub num_features: usize,
     /// Pose of keyframe (for verification)
-    pub pose: na::Isometry3<f64>,
+    pub pose: na::Isometry3<Float>,
 }
 
 impl KeyframeDescriptor {
     /// Compute similarity between two descriptors (0-1, higher = more similar)
-    pub fn similarity(&self, other: &KeyframeDescriptor) -> f64 {
+    pub fn similarity(&self, other: &KeyframeDescriptor) -> Float {
         if self.descriptor.len() != other.descriptor.len() {
             return 0.0;
         }
@@ -397,13 +400,13 @@ pub struct LoopClosureCandidate {
     /// ID of candidate keyframe
     pub candidate_id: u64,
     /// Similarity score (0-1)
-    pub similarity_score: f64,
+    pub similarity_score: Float,
     /// Estimated relative pose
-    pub relative_pose: na::Isometry3<f64>,
+    pub relative_pose: na::Isometry3<Float>,
     /// Number of inlier matches (descriptor-level proxy)
     pub inlier_count: usize,
     /// Inlier ratio based on overlapping features (0-1)
-    pub inlier_ratio: f64,
+    pub inlier_ratio: Float,
 }
 
 /// Loop closure constraint for optimization
@@ -414,9 +417,9 @@ pub struct LoopClosureConstraint {
     /// ID of second keyframe (from past)
     pub keyframe_id_2: u64,
     /// Relative transformation from frame 2 to frame 1
-    pub relative_pose: na::Isometry3<f64>,
+    pub relative_pose: na::Isometry3<Float>,
     /// Information matrix (inverse of covariance)
-    pub information_matrix: na::Matrix6<f64>,
+    pub information_matrix: na::Matrix6<Float>,
 }
 
 /// Keyframe database for loop closure detection
@@ -605,7 +608,11 @@ impl LoopClosureDetector {
     }
 
     /// Estimate anisotropic information matrix (inverse covariance) from match quality
-    fn estimate_information_matrix(&self, similarity: f64, inlier_ratio: f64) -> na::Matrix6<f64> {
+    fn estimate_information_matrix(
+        &self,
+        similarity: Float,
+        inlier_ratio: Float,
+    ) -> na::Matrix6<Float> {
         // Base sigmas
         let sigma_t = self.config.translation_sigma.max(1e-6);
         let sigma_r = self.config.rotation_sigma.max(1e-6);
@@ -657,11 +664,13 @@ mod tests {
         KeyframeDescriptor {
             keyframe_id: id,
             timestamp: (id as i64) * 1_000_000,
-            descriptor: (0..10).map(|i| (i as f64 * 0.1 + offset).sin()).collect(),
+            descriptor: (0..10)
+                .map(|i| ((i as Float) * fl!(0.1) + offset as Float).sin())
+                .collect(),
             num_features: 100,
             pose: na::Isometry3::new(
-                na::Vector3::new(id as f64 * 0.5, 0.0, 0.0),
-                na::Vector3::zeros(),
+                na::Vector3::new(id as Float * fl!(0.5), fl!(0.0), fl!(0.0)),
+                na::Vector3::<Float>::zeros(),
             ),
         }
     }

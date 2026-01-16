@@ -207,8 +207,12 @@ impl InterKeyframeImuFactor {
 
         // Combine residuals [p, v, R]
         let mut residual = na::Vector6::zeros();
-        residual.fixed_view_mut::<3, 1>(0, 0).copy_from(&r_p);
-        residual.fixed_view_mut::<3, 1>(3, 0).copy_from(&r_v);
+        residual
+            .fixed_view_mut::<3, 1>(0, 0)
+            .copy_from(&r_p.cast::<f64>());
+        residual
+            .fixed_view_mut::<3, 1>(3, 0)
+            .copy_from(&r_v.cast::<f64>());
 
         // For now, return 6D residual (position + velocity)
         // Rotation residual is implicit in pose optimization
