@@ -48,6 +48,7 @@ impl Default for LightGlueConfig {
 }
 
 /// LightGlue-based descriptor matcher using ONNX Runtime
+#[allow(dead_code)]
 pub struct LightGlueMatcher {
     config: LightGlueConfig,
     #[cfg(feature = "lightglue")]
@@ -96,6 +97,7 @@ impl LightGlueMatcher {
     }
 
     #[cfg(feature = "lightglue")]
+    #[allow(dead_code)]
     fn run_inference(
         &mut self,
         keypoints0: &Array2<f32>,
