@@ -75,6 +75,12 @@ pub struct FeatureDetectionConfig {
     pub optical_flow_max_iterations: u32,
     #[serde(rename = "optical_flow_convergence_threshold")]
     pub optical_flow_convergence_threshold: f64,
+    #[serde(default = "default_subpixel_enable")]
+    pub subpixel_enable: bool,
+    #[serde(default = "default_subpixel_iterations")]
+    pub subpixel_iterations: u32,
+    #[serde(default = "default_subpixel_threshold")]
+    pub subpixel_threshold: f64,
 }
 
 impl Default for FeatureDetectionConfig {
@@ -84,6 +90,9 @@ impl Default for FeatureDetectionConfig {
             max_features_per_grid: 200,
             optical_flow_max_iterations: 30,
             optical_flow_convergence_threshold: 0.005,
+            subpixel_enable: true,
+            subpixel_iterations: 15,
+            subpixel_threshold: 0.0005,
         }
     }
 }
@@ -182,5 +191,17 @@ fn default_imu_prior_weight_rot() -> f64 {
 }
 
 fn default_imu_prior_huber_delta() -> f64 {
-    0.0
+    1.0
+}
+
+fn default_subpixel_enable() -> bool {
+    true
+}
+
+fn default_subpixel_iterations() -> u32 {
+    15
+}
+
+fn default_subpixel_threshold() -> f64 {
+    0.0005
 }
