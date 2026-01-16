@@ -71,6 +71,8 @@
 
 pub mod feature_tracker;
 pub mod frame_skip;
+#[cfg(feature = "gpu")]
+pub mod gpu;
 pub mod image_utilities;
 pub mod patch;
 pub mod patch_simd;
