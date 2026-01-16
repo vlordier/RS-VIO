@@ -10,37 +10,61 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - name: Install Rust
-      run: |
-        rustup toolchain install stable
-        rustup default stable
-        rustup component add rustfmt clippy
-    - name: Install cargo-audit
-      run: cargo install cargo-audit
-    - name: Install cargo-tarpaulin
-      run: cargo install cargo-tarpaulin
-    - name: Check formatting
-      run: cargo fmt --check
-    - name: Run clippy
-      run: cargo clippy -- -D warnings
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
-    - name: Audit dependencies
-      run: cargo audit
-    - name: Generate coverage
-      run: cargo tarpaulin --ignore-tests --out Html
-    - name: Build documentation
-      run: cargo doc --no-deps
-      if: github.ref == 'refs/heads/main'
-    - name: Publish documentation
-      run: |
-        curl -X PUT -H "Authorization: Bearer ${{ secrets.DOCS_RS_TOKEN }}" \
-             -H "Content-Type: application/json" \
-             https://docs.rs/crate/rs-vio/0.1.0/build
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable
+          rustup default stable
+          rustup component add rustfmt clippy
+      - name: Install quality tools
+        run: |
+          cargo install cargo-tarpaulin
+          cargo install cargo-audit
+          cargo install cargo-deny
+          cargo install cargo-bloat
+          cargo install cargo-udeps
+          cargo install flamegraph
+          sudo apt-get update
+          sudo apt-get install -y valgrind heaptrack linux-tools-common linux-tools-generic
+      - name: Check formatting
+        run: cargo fmt --check
+      - name: Run clippy
+        run: cargo clippy -- -D warnings
+      - name: Check unused dependencies
+        run: cargo +nightly udeps
+      - name: Build
+        run: cargo build --verbose
+      - name: Build with memory profiling
+        run: cargo build --features dhat-heap --release
+      - name: Run tests
+        run: cargo test --verbose
+      - name: Run tests with memory profiling
+        run: |
+          cargo test --features dhat-heap --release -- --nocapture
+          heaptrack cargo test --features lightglue --release -- --nocapture
+      - name: Run benchmarks
+        run: cargo bench
+      - name: Memory usage analysis
+        run: cargo bloat --release --crates
+      - name: Audit dependencies
+        run: cargo audit
+      - name: Dependency license check
+        run: cargo deny check licenses
+      - name: Generate coverage
+        run: cargo tarpaulin --ignore-tests --out Html
+      - name: Generate flamegraph for hot paths
+        run: |
+          cargo build --release --bin run_euroc
+          flamegraph --bin run_euroc -- data/euroc/MH_01_easy/ --output flamegraph.svg
+      - name: Build documentation
+        run: cargo doc --no-deps
+        if: github.ref == 'refs/heads/main'
+      - name: Publish documentation
+        run: |
+          curl -X PUT -H "Authorization: Bearer ${{ secrets.DOCS_RS_TOKEN }}" \
+               -H "Content-Type: application/json" \
+               https://docs.rs/crate/rs-vio/0.1.0/build
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
   performance-smoke:
     runs-on: ubuntu-latest

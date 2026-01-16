@@ -46,11 +46,15 @@ ndarray = { version = "0.16", optional = true }
 use_f32 = []
 # Feature flag for LightGlue ONNX-based verification
 lightglue = ["ort", "ndarray"]
+# Feature flag for memory profiling with dhat
+dhat-heap = []
 
 [dev-dependencies]
 criterion = "0.5"
 proptest = "1.4"
 tempfile = "3"
+dhat = "0.3"
+libfuzzer-sys = "0.4"
 
 [package.metadata.cargo-machete]
 ignored = ["tracing"]  # Used via tracing-subscriber for structured logging
