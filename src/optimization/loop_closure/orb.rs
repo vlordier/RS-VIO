@@ -449,12 +449,173 @@ mod tests {
         let image = create_test_image(640, 480);
 
         let features = extractor.extract(&image, 640, 480);
-        if let Some(feature) = features.first() {
-            // Descriptor should be 32 bytes (256 bits)
-            assert_eq!(feature.descriptor.len(), 32);
-            // Verify descriptor is valid (all bytes are u8, which is always true,
-            // but this ensures the descriptor is properly formed)
-            assert!(!feature.descriptor.is_empty());
+        for feature in &features {
+            assert_eq!(
+                feature.descriptor.len(),
+                32,
+                "ORB descriptor should be 256 bits (32 bytes)"
+            );
+            // Verify it's actually binary (0 or 255 for u8 representation)
+            for &byte in &feature.descriptor {
+                assert!(
+                    byte == 0 || byte == 255,
+                    "ORB descriptor bytes should be binary"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn orb_extraction_edge_cases() {
+        let config = OrbConfig::default();
+        let max_features = config.num_features;
+        let extractor = OrbExtractor::new(config);
+
+        // Test 1: Empty image
+        let empty_image = vec![];
+        let features = extractor.extract(&empty_image, 0, 0);
+        assert_eq!(features.len(), 0, "Empty image should return no features");
+
+        // Test 2: Very small image
+        let small_image = create_test_image(16, 16);
+        let features = extractor.extract(&small_image, 16, 16);
+        assert!(
+            features.len() <= max_features,
+            "Small image should return few features"
+        );
+
+        // Test 3: Very large image
+        let large_image = create_test_image(1920, 1080);
+        let features = extractor.extract(&large_image, 1920, 1080);
+        assert!(
+            features.len() <= max_features,
+            "Large image should respect max features"
+        );
+
+        // Test 4: All black image (should return no features)
+        let black_image = vec![0u8; 640 * 480];
+        let features = extractor.extract(&black_image, 640, 480);
+        // FAST detector should not find features in uniform image
+        assert_eq!(
+            features.len(),
+            0,
+            "All black image should return no features"
+        );
+
+        // Test 5: All white image
+        let white_image = vec![255u8; 640 * 480];
+        let features = extractor.extract(&white_image, 640, 480);
+        assert_eq!(
+            features.len(),
+            0,
+            "All white image should return no features"
+        );
+
+        // Test 6: Checkerboard pattern (should find many features)
+        let mut checkerboard = vec![0u8; 640 * 480];
+        for y in 0..480 {
+            for x in 0..640 {
+                let pattern = ((x / 32) + (y / 32)) % 2;
+                checkerboard[y * 640 + x] = if pattern == 0 { 0 } else { 255 };
+            }
+        }
+        let features = extractor.extract(&checkerboard, 640, 480);
+        assert!(features.len() > 0, "Checkerboard should produce features");
+        assert!(
+            features.len() <= max_features,
+            "Should respect max features"
+        );
+    }
+
+    #[test]
+    fn orb_config_edge_cases() {
+        // Test various configurations
+        let configs = vec![
+            OrbConfig {
+                num_features: 0,
+                scale_factor: 1.0,
+                num_levels: 1,
+                patch_size: 31,
+                use_pyramid: false,
+            },
+            OrbConfig {
+                num_features: 10000,
+                scale_factor: 2.0,
+                num_levels: 8,
+                patch_size: 31,
+                use_pyramid: true,
+            },
+        ];
+
+        for config in configs {
+            let extractor = OrbExtractor::new(config.clone());
+            let image = create_test_image(640, 480);
+            let features = extractor.extract(&image, 640, 480);
+            // Should not panic and return reasonable results
+            assert!(features.len() <= config.num_features);
+        }
+    }
+
+    #[test]
+    fn orb_feature_properties() {
+        let config = OrbConfig::default();
+        let extractor = OrbExtractor::new(config);
+        let image = create_test_image(640, 480);
+
+        let features = extractor.extract(&image, 640, 480);
+
+        for feature in &features {
+            // Check coordinate bounds
+            assert!(
+                feature.position[0] >= 0.0 && feature.position[0] < 640.0,
+                "X coordinate should be within image bounds"
+            );
+            assert!(
+                feature.position[1] >= 0.0 && feature.position[1] < 480.0,
+                "Y coordinate should be within image bounds"
+            );
+
+            // Check descriptor properties
+            assert_eq!(
+                feature.descriptor.len(),
+                32,
+                "Descriptor should be 32 bytes"
+            );
+            assert!(
+                feature.strength >= 0.0,
+                "FAST response should be non-negative"
+            );
+
+            // Check level and orientation
+            assert!(feature.level >= 0, "Level should be non-negative");
+            assert!(
+                feature.orientation >= 0.0 && feature.orientation < 2.0 * std::f64::consts::PI,
+                "Orientation should be in [0, 2π)"
+            );
+        }
+    }
+
+    #[test]
+    fn orb_pyramid_functionality() {
+        let mut config = OrbConfig::default();
+        config.use_pyramid = true;
+        config.num_levels = 3;
+
+        let extractor = OrbExtractor::new(config);
+        let image = create_test_image(640, 480);
+
+        let features = extractor.extract(&image, 640, 480);
+
+        // Should extract features across multiple scales
+        let levels: std::collections::HashSet<_> =
+            features.iter().map(|f| f.level as i32).collect();
+        assert!(
+            levels.len() > 1,
+            "Multi-scale extraction should produce features at different levels"
+        );
+
+        for feature in &features {
+            assert!(feature.level >= 0, "Level should be valid");
         }
     }
 

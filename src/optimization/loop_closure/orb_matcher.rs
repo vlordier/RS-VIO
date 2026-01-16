@@ -126,6 +126,7 @@ impl DescriptorMatcher for OrbMatcher {
 mod tests {
     use super::*;
     use crate::fl;
+    use crate::types::Vector3;
     use nalgebra::Isometry3;
 
     fn create_test_descriptor(seed: u64) -> KeyframeDescriptor {
@@ -230,5 +231,180 @@ mod tests {
                 len
             );
         }
+    }
+
+    #[test]
+    fn orb_matcher_edge_cases() {
+        let matcher = OrbMatcher::new();
+
+        // Test 1: Empty descriptors
+        let empty_desc = vec![];
+        let binary = matcher.descriptor_to_binary(&empty_desc);
+        assert!(binary.is_none(), "Empty descriptor should return None");
+
+        // Test 2: Very small descriptors
+        let tiny_desc = vec![0.0];
+        let binary = matcher.descriptor_to_binary(&tiny_desc);
+        assert!(binary.is_none(), "Tiny descriptor should return None");
+
+        // Test 3: All zeros
+        let zero_desc = vec![0.0; 32];
+        let binary = matcher.descriptor_to_binary(&zero_desc);
+        assert!(binary.is_some(), "All zeros should still convert");
+
+        // Test 4: All ones
+        let ones_desc = vec![1.0; 32];
+        let binary = matcher.descriptor_to_binary(&ones_desc);
+        assert!(binary.is_some(), "All ones should still convert");
+
+        // Test 5: Extreme values
+        let extreme_desc = vec![
+            fl!(-100.0),
+            fl!(0.0),
+            fl!(100.0),
+            Float::INFINITY,
+            Float::NEG_INFINITY,
+            Float::NAN,
+        ];
+        let binary = matcher.descriptor_to_binary(&extreme_desc);
+        assert!(binary.is_some(), "Should handle extreme values gracefully");
+
+        // Test 6: Very long descriptors
+        let long_desc = vec![0.5; 1024];
+        let binary = matcher.descriptor_to_binary(&long_desc);
+        assert!(binary.is_some(), "Should handle very long descriptors");
+    }
+
+    #[test]
+    fn orb_matcher_keyframe_matching_edge_cases() {
+        let matcher = OrbMatcher::new();
+
+        // Test 1: Matching identical keyframes
+        let desc1 = create_test_descriptor(42);
+        let desc2 = desc1.clone();
+        let metrics = matcher.match_keyframes(&desc1, &desc2);
+        assert!(
+            metrics.similarity > 0.95,
+            "Identical keyframes should have high similarity"
+        );
+
+        // Test 2: Matching keyframes with no features
+        let mut desc_no_features = desc1.clone();
+        desc_no_features.num_features = 0;
+        let metrics = matcher.match_keyframes(&desc_no_features, &desc2);
+        assert_eq!(
+            metrics.match_count, 0,
+            "No features should result in zero matches"
+        );
+
+        // Test 3: Matching keyframes with different feature counts
+        let mut desc_few_features = desc1.clone();
+        desc_few_features.num_features = 1;
+        let metrics = matcher.match_keyframes(&desc_few_features, &desc2);
+        assert!(
+            metrics.match_count <= 1,
+            "Should respect minimum feature count"
+        );
+
+        // Test 4: Matching with very different poses
+        let mut desc_different_pose = desc1.clone();
+        desc_different_pose.pose = Isometry3::new(
+            Vector3::new(100.0, 200.0, 50.0),
+            Vector3::new(1.57, 0.78, 0.0),
+        );
+        let metrics = matcher.match_keyframes(&desc1, &desc_different_pose);
+        // Should still compute similarity based on descriptors, not pose
+        assert!(metrics.similarity >= 0.0 && metrics.similarity <= 1.0);
+
+        // Test 5: Matching with corrupted descriptors
+        let mut desc_corrupted = desc1.clone();
+        desc_corrupted.descriptor = vec![Float::NAN; desc_corrupted.descriptor.len()];
+        let metrics = matcher.match_keyframes(&desc1, &desc_corrupted);
+        // Should handle NaN gracefully (likely return low similarity)
+        assert!(metrics.similarity >= 0.0);
+
+        // Test 6: Matching with different descriptor lengths
+        let mut desc_different_len = desc1.clone();
+        desc_different_len.descriptor = vec![0.5; 64]; // Different length
+        let metrics = matcher.match_keyframes(&desc1, &desc_different_len);
+        // Should handle length mismatch gracefully
+        assert!(metrics.similarity >= 0.0 && metrics.similarity <= 1.0);
+    }
+
+    #[test]
+    fn orb_matcher_configuration_edge_cases() {
+        // Test different configurations
+        let configs = vec![
+            OrbMatcher {
+                max_hamming_distance: 0, // Very strict
+                use_ratio_test: false,
+                ratio_threshold: 0.0,
+            },
+            OrbMatcher {
+                max_hamming_distance: 256, // Very lenient
+                use_ratio_test: true,
+                ratio_threshold: 0.95,
+            },
+            OrbMatcher {
+                max_hamming_distance: 128, // Default-like
+                use_ratio_test: true,
+                ratio_threshold: 0.7,
+            },
+        ];
+
+        for config in configs {
+            let desc1 = create_test_descriptor(42);
+            let desc2 = create_test_descriptor(43);
+
+            let metrics = config.match_keyframes(&desc1, &desc2);
+            assert!(metrics.similarity >= 0.0 && metrics.similarity <= 1.0);
+            assert!(metrics.match_ratio >= 0.0 && metrics.match_ratio <= 1.0);
+        }
+    }
+
+    #[test]
+    fn orb_matcher_binary_conversion_properties() {
+        let matcher = OrbMatcher::new();
+
+        // Test that binary conversion is deterministic
+        let desc = vec![0.5; 32];
+        let binary1 = matcher.descriptor_to_binary(&desc).unwrap();
+        let binary2 = matcher.descriptor_to_binary(&desc).unwrap();
+        assert_eq!(
+            binary1, binary2,
+            "Binary conversion should be deterministic"
+        );
+
+        // Test that similar descriptors produce similar binary
+        let desc_similar = vec![0.5001; 32];
+        let binary_similar = matcher.descriptor_to_binary(&desc_similar).unwrap();
+
+        let hamming_distance: u32 = binary1
+            .iter()
+            .zip(binary_similar.iter())
+            .map(|(a, b)| (a ^ b).count_ones())
+            .sum();
+
+        assert!(
+            hamming_distance < 32,
+            "Similar descriptors should have low Hamming distance"
+        );
+
+        // Test threshold behavior
+        let desc_zeros = vec![0.0; 32];
+        let desc_ones = vec![1.0; 32];
+        let binary_zeros = matcher.descriptor_to_binary(&desc_zeros).unwrap();
+        let binary_ones = matcher.descriptor_to_binary(&desc_ones).unwrap();
+
+        let hamming_max: u32 = binary_zeros
+            .iter()
+            .zip(binary_ones.iter())
+            .map(|(a, b)| (a ^ b).count_ones())
+            .sum();
+
+        assert_eq!(
+            hamming_max, 256,
+            "Opposite descriptors should have max Hamming distance"
+        );
     }
 }

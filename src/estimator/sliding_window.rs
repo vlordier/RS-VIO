@@ -570,14 +570,14 @@ impl SlidingWindow {
                                 if let (Some(l_feat), Some(r_feat)) = (left_feat, right_feat) {
                                     // Perform stereo triangulation
                                     let left_obs = Vector3::new(
-                                        l_feat.undistorted_coord[0],
-                                        l_feat.undistorted_coord[1],
-                                        fl!(1.0),
+                                        l_feat.undistorted_coord[0] as f64,
+                                        l_feat.undistorted_coord[1] as f64,
+                                        1.0,
                                     );
                                     let right_obs = Vector3::new(
-                                        r_feat.undistorted_coord[0],
-                                        r_feat.undistorted_coord[1],
-                                        fl!(1.0),
+                                        r_feat.undistorted_coord[0] as f64,
+                                        r_feat.undistorted_coord[1] as f64,
+                                        1.0,
                                     );
 
                                     match Self::triangulate_stereo(
@@ -594,9 +594,9 @@ impl SlidingWindow {
                                             // Triangulation failed, use fallback
                                             log::debug!("[SlidingWindow] Triangulation failed for feature {}, using fallback", feature_id);
                                             let p_C = Vector3::new(
-                                                l_feat.undistorted_coord[0],
-                                                l_feat.undistorted_coord[1],
-                                                fl!(2.0),
+                                                l_feat.undistorted_coord[0] as f64,
+                                                l_feat.undistorted_coord[1] as f64,
+                                                2.0,
                                             );
                                             let (R_W_B, t_W_B) = (
                                                 frame.state.T_W_B.fixed_view::<3, 3>(0, 0).into_owned(),

@@ -290,4 +290,403 @@ mod tests {
         assert!((array[[0, 0]] - 0.0).abs() < 1e-6);
         assert!((array[[0, 2]] - 1.0).abs() < 1e-6);
     }
+
+    #[test]
+    fn test_lightglue_model_loading_with_weights() {
+        use std::path::Path;
+
+        // Test model loading when weights are available
+        let config = LightGlueConfig {
+            model_path: PathBuf::from("models/lightglue_superpoint.onnx"),
+            ..Default::default()
+        };
+
+        #[cfg(feature = "lightglue")]
+        {
+            let result = LightGlueMatcher::new(config.clone());
+
+            if Path::new("models/lightglue_superpoint.onnx").exists() {
+                // If model weights exist, should succeed
+                assert!(result.is_ok(), "Should load model when weights exist");
+                let mut matcher = result.unwrap();
+
+                // Test that we can access the session
+                assert!(matcher.session.is_some(), "Session should be initialized");
+
+                // Test inference with synthetic data
+                let keypoints0 = Array2::<f32>::zeros((10, 2));
+                let keypoints1 = Array2::<f32>::zeros((10, 2));
+                let descriptors0 = Array2::<f32>::zeros((10, 256));
+                let descriptors1 = Array2::<f32>::zeros((10, 256));
+
+                let inference_result =
+                    matcher.run_inference(&keypoints0, &keypoints1, &descriptors0, &descriptors1);
+
+                assert!(
+                    inference_result.is_ok(),
+                    "Inference should succeed with valid inputs"
+                );
+                let (matches, scores) = inference_result.unwrap();
+                assert!(
+                    !matches.is_empty() || scores.is_empty(),
+                    "Should return matches or empty results"
+                );
+            } else {
+                // If no weights, should fail gracefully
+                assert!(result.is_err(), "Should fail when weights don't exist");
+            }
+        }
+
+        #[cfg(not(feature = "lightglue"))]
+        {
+            // Without feature, should always succeed (no-op)
+            let result = LightGlueMatcher::new(config);
+            assert!(
+                result.is_ok(),
+                "Should always succeed without lightglue feature"
+            );
+        }
+    }
+
+    #[test]
+    fn test_lightglue_inference_edge_cases() {
+        use std::path::Path;
+
+        let config = LightGlueConfig {
+            model_path: PathBuf::from("models/lightglue_superpoint.onnx"),
+            ..Default::default()
+        };
+
+        #[cfg(feature = "lightglue")]
+        {
+            if !Path::new("models/lightglue_superpoint.onnx").exists() {
+                // Skip if no model weights
+                return;
+            }
+
+            let mut matcher = LightGlueMatcher::new(config).unwrap();
+
+            // Test 1: Empty keypoints/descriptors
+            let empty_kpts = Array2::<f32>::zeros((0, 2));
+            let empty_desc = Array2::<f32>::zeros((0, 256));
+
+            let result = matcher.run_inference(&empty_kpts, &empty_kpts, &empty_desc, &empty_desc);
+            assert!(result.is_ok(), "Should handle empty inputs gracefully");
+
+            // Test 2: Single feature
+            let single_kpts = Array2::<f32>::from_shape_vec((1, 2), vec![100.0, 200.0]).unwrap();
+            let single_desc = Array2::<f32>::zeros((1, 256));
+
+            let result =
+                matcher.run_inference(&single_kpts, &single_kpts, &single_desc, &single_desc);
+            assert!(result.is_ok(), "Should handle single feature");
+
+            // Test 3: Mismatched dimensions (should fail gracefully)
+            let kpts_a = Array2::<f32>::zeros((5, 2));
+            let kpts_b = Array2::<f32>::zeros((3, 2)); // Different number of keypoints
+            let desc_a = Array2::<f32>::zeros((5, 256));
+            let desc_b = Array2::<f32>::zeros((3, 256));
+
+            let result = matcher.run_inference(&kpts_a, &kpts_b, &desc_a, &desc_b);
+            assert!(result.is_ok(), "Should handle mismatched keypoint counts");
+
+            // Test 4: Large number of features
+            let large_kpts = Array2::<f32>::zeros((1000, 2));
+            let large_desc = Array2::<f32>::zeros((1000, 256));
+
+            let result = matcher.run_inference(&large_kpts, &large_kpts, &large_desc, &large_desc);
+            assert!(result.is_ok(), "Should handle large feature sets");
+
+            // Test 5: Very different descriptors (should return few/no matches)
+            let kpts = Array2::<f32>::zeros((10, 2));
+            let desc_similar = Array2::<f32>::zeros((10, 256));
+            let mut desc_different = Array2::<f32>::ones((10, 256)) * 0.5;
+
+            // Make descriptors very different
+            for i in 0..10 {
+                for j in 0..256 {
+                    desc_different[[i, j]] = if j % 2 == 0 { 1.0 } else { 0.0 };
+                }
+            }
+
+            let result = matcher.run_inference(&kpts, &kpts, &desc_similar, &desc_different);
+            assert!(result.is_ok(), "Should handle very different descriptors");
+        }
+    }
+
+    #[test]
+    fn test_lightglue_descriptor_preprocessing() {
+        // Test descriptor preprocessing with various inputs
+        let test_cases = vec![
+            // Empty descriptors
+            vec![],
+            // Single descriptor
+            vec![vec![0u8; 32]],
+            // Multiple descriptors with different values
+            vec![vec![0u8; 32], vec![255u8; 32], vec![128u8; 32]],
+            // Variable length descriptors (should handle gracefully)
+            vec![vec![0u8; 16], vec![0u8; 64]],
+        ];
+
+        for descriptors in test_cases {
+            if !descriptors.is_empty() {
+                let array = LightGlueMatcher::descriptors_to_f32(&descriptors);
+                assert_eq!(array.nrows(), descriptors.len());
+                assert_eq!(array.ncols(), descriptors[0].len());
+            }
+        }
+    }
+
+    #[test]
+    fn test_lightglue_config_validation() {
+        // Test various configuration scenarios
+        let configs = vec![
+            LightGlueConfig {
+                confidence_threshold: -0.1, // Invalid
+                ..Default::default()
+            },
+            LightGlueConfig {
+                confidence_threshold: 1.5, // Invalid
+                ..Default::default()
+            },
+            LightGlueConfig {
+                confidence_threshold: 0.5, // Valid
+                max_keypoints: 0,          // Invalid
+                ..Default::default()
+            },
+            LightGlueConfig {
+                confidence_threshold: 0.5, // Valid
+                max_keypoints: 10000,      // Valid
+                ..Default::default()
+            },
+        ];
+
+        for config in configs {
+            // Config validation should not panic - let the matcher handle invalid values
+            let _matcher = LightGlueMatcher::new(config);
+        }
+    }
+
+    #[test]
+    fn test_lightglue_model_weight_validation() {
+        use std::fs;
+        use std::path::Path;
+        use std::process::Command;
+
+        let model_path = "models/lightglue_superpoint.onnx";
+        let model_url = "https://github.com/fabio-sim/LightGlue-ONNX/releases/download/v2.0/superpoint_lightglue_pipeline.ort.onnx";
+
+        #[cfg(feature = "lightglue")]
+        {
+            // Ensure model directory exists
+            std::fs::create_dir_all("models").ok();
+
+            // Auto-download model if not present (for testing)
+            if !Path::new(model_path).exists() {
+                println!("📥 Auto-downloading LightGlue model for testing...");
+                println!("   URL: {}", model_url);
+
+                let download_result = if cfg!(target_os = "windows") {
+                    Command::new("powershell")
+                        .args(&[
+                            "-Command",
+                            &format!(
+                                "Invoke-WebRequest -Uri '{}' -OutFile '{}'",
+                                model_url, model_path
+                            ),
+                        ])
+                        .status()
+                } else {
+                    Command::new("curl")
+                        .args(&["-L", "-o", model_path, model_url])
+                        .status()
+                };
+
+                match download_result {
+                    Ok(status) if status.success() => {
+                        println!("✅ Model downloaded successfully");
+                    },
+                    _ => {
+                        println!("⚠️  Model download failed - skipping validation test");
+                        return;
+                    },
+                }
+            }
+
+            // Verify model file exists and has reasonable size
+            assert!(
+                Path::new(model_path).exists(),
+                "Model file should exist after download"
+            );
+            let metadata = fs::metadata(model_path).unwrap();
+            assert!(
+                metadata.len() > 1000000,
+                "Model file should be reasonably large (>1MB)"
+            );
+
+            // Try to load the model
+            let config = LightGlueConfig {
+                model_path: PathBuf::from(model_path),
+                ..Default::default()
+            };
+
+            let result = LightGlueMatcher::new(config);
+            assert!(result.is_ok(), "Should successfully load model weights");
+
+            let mut matcher = result.unwrap();
+            assert!(matcher.session.is_some(), "Session should be initialized");
+
+            // Test with real data shapes (typical LightGlue inputs)
+            let keypoints0 =
+                Array2::<f32>::from_shape_vec((50, 2), (0..100).map(|x| x as f32 * 0.1).collect())
+                    .unwrap();
+            let keypoints1 =
+                Array2::<f32>::from_shape_vec((45, 2), (0..90).map(|x| x as f32 * 0.12).collect())
+                    .unwrap();
+
+            // LightGlue uses 256-dim descriptors
+            let descriptors0 = Array2::<f32>::from_shape_vec(
+                (50, 256),
+                (0..12800).map(|x| (x as f32).sin() * 0.1).collect(),
+            )
+            .unwrap();
+            let descriptors1 = Array2::<f32>::from_shape_vec(
+                (45, 256),
+                (0..11520).map(|x| (x as f32 * 1.1).cos() * 0.1).collect(),
+            )
+            .unwrap();
+
+            let inference_result =
+                matcher.run_inference(&keypoints0, &keypoints1, &descriptors0, &descriptors1);
+
+            assert!(
+                inference_result.is_ok(),
+                "Inference should succeed with realistic inputs"
+            );
+            let (matches, scores) = inference_result.unwrap();
+
+            // Validate output shapes and ranges
+            assert!(matches.len() <= keypoints0.nrows().min(keypoints1.nrows()));
+            assert_eq!(scores.len(), matches.len());
+
+            for &score in &scores {
+                assert!(
+                    score >= 0.0 && score <= 1.0,
+                    "Confidence scores should be in [0,1]"
+                );
+            }
+
+            println!("✅ LightGlue model validation successful!");
+            println!("   Matches found: {}", matches.len());
+            println!(
+                "   Average confidence: {:.3}",
+                scores.iter().sum::<f32>() / scores.len() as f32
+            );
+        }
+
+        #[cfg(not(feature = "lightglue"))]
+        {
+            println!("⚠️  LightGlue feature not enabled - skipping weight validation");
+        }
+    }
+
+    #[test]
+    fn test_lightglue_realistic_scenarios() {
+        use std::path::Path;
+
+        #[cfg(feature = "lightglue")]
+        {
+            if !Path::new("models/lightglue_superpoint.onnx").exists() {
+                println!("⚠️  Skipping realistic scenario tests - model weights not available");
+                return;
+            }
+
+            let config = LightGlueConfig {
+                model_path: PathBuf::from("models/lightglue_superpoint.onnx"),
+                confidence_threshold: 0.1, // Lower threshold for testing
+                ..Default::default()
+            };
+
+            let mut matcher = LightGlueMatcher::new(config).unwrap();
+
+            // Scenario 1: Sequential frames (should have good matches)
+            let keypoints0 = Array2::<f32>::from_shape_vec(
+                (30, 2),
+                (0..60)
+                    .map(|i| {
+                        let x = (i / 2) as f32 * 10.0;
+                        let y = (i % 2) as f32 * 10.0;
+                        if i % 2 == 0 {
+                            x
+                        } else {
+                            y
+                        }
+                    })
+                    .collect(),
+            )
+            .unwrap();
+
+            let mut keypoints1 = keypoints0.clone();
+            // Add small motion (translation + small rotation)
+            for i in 0..30 {
+                keypoints1[[i, 0]] += 2.0 + (i as f32 * 0.1).sin(); // X translation + noise
+                keypoints1[[i, 1]] += 1.0 + (i as f32 * 0.1).cos(); // Y translation + noise
+            }
+
+            let descriptors0 = Array2::<f32>::from_shape_vec(
+                (30, 256),
+                (0..7680).map(|x| (x as f32 * 0.01).sin()).collect(),
+            )
+            .unwrap();
+
+            let mut descriptors1 = descriptors0.clone();
+            // Add small descriptor variations
+            for i in 0..30 {
+                for j in 0..256 {
+                    descriptors1[[i, j]] += (i as f32 * 0.001).sin() * 0.1;
+                }
+            }
+
+            let result =
+                matcher.run_inference(&keypoints0, &keypoints1, &descriptors0, &descriptors1);
+            assert!(result.is_ok(), "Should handle sequential frame scenario");
+
+            // Scenario 2: Loop closure (similar keypoints, different descriptors)
+            let keypoints_loop = keypoints0.clone();
+            let descriptors_loop = Array2::<f32>::from_shape_vec(
+                (30, 256),
+                (0..7680).map(|x| (x as f32 * 0.015).cos()).collect(),
+            )
+            .unwrap();
+
+            let result = matcher.run_inference(
+                &keypoints0,
+                &keypoints_loop,
+                &descriptors0,
+                &descriptors_loop,
+            );
+            assert!(result.is_ok(), "Should handle loop closure scenario");
+
+            // Scenario 3: Different scenes (poor matches expected)
+            let keypoints_different =
+                Array2::<f32>::from_shape_vec((20, 2), (0..40).map(|i| i as f32 * 15.0).collect())
+                    .unwrap();
+
+            let descriptors_different = Array2::<f32>::from_shape_vec(
+                (20, 256),
+                (0..5120).map(|x| (x as f32 * 0.1).cos()).collect(),
+            )
+            .unwrap();
+
+            let result = matcher.run_inference(
+                &keypoints0,
+                &keypoints_different,
+                &descriptors0,
+                &descriptors_different,
+            );
+            assert!(result.is_ok(), "Should handle different scene scenario");
+
+            println!("✅ LightGlue realistic scenario tests passed!");
+        }
+    }
 }
