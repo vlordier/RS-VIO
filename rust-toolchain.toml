@@ -1,6 +1,7 @@
 [toolchain]
-# Minimum Supported Rust Version: 1.75.0
+# Minimum Supported Rust Version: 1.92.0
 # This is the minimum version required for all compilation and testing
 # Earlier versions may compile but are not officially supported
-channel = "1.75"
+# Updated to 1.92.0 for Cargo.lock v4 support
+channel = "1.92"
 profile = "minimal"
