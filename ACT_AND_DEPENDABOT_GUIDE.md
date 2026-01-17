@@ -212,6 +212,14 @@ gh pr merge <PR-number> --auto --squash
   - Use `-j quick-check` for faster feedback
   - Check Docker resource limits
 
+**Problem:** Build fails with `error: usage of an 'unsafe' block` or `forbid unsafe_code`
+- **Cause:** `Cargo.toml` has `unsafe_code = "forbid"` but code uses SIMD intrinsics
+- **Solution:**
+   - Set `unsafe_code = "warn"` in `[lints.rust]` section of `Cargo.toml`
+   - Add `#![allow(unsafe_code)]` at the top of modules needing SIMD
+   - Document safety invariants with `// SAFETY:` comments
+   - Note: `warnings = "deny"` in Cargo.toml escalates all warnings to errors
+
 ### Dependabot Issues
 
 **Problem:** PRs not created
