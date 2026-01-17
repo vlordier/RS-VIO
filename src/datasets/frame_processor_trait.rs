@@ -4,10 +4,10 @@
 //! using the **Strategy** and **Decorator** patterns.
 
 use crate::datasets::FrameContext;
-use crate::estimator::Estimator;
-use crate::Result;
 use crate::debug_log;
+use crate::estimator::Estimator;
 use crate::trace_log;
+use crate::Result;
 
 /// Trait for a single frame processing step
 ///

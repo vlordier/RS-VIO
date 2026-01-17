@@ -10,10 +10,10 @@
 //! 3. **Diagnostics**: Condition number, rank estimates without full SVD
 //! 4. **Documentation**: Why each path is chosen, performance costs
 
-use crate::types::Float;
-use nalgebra as na;
 use crate::debug_log;
+use crate::types::Float;
 use na::linalg::{Cholesky, LU, SVD};
+use nalgebra as na;
 
 const EPSILON: Float = 1e-10;
 const MAX_DAMPING_SCALE: Float = 1000.0;
@@ -232,7 +232,11 @@ mod tests {
         assert!(matches!(quality.method, SolveMethod::Cholesky));
         // With damping 1e-5, solution is slightly off: error ~ 1e-5 * ||b||
         let error = (x.clone() - b.clone()).norm() / b.norm();
-        assert!(error < 1e-4, "Relative error {:.2e} exceeds tolerance", error);
+        assert!(
+            error < 1e-4,
+            "Relative error {:.2e} exceeds tolerance",
+            error
+        );
     }
 
     #[test]

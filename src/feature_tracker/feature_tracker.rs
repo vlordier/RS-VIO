@@ -10,8 +10,8 @@ use crate::datasets::config::FeatureDetectionConfig;
 
 use super::{frame_skip, image_utilities, patch};
 
-use log::info;
 use crate::debug_log;
+use log::info;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Feature {
@@ -107,7 +107,12 @@ impl<const LEVELS: u32> PatchTracker<LEVELS> {
     pub fn process_frame(&mut self, greyscale_image: &GrayImage) {
         // build current image pyramid
         let mut current_image_pyramid = Vec::new();
-        image_utilities::ensure_pyramid_allocated(&mut current_image_pyramid, greyscale_image.width(), greyscale_image.height(), LEVELS as usize);
+        image_utilities::ensure_pyramid_allocated(
+            &mut current_image_pyramid,
+            greyscale_image.width(),
+            greyscale_image.height(),
+            LEVELS as usize,
+        );
         image_utilities::fill_pyramid(&mut current_image_pyramid, greyscale_image);
 
         if !self.previous_image_pyramid.is_empty() {
@@ -217,7 +222,7 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             feature_velocities: HashMap::new(),
             frame_skipper: frame_skip::AdaptiveFrameSkipper::new(30.0, 5, 2.0),
             last_frame_time: None,
-                    frame_count: 0,
+            frame_count: 0,
         }
     }
 
@@ -266,8 +271,8 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
         frame: &mut crate::estimator::Frame,
     ) {
         let frame_start = Instant::now();
-    self.frame_count += 1;
-    let should_log = self.frame_count % 30 == 0; // Log every 30 frames (~1 Hz @ 30 FPS)
+        self.frame_count += 1;
+        let should_log = self.frame_count % 30 == 0; // Log every 30 frames (~1 Hz @ 30 FPS)
 
         // Adaptive frame skipping: check if we should process this frame
         // Estimate motion from recent feature positions (simple heuristic)
@@ -279,7 +284,10 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
                 self.frame_skipper.record_frame_time(delta);
             }
             if should_log {
-                debug_log!("[FeatureTracker] Frame {} skipped for real-time constraints", self.frame_count);
+                debug_log!(
+                    "[FeatureTracker] Frame {} skipped for real-time constraints",
+                    self.frame_count
+                );
             }
             return;
         }
@@ -369,8 +377,14 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
         self.update_temporal_consistency();
 
         // swap current <-> previous to reuse allocations next frame
-        std::mem::swap(&mut self.previous_image_pyramid0, &mut self.current_image_pyramid0);
-        std::mem::swap(&mut self.previous_image_pyramid1, &mut self.current_image_pyramid1);
+        std::mem::swap(
+            &mut self.previous_image_pyramid0,
+            &mut self.current_image_pyramid0,
+        );
+        std::mem::swap(
+            &mut self.previous_image_pyramid1,
+            &mut self.current_image_pyramid1,
+        );
 
         // Get tracked points from both cameras
         let [tracked_left, tracked_right] = self.get_track_points();
@@ -630,7 +644,6 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             }
         }
     }
-
 }
 
 fn add_points(
@@ -826,7 +839,12 @@ mod tests {
     /// Test helper: build pyramid using shared utilities
     fn build_image_pyramid(img: &GrayImage, levels: u32) -> Vec<GrayImage> {
         let mut pyr = Vec::new();
-        image_utilities::ensure_pyramid_allocated(&mut pyr, img.width(), img.height(), levels as usize);
+        image_utilities::ensure_pyramid_allocated(
+            &mut pyr,
+            img.width(),
+            img.height(),
+            levels as usize,
+        );
         image_utilities::fill_pyramid(&mut pyr, img);
         pyr
     }

@@ -89,11 +89,9 @@ impl GpuRansacFundamental {
         confidence: f32,
     ) -> Result<super::ransac::RansacResult<super::ransac::FundamentalMatrix>> {
         debug_log!("Using CPU RANSAC (GPU not yet implemented)");
-        super::ransac::RansacFundamental::estimate(matches, threshold, confidence)
-            .ok_or_else(|| std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "RANSAC estimation failed",
-            ).into())
+        super::ransac::RansacFundamental::estimate(matches, threshold, confidence).ok_or_else(
+            || std::io::Error::new(std::io::ErrorKind::Other, "RANSAC estimation failed").into(),
+        )
     }
 }
 
@@ -115,11 +113,9 @@ impl GpuProsacFundamental {
         confidence: f32,
     ) -> Result<super::ransac::ProsacResult<super::ransac::FundamentalMatrix>> {
         debug_log!("Using CPU PROSAC (GPU not yet implemented)");
-        super::ransac::ProsacFundamental::estimate(matches, max_sample_size, confidence)
-            .ok_or_else(|| std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "PROSAC estimation failed",
-            ).into())
+        super::ransac::ProsacFundamental::estimate(matches, max_sample_size, confidence).ok_or_else(
+            || std::io::Error::new(std::io::ErrorKind::Other, "PROSAC estimation failed").into(),
+        )
     }
 }
 
@@ -146,10 +142,7 @@ pub mod geometric_gpu {
     }
 
     /// Inlier counting (CPU implementation, GPU-ready interface)
-    pub fn count_inliers_gpu(
-        distances: &[f32],
-        threshold: f32,
-    ) -> Result<usize> {
+    pub fn count_inliers_gpu(distances: &[f32], threshold: f32) -> Result<usize> {
         // Future: GPU parallel reduction would count inliers
         Ok(distances.iter().filter(|&&d| d < threshold).count())
     }
@@ -183,7 +176,9 @@ impl RobustEstimator {
     ) -> Option<super::ransac::RansacResult<super::ransac::FundamentalMatrix>> {
         match self {
             RobustEstimator::GpuRansac(gpu) => gpu.estimate(matches, threshold, confidence).ok(),
-            RobustEstimator::CpuRansac => super::ransac::RansacFundamental::estimate(matches, threshold, confidence),
+            RobustEstimator::CpuRansac => {
+                super::ransac::RansacFundamental::estimate(matches, threshold, confidence)
+            },
             _ => None, // Other variants not implemented for this method
         }
     }
@@ -196,8 +191,12 @@ impl RobustEstimator {
         confidence: f32,
     ) -> Option<super::ransac::ProsacResult<super::ransac::FundamentalMatrix>> {
         match self {
-            RobustEstimator::GpuProsac(gpu) => gpu.estimate(matches, max_sample_size, confidence).ok(),
-            RobustEstimator::CpuProsac => super::ransac::ProsacFundamental::estimate(matches, max_sample_size, confidence),
+            RobustEstimator::GpuProsac(gpu) => {
+                gpu.estimate(matches, max_sample_size, confidence).ok()
+            },
+            RobustEstimator::CpuProsac => {
+                super::ransac::ProsacFundamental::estimate(matches, max_sample_size, confidence)
+            },
             _ => None, // Other variants not implemented for this method
         }
     }
@@ -266,5 +265,4 @@ mod tests {
         // This tests that the framework works
         assert!(result.is_ok() || result.is_err()); // Either result is fine
     }
-}</content>
-<parameter name="filePath">src/feature_tracker/gpu.rs
+}

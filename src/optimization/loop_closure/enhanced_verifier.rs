@@ -184,7 +184,10 @@ impl GeometricVerifier for EnhancedGeometricVerifier {
                 0.0, 0.0, 1.0, // 0, 0, 1
             );
 
-            match self.pnp_solver.solve(correspondences, &camera_intrinsics, workspace) {
+            match self
+                .pnp_solver
+                .solve(correspondences, &camera_intrinsics, workspace)
+            {
                 Ok(result) => {
                     log::debug!(
                         "[EnhancedVerifier] PnP-RANSAC successful: {} inliers ({:.1}%)",

@@ -215,9 +215,7 @@ impl ProsacFundamental {
 
         // Clamp to prevent runaway iteration counts when sample_size is large.
         let estimated = (t_n * (sample_size as f32 / Self::MIN_SAMPLES as f32)).ceil();
-        estimated
-            .clamp(1.0, Self::MAX_ITERATIONS as f32)
-            .round() as usize
+        estimated.clamp(1.0, Self::MAX_ITERATIONS as f32).round() as usize
     }
 }
 /// Result of PROSAC estimation
@@ -503,7 +501,7 @@ impl RansacFundamental {
                 if inlier_count > best_inlier_count {
                     best_inlier_count = inlier_count;
                     let inlier_ratio = inlier_count as f32 / matches.len() as f32;
-                    
+
                     // Collect inlier indices from mask
                     let mut inliers = Vec::new();
                     for (i, &is_inlier) in inlier_mask.iter().enumerate() {
@@ -792,18 +790,24 @@ mod tests {
         ];
 
         let mut workspace = crate::estimator::frame_workspace::FrameWorkspace::default();
-        
+
         // Should not panic and should complete
         let _result = RansacFundamental::estimate_with_workspace(
-            &matches, 
+            &matches,
             5.0,  // threshold
             0.99, // confidence
-            &mut workspace
+            &mut workspace,
         );
 
         // Verify workspace buffers are reused (they should be allocated and cleared)
-        assert!(workspace.ransac_hypothesis_samples_mut().is_empty() || workspace.ransac_hypothesis_samples_mut().len() > 0);
-        assert!(workspace.ransac_inlier_mask_mut().is_empty() || workspace.ransac_inlier_mask_mut().len() > 0);
+        assert!(
+            workspace.ransac_hypothesis_samples_mut().is_empty()
+                || workspace.ransac_hypothesis_samples_mut().len() > 0
+        );
+        assert!(
+            workspace.ransac_inlier_mask_mut().is_empty()
+                || workspace.ransac_inlier_mask_mut().len() > 0
+        );
     }
 
     #[test]
@@ -822,13 +826,17 @@ mod tests {
 
         // Test workspace implementation
         let mut workspace = crate::estimator::frame_workspace::FrameWorkspace::default();
-        let result_workspace = RansacFundamental::estimate_with_workspace(&matches, 5.0, 0.99, &mut workspace);
+        let result_workspace =
+            RansacFundamental::estimate_with_workspace(&matches, 5.0, 0.99, &mut workspace);
 
         // Both should produce results
         assert!(result_orig.is_some() || result_workspace.is_none());
-        
+
         // Verify workspace variant clears and reuses buffers
         // (inlier mask should be cleared after use)
-        assert!(workspace.ransac_inlier_mask().is_empty() || workspace.ransac_inlier_mask().iter().all(|&x| !x));
+        assert!(
+            workspace.ransac_inlier_mask().is_empty()
+                || workspace.ransac_inlier_mask().iter().all(|&x| !x)
+        );
     }
 }

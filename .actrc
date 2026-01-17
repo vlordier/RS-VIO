@@ -1,0 +1,16 @@
+# act configuration for local GitHub Actions testing
+# Use catthehacker ubuntu image with full tooling
+-P ubuntu-latest=catthehacker/ubuntu:full-latest
+
+# Platform architecture
+--container-architecture linux/amd64
+
+# Environment variables
+--env SKIP_UPLOAD=true
+--env ACT=true
+
+# Artifact and cache directory
+--artifact-server-path /tmp/act-artifacts
+
+# Use GitHub token from environment if available
+# export GITHUB_TOKEN=your_token_here before running act

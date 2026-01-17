@@ -97,7 +97,7 @@ impl PnPRansacSolver {
     }
 
     /// Solve PnP-RANSAC and return pose with inliers
-    /// 
+    ///
     /// Uses preallocated workspace buffers to eliminate per-iteration allocations:
     /// - ransac_hypothesis_samples: tracks sampled point indices
     /// - ransac_inlier_mask: boolean mask for inlier/outlier classification
@@ -130,7 +130,11 @@ impl PnPRansacSolver {
             // Reuse workspace buffer for sampled indices (no allocation)
             let samples = workspace.ransac_hypothesis_samples_mut();
             samples.clear();
-            samples.extend(all_indices.choose_multiple(&mut rng, 4.min(correspondences.len())).cloned());
+            samples.extend(
+                all_indices
+                    .choose_multiple(&mut rng, 4.min(correspondences.len()))
+                    .cloned(),
+            );
 
             if samples.len() < 4 {
                 continue;
@@ -138,7 +142,7 @@ impl PnPRansacSolver {
 
             // Get a local copy of sampled indices for DLT
             let sampled_indices: Vec<usize> = samples.iter().copied().collect();
-            
+
             // Try to solve PnP with this sample
             let sample_correspondences: Vec<Correspondence> = sampled_indices
                 .iter()
@@ -148,10 +152,10 @@ impl PnPRansacSolver {
             if let Ok(pose) = self.solve_dlt(&sample_correspondences, camera_intrinsics) {
                 // Get workspace buffers once (to avoid borrow checker conflicts)
                 let (inlier_mask, residuals) = workspace.ransac_buffers_mut();
-                
+
                 inlier_mask.clear();
                 inlier_mask.resize(correspondences.len(), false);
-                
+
                 residuals.clear();
                 residuals.resize(correspondences.len(), 0.0);
 
@@ -229,9 +233,8 @@ impl PnPRansacSolver {
 
         // Compute final mean error from best pose
         let residuals = workspace.ransac_residuals();
-        let mean_error = best_inliers.iter()
-            .map(|&idx| residuals[idx])
-            .sum::<f64>() / best_inliers.len() as f64;
+        let mean_error =
+            best_inliers.iter().map(|&idx| residuals[idx]).sum::<f64>() / best_inliers.len() as f64;
 
         Ok(PnPRansacResult {
             pose: best_pose,
@@ -379,7 +382,7 @@ impl PnPRansacSolver {
         camera_intrinsics: &na::Matrix3<f64>,
     ) -> Result<PnPRansacResult> {
         let mut workspace = crate::estimator::frame_workspace::FrameWorkspace::new(
-            crate::estimator::frame_workspace::WorkspaceConfig::default()
+            crate::estimator::frame_workspace::WorkspaceConfig::default(),
         );
         self.solve(correspondences, camera_intrinsics, &mut workspace)
     }
@@ -427,7 +430,7 @@ mod tests {
 
         let camera = na::Matrix3::identity();
         let mut workspace = crate::estimator::frame_workspace::FrameWorkspace::new(
-            crate::estimator::frame_workspace::WorkspaceConfig::default()
+            crate::estimator::frame_workspace::WorkspaceConfig::default(),
         );
         let result = solver.solve(correspondences, &camera, &mut workspace);
 

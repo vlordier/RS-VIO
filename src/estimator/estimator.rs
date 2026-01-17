@@ -1,6 +1,7 @@
 use crate::datasets::config::Config;
 use crate::datasets::CameraModelType;
 use crate::datasets::ImuData;
+use crate::debug_log;
 use crate::estimator::Frame;
 use crate::estimator::SlidingWindow;
 use crate::estimator::{FrameWorkspace, WorkspaceConfig};
@@ -20,7 +21,6 @@ use crate::optimization::loop_closure::{
 };
 use crate::types::{Float, Matrix4x4, Vector3};
 use crate::viewers::Viewer;
-use crate::debug_log;
 use crate::{Result, VIOError};
 use image::GrayImage;
 use nalgebra as na;
@@ -181,7 +181,9 @@ impl Estimator {
                 max_image_width: config.camera.image_width,
                 max_image_height: config.camera.image_height,
                 // Approximate capacity using grid_cols * max_features_per_grid
-                max_features_per_frame: (feature_config.grid_cols * feature_config.max_features_per_grid) as usize,
+                max_features_per_frame: (feature_config.grid_cols
+                    * feature_config.max_features_per_grid)
+                    as usize,
                 max_imu_samples: 200,
                 capacity_headroom: 1.2,
             }),
@@ -201,7 +203,6 @@ impl Estimator {
         let deadline = _total_start_time + self.max_frame_processing_time;
         self.frame_count += 1;
         let should_log = self.frame_count % 30 == 0; // Log every 30 frames (~1 Hz @ 30 FPS)
-
 
         // New frame: update counters
         self.frame_id_counter += 1;
@@ -229,7 +230,7 @@ impl Estimator {
         let mut _optimization_time_ms = 0.0f64;
 
         // Create workspace for frame processing (reusable buffers for RANSAC, descriptors, etc.)
-        let mut workspace = crate::estimator::frame_workspace::FrameWorkspace::default();        // Frame creation
+        let mut workspace = crate::estimator::frame_workspace::FrameWorkspace::default(); // Frame creation
         let frame_creation_start = Instant::now();
 
         // Reset workspace buffers for new frame processing
@@ -239,14 +240,18 @@ impl Estimator {
         let img_w = self.config.camera.image_width;
         let img_h = self.config.camera.image_height;
 
-        self.frame_workspace.load_left_image(left_image).map_err(|e| {
-            log::error!("[Estimator] Failed to load left image: {}", e);
-            VIOError::Image(format!("Failed to load left image: {}", e))
-        })?;
-        self.frame_workspace.load_right_image(right_image).map_err(|e| {
-            log::error!("[Estimator] Failed to load right image: {}", e);
-            VIOError::Image(format!("Failed to load right image: {}", e))
-        })?;
+        self.frame_workspace
+            .load_left_image(left_image)
+            .map_err(|e| {
+                log::error!("[Estimator] Failed to load left image: {}", e);
+                VIOError::Image(format!("Failed to load left image: {}", e))
+            })?;
+        self.frame_workspace
+            .load_right_image(right_image)
+            .map_err(|e| {
+                log::error!("[Estimator] Failed to load right image: {}", e);
+                VIOError::Image(format!("Failed to load right image: {}", e))
+            })?;
 
         // Create GrayImage objects from workspace buffers without reallocation
         let left_buf = self.frame_workspace.take_left_image_buffer();
@@ -291,13 +296,14 @@ impl Estimator {
             if self.config.debug.use_imu {
                 // Load IMU samples into workspace buffer
                 for imu_sample in imu.iter() {
-                    self.frame_workspace.push_imu_sample(imu_sample)
+                    self.frame_workspace
+                        .push_imu_sample(imu_sample)
                         .map_err(|e| {
                             log::warn!("[Estimator] IMU buffer overflow: {}", e);
                             VIOError::Optimization(e)
                         })?;
                 }
-                
+
                 // Attach IMU measurements to frame (clone from workspace)
                 current_frame.imu_from_last_frame = self.frame_workspace.imu_samples().to_vec();
                 // During initialization, collect IMU samples for bias estimation
@@ -528,9 +534,7 @@ impl Estimator {
             }
             _motion_tracking_time_ms = motion_tracking_start.elapsed().as_secs_f64() * 1000.0;
         } else {
-            debug_log!(
-                "[Estimator] Sliding window is not full, skipping motion tracking"
-            );
+            debug_log!("[Estimator] Sliding window is not full, skipping motion tracking");
         }
 
         // View map points and keyframe poses
@@ -546,9 +550,9 @@ impl Estimator {
             let descriptor =
                 self.create_keyframe_descriptor(kf_id, frame_timestamp, &current_frame, frame_pose);
 
-            if let Ok(constraints) = self
-                .loop_closure_detector
-                .detect_loop_closure(kf_id, descriptor, &mut workspace)
+            if let Ok(constraints) =
+                self.loop_closure_detector
+                    .detect_loop_closure(kf_id, descriptor, &mut workspace)
             {
                 if !constraints.is_empty() {
                     log::info!(

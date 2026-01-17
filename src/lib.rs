@@ -163,10 +163,10 @@ pub fn init_logging() {
 pub mod camera;
 pub mod datasets;
 pub mod error_handling;
-pub mod logging;
 pub mod estimator;
 pub mod feature_tracker;
 pub mod imu;
+pub mod logging;
 pub mod math;
 pub mod optimization;
 pub mod types;

@@ -5,6 +5,7 @@ use crate::optimization::factors::{
 };
 use crate::optimization::loop_closure::LoopClosureConstraint;
 
+use crate::debug_log;
 use crate::{
     fl,
     types::{Float, Matrix3x3, Matrix4x4, Vector3},
@@ -19,7 +20,6 @@ use na::{DVector, UnitQuaternion};
 use nalgebra as na;
 use std::collections::HashMap;
 use std::collections::VecDeque;
-use crate::debug_log;
 
 /// Trait for window management strategies.
 ///
@@ -1409,8 +1409,16 @@ mod tests {
         let baseline = 0.1;
         let true_point = Vector3::new(0.0, 0.0, 5.0);
 
-        let left_obs = Vector3::new(true_point.x / true_point.z, true_point.y / true_point.z, 1.0);
-        let right_obs = Vector3::new((true_point.x - baseline) / true_point.z, true_point.y / true_point.z, 1.0);
+        let left_obs = Vector3::new(
+            true_point.x / true_point.z,
+            true_point.y / true_point.z,
+            1.0,
+        );
+        let right_obs = Vector3::new(
+            (true_point.x - baseline) / true_point.z,
+            true_point.y / true_point.z,
+            1.0,
+        );
 
         let T_W_B = Matrix4x4::identity();
         let T_B_Cl = Matrix4x4::identity();

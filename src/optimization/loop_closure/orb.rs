@@ -16,10 +16,10 @@
 //! 3. **Descriptor Extraction**: Rotated BRIEF pattern
 //! 4. **Matching**: Hamming distance with ratio test
 
-use na::Vector2;
-use nalgebra as na;
 use crate::debug_log;
 use crate::optimization::loop_closure::descriptor_pool::OrbBinaryPool;
+use na::Vector2;
+use nalgebra as na;
 use std::f64::consts::PI;
 use std::sync::Arc;
 
@@ -172,8 +172,14 @@ impl OrbExtractor {
                                 // Valid FAST corner
                                 let orientation =
                                     self.compute_orientation(image, x, y, width as usize);
-                                let descriptor =
-                                    self.extract_brief(image, x, y, width as usize, orientation, None);
+                                let descriptor = self.extract_brief(
+                                    image,
+                                    x,
+                                    y,
+                                    width as usize,
+                                    orientation,
+                                    None,
+                                );
 
                                 let feature = OrbFeature {
                                     position: Vector2::new(x as f64, y as f64),
@@ -443,7 +449,10 @@ impl OrbExtractor {
         features.sort_by(|a, b| b.strength.total_cmp(&a.strength));
         features.truncate(self.config.num_features);
 
-        debug_log!("[OrbExtractor] Extracted {} ORB features with pooling", features.len());
+        debug_log!(
+            "[OrbExtractor] Extracted {} ORB features with pooling",
+            features.len()
+        );
         features
     }
 
@@ -485,8 +494,14 @@ impl OrbExtractor {
                                 // Valid FAST corner
                                 let orientation =
                                     self.compute_orientation(image, x, y, width as usize);
-                                let descriptor =
-                                    self.extract_brief(image, x, y, width as usize, orientation, pool);
+                                let descriptor = self.extract_brief(
+                                    image,
+                                    x,
+                                    y,
+                                    width as usize,
+                                    orientation,
+                                    pool,
+                                );
 
                                 let feature = OrbFeature {
                                     position: Vector2::new(x as f64, y as f64),
@@ -578,16 +593,16 @@ mod tests {
     use super::*;
 
     /// Create test image with actual FAST-9 corners AND texture for BRIEF descriptors
-    /// 
+    ///
     /// FAST-9 uses this circular pattern of 8 offsets:
     /// (-1,-3), (-2,-2), (-3,-1), (-3,0), (-3,1), (-2,2), (-1,3), (0,3)
-    /// 
+    ///
     /// Requires >= 3 consecutive pixels brighter OR darker than center by threshold (50)
     /// BRIEF descriptors need texture variation to produce unique descriptors
     fn create_test_image(width: usize, height: usize) -> Vec<u8> {
         // Start with textured background for BRIEF descriptor diversity
         let mut image = vec![0u8; width * height];
-        
+
         // Add checkerboard texture to background (8x8 blocks)
         for y in 0..height {
             for x in 0..width {
@@ -599,26 +614,46 @@ mod tests {
 
         // FAST-9 circle offsets (from fast_corner_score implementation)
         let fast_offsets = [
-            (-1, -3), (-2, -2), (-3, -1), (-3, 0), 
-            (-3, 1), (-2, 2), (-1, 3), (0, 3),
+            (-1, -3),
+            (-2, -2),
+            (-3, -1),
+            (-3, 0),
+            (-3, 1),
+            (-2, 2),
+            (-1, 3),
+            (0, 3),
         ];
 
         // Create bright FAST corners at known locations with unique texture
         let corner_positions = [
-            (50, 50),   (200, 50),  (350, 50),  (500, 50),
-            (50, 150),  (200, 150), (350, 150), (500, 150),
-            (50, 250),  (200, 250), (350, 250), (500, 250),
-            (50, 350),  (200, 350), (350, 350), (500, 350),
+            (50, 50),
+            (200, 50),
+            (350, 50),
+            (500, 50),
+            (50, 150),
+            (200, 150),
+            (350, 150),
+            (500, 150),
+            (50, 250),
+            (200, 250),
+            (350, 250),
+            (500, 250),
+            (50, 350),
+            (200, 350),
+            (350, 350),
+            (500, 350),
         ];
 
         for (corner_idx, &(cx, cy)) in corner_positions.iter().enumerate() {
-            if cx < width.saturating_sub(20) && cy < height.saturating_sub(20) 
-               && cx >= 20 && cy >= 20 {
-                
+            if cx < width.saturating_sub(20)
+                && cy < height.saturating_sub(20)
+                && cx >= 20
+                && cy >= 20
+            {
                 // Set center pixel with variation per corner
                 let base_intensity = 180 + (corner_idx % 4) as u8 * 15;
                 image[cy * width + cx] = base_intensity;
-                
+
                 // Make ALL 8 FAST circle pixels VERY bright (>center + 50)
                 for &(dx, dy) in &fast_offsets {
                     let nx = (cx as i32 + dx) as usize;
@@ -632,13 +667,16 @@ mod tests {
                 for dy in -15..=15 {
                     for dx in -15..=15 {
                         let dist_sq = dx * dx + dy * dy;
-                        if dist_sq > 0 && dist_sq < 225 { // radius 15
+                        if dist_sq > 0 && dist_sq < 225 {
+                            // radius 15
                             let x = (cx as i32 + dx) as usize;
                             let y = (cy as i32 + dy) as usize;
                             if x < width && y < height {
                                 // Create gradient based on angle and corner index
                                 let angle_factor = ((dx as f64).atan2(dy as f64) * 10.0) as i32;
-                                let intensity = (120 + (corner_idx as i32 * 7) + angle_factor).clamp(60, 240) as u8;
+                                let intensity = (120 + (corner_idx as i32 * 7) + angle_factor)
+                                    .clamp(60, 240)
+                                    as u8;
                                 image[y * width + x] = intensity;
                             }
                         }
@@ -654,32 +692,40 @@ mod tests {
     fn debug_fast_corner_detection() {
         let config = OrbConfig::default();
         let extractor = OrbExtractor::new(config);
-        
+
         // Create test image
         let image = create_test_image(640, 480);
-        
+
         // Manually check corner positions
         let test_positions = vec![(50, 50), (200, 50), (350, 50)];
-        
+
         for &(x, y) in &test_positions {
             let center_val = image[y * 640 + x];
             println!("Position ({}, {}) center value: {}", x, y, center_val);
-            
+
             // Check FAST circle neighbors
             let offsets = [
-                (-1, -3), (-2, -2), (-3, -1), (-3, 0),
-                (-3, 1), (-2, 2), (-1, 3), (0, 3),
+                (-1, -3),
+                (-2, -2),
+                (-3, -1),
+                (-3, 0),
+                (-3, 1),
+                (-2, 2),
+                (-1, 3),
+                (0, 3),
             ];
-            
+
             for (i, &(dx, dy)) in offsets.iter().enumerate() {
                 let nx = (x as i32 + dx) as usize;
                 let ny = (y as i32 + dy) as usize;
                 let neighbor_val = image[ny * 640 + nx];
                 let diff = neighbor_val as i32 - center_val as i32;
-                println!("  Offset {}: ({:2},{:2}) value={:3} diff={:4}", 
-                         i, dx, dy, neighbor_val, diff);
+                println!(
+                    "  Offset {}: ({:2},{:2}) value={:3} diff={:4}",
+                    i, dx, dy, neighbor_val, diff
+                );
             }
-            
+
             if let Some(score) = extractor.fast_corner_score(&image, x, y, 640) {
                 println!("  ✓ FAST score: {}", score);
             } else {
@@ -687,7 +733,7 @@ mod tests {
             }
             println!();
         }
-        
+
         // Try extraction
         let features = extractor.extract(&image, 640, 480);
         println!("Total features extracted: {}", features.len());
@@ -701,17 +747,20 @@ mod tests {
         let image = create_test_image(640, 480);
 
         let features = extractor.extract(&image, 640, 480);
-        
+
         // With 9 explicit cross corners, we MUST extract features
         assert!(
             features.len() > 0,
             "MUST extract features from test image with explicit FAST corners. Got 0 features - test image generation is broken!"
         );
-        
+
         // Should not exceed max
         assert!(features.len() <= 500, "Should not exceed max features");
-        
-        println!("✅ Extracted {} features from test image (expected >0)", features.len());
+
+        println!(
+            "✅ Extracted {} features from test image (expected >0)",
+            features.len()
+        );
     }
 
     #[test]
@@ -722,14 +771,14 @@ mod tests {
 
         let features = extractor.extract(&image, 640, 480);
         assert!(features.len() > 0, "Should extract features");
-        
+
         for feature in &features {
             assert_eq!(
                 feature.descriptor.len(),
                 32,
                 "ORB descriptor should be 256 bits (32 bytes)"
             );
-            
+
             // ORB descriptors are bit-packed: each byte contains 8 binary bits
             // So bytes can be any value 0-255 (not just 0 or 255)
             // Verify at least some descriptors have non-zero bytes (not all empty)
@@ -739,9 +788,11 @@ mod tests {
                 "Descriptor should not be all zeros - indicates extraction failure"
             );
         }
-        
-        println!("✅ ORB binary descriptor test passed: {} features with 32-byte descriptors", 
-                 features.len());
+
+        println!(
+            "✅ ORB binary descriptor test passed: {} features with 32-byte descriptors",
+            features.len()
+        );
     }
 
     #[test]
@@ -1069,7 +1120,7 @@ mod tests {
         let mut balance_ratios = Vec::new();
         let mut all_ones_count = 0;
         let mut all_zeros_count = 0;
-        
+
         for feature in &features {
             // Test descriptor binary properties
             let mut ones_count = 0;
@@ -1077,13 +1128,17 @@ mod tests {
             for &byte in &feature.descriptor {
                 ones_count += byte.count_ones() as usize;
             }
-            
+
             let zeros_count = 256 - ones_count;
-            
+
             // Track pathological cases
-            if ones_count == 256 { all_ones_count += 1; }
-            if zeros_count == 256 { all_zeros_count += 1; }
-            
+            if ones_count == 256 {
+                all_ones_count += 1;
+            }
+            if zeros_count == 256 {
+                all_zeros_count += 1;
+            }
+
             let balance_ratio = ones_count as f32 / 256.0;
             balance_ratios.push(balance_ratio);
         }
@@ -1093,7 +1148,9 @@ mod tests {
         assert!(
             pathological_ratio < 0.3,
             "Too many pathological descriptors (all 0s or all 1s): {}/{} = {:.1}%",
-            all_ones_count + all_zeros_count, features.len(), pathological_ratio * 100.0
+            all_ones_count + all_zeros_count,
+            features.len(),
+            pathological_ratio * 100.0
         );
 
         // Check that average balance is reasonable (20%-80%)
@@ -1104,8 +1161,12 @@ mod tests {
             avg_balance * 100.0
         );
 
-        println!("✅ Descriptor properties: avg balance {:.1}%, {} features ({} pathological)", 
-                 avg_balance * 100.0, features.len(), all_ones_count + all_zeros_count);
+        println!(
+            "✅ Descriptor properties: avg balance {:.1}%, {} features ({} pathological)",
+            avg_balance * 100.0,
+            features.len(),
+            all_ones_count + all_zeros_count
+        );
     }
 
     #[test]
@@ -1179,14 +1240,14 @@ mod tests {
 
     #[test]
     fn extract_with_pool_actually_uses_pool() {
-        use std::sync::Arc;
         use crate::optimization::loop_closure::descriptor_pool::OrbBinaryPool;
+        use std::sync::Arc;
 
         let mut config = OrbConfig::default();
         config.use_pyramid = false;
         config.num_features = 50; // Limit for predictable testing
         let extractor = OrbExtractor::new(config);
-        
+
         let image = create_test_image(640, 480);
         let pool = Arc::new(OrbBinaryPool::new(100));
 
@@ -1199,28 +1260,31 @@ mod tests {
 
         // Check pool state before extraction
         let acquired_before = pool.acquired_count();
-        assert_eq!(acquired_before, 0, "Pool should start with 0 acquired buffers");
-        
+        assert_eq!(
+            acquired_before, 0,
+            "Pool should start with 0 acquired buffers"
+        );
+
         // Extract with pool
         let features_with_pool = extractor.extract_with_pool(&image, 640, 480, Some(&pool));
-        
+
         // CRITICAL: Verify pool was actually used
         let acquired_during = pool.acquired_count();
         assert!(
             acquired_during > 0,
             "Pool MUST be used during extraction! Got 0 acquisitions - pooling is not working!"
         );
-        
+
         // Verify features were extracted
         assert!(
             features_with_pool.len() > 0,
             "Pooled extraction must produce features. Got 0!"
         );
-        
+
         // All descriptors must be 32 bytes
         for (i, feature) in features_with_pool.iter().enumerate() {
             assert_eq!(
-                feature.descriptor.len(), 
+                feature.descriptor.len(),
                 32,
                 "Feature {} descriptor must be 32 bytes, got {}",
                 i,
@@ -1235,20 +1299,23 @@ mod tests {
             "Pooled and non-pooled extraction must produce same feature count"
         );
 
-        println!("✅ Pool usage verified: {} acquisitions for {} features", 
-                 acquired_during, features_with_pool.len());
+        println!(
+            "✅ Pool usage verified: {} acquisitions for {} features",
+            acquired_during,
+            features_with_pool.len()
+        );
     }
 
     #[test]
     fn extract_with_pool_determinism() {
-        use std::sync::Arc;
         use crate::optimization::loop_closure::descriptor_pool::OrbBinaryPool;
+        use std::sync::Arc;
 
         let mut config = OrbConfig::default();
         config.use_pyramid = false;
         let extractor = OrbExtractor::new(config);
         let image = create_test_image(640, 480);
-        
+
         let pool = Arc::new(OrbBinaryPool::new(500));
 
         // Extract multiple times - must be deterministic
@@ -1274,24 +1341,29 @@ mod tests {
             assert!(
                 pos_diff < 1e-10,
                 "Feature {} position must match: pooled={:?} vs non-pooled={:?}",
-                i, features1[i].position, features_no_pool[i].position
+                i,
+                features1[i].position,
+                features_no_pool[i].position
             );
         }
 
-        println!("✅ Determinism verified: {} features consistently extracted", features1.len());
+        println!(
+            "✅ Determinism verified: {} features consistently extracted",
+            features1.len()
+        );
     }
 
     #[test]
     fn extract_with_pool_stress_test_exhaustion() {
-        use std::sync::Arc;
         use crate::optimization::loop_closure::descriptor_pool::OrbBinaryPool;
+        use std::sync::Arc;
 
         let mut config = OrbConfig::default();
         config.use_pyramid = false;
         config.num_features = 100; // Request more than pool size
         let extractor = OrbExtractor::new(config);
         let image = create_test_image(640, 480);
-        
+
         // Small pool - will exhaust
         let small_pool = Arc::new(OrbBinaryPool::new(10));
 
@@ -1311,7 +1383,7 @@ mod tests {
                 "Feature {} must have 32-byte descriptor even with pool exhaustion",
                 i
             );
-            
+
             // Verify descriptor is not all zeros (would indicate allocation failure)
             let has_nonzero = feature.descriptor.iter().any(|&b| b != 0);
             assert!(
@@ -1321,8 +1393,10 @@ mod tests {
             );
         }
 
-        println!("✅ Pool exhaustion handled: extracted {} features with pool size 10", 
-                 features.len());
+        println!(
+            "✅ Pool exhaustion handled: extracted {} features with pool size 10",
+            features.len()
+        );
     }
 
     #[test]
@@ -1335,43 +1409,65 @@ mod tests {
         let image = create_test_image(640, 480);
 
         let features = extractor.extract(&image, 640, 480);
-        assert!(features.len() > 5, "Need multiple features to test uniqueness");
+        assert!(
+            features.len() > 5,
+            "Need multiple features to test uniqueness"
+        );
 
         // Track descriptor occurrences
         let mut descriptor_counts: HashMap<String, Vec<usize>> = HashMap::new();
         for (i, feature) in features.iter().enumerate() {
-            let desc_hex: String = feature.descriptor.iter()
+            let desc_hex: String = feature
+                .descriptor
+                .iter()
                 .map(|b| format!("{:02x}", b))
                 .collect();
-            
-            descriptor_counts.entry(desc_hex).or_insert_with(Vec::new).push(i);
+
+            descriptor_counts
+                .entry(desc_hex)
+                .or_insert_with(Vec::new)
+                .push(i);
         }
 
         let unique_count = descriptor_counts.len();
         let uniqueness_ratio = unique_count as f64 / features.len() as f64;
-        
+
         // At least 70% of features should have unique descriptors
         // (Some duplication is OK for features in similar local texture)
         assert!(
             uniqueness_ratio >= 0.7,
             "Descriptor uniqueness too low: {}/{} = {:.1}%. Expected >=70%",
-            unique_count, features.len(), uniqueness_ratio * 100.0
+            unique_count,
+            features.len(),
+            uniqueness_ratio * 100.0
         );
-        
+
         // Log duplicates for debugging
-        let duplicates: Vec<_> = descriptor_counts.iter()
+        let duplicates: Vec<_> = descriptor_counts
+            .iter()
             .filter(|(_, indices)| indices.len() > 1)
             .collect();
-        
+
         if !duplicates.is_empty() {
-            println!("Note: {} duplicate descriptor groups found:", duplicates.len());
+            println!(
+                "Note: {} duplicate descriptor groups found:",
+                duplicates.len()
+            );
             for (desc, indices) in duplicates.iter().take(3) {
-                println!("  Descriptor {} appears at features: {:?}", &desc[..16], indices);
+                println!(
+                    "  Descriptor {} appears at features: {:?}",
+                    &desc[..16],
+                    indices
+                );
             }
         }
 
-        println!("✅ Descriptor uniqueness: {}/{} unique ({:.1}%)",
-                 unique_count, features.len(), uniqueness_ratio * 100.0);
+        println!(
+            "✅ Descriptor uniqueness: {}/{} unique ({:.1}%)",
+            unique_count,
+            features.len(),
+            uniqueness_ratio * 100.0
+        );
     }
 
     #[test]
@@ -1379,7 +1475,7 @@ mod tests {
         // Test hamming distance with Vec descriptors
         let mut desc1 = vec![0u8; 32];
         let mut desc2 = vec![0u8; 32];
-        
+
         // Set some bits
         desc1[0] = 0b10101010;
         desc1[1] = 0b11110000;
@@ -1395,13 +1491,18 @@ mod tests {
         };
 
         let distance = feature.hamming_distance(&desc2);
-        
+
         // Count expected differences
         let byte1_xor: u8 = 0b11110000 ^ 0b11000011; // = 0b00110011
         let expected_distance = byte1_xor.count_ones();
-        
-        assert_eq!(distance, expected_distance, "Hamming distance should match bit differences");
-        println!("✅ Vec descriptor hamming distance test passed: distance = {}", distance);
+
+        assert_eq!(
+            distance, expected_distance,
+            "Hamming distance should match bit differences"
+        );
+        println!(
+            "✅ Vec descriptor hamming distance test passed: distance = {}",
+            distance
+        );
     }
 }
-

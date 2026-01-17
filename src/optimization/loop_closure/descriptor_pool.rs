@@ -84,7 +84,8 @@ impl OrbBinaryPool {
     pub fn acquire_binary(&self) -> Option<Vec<u8>> {
         let mut bufs = self.buffers.lock().expect("mutex poisoned");
         if let Some(buf) = bufs.pop() {
-            self.acquired.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.acquired
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             return Some(buf);
         }
         None
@@ -96,7 +97,8 @@ impl OrbBinaryPool {
         buffer.resize(32, 0);
         let mut bufs = self.buffers.lock().expect("mutex poisoned");
         bufs.push(buffer);
-        self.acquired.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+        self.acquired
+            .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Current number of acquired buffers
@@ -141,7 +143,8 @@ impl FloatDescriptorPool {
         let mut bufs = self.buffers.lock().expect("mutex poisoned");
         if let Some(mut buf) = bufs.pop() {
             buf.clear();
-            self.acquired.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.acquired
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             return Some(buf);
         }
         None
@@ -153,7 +156,8 @@ impl FloatDescriptorPool {
         let mut bufs = self.buffers.lock().expect("mutex poisoned");
         if buffer.capacity() >= self.buffer_size && bufs.len() < self.max_concurrent {
             bufs.push(buffer);
-            self.acquired.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+            self.acquired
+                .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
         }
         // Otherwise: buffer is dropped if pool is full or capacity mismatch
     }

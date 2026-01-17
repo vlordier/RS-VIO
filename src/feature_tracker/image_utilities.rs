@@ -122,10 +122,8 @@ pub fn downsample_half_box(src: &GrayImage, dst: &mut GrayImage) {
             let idx1 = (sy * sw + sx + 1) as usize;
             let idx2 = ((sy + 1) * sw + sx) as usize;
             let idx3 = ((sy + 1) * sw + sx + 1) as usize;
-            let sum = sdata[idx0] as u32
-                + sdata[idx1] as u32
-                + sdata[idx2] as u32
-                + sdata[idx3] as u32;
+            let sum =
+                sdata[idx0] as u32 + sdata[idx1] as u32 + sdata[idx2] as u32 + sdata[idx3] as u32;
             ddata[(y * dw + x) as usize] = (sum / 4) as u8;
         }
     }
@@ -273,10 +271,7 @@ pub fn detect_key_points(
 
             while points_added < num_points_in_cell && threshold >= 10 {
                 let mut fast_corners = corners_fast9(&image_view, threshold);
-                fast_corners.sort_by(|a, b| {
-                    a.score
-                        .total_cmp(&b.score)
-                });
+                fast_corners.sort_by(|a, b| a.score.total_cmp(&b.score));
 
                 for mut point in fast_corners {
                     if points_added >= num_points_in_cell {

@@ -589,7 +589,10 @@ impl LoopClosureDetector {
                 continue;
             }
 
-            if let Some(verified) = self.verifier.verify(&descriptor, &keyframe, &metrics, workspace) {
+            if let Some(verified) =
+                self.verifier
+                    .verify(&descriptor, &keyframe, &metrics, workspace)
+            {
                 let constraint = LoopClosureConstraint {
                     keyframe_id_1: keyframe_id,
                     keyframe_id_2: candidate_id,
@@ -757,7 +760,9 @@ mod tests {
 
         // Revisit location similar to frame 0
         let query = create_test_descriptor(100, 0.0); // Similar to frame 0
-        let closures = detector.detect_loop_closure(100, query, &mut workspace).unwrap();
+        let closures = detector
+            .detect_loop_closure(100, query, &mut workspace)
+            .unwrap();
 
         // Should detect loop closure with frame 0
         assert!(closures.len() >= 1);
@@ -788,7 +793,9 @@ mod tests {
             num_features: 20,
             ..create_test_descriptor(1, 0.0)
         };
-        let closures = detector.detect_loop_closure(1, query, &mut workspace).unwrap();
+        let closures = detector
+            .detect_loop_closure(1, query, &mut workspace)
+            .unwrap();
 
         // Should be filtered out by min_matches/min_inliers/ratio
         assert!(closures.is_empty());
@@ -841,7 +848,9 @@ mod tests {
             num_features: 80,
             ..create_test_descriptor(1, 0.0)
         };
-        let closures = detector.detect_loop_closure(1, second, &mut workspace).unwrap();
+        let closures = detector
+            .detect_loop_closure(1, second, &mut workspace)
+            .unwrap();
         assert!(closures.is_empty());
     }
 
@@ -900,7 +909,9 @@ mod tests {
 
         // Very different descriptor should fail verifier
         let query = create_test_descriptor(1, 3.14);
-        let closures = detector.detect_loop_closure(1, query, &mut workspace).unwrap();
+        let closures = detector
+            .detect_loop_closure(1, query, &mut workspace)
+            .unwrap();
         assert!(closures.is_empty());
     }
 
@@ -925,7 +936,9 @@ mod tests {
             timestamp: 10_000_000,
             ..create_test_descriptor(1, 0.0)
         };
-        let closures = detector.detect_loop_closure(1, second, &mut workspace).unwrap();
+        let closures = detector
+            .detect_loop_closure(1, second, &mut workspace)
+            .unwrap();
         assert!(closures.is_empty());
     }
 
@@ -1002,7 +1015,9 @@ mod tests {
             num_features: 5,
             ..create_test_descriptor(1, 0.0)
         };
-        let closures = detector.detect_loop_closure(1, query, &mut workspace).unwrap();
+        let closures = detector
+            .detect_loop_closure(1, query, &mut workspace)
+            .unwrap();
         assert!(closures.is_empty());
     }
 
@@ -1046,7 +1061,9 @@ mod tests {
 
         // Revisit similar location
         let query = create_test_descriptor(10, 0.0);
-        let closures = detector.detect_loop_closure(10, query, &mut workspace).unwrap();
+        let closures = detector
+            .detect_loop_closure(10, query, &mut workspace)
+            .unwrap();
 
         // Should detect some loop closures
         assert!(closures.len() > 0);
@@ -1079,7 +1096,9 @@ mod tests {
             num_features: 100,
             ..create_test_descriptor(10, 0.0)
         };
-        let closures = detector.detect_loop_closure(10, query, &mut workspace).unwrap();
+        let closures = detector
+            .detect_loop_closure(10, query, &mut workspace)
+            .unwrap();
 
         // With sufficient features and similarity, should detect loop closure
         assert!(closures.len() > 0);

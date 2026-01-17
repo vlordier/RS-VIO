@@ -75,14 +75,14 @@ pub struct FrameWorkspace {
     imu_samples: Vec<ImuData>,
 
     // Temporary RANSAC / matching workspace
-    ransac_buffer: Vec<(usize, usize)>,     // match pairs
-    descriptor_buffer: Vec<Float>,           // descriptors
-    residual_buffer: Vec<Float>,             // for scoring
-    
+    ransac_buffer: Vec<(usize, usize)>, // match pairs
+    descriptor_buffer: Vec<Float>,      // descriptors
+    residual_buffer: Vec<Float>,        // for scoring
+
     // RANSAC-specific buffers (for hypothesis sampling and inlier tracking)
-    ransac_hypothesis_samples: Vec<usize>,   // sampled point indices (used per RANSAC iteration)
-    ransac_inlier_mask: Vec<bool>,          // inlier flags per point
-    ransac_residuals: Vec<Float>,           // residual per point for scoring
+    ransac_hypothesis_samples: Vec<usize>, // sampled point indices (used per RANSAC iteration)
+    ransac_inlier_mask: Vec<bool>,         // inlier flags per point
+    ransac_residuals: Vec<Float>,          // residual per point for scoring
 
     // Scratch matrices for optimization
     scratch_matrix_6x6: na::Matrix6<Float>,
@@ -97,8 +97,7 @@ impl FrameWorkspace {
             * config.capacity_headroom;
         let features_capacity =
             (config.max_features_per_frame as f32 * config.capacity_headroom) as usize;
-        let imu_capacity =
-            (config.max_imu_samples as f32 * config.capacity_headroom) as usize;
+        let imu_capacity = (config.max_imu_samples as f32 * config.capacity_headroom) as usize;
 
         Self {
             config,
@@ -143,12 +142,14 @@ impl Default for FrameWorkspace {
 
 impl FrameWorkspace {
     /// Load left image into workspace buffer (borrowed ownership).
-    /// 
+    ///
     /// # Returns
     /// - `Ok(())` if image fits within capacity
     /// - `Err` if image size exceeds configured max
     pub fn load_left_image(&mut self, pixels: &[u8]) -> Result<(), String> {
-        if pixels.len() > self.config.max_image_width as usize * self.config.max_image_height as usize {
+        if pixels.len()
+            > self.config.max_image_width as usize * self.config.max_image_height as usize
+        {
             return Err(format!(
                 "Left image too large: {} bytes > {} bytes max",
                 pixels.len(),
@@ -162,7 +163,9 @@ impl FrameWorkspace {
 
     /// Load right image into workspace buffer.
     pub fn load_right_image(&mut self, pixels: &[u8]) -> Result<(), String> {
-        if pixels.len() > self.config.max_image_width as usize * self.config.max_image_height as usize {
+        if pixels.len()
+            > self.config.max_image_width as usize * self.config.max_image_height as usize
+        {
             return Err(format!(
                 "Right image too large: {} bytes > {} bytes max",
                 pixels.len(),
@@ -292,7 +295,10 @@ impl FrameWorkspace {
     /// Get mutable references to hypothesis samples and inlier mask (for feature tracker RANSAC).
     /// This avoids borrow checker issues with getting both mut refs separately.
     pub fn feature_ransac_buffers_mut(&mut self) -> (&mut Vec<usize>, &mut Vec<bool>) {
-        (&mut self.ransac_hypothesis_samples, &mut self.ransac_inlier_mask)
+        (
+            &mut self.ransac_hypothesis_samples,
+            &mut self.ransac_inlier_mask,
+        )
     }
 
     /// Borrow scratch 6×6 matrix.

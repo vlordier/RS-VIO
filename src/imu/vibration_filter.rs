@@ -11,7 +11,10 @@ use rustfft::num_complex::Complex;
 use rustfft::{Fft, FftDirection};
 
 #[derive(Copy, Clone)]
-pub enum AxisSource { Gyro, Accel }
+pub enum AxisSource {
+    Gyro,
+    Accel,
+}
 
 /// Configuration for vibration notch filtering
 #[derive(Debug, Clone)]
@@ -214,7 +217,9 @@ impl VibrationNotchFilter {
     fn analyze_axis(&mut self, axis: usize, source: AxisSource) -> Vec<VibrationPeak> {
         let mut peaks = Vec::new();
         let n = self.config.fft_size;
-        if n < 3 { return peaks; }
+        if n < 3 {
+            return peaks;
+        }
 
         // FFT with window
         for i in 0..n {
@@ -235,15 +240,22 @@ impl VibrationNotchFilter {
         let nyquist = self.config.sampling_rate / 2.0;
         let max_freq = self.config.max_freq.min(nyquist);
         let min_freq = self.config.min_freq.min(max_freq);
-        let bin_min = (min_freq * self.config.fft_size as Float / self.config.sampling_rate) as usize;
-        let bin_max = (max_freq * self.config.fft_size as Float / self.config.sampling_rate) as usize;
-        if bin_max <= bin_min + 1 || bin_min + 1 >= n { return peaks; }
+        let bin_min =
+            (min_freq * self.config.fft_size as Float / self.config.sampling_rate) as usize;
+        let bin_max =
+            (max_freq * self.config.fft_size as Float / self.config.sampling_rate) as usize;
+        if bin_max <= bin_min + 1 || bin_min + 1 >= n {
+            return peaks;
+        }
 
         // Noise floor via median
         self.sorted_mags.clear();
         let upper = bin_max.min(n);
-        self.sorted_mags.extend_from_slice(&self.magnitude_buffer[bin_min..upper]);
-        if self.sorted_mags.is_empty() { return peaks; }
+        self.sorted_mags
+            .extend_from_slice(&self.magnitude_buffer[bin_min..upper]);
+        if self.sorted_mags.is_empty() {
+            return peaks;
+        }
         self.sorted_mags.sort_by(|a, b| a.total_cmp(b));
         let noise_floor = self.sorted_mags[self.sorted_mags.len() / 2];
 
@@ -252,10 +264,18 @@ impl VibrationNotchFilter {
             let mag = self.magnitude_buffer[bin];
             let prev_mag = self.magnitude_buffer[bin - 1];
             let next_mag = self.magnitude_buffer[bin + 1];
-            if mag > prev_mag && mag > next_mag && (mag as Float) > (noise_floor as Float) * (1.0 + self.config.peak_threshold) {
-                let frequency = bin as Float * self.config.sampling_rate / self.config.fft_size as Float;
+            if mag > prev_mag
+                && mag > next_mag
+                && (mag as Float) > (noise_floor as Float) * (1.0 + self.config.peak_threshold)
+            {
+                let frequency =
+                    bin as Float * self.config.sampling_rate / self.config.fft_size as Float;
                 let snr = mag as Float / noise_floor as Float;
-                peaks.push(VibrationPeak { frequency, magnitude: mag as Float, snr });
+                peaks.push(VibrationPeak {
+                    frequency,
+                    magnitude: mag as Float,
+                    snr,
+                });
             }
         }
 

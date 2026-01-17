@@ -1,8 +1,8 @@
 use super::get_feature_color;
 use super::Viewer;
 use crate::datasets::config::VisualizationConfig;
-use crate::types::{Array3, Float, Matrix3x3, Matrix4x4, ToArray};
 use crate::debug_log;
+use crate::types::{Array3, Float, Matrix3x3, Matrix4x4, ToArray};
 use crate::{Result, VIOError};
 use image::{DynamicImage, ImageBuffer, Luma};
 use rerun::components::Color;

@@ -1,6 +1,6 @@
 use super::{DescriptorMatcher, MatchMetrics};
-use crate::optimization::loop_closure::KeyframeDescriptor;
 use crate::optimization::loop_closure::descriptor_pool::OrbBinaryPool;
+use crate::optimization::loop_closure::KeyframeDescriptor;
 use crate::types::Float;
 use std::sync::Arc;
 
@@ -97,11 +97,10 @@ impl DescriptorMatcher for OrbMatcher {
                 } else {
                     let normalized_distance = hamming_distance as Float / 256.0;
                     let similarity = (1.0 - normalized_distance).max(0.0);
-                    let match_count =
-                        (similarity * overlapping_features as Float).round() as usize;
+                    let match_count = (similarity * overlapping_features as Float).round() as usize;
                     (similarity, match_count.min(overlapping_features))
                 }
-            }
+            },
             _ => (0.0, 0),
         };
 

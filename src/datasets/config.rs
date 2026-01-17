@@ -60,37 +60,57 @@ impl CameraConfig {
     pub fn validate(&self) -> Result<()> {
         // Validate image dimensions
         if self.image_width == 0 || self.image_height == 0 {
-            return Err(VIOError::Config("Image dimensions must be positive".to_string()));
+            return Err(VIOError::Config(
+                "Image dimensions must be positive".to_string(),
+            ));
         }
         if self.image_width > 10000 || self.image_height > 10000 {
-            return Err(VIOError::Config("Image dimensions unreasonably large (>10000)".to_string()));
+            return Err(VIOError::Config(
+                "Image dimensions unreasonably large (>10000)".to_string(),
+            ));
         }
 
         // Validate intrinsics vectors (fx, fy, cx, cy for pinhole; more for other models)
         if self.left_intrinsics.len() < 4 {
-            return Err(VIOError::Config("Left intrinsics must have at least 4 parameters".to_string()));
+            return Err(VIOError::Config(
+                "Left intrinsics must have at least 4 parameters".to_string(),
+            ));
         }
         if self.right_intrinsics.len() < 4 {
-            return Err(VIOError::Config("Right intrinsics must have at least 4 parameters".to_string()));
+            return Err(VIOError::Config(
+                "Right intrinsics must have at least 4 parameters".to_string(),
+            ));
         }
 
         // Validate transform matrices (should be 16 elements for 4x4 matrix)
         if self.T_B_Cl.len() != 16 {
-            return Err(VIOError::Config(format!("T_B_Cl must have 16 elements, got {}", self.T_B_Cl.len())));
+            return Err(VIOError::Config(format!(
+                "T_B_Cl must have 16 elements, got {}",
+                self.T_B_Cl.len()
+            )));
         }
         if self.T_B_Cr.len() != 16 {
-            return Err(VIOError::Config(format!("T_B_Cr must have 16 elements, got {}", self.T_B_Cr.len())));
+            return Err(VIOError::Config(format!(
+                "T_B_Cr must have 16 elements, got {}",
+                self.T_B_Cr.len()
+            )));
         }
 
         // Check for NaN/Inf in critical parameters
         for (i, &val) in self.left_intrinsics.iter().enumerate() {
             if !val.is_finite() {
-                return Err(VIOError::Config(format!("Left intrinsic[{}] is not finite", i)));
+                return Err(VIOError::Config(format!(
+                    "Left intrinsic[{}] is not finite",
+                    i
+                )));
             }
         }
         for (i, &val) in self.right_intrinsics.iter().enumerate() {
             if !val.is_finite() {
-                return Err(VIOError::Config(format!("Right intrinsic[{}] is not finite", i)));
+                return Err(VIOError::Config(format!(
+                    "Right intrinsic[{}] is not finite",
+                    i
+                )));
             }
         }
         for (i, &val) in self.T_B_Cl.iter().enumerate() {
@@ -125,31 +145,49 @@ impl KeyframeManagementConfig {
     pub fn validate_and_clamp(&mut self) {
         // Clamp window size to reasonable range [2, 50]
         if self.keyframe_window_size < 2 {
-            log::warn!("keyframe_window_size {} too small, clamping to 2", self.keyframe_window_size);
+            log::warn!(
+                "keyframe_window_size {} too small, clamping to 2",
+                self.keyframe_window_size
+            );
             self.keyframe_window_size = 2;
         }
         if self.keyframe_window_size > 50 {
-            log::warn!("keyframe_window_size {} too large, clamping to 50", self.keyframe_window_size);
+            log::warn!(
+                "keyframe_window_size {} too large, clamping to 50",
+                self.keyframe_window_size
+            );
             self.keyframe_window_size = 50;
         }
 
         // Clamp translation threshold to [0.01, 10.0] meters
         if self.translation_threshold < 0.01 {
-            log::warn!("translation_threshold {} too small, clamping to 0.01", self.translation_threshold);
+            log::warn!(
+                "translation_threshold {} too small, clamping to 0.01",
+                self.translation_threshold
+            );
             self.translation_threshold = 0.01;
         }
         if self.translation_threshold > 10.0 {
-            log::warn!("translation_threshold {} too large, clamping to 10.0", self.translation_threshold);
+            log::warn!(
+                "translation_threshold {} too large, clamping to 10.0",
+                self.translation_threshold
+            );
             self.translation_threshold = 10.0;
         }
 
         // Clamp rotation threshold to [0.01, 3.14] radians
         if self.rotation_threshold < 0.01 {
-            log::warn!("rotation_threshold {} too small, clamping to 0.01", self.rotation_threshold);
+            log::warn!(
+                "rotation_threshold {} too small, clamping to 0.01",
+                self.rotation_threshold
+            );
             self.rotation_threshold = 0.01;
         }
         if self.rotation_threshold > 3.14 {
-            log::warn!("rotation_threshold {} too large, clamping to π", self.rotation_threshold);
+            log::warn!(
+                "rotation_threshold {} too large, clamping to π",
+                self.rotation_threshold
+            );
             self.rotation_threshold = 3.14;
         }
 
@@ -159,7 +197,10 @@ impl KeyframeManagementConfig {
             self.processing_timeout_ms = 1;
         }
         if self.processing_timeout_ms > 10000 {
-            log::warn!("processing_timeout_ms {} too large, clamping to 10000", self.processing_timeout_ms);
+            log::warn!(
+                "processing_timeout_ms {} too large, clamping to 10000",
+                self.processing_timeout_ms
+            );
             self.processing_timeout_ms = 10000;
         }
     }
@@ -216,7 +257,10 @@ impl FeatureDetectionConfig {
             self.max_features_per_grid = 1;
         }
         if self.max_features_per_grid > 1000 {
-            log::warn!("max_features_per_grid {} too large, clamping to 1000", self.max_features_per_grid);
+            log::warn!(
+                "max_features_per_grid {} too large, clamping to 1000",
+                self.max_features_per_grid
+            );
             self.max_features_per_grid = 1000;
         }
 
@@ -226,17 +270,26 @@ impl FeatureDetectionConfig {
             self.optical_flow_max_iterations = 1;
         }
         if self.optical_flow_max_iterations > 100 {
-            log::warn!("optical_flow_max_iterations {} too large, clamping to 100", self.optical_flow_max_iterations);
+            log::warn!(
+                "optical_flow_max_iterations {} too large, clamping to 100",
+                self.optical_flow_max_iterations
+            );
             self.optical_flow_max_iterations = 100;
         }
 
         // Clamp convergence threshold to [1e-6, 1.0]
         if self.optical_flow_convergence_threshold < 1e-6 {
-            log::warn!("optical_flow_convergence_threshold {} too small, clamping to 1e-6", self.optical_flow_convergence_threshold);
+            log::warn!(
+                "optical_flow_convergence_threshold {} too small, clamping to 1e-6",
+                self.optical_flow_convergence_threshold
+            );
             self.optical_flow_convergence_threshold = 1e-6;
         }
         if self.optical_flow_convergence_threshold > 1.0 {
-            log::warn!("optical_flow_convergence_threshold {} too large, clamping to 1.0", self.optical_flow_convergence_threshold);
+            log::warn!(
+                "optical_flow_convergence_threshold {} too large, clamping to 1.0",
+                self.optical_flow_convergence_threshold
+            );
             self.optical_flow_convergence_threshold = 1.0;
         }
 
@@ -246,17 +299,26 @@ impl FeatureDetectionConfig {
             self.subpixel_iterations = 1;
         }
         if self.subpixel_iterations > 50 {
-            log::warn!("subpixel_iterations {} too large, clamping to 50", self.subpixel_iterations);
+            log::warn!(
+                "subpixel_iterations {} too large, clamping to 50",
+                self.subpixel_iterations
+            );
             self.subpixel_iterations = 50;
         }
 
         // Clamp subpixel threshold to [1e-8, 0.1]
         if self.subpixel_threshold < 1e-8 {
-            log::warn!("subpixel_threshold {} too small, clamping to 1e-8", self.subpixel_threshold);
+            log::warn!(
+                "subpixel_threshold {} too small, clamping to 1e-8",
+                self.subpixel_threshold
+            );
             self.subpixel_threshold = 1e-8;
         }
         if self.subpixel_threshold > 0.1 {
-            log::warn!("subpixel_threshold {} too large, clamping to 0.1", self.subpixel_threshold);
+            log::warn!(
+                "subpixel_threshold {} too large, clamping to 0.1",
+                self.subpixel_threshold
+            );
             self.subpixel_threshold = 0.1;
         }
     }
@@ -287,7 +349,10 @@ impl OptimizationConfig {
             self.bundle_adjustment_max_iterations = 1;
         }
         if self.bundle_adjustment_max_iterations > 100 {
-            log::warn!("bundle_adjustment_max_iterations {} too large, clamping to 100", self.bundle_adjustment_max_iterations);
+            log::warn!(
+                "bundle_adjustment_max_iterations {} too large, clamping to 100",
+                self.bundle_adjustment_max_iterations
+            );
             self.bundle_adjustment_max_iterations = 100;
         }
 
@@ -297,36 +362,57 @@ impl OptimizationConfig {
             self.pnp_max_iterations = 1;
         }
         if self.pnp_max_iterations > 100 {
-            log::warn!("pnp_max_iterations {} too large, clamping to 100", self.pnp_max_iterations);
+            log::warn!(
+                "pnp_max_iterations {} too large, clamping to 100",
+                self.pnp_max_iterations
+            );
             self.pnp_max_iterations = 100;
         }
 
         // Clamp IMU prior weights to [1e-6, 1e6]
         if self.imu_prior_weight_pos < 1e-6 {
-            log::warn!("imu_prior_weight_pos {} too small, clamping to 1e-6", self.imu_prior_weight_pos);
+            log::warn!(
+                "imu_prior_weight_pos {} too small, clamping to 1e-6",
+                self.imu_prior_weight_pos
+            );
             self.imu_prior_weight_pos = 1e-6;
         }
         if self.imu_prior_weight_pos > 1e6 {
-            log::warn!("imu_prior_weight_pos {} too large, clamping to 1e6", self.imu_prior_weight_pos);
+            log::warn!(
+                "imu_prior_weight_pos {} too large, clamping to 1e6",
+                self.imu_prior_weight_pos
+            );
             self.imu_prior_weight_pos = 1e6;
         }
 
         if self.imu_prior_weight_rot < 1e-6 {
-            log::warn!("imu_prior_weight_rot {} too small, clamping to 1e-6", self.imu_prior_weight_rot);
+            log::warn!(
+                "imu_prior_weight_rot {} too small, clamping to 1e-6",
+                self.imu_prior_weight_rot
+            );
             self.imu_prior_weight_rot = 1e-6;
         }
         if self.imu_prior_weight_rot > 1e6 {
-            log::warn!("imu_prior_weight_rot {} too large, clamping to 1e6", self.imu_prior_weight_rot);
+            log::warn!(
+                "imu_prior_weight_rot {} too large, clamping to 1e6",
+                self.imu_prior_weight_rot
+            );
             self.imu_prior_weight_rot = 1e6;
         }
 
         // Clamp Huber delta to [1e-3, 100.0]
         if self.imu_prior_huber_delta < 1e-3 {
-            log::warn!("imu_prior_huber_delta {} too small, clamping to 1e-3", self.imu_prior_huber_delta);
+            log::warn!(
+                "imu_prior_huber_delta {} too small, clamping to 1e-3",
+                self.imu_prior_huber_delta
+            );
             self.imu_prior_huber_delta = 1e-3;
         }
         if self.imu_prior_huber_delta > 100.0 {
-            log::warn!("imu_prior_huber_delta {} too large, clamping to 100.0", self.imu_prior_huber_delta);
+            log::warn!(
+                "imu_prior_huber_delta {} too large, clamping to 100.0",
+                self.imu_prior_huber_delta
+            );
             self.imu_prior_huber_delta = 100.0;
         }
     }

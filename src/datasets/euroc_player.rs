@@ -2,8 +2,8 @@ use crate::datasets::{
     config::Config, player_trait::DatasetPlayer, FrameContext, ImageData, ImuData, PlayerConfig,
     PlayerResult,
 };
-use crate::estimator::Estimator;
 use crate::debug_log;
+use crate::estimator::Estimator;
 use crate::{Result, VIOError};
 use image::ImageReader;
 use std::fs::File;

@@ -154,21 +154,33 @@ impl MarginalizationConfig {
     pub fn validate_and_clamp(&mut self) {
         // Clamp damping to [1e-12, 1.0]
         if self.damping < 1e-12 {
-            log::warn!("marginalization damping {} too small, clamping to 1e-12", self.damping);
+            log::warn!(
+                "marginalization damping {} too small, clamping to 1e-12",
+                self.damping
+            );
             self.damping = 1e-12;
         }
         if self.damping > 1.0 {
-            log::warn!("marginalization damping {} too large, clamping to 1.0", self.damping);
+            log::warn!(
+                "marginalization damping {} too large, clamping to 1.0",
+                self.damping
+            );
             self.damping = 1.0;
         }
 
         // Clamp max_keyframes to [2, 50]
         if self.max_keyframes < 2 {
-            log::warn!("max_keyframes {} too small, clamping to 2", self.max_keyframes);
+            log::warn!(
+                "max_keyframes {} too small, clamping to 2",
+                self.max_keyframes
+            );
             self.max_keyframes = 2;
         }
         if self.max_keyframes > 50 {
-            log::warn!("max_keyframes {} too large, clamping to 50", self.max_keyframes);
+            log::warn!(
+                "max_keyframes {} too large, clamping to 50",
+                self.max_keyframes
+            );
             self.max_keyframes = 50;
         }
 
@@ -179,17 +191,27 @@ impl MarginalizationConfig {
         }
         let max_marg = self.max_keyframes / 2;
         if self.num_marginalize_per_step > max_marg {
-            log::warn!("num_marginalize_per_step {} too large, clamping to {}", self.num_marginalize_per_step, max_marg);
+            log::warn!(
+                "num_marginalize_per_step {} too large, clamping to {}",
+                self.num_marginalize_per_step,
+                max_marg
+            );
             self.num_marginalize_per_step = max_marg;
         }
 
         // Clamp min_landmark_observations to [2, 20]
         if self.min_landmark_observations < 2 {
-            log::warn!("min_landmark_observations {} too small, clamping to 2", self.min_landmark_observations);
+            log::warn!(
+                "min_landmark_observations {} too small, clamping to 2",
+                self.min_landmark_observations
+            );
             self.min_landmark_observations = 2;
         }
         if self.min_landmark_observations > 20 {
-            log::warn!("min_landmark_observations {} too large, clamping to 20", self.min_landmark_observations);
+            log::warn!(
+                "min_landmark_observations {} too large, clamping to 20",
+                self.min_landmark_observations
+            );
             self.min_landmark_observations = 20;
         }
 
@@ -199,36 +221,60 @@ impl MarginalizationConfig {
             self.landmark_age_limit = 1;
         }
         if self.landmark_age_limit > 1000 {
-            log::warn!("landmark_age_limit {} too large, clamping to 1000", self.landmark_age_limit);
+            log::warn!(
+                "landmark_age_limit {} too large, clamping to 1000",
+                self.landmark_age_limit
+            );
             self.landmark_age_limit = 1000;
         }
 
         // Clamp prior_info_scale to [0.01, 10.0]
         if self.prior_info_scale < 0.01 {
-            log::warn!("prior_info_scale {} too small, clamping to 0.01", self.prior_info_scale);
+            log::warn!(
+                "prior_info_scale {} too small, clamping to 0.01",
+                self.prior_info_scale
+            );
             self.prior_info_scale = 0.01;
         }
         if self.prior_info_scale > 10.0 {
-            log::warn!("prior_info_scale {} too large, clamping to 10.0", self.prior_info_scale);
+            log::warn!(
+                "prior_info_scale {} too large, clamping to 10.0",
+                self.prior_info_scale
+            );
             self.prior_info_scale = 10.0;
         }
 
         // Validate string enums
-        let valid_hessian = ["GaussNewton", "Diagonal", "LevenbergMarquardt", "Exact", "Identity"];
+        let valid_hessian = [
+            "GaussNewton",
+            "Diagonal",
+            "LevenbergMarquardt",
+            "Exact",
+            "Identity",
+        ];
         if !valid_hessian.contains(&self.hessian_approximator.as_str()) {
-            log::warn!("Invalid hessian_approximator '{}', defaulting to 'Diagonal'", self.hessian_approximator);
+            log::warn!(
+                "Invalid hessian_approximator '{}', defaulting to 'Diagonal'",
+                self.hessian_approximator
+            );
             self.hessian_approximator = "Diagonal".to_string();
         }
 
         let valid_gradient = ["Standard", "Zero"];
         if !valid_gradient.contains(&self.gradient_computer.as_str()) {
-            log::warn!("Invalid gradient_computer '{}', defaulting to 'Standard'", self.gradient_computer);
+            log::warn!(
+                "Invalid gradient_computer '{}', defaulting to 'Standard'",
+                self.gradient_computer
+            );
             self.gradient_computer = "Standard".to_string();
         }
 
         let valid_prior = ["Standard", "Regularized"];
         if !valid_prior.contains(&self.prior_constructor.as_str()) {
-            log::warn!("Invalid prior_constructor '{}', defaulting to 'Standard'", self.prior_constructor);
+            log::warn!(
+                "Invalid prior_constructor '{}', defaulting to 'Standard'",
+                self.prior_constructor
+            );
             self.prior_constructor = "Standard".to_string();
         }
     }
