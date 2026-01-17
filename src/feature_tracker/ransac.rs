@@ -93,6 +93,9 @@ pub struct ProsacFundamental;
 impl ProsacFundamental {
     /// Minimum number of points needed to estimate a fundamental matrix
     const MIN_SAMPLES: usize = 7;
+    /// Hard cap on iterations to keep property tests and CI runs fast even when the
+    /// analytic bound explodes for large sample sizes.
+    const MAX_ITERATIONS: usize = 500;
 
     /// Estimate fundamental matrix using PROSAC (Progressive Sample Consensus)
     ///
@@ -202,7 +205,7 @@ impl ProsacFundamental {
     ) -> usize {
         let inlier_ratio = 1.0 - outlier_ratio;
         if inlier_ratio <= 0.0 {
-            return 1000;
+            return Self::MAX_ITERATIONS;
         }
 
         // PROSAC iteration formula (simplified version)
@@ -210,8 +213,11 @@ impl ProsacFundamental {
         let _t_1 =
             (1.0 - confidence).ln() / (1.0 - inlier_ratio.powi(Self::MIN_SAMPLES as i32)).ln();
 
-        // PROSAC typically needs fewer iterations due to better sampling
-        (t_n * (sample_size as f32 / Self::MIN_SAMPLES as f32)).ceil() as usize
+        // Clamp to prevent runaway iteration counts when sample_size is large.
+        let estimated = (t_n * (sample_size as f32 / Self::MIN_SAMPLES as f32)).ceil();
+        estimated
+            .clamp(1.0, Self::MAX_ITERATIONS as f32)
+            .round() as usize
     }
 }
 /// Result of PROSAC estimation
