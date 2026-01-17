@@ -2,6 +2,7 @@ use super::get_feature_color;
 use super::Viewer;
 use crate::datasets::config::VisualizationConfig;
 use crate::types::{Array3, Float, Matrix3x3, Matrix4x4, ToArray};
+use crate::debug_log;
 use crate::{Result, VIOError};
 use image::{DynamicImage, ImageBuffer, Luma};
 use rerun::components::Color;
@@ -130,7 +131,7 @@ impl Viewer for RerunViewer {
             rec.set_time_sequence("frame", 0);
             if self.log_axes {
                 match rec.log("origin", &rerun::ViewCoordinates::RDF()) {
-                    Ok(_) => log::debug!("[RerunViewer] Successfully logged coordinate system"),
+                    Ok(_) => debug_log!("[RerunViewer] Successfully logged coordinate system"),
                     Err(e) => {
                         log::warn!("[RerunViewer] Failed to log coordinate system: {}", e);
                     },
@@ -151,7 +152,7 @@ impl Viewer for RerunViewer {
                         .with_origins(origins)
                         .with_colors(colors),
                 ) {
-                    Ok(_) => log::debug!("[RerunViewer] Successfully logged axis arrows"),
+                    Ok(_) => debug_log!("[RerunViewer] Successfully logged axis arrows"),
                     Err(e) => log::warn!("[RerunViewer] Failed to log axis arrows: {}", e),
                 }
             }
@@ -249,7 +250,7 @@ impl Viewer for RerunViewer {
             let rr_image = rerun::EncodedImage::from_file_contents(bytes);
             match rec.log(entity_path, &rr_image) {
                 Ok(_) => {
-                    log::debug!(
+                    debug_log!(
                         "[RerunViewer] Successfully logged equalized image to {}",
                         entity_path
                     );

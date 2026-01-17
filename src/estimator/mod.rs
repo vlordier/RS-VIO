@@ -97,11 +97,13 @@
 pub mod constant_velocity_model;
 pub mod estimator;
 pub mod frame;
+pub mod frame_workspace;
 pub mod sliding_window;
 pub mod state;
 
 pub use constant_velocity_model::{ConstantVelocityConfig, ConstantVelocityModel};
 pub use estimator::Estimator;
 pub use frame::Frame;
+pub use frame_workspace::{FrameWorkspace, WorkspaceConfig};
 pub use sliding_window::SlidingWindow;
 pub use state::State;

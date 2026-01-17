@@ -54,6 +54,8 @@ lightglue = ["ort", "ndarray"]
 dhat-heap = []
 # Feature flag for GPU acceleration framework (placeholder for future CUDA/OpenCL support)
 gpu = []
+# Feature flag to enable debug/trace logging in hot paths (default off)
+debug-logging = []
 
 [dev-dependencies]
 criterion = "0.5"

@@ -141,6 +141,7 @@ impl GeometricVerifier for EnhancedGeometricVerifier {
         query: &KeyframeDescriptor,
         candidate: &KeyframeDescriptor,
         metrics: &MatchMetrics,
+        workspace: &mut crate::estimator::frame_workspace::FrameWorkspace,
     ) -> Option<VerifiedMatch> {
         // Pre-filter based on similarity
         if (metrics.similarity as f64) < self.config.min_pre_filter_similarity {
@@ -183,7 +184,7 @@ impl GeometricVerifier for EnhancedGeometricVerifier {
                 0.0, 0.0, 1.0, // 0, 0, 1
             );
 
-            match self.pnp_solver.solve(correspondences, &camera_intrinsics) {
+            match self.pnp_solver.solve(correspondences, &camera_intrinsics, workspace) {
                 Ok(result) => {
                     log::debug!(
                         "[EnhancedVerifier] PnP-RANSAC successful: {} inliers ({:.1}%)",
@@ -310,7 +311,8 @@ mod tests {
         };
 
         // Should be rejected due to low similarity
-        let result = verifier.verify(&query, &candidate, &metrics);
+        let mut workspace = crate::estimator::frame_workspace::FrameWorkspace::default();
+        let result = verifier.verify(&query, &candidate, &metrics, &mut workspace);
         assert!(result.is_none());
     }
 
@@ -346,7 +348,8 @@ mod tests {
         };
 
         // Should be accepted (PnP disabled)
-        let result = verifier.verify(&query, &candidate, &metrics);
+        let mut workspace = crate::estimator::frame_workspace::FrameWorkspace::default();
+        let result = verifier.verify(&query, &candidate, &metrics, &mut workspace);
         assert!(result.is_some());
     }
 }

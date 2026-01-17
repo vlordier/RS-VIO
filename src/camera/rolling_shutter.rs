@@ -186,9 +186,12 @@ impl RollingShutterCompensator {
                 self.interpolate_between_imu(imu_before, imu_after, alpha, current_pose)
             },
             _ => {
-                // Extrapolate using the most recent measurement
-                let latest_imu = imu_buffer.last().unwrap();
-                self.pose_from_imu(latest_imu, current_pose)
+                // Extrapolate using the most recent measurement if available
+                if let Some(latest_imu) = imu_buffer.last() {
+                    self.pose_from_imu(latest_imu, current_pose)
+                } else {
+                    *current_pose
+                }
             },
         }
     }

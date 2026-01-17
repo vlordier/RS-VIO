@@ -3,6 +3,7 @@ use crate::datasets::{
     PlayerResult,
 };
 use crate::estimator::Estimator;
+use crate::debug_log;
 use crate::{Result, VIOError};
 use image::ImageReader;
 use std::fs::File;
@@ -289,6 +290,6 @@ impl DatasetPlayer for TUMVIPlayer {
 
     fn initialize_estimator(&self, _estimator: &mut Estimator, _image_data: &[ImageData]) {
         // TUM-VI starts at identity pose - estimator already initialized with identity
-        log::debug!("[TUMVIPlayer] Estimator initialized with identity pose");
+        debug_log!("[TUMVIPlayer] Estimator initialized with identity pose");
     }
 }

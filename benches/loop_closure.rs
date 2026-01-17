@@ -137,19 +137,23 @@ fn bench_detection_database_size(c: &mut Criterion) {
                     ..Default::default()
                 };
                 let mut detector = LoopClosureDetector::new(config);
+                let mut workspace = crate::estimator::frame_workspace::FrameWorkspace::default();
 
                 // Populate database
                 for i in 0..size {
                     let desc = create_test_descriptor(i as u64, i as f64 * 0.1);
-                    let _ = detector.detect_loop_closure(i as u64, desc);
+                    let _ = detector.detect_loop_closure(i as u64, desc, &mut workspace);
                 }
 
                 // Benchmark loop closure detection
                 let query = create_test_descriptor((size + 100) as u64, 5.0);
 
                 b.iter(|| {
-                    let _ =
-                        black_box(detector.detect_loop_closure((size + 100) as u64, query.clone()));
+                    let _ = black_box(detector.detect_loop_closure(
+                        (size + 100) as u64,
+                        query.clone(),
+                        &mut workspace,
+                    ));
                 });
             },
         );

@@ -34,6 +34,7 @@ use crate::Result;
 use nalgebra as na;
 
 /// Trait for GPU-accelerated robustness computations
+use crate::debug_log; // Importing debug_log macro
 pub trait GpuAccelerated {
     /// Check if GPU acceleration is available
     fn is_available() -> bool;
@@ -87,7 +88,7 @@ impl GpuRansacFundamental {
         threshold: f32,
         confidence: f32,
     ) -> Result<super::ransac::RansacResult<super::ransac::FundamentalMatrix>> {
-        log::debug!("Using CPU RANSAC (GPU not yet implemented)");
+        debug_log!("Using CPU RANSAC (GPU not yet implemented)");
         super::ransac::RansacFundamental::estimate(matches, threshold, confidence)
             .ok_or_else(|| std::io::Error::new(
                 std::io::ErrorKind::Other,
@@ -113,7 +114,7 @@ impl GpuProsacFundamental {
         max_sample_size: usize,
         confidence: f32,
     ) -> Result<super::ransac::ProsacResult<super::ransac::FundamentalMatrix>> {
-        log::debug!("Using CPU PROSAC (GPU not yet implemented)");
+        debug_log!("Using CPU PROSAC (GPU not yet implemented)");
         super::ransac::ProsacFundamental::estimate(matches, max_sample_size, confidence)
             .ok_or_else(|| std::io::Error::new(
                 std::io::ErrorKind::Other,
@@ -134,7 +135,7 @@ pub mod geometric_gpu {
         _threshold: f32,
     ) -> Result<Vec<f32>> {
         // Future: GPU kernel would compute all Sampson distances in parallel
-        log::debug!("Using CPU geometric verification (GPU not yet implemented)");
+        debug_log!("Using CPU geometric verification (GPU not yet implemented)");
 
         let mut distances = Vec::with_capacity(points1.len());
         for (p1, p2) in points1.iter().zip(points2.iter()) {

@@ -3,6 +3,7 @@ use crate::datasets::CameraModelType;
 use crate::datasets::ImuData;
 use crate::estimator::Frame;
 use crate::estimator::SlidingWindow;
+use crate::estimator::{FrameWorkspace, WorkspaceConfig};
 use crate::feature_tracker::StereoPatchTracker;
 use crate::fl;
 use crate::imu::ExtrinsicCalibrator;
@@ -19,6 +20,7 @@ use crate::optimization::loop_closure::{
 };
 use crate::types::{Float, Matrix4x4, Vector3};
 use crate::viewers::Viewer;
+use crate::debug_log;
 use crate::{Result, VIOError};
 use image::GrayImage;
 use nalgebra as na;
@@ -80,6 +82,10 @@ pub struct Estimator {
     loop_closure_detector: LoopClosureDetector,
     // ORB descriptor extractor for loop closure
     orb_extractor: Option<crate::optimization::loop_closure::orb::OrbExtractor>,
+    // Frame workspace with preallocated buffers for per-frame processing
+    frame_workspace: FrameWorkspace,
+    // Frame counter for sampled logging (log every N frames to reduce overhead)
+    frame_count: u64,
 }
 
 impl Estimator {
@@ -171,6 +177,15 @@ impl Estimator {
             } else {
                 None
             },
+            frame_workspace: FrameWorkspace::new(WorkspaceConfig {
+                max_image_width: config.camera.image_width,
+                max_image_height: config.camera.image_height,
+                // Approximate capacity using grid_cols * max_features_per_grid
+                max_features_per_frame: (feature_config.grid_cols * feature_config.max_features_per_grid) as usize,
+                max_imu_samples: 200,
+                capacity_headroom: 1.2,
+            }),
+            frame_count: 0,
         }
     }
 
@@ -184,13 +199,16 @@ impl Estimator {
     ) -> Result<()> {
         let _total_start_time = Instant::now();
         let deadline = _total_start_time + self.max_frame_processing_time;
+        self.frame_count += 1;
+        let should_log = self.frame_count % 30 == 0; // Log every 30 frames (~1 Hz @ 30 FPS)
+
 
         // New frame: update counters
         self.frame_id_counter += 1;
         self.frames_since_last_keyframe += 1;
 
-        if self.enable_debug_output {
-            log::debug!(
+        if self.enable_debug_output && should_log {
+            debug_log!(
                 "============================== Frame {} ==============================",
                 self.frame_id_counter
             );
@@ -210,14 +228,29 @@ impl Estimator {
         let mut _motion_tracking_time_ms = 0.0f64;
         let mut _optimization_time_ms = 0.0f64;
 
-        // Frame creation
+        // Create workspace for frame processing (reusable buffers for RANSAC, descriptors, etc.)
+        let mut workspace = crate::estimator::frame_workspace::FrameWorkspace::default();        // Frame creation
         let frame_creation_start = Instant::now();
 
-        // Create GrayImage objects directly from input slices (no clone needed for tracking)
+        // Reset workspace buffers for new frame processing
+        self.frame_workspace.reset();
+
+        // Load images into preallocated workspace buffers (zero-copy)
         let img_w = self.config.camera.image_width;
         let img_h = self.config.camera.image_height;
 
-        let left_img = match GrayImage::from_raw(img_w, img_h, left_image.to_vec()) {
+        self.frame_workspace.load_left_image(left_image).map_err(|e| {
+            log::error!("[Estimator] Failed to load left image: {}", e);
+            VIOError::Image(format!("Failed to load left image: {}", e))
+        })?;
+        self.frame_workspace.load_right_image(right_image).map_err(|e| {
+            log::error!("[Estimator] Failed to load right image: {}", e);
+            VIOError::Image(format!("Failed to load right image: {}", e))
+        })?;
+
+        // Create GrayImage objects from workspace buffers without reallocation
+        let left_buf = self.frame_workspace.take_left_image_buffer();
+        let left_img = match GrayImage::from_raw(img_w, img_h, left_buf) {
             Some(img) => img,
             None => {
                 log::error!("[Estimator] Failed to construct GrayImage for left camera");
@@ -226,7 +259,8 @@ impl Estimator {
                 ));
             },
         };
-        let right_img = match GrayImage::from_raw(img_w, img_h, right_image.to_vec()) {
+        let right_buf = self.frame_workspace.take_right_image_buffer();
+        let right_img = match GrayImage::from_raw(img_w, img_h, right_buf) {
             Some(img) => img,
             None => {
                 log::error!(
@@ -255,9 +289,17 @@ impl Estimator {
         if let Some(imu) = imu_data {
             // Check if IMU is enabled in debug config
             if self.config.debug.use_imu {
-                // Attach IMU measurements to frame
-                current_frame.imu_from_last_frame = imu.to_vec();
-
+                // Load IMU samples into workspace buffer
+                for imu_sample in imu.iter() {
+                    self.frame_workspace.push_imu_sample(imu_sample)
+                        .map_err(|e| {
+                            log::warn!("[Estimator] IMU buffer overflow: {}", e);
+                            VIOError::Optimization(e)
+                        })?;
+                }
+                
+                // Attach IMU measurements to frame (clone from workspace)
+                current_frame.imu_from_last_frame = self.frame_workspace.imu_samples().to_vec();
                 // During initialization, collect IMU samples for bias estimation
                 if self.is_initializing {
                     for imu_sample in imu {
@@ -302,7 +344,9 @@ impl Estimator {
                     self.imu_measurement_count += 1;
                 }
             } else {
-                log::debug!("[Estimator] IMU disabled via debug config");
+                if should_log {
+                    debug_log!("[Estimator] IMU disabled via debug config");
+                }
             }
 
             // Use motion predictor for feature tracking
@@ -331,10 +375,12 @@ impl Estimator {
                 self.velocity_estimator
                     .initialize_from_imu(imu, &initial_orientation);
                 self.velocity_estimator_initialized = true;
-                log::debug!(
-                    "[Estimator] Velocity estimator initialized with {} IMU samples",
-                    imu.len()
-                );
+                if should_log {
+                    debug_log!(
+                        "[Estimator] Velocity estimator initialized with {} IMU samples",
+                        imu.len()
+                    );
+                }
             }
 
             // Update velocity estimator
@@ -373,6 +419,12 @@ impl Estimator {
             .process_frame(&left_img, &right_img, &mut current_frame);
         _patch_tracking_time_ms = tracking_start.elapsed().as_secs_f64() * 1000.0;
         self.view_patch_tracking_results(&current_frame, &left_img, &right_img, img_w, img_h);
+
+        // Return image buffers to workspace for reuse
+        let left_buf_back = left_img.into_raw();
+        let right_buf_back = right_img.into_raw();
+        self.frame_workspace.put_left_image_buffer(left_buf_back);
+        self.frame_workspace.put_right_image_buffer(right_buf_back);
 
         // Check deadline after patch tracking
         if Instant::now() > deadline {
@@ -449,7 +501,7 @@ impl Estimator {
                     let is_keyframe = is_imu_keyframe || visual_keyframe;
 
                     if is_keyframe {
-                        let reason = if is_imu_keyframe && !visual_keyframe {
+                        let _reason = if is_imu_keyframe && !visual_keyframe {
                             format!("IMU-aided: {}", keyframe_reason)
                         } else if visual_keyframe {
                             let t_norm = t_rel.norm();
@@ -457,7 +509,7 @@ impl Estimator {
                         } else {
                             keyframe_reason
                         };
-                        log::debug!("[Estimator] Keyframe triggered: {}", reason);
+                        debug_log!("[Estimator] Keyframe triggered: {}", _reason);
 
                         current_frame.is_keyframe = true;
                     } else {
@@ -476,7 +528,9 @@ impl Estimator {
             }
             _motion_tracking_time_ms = motion_tracking_start.elapsed().as_secs_f64() * 1000.0;
         } else {
-            log::debug!("[Estimator] Sliding window is not full, skipping motion tracking");
+            debug_log!(
+                "[Estimator] Sliding window is not full, skipping motion tracking"
+            );
         }
 
         // View map points and keyframe poses
@@ -494,7 +548,7 @@ impl Estimator {
 
             if let Ok(constraints) = self
                 .loop_closure_detector
-                .detect_loop_closure(kf_id, descriptor)
+                .detect_loop_closure(kf_id, descriptor, &mut workspace)
             {
                 if !constraints.is_empty() {
                     log::info!(
@@ -539,14 +593,14 @@ impl Estimator {
         }
 
         // Final timing summary
-        let total_duration_ms = _total_start_time.elapsed().as_secs_f64() * 1000.0;
-        log::debug!(
+        let _total_duration_ms = _total_start_time.elapsed().as_secs_f64() * 1000.0;
+        debug_log!(
             "[Timing] frame_creation={:.3} ms, patch_tracking={:.3} ms, motion_tracking={:.3} ms, optimization={:.3} ms, total={:.3} ms",
             _frame_creation_time_ms,
             _patch_tracking_time_ms,
             _motion_tracking_time_ms,
             _optimization_time_ms,
-            total_duration_ms
+            _total_duration_ms
         );
 
         Ok(())

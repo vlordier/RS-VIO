@@ -1,4 +1,4 @@
-use image::{GenericImageView, GrayImage};
+use image::{GenericImage, GenericImageView, GrayImage, Luma};
 use imageproc::corners::{corners_fast9, Corner};
 use nalgebra as na;
 
@@ -105,6 +105,74 @@ pub fn se2_exp_matrix(a: &na::SVector<f32, 3>) -> na::SMatrix<f32, 3, 3> {
     se2_mat
 }
 
+/// Downsample an image by 2x using a 2x2 box filter (average).
+/// Dst dimensions must be exactly half of src dimensions.
+pub fn downsample_half_box(src: &GrayImage, dst: &mut GrayImage) {
+    let (sw, sh) = src.dimensions();
+    let (dw, dh) = dst.dimensions();
+    debug_assert_eq!(dw, sw / 2);
+    debug_assert_eq!(dh, sh / 2);
+    let sdata = src.as_raw();
+    let ddata = dst.as_mut();
+    for y in 0..dh {
+        let sy = y * 2;
+        for x in 0..dw {
+            let sx = x * 2;
+            let idx0 = (sy * sw + sx) as usize;
+            let idx1 = (sy * sw + sx + 1) as usize;
+            let idx2 = ((sy + 1) * sw + sx) as usize;
+            let idx3 = ((sy + 1) * sw + sx + 1) as usize;
+            let sum = sdata[idx0] as u32
+                + sdata[idx1] as u32
+                + sdata[idx2] as u32
+                + sdata[idx3] as u32;
+            ddata[(y * dw + x) as usize] = (sum / 4) as u8;
+        }
+    }
+}
+
+/// Fill a preallocated pyramid in-place with downsampled levels.
+/// Level 0 is copied from src; subsequent levels are 2x downsampled.
+pub fn fill_pyramid(pyr: &mut [GrayImage], src: &GrayImage) {
+    // Level 0: copy
+    let (w0, h0) = src.dimensions();
+    debug_assert_eq!(pyr[0].dimensions(), (w0, h0));
+    pyr[0].copy_from(src, 0, 0).ok();
+    // Subsequent levels: 2x2 box downsample
+    for level in 1..pyr.len() {
+        let (left, right) = pyr.split_at_mut(level);
+        let prev = &left[level - 1];
+        let dst = &mut right[0];
+        let (pw, ph) = prev.dimensions();
+        let (dw, dh) = dst.dimensions();
+        debug_assert_eq!(dw, pw / 2);
+        debug_assert_eq!(dh, ph / 2);
+        downsample_half_box(prev, dst);
+    }
+}
+
+/// Ensure a pyramid Vec is allocated with the correct number of levels and dimensions.
+/// If already allocated, does nothing. Returns true if allocation was needed.
+pub fn ensure_pyramid_allocated(pyr: &mut Vec<GrayImage>, w: u32, h: u32, levels: usize) -> bool {
+    if pyr.len() == levels {
+        // Already allocated, verify dimensions match
+        let (pw, ph) = pyr[0].dimensions();
+        if pw == w && ph == h {
+            return false;
+        }
+    }
+    // Allocate or reallocate
+    pyr.clear();
+    let mut cw = w;
+    let mut ch = h;
+    for _ in 0..levels {
+        pyr.push(GrayImage::from_pixel(cw, ch, Luma([0u8])));
+        cw /= 2;
+        ch /= 2;
+    }
+    true
+}
+
 /// Refine corner position to sub-pixel accuracy using quadratic interpolation
 /// of the corner response function around the detected corner location.
 pub fn refine_corner_subpixel(image: &GrayImage, corner: &Corner, window_size: u32) -> (f32, f32) {
@@ -207,8 +275,7 @@ pub fn detect_key_points(
                 let mut fast_corners = corners_fast9(&image_view, threshold);
                 fast_corners.sort_by(|a, b| {
                     a.score
-                        .partial_cmp(&b.score)
-                        .unwrap_or(std::cmp::Ordering::Equal)
+                        .total_cmp(&b.score)
                 });
 
                 for mut point in fast_corners {

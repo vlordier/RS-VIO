@@ -6,6 +6,8 @@
 use crate::datasets::FrameContext;
 use crate::estimator::Estimator;
 use crate::Result;
+use crate::debug_log;
+use crate::trace_log;
 
 /// Trait for a single frame processing step
 ///
@@ -42,15 +44,24 @@ pub trait FrameProcessor: Send + Sync {
 /// The pipeline executes each processor in sequence, accumulating timing information.
 pub struct ProcessingPipeline {
     processors: Vec<Box<dyn FrameProcessor>>,
+    #[cfg(feature = "debug-logging")]
     name: String,
 }
 
 impl ProcessingPipeline {
     /// Create a new empty processing pipeline
+    #[cfg(feature = "debug-logging")]
     pub fn new(name: impl Into<String>) -> Self {
         ProcessingPipeline {
             processors: Vec::new(),
             name: name.into(),
+        }
+    }
+
+    #[cfg(not(feature = "debug-logging"))]
+    pub fn new(_name: impl Into<String>) -> Self {
+        ProcessingPipeline {
+            processors: Vec::new(),
         }
     }
 
@@ -69,7 +80,7 @@ impl ProcessingPipeline {
         let mut total_time = 0.0;
 
         for processor in &self.processors {
-            log::debug!(
+            debug_log!(
                 "[Pipeline::{}] Running stage: {}",
                 self.name,
                 processor.name()
@@ -77,7 +88,7 @@ impl ProcessingPipeline {
             let stage_time = processor.process(estimator, context)?;
             total_time += stage_time;
 
-            log::trace!(
+            trace_log!(
                 "[Pipeline::{}] Stage '{}' took {:.2}ms",
                 self.name,
                 processor.name(),

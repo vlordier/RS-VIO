@@ -3,6 +3,7 @@ use crate::datasets::{
     PlayerResult,
 };
 use crate::estimator::Estimator;
+use crate::debug_log;
 use crate::{Result, VIOError};
 use image::ImageReader;
 use std::fs::File;
@@ -290,6 +291,6 @@ impl DatasetPlayer for FourSeasonsPlayer {
 
     fn initialize_estimator(&self, _estimator: &mut Estimator, _image_data: &[ImageData]) {
         // FourSeasons starts at identity pose - estimator already initialized with identity
-        log::debug!("[FourSeasonsPlayer] Estimator initialized with identity pose");
+        debug_log!("[FourSeasonsPlayer] Estimator initialized with identity pose");
     }
 }

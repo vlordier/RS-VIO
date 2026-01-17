@@ -3,6 +3,7 @@ use crate::datasets::{
     PlayerResult,
 };
 use crate::estimator::Estimator;
+use crate::debug_log;
 use crate::{Result, VIOError};
 use image::ImageReader;
 use std::fs::File;
@@ -282,6 +283,6 @@ impl DatasetPlayer for EurocPlayer {
     fn initialize_estimator(&self, _estimator: &mut Estimator, _image_data: &[ImageData]) {
         // EuroC starts at identity pose - estimator already initialized with identity
         // For datasets with ground truth initial poses, this could be extended to load them
-        log::debug!("[EurocPlayer] Estimator initialized with identity pose");
+        debug_log!("[EurocPlayer] Estimator initialized with identity pose");
     }
 }

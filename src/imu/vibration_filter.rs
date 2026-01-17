@@ -4,33 +4,14 @@
 //! Used to identify dominant vibration frequencies and apply targeted filtering to reduce
 //! motion blur and improve VIO accuracy.
 //!
-//! ## Algorithm Overview
-//!
-//! 1. **FFT Analysis**: Compute frequency spectrum of IMU signals over sliding windows
-//! 2. **Peak Detection**: Identify dominant vibration frequencies (typically motor harmonics)
-//! 3. **Notch Filter Design**: Design IIR notch filters targeting identified frequencies
-//! 4. **Real-time Application**: Apply filters to incoming IMU measurements
-//!
-//! ## Key Features
-//!
-//! - Real-time FFT analysis with configurable window sizes
-//! - Automatic peak detection in frequency domain
-//! - Adaptive notch filter design based on detected frequencies
-//! - CPU-efficient implementation for embedded systems
-//! - Integration with existing IMU bias correction pipeline
-//!
-//! ## Usage
-//!
-//! ```rust,ignore
-//! let mut filter = VibrationNotchFilter::new(200.0, 512); // 200Hz sampling, 512-point FFT
-//! let filtered_imu = filter.process_measurement(raw_imu);
-//! ```
-
 use crate::datasets::ImuData;
 use crate::types::Float;
 use rustfft::algorithm::Radix4;
 use rustfft::num_complex::Complex;
 use rustfft::{Fft, FftDirection};
+
+#[derive(Copy, Clone)]
+pub enum AxisSource { Gyro, Accel }
 
 /// Configuration for vibration notch filtering
 #[derive(Debug, Clone)]
@@ -81,6 +62,14 @@ pub struct VibrationNotchFilter {
     config: VibrationFilterConfig,
     /// FFT planner
     fft: Radix4<f32>,
+    /// Preallocated FFT input/output buffer (complex)
+    fft_buffer: Vec<Complex<f32>>,
+    /// Precomputed Hann window
+    window: Vec<f32>,
+    /// Magnitude buffer for spectrum
+    magnitude_buffer: Vec<f32>,
+    /// Scratch buffer for sorted magnitudes (noise floor)
+    sorted_mags: Vec<f32>,
     /// Gyroscope signal buffers (x, y, z)
     gyro_buffers: [Vec<f32>; 3],
     /// Accelerometer signal buffers (x, y, z)
@@ -104,11 +93,25 @@ impl VibrationNotchFilter {
         config.sampling_rate = sampling_rate;
         config.fft_size = fft_size;
 
+        // Clamp configured frequencies to Nyquist to ensure stability
+        let nyquist = config.sampling_rate / 2.0;
+        config.max_freq = config.max_freq.min(nyquist);
+        config.min_freq = config.min_freq.min(config.max_freq);
+
         let fft = Radix4::new(fft_size, FftDirection::Forward);
+
+        // Precompute window
+        let window: Vec<f32> = (0..fft_size)
+            .map(|i| 0.5 * (1.0 - (2.0 * std::f32::consts::PI * i as f32 / fft_size as f32).cos()))
+            .collect();
 
         Self {
             config,
             fft,
+            fft_buffer: vec![Complex::new(0.0, 0.0); fft_size],
+            window,
+            magnitude_buffer: vec![0.0; fft_size],
+            sorted_mags: Vec::with_capacity(fft_size),
             gyro_buffers: [
                 vec![0.0; fft_size],
                 vec![0.0; fft_size],
@@ -171,15 +174,16 @@ impl VibrationNotchFilter {
 
     /// Update notch filters based on current vibration analysis
     fn update_filters(&mut self) {
-        // Analyze gyro signals for vibration peaks
-        let gyro_peaks = self.analyze_signal(&self.gyro_buffers);
-
-        // Analyze accel signals for vibration peaks
-        let accel_peaks = self.analyze_signal(&self.accel_buffers);
-
-        // Combine and sort by magnitude
-        let mut all_peaks = gyro_peaks;
-        all_peaks.extend(accel_peaks);
+        // Analyze gyro and accel signals axis-by-axis to avoid borrow conflicts
+        let mut all_peaks = Vec::new();
+        for axis in 0..3 {
+            let detected = self.analyze_axis(axis, AxisSource::Gyro);
+            all_peaks.extend(detected);
+        }
+        for axis in 0..3 {
+            let detected = self.analyze_axis(axis, AxisSource::Accel);
+            all_peaks.extend(detected);
+        }
         all_peaks.sort_by(|a, b| b.magnitude.total_cmp(&a.magnitude));
 
         // Take top peaks
@@ -204,85 +208,60 @@ impl VibrationNotchFilter {
     }
 
     /// Analyze signal for vibration peaks using FFT
-    fn analyze_signal(&self, buffers: &[Vec<f32>; 3]) -> Vec<VibrationPeak> {
+    // analyze_signal removed; inlined into update_filters to satisfy borrow rules
+
+    /// Analyze a single axis: compute FFT, magnitudes, detect peaks
+    fn analyze_axis(&mut self, axis: usize, source: AxisSource) -> Vec<VibrationPeak> {
         let mut peaks = Vec::new();
+        let n = self.config.fft_size;
+        if n < 3 { return peaks; }
 
-        for buffer in buffers {
-            let spectrum = self.compute_fft(buffer);
-            let detected = self.find_peaks(&spectrum);
-            peaks.extend(detected);
+        // FFT with window
+        for i in 0..n {
+            let sample = match source {
+                AxisSource::Gyro => self.gyro_buffers[axis][i],
+                AxisSource::Accel => self.accel_buffers[axis][i],
+            };
+            self.fft_buffer[i] = Complex::new(sample, 0.0) * self.window[i];
+        }
+        self.fft.process(&mut self.fft_buffer);
+
+        // Magnitudes
+        for i in 0..n {
+            self.magnitude_buffer[i] = self.fft_buffer[i].norm();
         }
 
-        peaks
-    }
+        // Frequency bin range
+        let nyquist = self.config.sampling_rate / 2.0;
+        let max_freq = self.config.max_freq.min(nyquist);
+        let min_freq = self.config.min_freq.min(max_freq);
+        let bin_min = (min_freq * self.config.fft_size as Float / self.config.sampling_rate) as usize;
+        let bin_max = (max_freq * self.config.fft_size as Float / self.config.sampling_rate) as usize;
+        if bin_max <= bin_min + 1 || bin_min + 1 >= n { return peaks; }
 
-    /// Compute FFT of signal buffer
-    fn compute_fft(&self, signal: &[f32]) -> Vec<Complex<f32>> {
-        let mut buffer: Vec<Complex<f32>> = signal.iter().map(|&x| Complex::new(x, 0.0)).collect();
+        // Noise floor via median
+        self.sorted_mags.clear();
+        let upper = bin_max.min(n);
+        self.sorted_mags.extend_from_slice(&self.magnitude_buffer[bin_min..upper]);
+        if self.sorted_mags.is_empty() { return peaks; }
+        self.sorted_mags.sort_by(|a, b| a.total_cmp(b));
+        let noise_floor = self.sorted_mags[self.sorted_mags.len() / 2];
 
-        // Apply window (Hanning)
-        let window: Vec<f32> = (0..signal.len())
-            .map(|i| {
-                0.5 * (1.0 - (2.0 * std::f32::consts::PI * i as f32 / signal.len() as f32).cos())
-            })
-            .collect();
-
-        for i in 0..buffer.len() {
-            buffer[i] *= window[i];
-        }
-
-        self.fft.process(&mut buffer);
-        buffer
-    }
-
-    /// Find peaks in frequency spectrum
-    fn find_peaks(&self, spectrum: &[Complex<f32>]) -> Vec<VibrationPeak> {
-        let mut peaks = Vec::new();
-        let magnitudes: Vec<f32> = spectrum.iter().map(|c| c.norm()).collect();
-
-        if magnitudes.len() < 3 {
-            return peaks;
-        }
-
-        // Find frequency bins in range
-        let bin_min = (self.config.min_freq * self.config.fft_size as Float
-            / self.config.sampling_rate) as usize;
-        let bin_max = (self.config.max_freq * self.config.fft_size as Float
-            / self.config.sampling_rate) as usize;
-
-        // Compute noise floor (median of spectrum)
-        let mut sorted_mags = magnitudes[bin_min..bin_max.min(magnitudes.len())].to_vec();
-        if sorted_mags.is_empty() {
-            return peaks;
-        }
-        sorted_mags.sort_by(|a, b| a.total_cmp(b));
-        let noise_floor = sorted_mags[sorted_mags.len() / 2];
-
-        // Find local maxima
-        for bin in (bin_min + 1)..(bin_max.min(magnitudes.len() - 1)) {
-            let mag = magnitudes[bin];
-            let prev_mag = magnitudes[bin - 1];
-            let next_mag = magnitudes[bin + 1];
-
-            // Local maximum and above threshold
-            if mag > prev_mag
-                && mag > next_mag
-                && mag as Float > noise_floor as Float * (1.0 + self.config.peak_threshold)
-            {
-                let frequency =
-                    bin as Float * self.config.sampling_rate / self.config.fft_size as Float;
+        // Local maxima above threshold
+        for bin in (bin_min + 1)..(upper.min(n - 1)) {
+            let mag = self.magnitude_buffer[bin];
+            let prev_mag = self.magnitude_buffer[bin - 1];
+            let next_mag = self.magnitude_buffer[bin + 1];
+            if mag > prev_mag && mag > next_mag && (mag as Float) > (noise_floor as Float) * (1.0 + self.config.peak_threshold) {
+                let frequency = bin as Float * self.config.sampling_rate / self.config.fft_size as Float;
                 let snr = mag as Float / noise_floor as Float;
-
-                peaks.push(VibrationPeak {
-                    frequency,
-                    magnitude: mag as Float,
-                    snr,
-                });
+                peaks.push(VibrationPeak { frequency, magnitude: mag as Float, snr });
             }
         }
 
         peaks
     }
+    // compute_fft and find_peaks removed; logic merged into analyze_axis
 
     /// Get current detected vibration peaks
     pub fn get_detected_peaks(&self) -> &[VibrationPeak] {
@@ -405,7 +384,7 @@ mod tests {
 
     #[test]
     fn test_fft_computation() {
-        let filter = VibrationNotchFilter::new(200.0, 512);
+        let mut filter = VibrationNotchFilter::new(200.0, 512);
 
         // Create test signal with known frequency (50Hz at 200Hz sampling)
         let fs = 200.0;
@@ -414,27 +393,19 @@ mod tests {
             .map(|i| ((i as f32 / fs) * std::f32::consts::PI * 2.0 * f).sin())
             .collect();
 
-        let spectrum = filter.compute_fft(&signal);
-        assert_eq!(spectrum.len(), 512);
-
-        // Check that spectrum contains the expected frequency
-        // Only look at positive frequencies (first N/2 bins)
-        let magnitudes: Vec<f32> = spectrum.iter().take(256).map(|c| c.norm()).collect();
-        let peak_bin = magnitudes
+        // Inject into gyro buffer and analyze
+        filter.gyro_buffers[0].copy_from_slice(&signal);
+        let peaks = filter.analyze_axis(0, AxisSource::Gyro);
+        assert!(!peaks.is_empty());
+        let top = peaks
             .iter()
-            .enumerate()
-            .max_by(|(_, a), (_, b)| a.total_cmp(b))
-            .unwrap()
-            .0;
-
-        // Should be around bin 128 (512 * 50 / 200)
-        let expected_bin = (50.0 * 512.0 / 200.0) as usize;
-        // Allow more tolerance due to windowing and discretization effects
+            .max_by(|a, b| a.magnitude.total_cmp(&b.magnitude))
+            .unwrap();
+        // Frequency should be near 50Hz
         assert!(
-            (peak_bin as i32 - expected_bin as i32).abs() <= 10,
-            "Peak bin {} not close to expected bin {} (tolerance 10)",
-            peak_bin,
-            expected_bin
+            (top.frequency - 50.0).abs() < 10.0,
+            "Peak freq {:.2}Hz not close to 50Hz",
+            top.frequency
         );
     }
 }

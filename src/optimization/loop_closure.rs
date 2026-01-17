@@ -38,6 +38,7 @@
 //! - Lepetit & Fua, "Keypoint Recognition Using Randomized Trees", TPAMI 2006
 
 pub mod bow_retriever;
+pub mod descriptor_pool;
 pub mod enhanced_verifier;
 #[cfg(feature = "lightglue")]
 pub mod lightglue;
@@ -111,6 +112,7 @@ pub trait GeometricVerifier: Send + Sync {
         query: &KeyframeDescriptor,
         candidate: &KeyframeDescriptor,
         metrics: &MatchMetrics,
+        workspace: &mut crate::estimator::frame_workspace::FrameWorkspace,
     ) -> Option<VerifiedMatch>;
 }
 
@@ -125,6 +127,7 @@ impl GeometricVerifier for SimpleRelativePoseVerifier {
         query: &KeyframeDescriptor,
         candidate: &KeyframeDescriptor,
         metrics: &MatchMetrics,
+        _workspace: &mut crate::estimator::frame_workspace::FrameWorkspace,
     ) -> Option<VerifiedMatch> {
         if metrics.similarity < self.min_similarity {
             return None;
@@ -162,6 +165,7 @@ impl GeometricVerifier for RansacEpipolarVerifier {
         query: &KeyframeDescriptor,
         candidate: &KeyframeDescriptor,
         metrics: &MatchMetrics,
+        _workspace: &mut crate::estimator::frame_workspace::FrameWorkspace,
     ) -> Option<VerifiedMatch> {
         // Need sufficient matches for RANSAC
         if metrics.match_count < 8 {
@@ -538,6 +542,7 @@ impl LoopClosureDetector {
         &mut self,
         keyframe_id: u64,
         descriptor: KeyframeDescriptor,
+        workspace: &mut crate::estimator::frame_workspace::FrameWorkspace,
     ) -> Result<Vec<LoopClosureConstraint>> {
         // Check minimum frame gap
         if let Some(last_id) = self.last_detection_keyframe_id {
@@ -584,7 +589,7 @@ impl LoopClosureDetector {
                 continue;
             }
 
-            if let Some(verified) = self.verifier.verify(&descriptor, &keyframe, &metrics) {
+            if let Some(verified) = self.verifier.verify(&descriptor, &keyframe, &metrics, workspace) {
                 let constraint = LoopClosureConstraint {
                     keyframe_id_1: keyframe_id,
                     keyframe_id_2: candidate_id,
@@ -742,16 +747,17 @@ mod tests {
             ..Default::default()
         };
         let mut detector = LoopClosureDetector::new(config);
+        let mut workspace = crate::estimator::frame_workspace::FrameWorkspace::default();
 
         // Add initial keyframes
         for i in 0..5 {
             let desc = create_test_descriptor(i, i as f64 * 0.1);
-            let _ = detector.detect_loop_closure(i, desc);
+            let _ = detector.detect_loop_closure(i, desc, &mut workspace);
         }
 
         // Revisit location similar to frame 0
         let query = create_test_descriptor(100, 0.0); // Similar to frame 0
-        let closures = detector.detect_loop_closure(100, query).unwrap();
+        let closures = detector.detect_loop_closure(100, query, &mut workspace).unwrap();
 
         // Should detect loop closure with frame 0
         assert!(closures.len() >= 1);
@@ -768,20 +774,21 @@ mod tests {
             ..Default::default()
         };
         let mut detector = LoopClosureDetector::new(config);
+        let mut workspace = crate::estimator::frame_workspace::FrameWorkspace::default();
 
         // Insert a baseline keyframe with limited features
         let base = KeyframeDescriptor {
             num_features: 20,
             ..create_test_descriptor(0, 0.0)
         };
-        let _ = detector.detect_loop_closure(0, base);
+        let _ = detector.detect_loop_closure(0, base, &mut workspace);
 
         // Query is similar but with same feature count; estimated matches remain < thresholds
         let query = KeyframeDescriptor {
             num_features: 20,
             ..create_test_descriptor(1, 0.0)
         };
-        let closures = detector.detect_loop_closure(1, query).unwrap();
+        let closures = detector.detect_loop_closure(1, query, &mut workspace).unwrap();
 
         // Should be filtered out by min_matches/min_inliers/ratio
         assert!(closures.is_empty());
@@ -819,13 +826,14 @@ mod tests {
             ..Default::default()
         };
         let mut detector = LoopClosureDetector::new(config);
+        let mut workspace = crate::estimator::frame_workspace::FrameWorkspace::default();
 
         let first = KeyframeDescriptor {
             timestamp: 0,
             num_features: 80,
             ..create_test_descriptor(0, 0.0)
         };
-        let _ = detector.detect_loop_closure(0, first);
+        let _ = detector.detect_loop_closure(0, first, &mut workspace);
 
         // Second frame is too close in time to pass temporal gating (~33ms per frame heuristic)
         let second = KeyframeDescriptor {
@@ -833,7 +841,7 @@ mod tests {
             num_features: 80,
             ..create_test_descriptor(1, 0.0)
         };
-        let closures = detector.detect_loop_closure(1, second).unwrap();
+        let closures = detector.detect_loop_closure(1, second, &mut workspace).unwrap();
         assert!(closures.is_empty());
     }
 
@@ -885,13 +893,14 @@ mod tests {
             min_similarity: 0.9,
         });
         let mut detector = LoopClosureDetector::new_with(config, matcher, verifier);
+        let mut workspace = crate::estimator::frame_workspace::FrameWorkspace::default();
 
         let base = create_test_descriptor(0, 0.0);
-        let _ = detector.detect_loop_closure(0, base);
+        let _ = detector.detect_loop_closure(0, base, &mut workspace);
 
         // Very different descriptor should fail verifier
         let query = create_test_descriptor(1, 3.14);
-        let closures = detector.detect_loop_closure(1, query).unwrap();
+        let closures = detector.detect_loop_closure(1, query, &mut workspace).unwrap();
         assert!(closures.is_empty());
     }
 
@@ -903,19 +912,20 @@ mod tests {
         config.descriptor_distance_threshold = 0.5;
 
         let mut detector = LoopClosureDetector::new(config);
+        let mut workspace = crate::estimator::frame_workspace::FrameWorkspace::default();
 
         let first = KeyframeDescriptor {
             timestamp: 0,
             ..create_test_descriptor(0, 0.0)
         };
-        let _ = detector.detect_loop_closure(0, first);
+        let _ = detector.detect_loop_closure(0, first, &mut workspace);
 
         // Only 10ms later; should be blocked by min_time_gap_ns even though frame gap is 0
         let second = KeyframeDescriptor {
             timestamp: 10_000_000,
             ..create_test_descriptor(1, 0.0)
         };
-        let closures = detector.detect_loop_closure(1, second).unwrap();
+        let closures = detector.detect_loop_closure(1, second, &mut workspace).unwrap();
         assert!(closures.is_empty());
     }
 
@@ -923,10 +933,11 @@ mod tests {
     fn test_detector_reset() {
         let config = LoopClosureConfig::default();
         let mut detector = LoopClosureDetector::new(config);
+        let mut workspace = crate::estimator::frame_workspace::FrameWorkspace::default();
 
         // Add a keyframe
         let desc = create_test_descriptor(0, 0.0);
-        let _ = detector.detect_loop_closure(0, desc);
+        let _ = detector.detect_loop_closure(0, desc, &mut workspace);
 
         assert_eq!(detector.database_size(), 1);
 
@@ -979,18 +990,19 @@ mod tests {
         let matcher: Box<dyn DescriptorMatcher> = Box::new(CosineMatcher);
         let verifier: Box<dyn GeometricVerifier> = Box::new(RansacEpipolarVerifier::default());
         let mut detector = LoopClosureDetector::new_with(config, matcher, verifier);
+        let mut workspace = crate::estimator::frame_workspace::FrameWorkspace::default();
 
         let base = KeyframeDescriptor {
             num_features: 5, // Too few for RANSAC (needs 8)
             ..create_test_descriptor(0, 0.0)
         };
-        let _ = detector.detect_loop_closure(0, base);
+        let _ = detector.detect_loop_closure(0, base, &mut workspace);
 
         let query = KeyframeDescriptor {
             num_features: 5,
             ..create_test_descriptor(1, 0.0)
         };
-        let closures = detector.detect_loop_closure(1, query).unwrap();
+        let closures = detector.detect_loop_closure(1, query, &mut workspace).unwrap();
         assert!(closures.is_empty());
     }
 
@@ -1024,16 +1036,17 @@ mod tests {
             min_similarity: 0.2,
         });
         let mut detector = LoopClosureDetector::new_with(config, matcher, verifier);
+        let mut workspace = crate::estimator::frame_workspace::FrameWorkspace::default();
 
         // Add initial keyframes
         for i in 0..3 {
             let desc = create_test_descriptor(i, i as f64 * 0.1);
-            let _ = detector.detect_loop_closure(i, desc);
+            let _ = detector.detect_loop_closure(i, desc, &mut workspace);
         }
 
         // Revisit similar location
         let query = create_test_descriptor(10, 0.0);
-        let closures = detector.detect_loop_closure(10, query).unwrap();
+        let closures = detector.detect_loop_closure(10, query, &mut workspace).unwrap();
 
         // Should detect some loop closures
         assert!(closures.len() > 0);
@@ -1054,18 +1067,19 @@ mod tests {
         let mut verifier = RansacEpipolarVerifier::default();
         verifier.min_inlier_ratio = 0.3;
         let mut detector = LoopClosureDetector::new_with(config, matcher, Box::new(verifier));
+        let mut workspace = crate::estimator::frame_workspace::FrameWorkspace::default();
 
         let base = KeyframeDescriptor {
             num_features: 100,
             ..create_test_descriptor(0, 0.0)
         };
-        let _ = detector.detect_loop_closure(0, base);
+        let _ = detector.detect_loop_closure(0, base, &mut workspace);
 
         let query = KeyframeDescriptor {
             num_features: 100,
             ..create_test_descriptor(10, 0.0)
         };
-        let closures = detector.detect_loop_closure(10, query).unwrap();
+        let closures = detector.detect_loop_closure(10, query, &mut workspace).unwrap();
 
         // With sufficient features and similarity, should detect loop closure
         assert!(closures.len() > 0);

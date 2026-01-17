@@ -19,6 +19,7 @@ use na::{DVector, UnitQuaternion};
 use nalgebra as na;
 use std::collections::HashMap;
 use std::collections::VecDeque;
+use crate::debug_log;
 
 /// Trait for window management strategies.
 ///
@@ -226,7 +227,7 @@ impl SlidingWindow {
         // Remove oldest frame if window is full (FIFO - first in, first out)
         if self.keyframes.len() >= self.max_frames {
             if let Some(removed_frame) = self.keyframes.pop_front() {
-                log::debug!(
+                debug_log!(
                     "[SlidingWindow] Removed oldest frame (frame_id: {}) to make room for new keyframe",
                     removed_frame.frame_id
                 );
@@ -236,11 +237,11 @@ impl SlidingWindow {
                     .retain(|c| c.keyframe_id_1 != removed_id && c.keyframe_id_2 != removed_id);
             }
         }
-        let frame_id = frame.frame_id;
+        let _frame_id = frame.frame_id;
 
         // Add frame to sliding window
         self.keyframes.push_back(frame);
-        log::debug!(
+        debug_log!(
             "[SlidingWindow] Added keyframe (frame_id: {}), window size: {}/{}",
             frame_id,
             self.keyframes.len(),
@@ -284,7 +285,7 @@ impl SlidingWindow {
     pub fn clear(&mut self) {
         self.keyframes.clear();
         self.loop_closure_constraints.clear();
-        log::debug!("[SlidingWindow] Cleared all keyframes");
+        debug_log!("[SlidingWindow] Cleared all keyframes");
     }
 
     fn build_solver_config(&self) -> LevenbergMarquardtConfig {
@@ -313,7 +314,7 @@ impl SlidingWindow {
             return Err(std::io::Error::other("Need more keyframes"));
         }
 
-        log::debug!(
+        debug_log!(
             "[SlidingWindow] Starting bundle adjustment optimization with {} keyframes",
             self.keyframes.len()
         );
@@ -368,6 +369,16 @@ impl SlidingWindow {
         // Simple midpoint triangulation method
         // Find the 3D point closest to both rays in their respective camera frames
 
+        // Disparity validation: for a baseline along +X, we expect u_left > u_right
+        let disparity = left_obs[0] - right_obs[0];
+        if t_Cl_Cr[0] > 0.0 && disparity <= 0.0 {
+            debug_log!(
+                "[SlidingWindow] Triangulation rejected: invalid disparity {:.3} for baseline +X",
+                disparity
+            );
+            return None;
+        }
+
         let p_L = Vector3::zeros(); // Left camera at origin in its frame
         let p_R_in_L = t_Cl_Cr; // Right camera position in left frame
 
@@ -386,7 +397,7 @@ impl SlidingWindow {
 
         let denom = a * c - b_val * b_val;
         if denom.abs() < 1e-8 {
-            log::debug!(
+            debug_log!(
                 "[SlidingWindow] Triangulation failed for feature: parallel rays (denom={:.6})",
                 denom
             );
@@ -395,6 +406,16 @@ impl SlidingWindow {
 
         let t_L = (b_val * e - b_val * d) / denom;
         let t_R = (a * e - b_val * d) / denom;
+
+        // Reject points that lie behind either camera (negative ray parameters)
+        if t_L <= 0.0 || t_R <= 0.0 {
+            debug_log!(
+                "[SlidingWindow] Triangulation rejected: negative ray parameters t_L={:.3}, t_R={:.3}",
+                t_L,
+                t_R
+            );
+            return None;
+        }
 
         // Get closest point on each ray
         let p_L_closest = p_L + t_L * dir_L;
@@ -405,7 +426,7 @@ impl SlidingWindow {
 
         // Filter invalid depths (behind camera)
         if p_Cl.z <= 0.05 {
-            log::debug!(
+            debug_log!(
                 "[SlidingWindow] Triangulation failed: invalid depth {:.3}m",
                 p_Cl.z
             );
@@ -589,7 +610,7 @@ impl SlidingWindow {
                                     );
 
                                     // Debug: log observation coordinates
-                                    log::debug!("[SlidingWindow] Feature {}: left=({:.1}, {:.1}), right=({:.1}, {:.1})",
+                                    debug_log!("[SlidingWindow] Feature {}: left=({:.1}, {:.1}), right=({:.1}, {:.1})",
                                         feature_id, left_obs[0], left_obs[1], right_obs[0], right_obs[1]);
 
                                     match Self::triangulate_stereo(
@@ -604,7 +625,7 @@ impl SlidingWindow {
                                         }
                                         None => {
                                             // Triangulation failed, use fallback
-                                            log::debug!("[SlidingWindow] Triangulation failed for feature {}, using fallback", feature_id);
+                                            debug_log!("[SlidingWindow] Triangulation failed for feature {}, using fallback", feature_id);
                                             let p_C = Vector3::new(
                                                 l_feat.undistorted_coord[0] as f64,
                                                 l_feat.undistorted_coord[1] as f64,
@@ -743,7 +764,7 @@ impl SlidingWindow {
                         None
                     };
                     problem.add_residual_block(&[&kf_var], Box::new(factor), loss);
-                    log::debug!(
+                    debug_log!(
                         "[SlidingWindow] Added IMU prior residual on keyframe {} (pos_weight={:.2}, rot_weight={:.2}, huber_delta={:?})",
                         last_index, w_pos, w_rot, imu_huber_delta
                     );
@@ -755,7 +776,7 @@ impl SlidingWindow {
 
         // Add marginalization prior if available
         if let Some(marg_prior) = self.marginalization_manager.get_prior() {
-            log::debug!(
+            debug_log!(
                 "[SlidingWindow] Adding marginalization prior with {} parameters, residual_dim={}",
                 marg_prior.param_ids.len(),
                 marg_prior.residual_dim
@@ -795,7 +816,7 @@ impl SlidingWindow {
         let num_residuals = problem.num_residual_blocks();
         let num_variables = initial_values.len();
 
-        log::debug!(
+        debug_log!(
             "Added SE3 and R3 variables, now {} variables total, {} residual blocks",
             num_variables,
             num_residuals
@@ -842,7 +863,7 @@ impl SlidingWindow {
 
                     match fallback_solver.optimize(&problem, &initial_values) {
                         Ok(result) => {
-                            log::debug!("[SlidingWindow] Fallback solver succeeded");
+                            debug_log!("[SlidingWindow] Fallback solver succeeded");
                             result
                         },
                         Err(e2) => {
@@ -875,7 +896,7 @@ impl SlidingWindow {
                 .marginalization_manager
                 .should_marginalize(self.keyframes.len())
             {
-                log::debug!("[SlidingWindow] Window is full, performing marginalization");
+                debug_log!("[SlidingWindow] Window is full, performing marginalization");
 
                 // Build parameter blocks for marginalization
                 let param_blocks = self.build_param_blocks_for_marginalization();
@@ -924,7 +945,7 @@ impl SlidingWindow {
                     &keep_ids,
                     &marg_ids,
                 ) {
-                    log::debug!(
+                    debug_log!(
                         "[SlidingWindow] Marginalization successful. Prior dimension: {}",
                         prior.param_ids.len()
                     );
@@ -935,7 +956,7 @@ impl SlidingWindow {
                 }
             }
 
-            log::debug!(
+            debug_log!(
                 "[SlidingWindow] Optimization successful. Initial cost: {:.3}, final cost: {:.3}",
                 opt_result.initial_cost,
                 opt_result.final_cost
@@ -1083,7 +1104,7 @@ impl SlidingWindow {
         self.map_points
             .extend(saved_map_points.iter().map(|(k, v)| (*k, *v)));
 
-        log::debug!(
+        debug_log!(
             "[SlidingWindow] Reverted {} keyframe poses and {} map points",
             saved_keyframe_poses.len(),
             saved_map_points.len()
@@ -1098,7 +1119,7 @@ impl SlidingWindow {
         // Errors are logged but not propagated (optimization failures are handled gracefully)
 
         // Determine convergence status accurately
-        let (status, convergence_reason) = match &opt_result.status {
+        let (_status, _convergence_reason) = match &opt_result.status {
             apex_solver::optimizer::OptimizationStatus::Converged => {
                 ("CONVERGED", "Converged".to_string())
             },
@@ -1139,10 +1160,10 @@ impl SlidingWindow {
                 ("NOT_CONVERGED", format!("Failed:{}", msg))
             },
         };
-        log::debug!(
+        debug_log!(
             "[SlidingWindow] Optimization status: {}, convergence_reason: {}",
-            status,
-            convergence_reason
+            _status,
+            _convergence_reason
         );
 
         // Update map_points and keyframe poses with optimized values
@@ -1320,7 +1341,7 @@ impl SlidingWindow {
                         return Ok(None);
                     },
                 };
-                log::debug!(
+                debug_log!(
                     "[SlidingWindow] Motion tracking successful. Initial cost: {:.3}, final cost: {:.3}",
                     opt_result.initial_cost,
                     opt_result.final_cost
@@ -1383,10 +1404,34 @@ mod tests {
     }
 
     #[test]
+    fn triangulate_stereo_recovers_forward_point() {
+        // Front-facing point should triangulate with positive depth near ground truth
+        let baseline = 0.1;
+        let true_point = Vector3::new(0.0, 0.0, 5.0);
+
+        let left_obs = Vector3::new(true_point.x / true_point.z, true_point.y / true_point.z, 1.0);
+        let right_obs = Vector3::new((true_point.x - baseline) / true_point.z, true_point.y / true_point.z, 1.0);
+
+        let T_W_B = Matrix4x4::identity();
+        let T_B_Cl = Matrix4x4::identity();
+        let T_B_Cr = Matrix4x4::new(
+            1.0, 0.0, 0.0, baseline, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        );
+
+        let result = SlidingWindow::triangulate_stereo(left_obs, right_obs, T_W_B, T_B_Cl, T_B_Cr);
+
+        let p = result.expect("Triangulation should succeed for a forward point");
+        assert!(p.z > 0.0);
+        assert!((p.x - true_point.x).abs() < 1e-3);
+        assert!((p.y - true_point.y).abs() < 1e-3);
+        assert!((p.z - true_point.z).abs() < 1e-2);
+    }
+
+    #[test]
     fn triangulate_stereo_behind_camera() {
         // Feature behind camera should fail
         let left_obs = Vector3::new(-0.5, 0.0, 1.0);
-        let right_obs = Vector3::new(-0.6, 0.0, 1.0);
+        let right_obs = Vector3::new(-0.4, 0.0, 1.0);
 
         let T_W_B = Matrix4x4::identity();
         let T_B_Cl = Matrix4x4::identity();

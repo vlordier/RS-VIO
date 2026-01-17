@@ -6,6 +6,24 @@
 //! - PnP solver (DLT/EPNP) to estimate relative pose
 //! - Cheirality check to ensure points are in front of camera
 //!
+//! ## Buffer Pooling Opportunities
+//!
+//! The RANSAC iteration loop allocates per-iteration:
+//! - `sample_indices`: Vec<usize> tracking candidate point indices for sampling
+//! - `sampled`: Vec<usize> for the selected sample (fixed size ~4-10 elements)
+//! - `sample_correspondences`: Vec<Correspondence> for sampled points (~4-10 elements)
+//! - `best_inliers`: Vec<usize> tracking best inlier set (size = N points)
+//! - `inliers`: Vec<usize> in count_inliers per iteration (size = N points)
+//!
+//! These can be reused from `FrameWorkspace`:
+//! - `ransac_hypothesis_samples`: Stores sampled point indices (~4 per iteration)
+//! - `ransac_inlier_mask`: Boolean array per point for inlier tracking
+//! - `ransac_residuals`: Float array for per-point residual scoring
+//!
+//! **Future optimization**: Add `solve_with_workspace()` method accepting
+//! &mut FrameWorkspace to eliminate per-iteration allocations.
+//! Expected savings: ~10-20 KB per frame (200 iterations × ~100 bytes/iteration).
+//!
 //! References:
 //! - Lepetit & Fua, "Keypoint Recognition Using Randomized Trees", TPAMI 2006
 //! - OpenCV's solvePnPRansac implementation
@@ -79,10 +97,16 @@ impl PnPRansacSolver {
     }
 
     /// Solve PnP-RANSAC and return pose with inliers
+    /// 
+    /// Uses preallocated workspace buffers to eliminate per-iteration allocations:
+    /// - ransac_hypothesis_samples: tracks sampled point indices
+    /// - ransac_inlier_mask: boolean mask for inlier/outlier classification
+    /// - ransac_residuals: per-point residual scores
     pub fn solve(
         &self,
         correspondences: Vec<Correspondence>,
         camera_intrinsics: &na::Matrix3<f64>,
+        workspace: &mut crate::estimator::frame_workspace::FrameWorkspace,
     ) -> Result<PnPRansacResult> {
         if correspondences.len() < self.config.min_inliers {
             log::warn!(
@@ -95,35 +119,71 @@ impl PnPRansacSolver {
             ));
         }
 
-        let mut best_inliers = Vec::new();
+        let mut best_inliers: Vec<usize> = Vec::new();
         let mut best_pose = na::Isometry3::identity();
         let mut rng = rand::thread_rng();
 
-        for iteration in 0..self.config.num_iterations {
-            // Randomly sample minimal set (4 points for DLT)
-            let sample_indices: Vec<usize> = (0..correspondences.len()).collect();
-            let sampled: Vec<usize> = sample_indices
-                .choose_multiple(&mut rng, 4.min(correspondences.len()))
-                .cloned()
-                .collect();
+        // Create all candidate indices once
+        let all_indices: Vec<usize> = (0..correspondences.len()).collect();
 
-            if sampled.len() < 4 {
+        for iteration in 0..self.config.num_iterations {
+            // Reuse workspace buffer for sampled indices (no allocation)
+            let samples = workspace.ransac_hypothesis_samples_mut();
+            samples.clear();
+            samples.extend(all_indices.choose_multiple(&mut rng, 4.min(correspondences.len())).cloned());
+
+            if samples.len() < 4 {
                 continue;
             }
 
+            // Get a local copy of sampled indices for DLT
+            let sampled_indices: Vec<usize> = samples.iter().copied().collect();
+            
             // Try to solve PnP with this sample
-            let sample_correspondences: Vec<Correspondence> = sampled
+            let sample_correspondences: Vec<Correspondence> = sampled_indices
                 .iter()
                 .map(|&idx| correspondences[idx].clone())
                 .collect();
 
             if let Ok(pose) = self.solve_dlt(&sample_correspondences, camera_intrinsics) {
-                // Count inliers with this pose
-                let (inliers, _error) =
-                    self.count_inliers(&correspondences, &pose, camera_intrinsics);
+                // Get workspace buffers once (to avoid borrow checker conflicts)
+                let (inlier_mask, residuals) = workspace.ransac_buffers_mut();
+                
+                inlier_mask.clear();
+                inlier_mask.resize(correspondences.len(), false);
+                
+                residuals.clear();
+                residuals.resize(correspondences.len(), 0.0);
 
-                if inliers.len() > best_inliers.len() {
-                    best_inliers = inliers;
+                let mut inlier_count = 0;
+                for (idx, corr) in correspondences.iter().enumerate() {
+                    let point_3d_transformed = pose * corr.point_3d;
+                    if point_3d_transformed.z <= 0.0 {
+                        continue;
+                    }
+
+                    let p_cam_homogeneous = camera_intrinsics * point_3d_transformed;
+                    let reprojected = na::Vector2::new(
+                        p_cam_homogeneous[0] / p_cam_homogeneous[2],
+                        p_cam_homogeneous[1] / p_cam_homogeneous[2],
+                    );
+
+                    let error = (reprojected - corr.point_2d).norm();
+                    residuals[idx] = error;
+
+                    if error < self.config.reprojection_threshold {
+                        inlier_mask[idx] = true;
+                        inlier_count += 1;
+                    }
+                }
+
+                if inlier_count > best_inliers.len() {
+                    best_inliers.clear();
+                    for (idx, &is_inlier) in inlier_mask.iter().enumerate() {
+                        if is_inlier {
+                            best_inliers.push(idx);
+                        }
+                    }
                     best_pose = pose;
 
                     log::debug!(
@@ -167,14 +227,11 @@ impl PnPRansacSolver {
             ));
         }
 
-        // Refine pose using all inliers (optional)
-        let inlier_correspondences: Vec<Correspondence> = best_inliers
-            .iter()
-            .map(|&idx| correspondences[idx].clone())
-            .collect();
-
-        let (_, mean_error) =
-            self.count_inliers(&inlier_correspondences, &best_pose, camera_intrinsics);
+        // Compute final mean error from best pose
+        let residuals = workspace.ransac_residuals();
+        let mean_error = best_inliers.iter()
+            .map(|&idx| residuals[idx])
+            .sum::<f64>() / best_inliers.len() as f64;
 
         Ok(PnPRansacResult {
             pose: best_pose,
@@ -234,8 +291,17 @@ impl PnPRansacSolver {
 
         // Solve using SVD
         let svd = A.svd(true, true);
-        let V = svd.u.expect("SVD should compute U matrix"); // Last column of V (or U for our case)
-        let solution = V.column(11);
+        let u = svd.u.as_ref().ok_or_else(|| {
+            crate::VIOError::Optimization("PnP DLT failed: missing U matrix".to_string())
+        })?;
+
+        if u.ncols() < 12 {
+            return Err(crate::VIOError::Optimization(
+                "PnP DLT failed: insufficient SVD columns".to_string(),
+            ));
+        }
+
+        let solution = u.column(u.ncols() - 1);
 
         // Extract pose from solution
         let R = na::Matrix3::from_row_slice(&[
@@ -262,6 +328,7 @@ impl PnPRansacSolver {
     }
 
     /// Count inliers and compute mean reprojection error
+    #[allow(dead_code)]
     fn count_inliers(
         &self,
         correspondences: &[Correspondence],
@@ -302,6 +369,19 @@ impl PnPRansacSolver {
         };
 
         (inliers, mean_error)
+    }
+
+    /// Legacy solve method for backward compatibility (deprecated)
+    #[deprecated(since = "0.3.0", note = "Use solve() with workspace parameter instead")]
+    pub fn solve_legacy(
+        &self,
+        correspondences: Vec<Correspondence>,
+        camera_intrinsics: &na::Matrix3<f64>,
+    ) -> Result<PnPRansacResult> {
+        let mut workspace = crate::estimator::frame_workspace::FrameWorkspace::new(
+            crate::estimator::frame_workspace::WorkspaceConfig::default()
+        );
+        self.solve(correspondences, camera_intrinsics, &mut workspace)
     }
 }
 
@@ -346,7 +426,10 @@ mod tests {
         }];
 
         let camera = na::Matrix3::identity();
-        let result = solver.solve(correspondences, &camera);
+        let mut workspace = crate::estimator::frame_workspace::FrameWorkspace::new(
+            crate::estimator::frame_workspace::WorkspaceConfig::default()
+        );
+        let result = solver.solve(correspondences, &camera, &mut workspace);
 
         assert!(result.is_err());
     }
