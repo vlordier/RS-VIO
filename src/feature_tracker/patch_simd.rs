@@ -1,7 +1,13 @@
+#![allow(unsafe_code)]
+
 /// SIMD-optimized patch matching for real-time performance
 ///
 /// This module provides vectorized implementations of patch-based tracking operations
 /// using platform-specific SIMD intrinsics when available.
+///
+/// # Safety
+/// This module uses unsafe code for SIMD intrinsics (AVX2, SSE4.1).
+/// All unsafe blocks are guarded by runtime feature detection.
 use nalgebra as na;
 
 #[cfg(target_arch = "x86_64")]
@@ -37,7 +43,7 @@ pub fn compute_residuals_simd(
                 compute_residuals_avx2(
                     sampled,
                     template,
-                    template_mean,
+                    _template_mean,
                     num_valid,
                     sample_sum,
                     &mut residuals,
@@ -48,7 +54,7 @@ pub fn compute_residuals_simd(
                 compute_residuals_sse(
                     sampled,
                     template,
-                    template_mean,
+                    _template_mean,
                     num_valid,
                     sample_sum,
                     &mut residuals,
@@ -58,7 +64,7 @@ pub fn compute_residuals_simd(
             compute_residuals_scalar(
                 sampled,
                 template,
-                template_mean,
+                _template_mean,
                 num_valid,
                 sample_sum,
                 &mut residuals,

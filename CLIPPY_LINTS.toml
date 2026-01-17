@@ -16,7 +16,7 @@ panic = "deny"  # panic!() - never panic in library code
 exit = "deny"  # process::exit() - never exit abruptly
 todo = "deny"  # TODO comments must be resolved before merging
 unimplemented = "deny"  # unimplemented!() - stub code not allowed
-unsafe_code = "deny"  # unsafe blocks not allowed in this codebase
+unsafe_code = "warn"  # unsafe blocks allowed only for SIMD intrinsics (must be documented)
 
 # =============================================================================
 # CORRECTNESS (DENY)

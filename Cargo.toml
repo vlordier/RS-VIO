@@ -77,7 +77,7 @@ path = "src/bin/calib_check.rs"
 ignored = ["tracing"]  # Used via tracing-subscriber for structured logging
 
 [lints.rust]
-unsafe_code = "forbid"
+unsafe_code = "warn"  # Allowed only for SIMD intrinsics (must be documented)
 warnings = "deny"
 non_snake_case = "allow"  # Allow for transformation matrices (T_A_B convention)
 
