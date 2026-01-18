@@ -170,6 +170,8 @@ pub trait Viewer: Send {
         _signal_snr: [f32; 3],
         _signal_rms: [f32; 3],
         _signal_peak: [f32; 3],
+        _motor_state: &str,
+        _fundamental_freq_hz: f32,
         _entity_path: &str,
     ) {
         // Default implementation - no-op

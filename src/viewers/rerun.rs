@@ -814,6 +814,8 @@ impl Viewer for RerunViewer {
         signal_snr: [f32; 3],
         signal_rms: [f32; 3],
         signal_peak: [f32; 3],
+        motor_state: &str,
+        fundamental_freq_hz: f32,
         entity_path: &str,
     ) {
         if !self.initialized {
@@ -823,6 +825,32 @@ impl Viewer for RerunViewer {
         if let Some(ref rec) = self.rec {
             rec.set_time_sequence("frame", self.frame_id);
             rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
+
+            // Log motor state prominently
+            let _motor_state_color = match motor_state {
+                "Off" => [0, 255, 0], // Green
+                "Running" => [255, 0, 0], // Red  
+                "Transitioning" => [255, 165, 0], // Orange
+                _ => [128, 128, 128], // Gray for unknown
+            };
+
+            if let Err(e) = rec.log(
+                format!("{}/motor_state", entity_path),
+                &rerun::TextDocument::new(format!("Motors: {}", motor_state))
+                    .with_media_type(rerun::MediaType::plain_text()),
+            ) {
+                log::debug!("[RerunViewer] Failed to log motor state: {}", e);
+            }
+
+            // Log fundamental frequency if motors running
+            if fundamental_freq_hz > 0.0 {
+                if let Err(e) = rec.log(
+                    format!("{}/freq_text", entity_path),
+                    &rerun::TextDocument::new(format!("Rotor Frequency f₀: {:.1} Hz", fundamental_freq_hz)),
+                ) {
+                    log::debug!("[RerunViewer] Failed to log frequency text: {}", e);
+                }
+            }
 
             // Log signal quality metrics as bar charts
             let snr_bars = vec![signal_snr[0] as f64, signal_snr[1] as f64, signal_snr[2] as f64];
@@ -849,11 +877,15 @@ impl Viewer for RerunViewer {
                 log::debug!("[RerunViewer] Failed to log peak: {}", e);
             }
 
-            // Log comprehensive signal quality report
+            // Log comprehensive signal quality report including motor state
             let quality_report = format!(
-                "SNR (X, Y, Z): [{:.2}, {:.2}, {:.2}] dB\n\
+                "Motor State: {}\n\
+                 Fundamental Frequency: {:.1} Hz\n\
+                 SNR (X, Y, Z): [{:.2}, {:.2}, {:.2}] dB\n\
                  RMS (X, Y, Z): [{:.4}, {:.4}, {:.4}] m/s²\n\
                  Peak (X, Y, Z): [{:.4}, {:.4}, {:.4}] m/s²",
+                motor_state,
+                fundamental_freq_hz,
                 signal_snr[0], signal_snr[1], signal_snr[2],
                 signal_rms[0], signal_rms[1], signal_rms[2],
                 signal_peak[0], signal_peak[1], signal_peak[2]
@@ -865,19 +897,53 @@ impl Viewer for RerunViewer {
                 log::debug!("[RerunViewer] Failed to log quality report: {}", e);
             }
 
-            // Determine overall signal quality
+            // Determine overall signal quality (adjusted for motor state)
             let avg_snr = (signal_snr[0] + signal_snr[1] + signal_snr[2]) / 3.0;
-            let quality_level = if avg_snr > 30.0 {
-                "Excellent"
-            } else if avg_snr > 20.0 {
-                "Good"
-            } else if avg_snr > 10.0 {
-                "Fair"
-            } else {
-                "Poor"
+            
+            // SNR thresholds differ based on motor state
+            let (quality_level, context) = match motor_state {
+                "Off" => {
+                    // Higher SNR expected when motors off
+                    let level = if avg_snr > 40.0 {
+                        "Excellent"
+                    } else if avg_snr > 30.0 {
+                        "Good"
+                    } else if avg_snr > 20.0 {
+                        "Fair"
+                    } else {
+                        "Poor"
+                    };
+                    (level, "stationary")
+                }
+                "Running" => {
+                    // Lower SNR acceptable when motors running
+                    let level = if avg_snr > 25.0 {
+                        "Excellent"
+                    } else if avg_snr > 15.0 {
+                        "Good"
+                    } else if avg_snr > 10.0 {
+                        "Fair"
+                    } else {
+                        "Poor"
+                    };
+                    (level, "in-flight")
+                }
+                _ => {
+                    let level = if avg_snr > 20.0 {
+                        "Good"
+                    } else if avg_snr > 10.0 {
+                        "Fair"
+                    } else {
+                        "Poor"
+                    };
+                    (level, "transitioning")
+                }
             };
 
-            let quality_summary = format!("Signal Quality: {} (SNR: {:.1} dB)", quality_level, avg_snr);
+            let quality_summary = format!(
+                "Signal Quality: {} ({}) - SNR: {:.1} dB", 
+                quality_level, context, avg_snr
+            );
             if let Err(e) = rec.log(
                 format!("{}/quality_summary", entity_path),
                 &rerun::TextDocument::new(quality_summary),

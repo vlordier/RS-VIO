@@ -105,12 +105,20 @@ pub fn example_imu_visualization(
         "imu/harmonics",
     );
 
-    // Step 5: Log signal quality metrics
+    // Step 5: Log signal quality metrics with motor state
+    let motor_state_str = match harmonic_decomp.motor_state {
+        rs_vio::imu::signal_analysis::MotorState::Off => "Off",
+        rs_vio::imu::signal_analysis::MotorState::Running => "Running",
+        rs_vio::imu::signal_analysis::MotorState::Transitioning => "Transitioning",
+    };
+
     viewer.log_imu_signal_quality(
         timestamp_ns,
         harmonic_decomp.quality.snr,
         harmonic_decomp.quality.rms,
         harmonic_decomp.quality.peak,
+        motor_state_str,
+        harmonic_decomp.quality.fundamental_freq_hz,
         "imu/quality",
     );
 
@@ -120,8 +128,32 @@ pub fn example_imu_visualization(
         + harmonic_decomp.quality.snr[2])
         / 3.0;
 
-    if avg_snr < 15.0 {
-        log::warn!("[IMU] Low signal quality (SNR: {:.1} dB), consider increasing measurement noise covariance", avg_snr);
+    // Adjust warnings based on motor state
+    match harmonic_decomp.motor_state {
+        rs_vio::imu::signal_analysis::MotorState::Off => {
+            if avg_snr < 20.0 {
+                log::warn!(
+                    "[IMU] Low signal quality in stationary mode (SNR: {:.1} dB), check sensor calibration",
+                    avg_snr
+                );
+            }
+        }
+        rs_vio::imu::signal_analysis::MotorState::Running => {
+            if avg_snr < 10.0 {
+                log::warn!(
+                    "[IMU] Very high vibration during flight (SNR: {:.1} dB), f₀={:.1} Hz - consider vibration damping",
+                    avg_snr, harmonic_decomp.quality.fundamental_freq_hz
+                );
+            } else {
+                log::info!(
+                    "[IMU] In-flight mode detected: f₀={:.1} Hz, SNR={:.1} dB",
+                    harmonic_decomp.quality.fundamental_freq_hz, avg_snr
+                );
+            }
+        }
+        rs_vio::imu::signal_analysis::MotorState::Transitioning => {
+            log::info!("[IMU] Motor state transitioning...");
+        }
     }
 }
 
