@@ -92,14 +92,17 @@ pub struct VibrationNotchFilter {
 impl VibrationNotchFilter {
     /// Create new vibration notch filter
     pub fn new(sampling_rate: Float, fft_size: usize) -> Self {
-        let mut config = VibrationFilterConfig::default();
-        config.sampling_rate = sampling_rate;
-        config.fft_size = fft_size;
-
-        // Clamp configured frequencies to Nyquist to ensure stability
-        let nyquist = config.sampling_rate / 2.0;
-        config.max_freq = config.max_freq.min(nyquist);
-        config.min_freq = config.min_freq.min(config.max_freq);
+        let default_config = VibrationFilterConfig::default();
+        let nyquist = sampling_rate / 2.0;
+        let config = VibrationFilterConfig {
+            sampling_rate,
+            fft_size,
+            max_freq: default_config.max_freq.min(nyquist),
+            min_freq: default_config
+                .min_freq
+                .min(default_config.max_freq.min(nyquist)),
+            ..default_config
+        };
 
         let fft = Radix4::new(fft_size, FftDirection::Forward);
 

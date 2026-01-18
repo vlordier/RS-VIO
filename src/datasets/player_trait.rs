@@ -26,7 +26,7 @@ pub trait DatasetPlayer: Send + Sync {
     /// - Initializing the estimator
     /// - Processing frames iteratively
     /// - Collecting statistics
-    fn run(&self, config: PlayerConfig) -> crate::Result<PlayerResult>;
+    fn run(&self, config: &PlayerConfig) -> crate::Result<PlayerResult>;
 
     /// Load image timestamps from the dataset
     ///
@@ -179,7 +179,7 @@ pub trait DatasetPlayer: Send + Sync {
 /// By extracting this pattern, we avoid code duplication across player implementations.
 pub fn execute<P: DatasetPlayer + ?Sized>(
     player: &P,
-    config: PlayerConfig,
+    config: &PlayerConfig,
     dataset_name: &str,
 ) -> Result<PlayerResult> {
     let mut result = PlayerResult::default();

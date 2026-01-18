@@ -1,10 +1,5 @@
-//! Math utilities for robust numerical algorithms.
+//! Mathematical utilities for VIO.
 //!
-//! This module provides building blocks for reliable, real-time optimization:
-//! - Robust solvers with graceful degradation
-//! - Condition number estimation
-//! - Stable matrix decompositions
-
-pub mod robust_solver;
-
-pub use robust_solver::{estimate_condition_number, RobustSolver, SolveMethod, SolveQuality};
+//! This module provides numerical utilities for the VIO pipeline.
+//! Robust solving functionality is implemented directly in the
+//! marginalization module for optimal performance.

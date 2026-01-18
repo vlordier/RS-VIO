@@ -83,9 +83,8 @@ impl Default for VibrationWeights {
     }
 }
 
-impl LearnedVibrationScheduler {
-    /// Create new learned vibration scheduler
-    pub fn new() -> Self {
+impl Default for LearnedVibrationScheduler {
+    fn default() -> Self {
         Self {
             vibration_filter: None,
             vibration_history: VecDeque::with_capacity(100),
@@ -94,6 +93,13 @@ impl LearnedVibrationScheduler {
             max_history: 100,
             learning_rate: 0.01,
         }
+    }
+}
+
+impl LearnedVibrationScheduler {
+    /// Create new learned vibration scheduler
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Initialize with vibration filter for real-time analysis

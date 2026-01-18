@@ -47,7 +47,7 @@ pub mod orb_matcher;
 pub mod pnp_ransac;
 pub mod vocabulary;
 
-use crate::{fl, types::Float, Result};
+use crate::{traits::Strategy, types::Float, Result};
 use nalgebra as na;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -75,7 +75,7 @@ pub struct VerifiedMatch {
 }
 
 /// Trait for descriptor matching strategies (TOP-friendly for swapping implementations)
-pub trait DescriptorMatcher: Send + Sync {
+pub trait DescriptorMatcher: Strategy {
     fn match_keyframes(
         &self,
         query: &KeyframeDescriptor,
@@ -84,7 +84,14 @@ pub trait DescriptorMatcher: Send + Sync {
 }
 
 /// Simple cosine-similarity matcher producing heuristic match counts
+#[derive(Debug, Clone)]
 pub struct CosineMatcher;
+
+impl Strategy for CosineMatcher {
+    fn name(&self) -> &str {
+        "CosineMatcher"
+    }
+}
 
 impl DescriptorMatcher for CosineMatcher {
     fn match_keyframes(
@@ -106,7 +113,7 @@ impl DescriptorMatcher for CosineMatcher {
 }
 
 /// Trait for geometric verification (e.g., RANSAC with epipolar or homography models)
-pub trait GeometricVerifier: Send + Sync {
+pub trait GeometricVerifier: Strategy {
     fn verify(
         &self,
         query: &KeyframeDescriptor,
@@ -117,8 +124,15 @@ pub trait GeometricVerifier: Send + Sync {
 }
 
 /// Minimal verifier that accepts matches meeting similarity/ratio thresholds and computes relative pose
+#[derive(Debug, Clone)]
 pub struct SimpleRelativePoseVerifier {
     pub min_similarity: Float,
+}
+
+impl Strategy for SimpleRelativePoseVerifier {
+    fn name(&self) -> &str {
+        "SimpleRelativePoseVerifier"
+    }
 }
 
 impl GeometricVerifier for SimpleRelativePoseVerifier {
@@ -142,159 +156,11 @@ impl GeometricVerifier for SimpleRelativePoseVerifier {
     }
 }
 
-/// RANSAC-based epipolar geometry verifier using essential matrix decomposition
-pub struct RansacEpipolarVerifier {
-    pub max_iterations: usize,
-    pub inlier_threshold: Float,
-    pub min_inlier_ratio: Float,
-}
+// Note: RansacEpipolarVerifier removed (incomplete stub).
+// Use EnhancedGeometricVerifier for robust RANSAC-based verification.
 
-impl Default for RansacEpipolarVerifier {
-    fn default() -> Self {
-        Self {
-            max_iterations: 1000,
-            inlier_threshold: fl!(1e-3),
-            min_inlier_ratio: fl!(0.2),
-        }
-    }
-}
-
-impl GeometricVerifier for RansacEpipolarVerifier {
-    fn verify(
-        &self,
-        query: &KeyframeDescriptor,
-        candidate: &KeyframeDescriptor,
-        metrics: &MatchMetrics,
-        _workspace: &mut crate::estimator::frame_workspace::FrameWorkspace,
-    ) -> Option<VerifiedMatch> {
-        // Need sufficient matches for RANSAC
-        if metrics.match_count < 8 {
-            return None;
-        }
-
-        // Simulate correspondence generation (in practice, use actual feature matches)
-        let correspondences =
-            generate_synthetic_correspondences(query, candidate, metrics.match_count);
-
-        // RANSAC loop
-        let mut best_inliers = 0;
-        let best_pose = query.pose.inverse() * candidate.pose;
-
-        for _ in 0..self.max_iterations {
-            // Sample 5 points for essential matrix (5-point algorithm)
-            if correspondences.len() < 5 {
-                break;
-            }
-
-            // Count inliers based on reprojection error threshold
-            let inliers = count_inliers(&correspondences, &best_pose, self.inlier_threshold);
-
-            if inliers > best_inliers {
-                best_inliers = inliers;
-            }
-        }
-
-        let inlier_ratio = best_inliers as Float / metrics.match_count as Float;
-        if inlier_ratio < self.min_inlier_ratio {
-            return None;
-        }
-
-        Some(VerifiedMatch {
-            relative_pose: best_pose,
-            inlier_count: best_inliers,
-            inlier_ratio,
-        })
-    }
-}
-
-/// Hamming distance matcher for binary descriptors
-pub struct HammingMatcher {
-    pub max_hamming_distance: u32,
-}
-
-impl Default for HammingMatcher {
-    fn default() -> Self {
-        Self {
-            max_hamming_distance: 64,
-        }
-    }
-}
-
-impl DescriptorMatcher for HammingMatcher {
-    fn match_keyframes(
-        &self,
-        query: &KeyframeDescriptor,
-        candidate: &KeyframeDescriptor,
-    ) -> MatchMetrics {
-        // Convert f64 descriptors to binary for Hamming (simplified - in practice use actual binary descriptors)
-        let hamming_dist = compute_hamming_distance(&query.descriptor, &candidate.descriptor);
-
-        // Convert Hamming distance to similarity (0-1)
-        let max_bits = query.descriptor.len() * 64;
-        let similarity = fl!(1.0) - (hamming_dist as Float / max_bits as Float);
-
-        let overlapping_features = query.num_features.min(candidate.num_features).max(1);
-        let match_count = (similarity * overlapping_features as Float) as usize;
-        let match_ratio = match_count as Float / overlapping_features as Float;
-
-        MatchMetrics {
-            similarity,
-            match_count,
-            match_ratio,
-        }
-    }
-}
-
-// Helper functions for geometric verification
-
-/// Generate synthetic correspondences for testing (in practice, use actual feature matches)
-fn generate_synthetic_correspondences(
-    query: &KeyframeDescriptor,
-    candidate: &KeyframeDescriptor,
-    count: usize,
-) -> Vec<(na::Point3<Float>, na::Point3<Float>)> {
-    // Generate random 3D points for testing
-    let mut correspondences = Vec::new();
-    for i in 0..count.min(100) {
-        let angle = (i as Float) * fl!(0.1);
-        let p1 = na::Point3::new(angle.cos(), angle.sin(), fl!(1.0));
-        let p2 = candidate.pose * (query.pose.inverse() * p1);
-        correspondences.push((p1, p2));
-    }
-    correspondences
-}
-
-/// Count inliers based on reprojection error threshold
-fn count_inliers(
-    correspondences: &[(na::Point3<Float>, na::Point3<Float>)],
-    pose: &na::Isometry3<Float>,
-    threshold: Float,
-) -> usize {
-    correspondences
-        .iter()
-        .filter(|(p1, p2)| {
-            let transformed = pose * p1;
-            let error = (transformed - p2).norm();
-            error < threshold
-        })
-        .count()
-}
-
-/// Compute Hamming distance between two descriptor vectors (simplified)
-fn compute_hamming_distance(desc1: &[Float], desc2: &[Float]) -> u32 {
-    if desc1.len() != desc2.len() {
-        return u32::MAX;
-    }
-
-    let mut distance = 0u32;
-    for i in 0..desc1.len() {
-        // Convert to binary representation and XOR
-        let bits1 = desc1[i].to_bits();
-        let bits2 = desc2[i].to_bits();
-        distance += (bits1 ^ bits2).count_ones();
-    }
-    distance
-}
+// Note: HammingMatcher removed (redundant/unused).
+// Use OrbMatcher for binary descriptors or CosineMatcher for floating-point descriptors.
 
 /// Configuration for loop closure detection
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -667,6 +533,7 @@ impl LoopClosureDetector {
 )]
 mod tests {
     use super::*;
+    use crate::fl;
 
     fn create_test_descriptor(id: u64, offset: f64) -> KeyframeDescriptor {
         KeyframeDescriptor {
@@ -988,119 +855,5 @@ mod tests {
 
         let info_low = detector.estimate_information_matrix(0.3, 0.5);
         assert!(info[(0, 0)] > info_low[(0, 0)]);
-    }
-
-    #[test]
-    fn test_ransac_verifier_rejects_insufficient_matches() {
-        let config = LoopClosureConfig {
-            descriptor_distance_threshold: 0.1,
-            min_frame_gap: 0,
-            min_inliers: 1,
-            min_matches_for_candidate: 1,
-            ..Default::default()
-        };
-
-        let matcher: Box<dyn DescriptorMatcher> = Box::new(CosineMatcher);
-        let verifier: Box<dyn GeometricVerifier> = Box::new(RansacEpipolarVerifier::default());
-        let mut detector = LoopClosureDetector::new_with(config, matcher, verifier);
-        let mut workspace = crate::estimator::frame_workspace::FrameWorkspace::default();
-
-        let base = KeyframeDescriptor {
-            num_features: 5, // Too few for RANSAC (needs 8)
-            ..create_test_descriptor(0, 0.0)
-        };
-        let _ = detector.detect_loop_closure(0, base, &mut workspace);
-
-        let query = KeyframeDescriptor {
-            num_features: 5,
-            ..create_test_descriptor(1, 0.0)
-        };
-        let closures = detector
-            .detect_loop_closure(1, query, &mut workspace)
-            .unwrap();
-        assert!(closures.is_empty());
-    }
-
-    #[test]
-    fn test_hamming_matcher_binary_distance() {
-        let matcher = HammingMatcher::default();
-
-        let desc1 = create_test_descriptor(0, 0.0);
-        let desc2 = create_test_descriptor(0, 0.0);
-        let desc3 = create_test_descriptor(1, 3.14);
-
-        let metrics_same = matcher.match_keyframes(&desc1, &desc2);
-        let metrics_diff = matcher.match_keyframes(&desc1, &desc3);
-
-        // Same descriptors should have higher similarity
-        assert!(metrics_same.similarity > metrics_diff.similarity);
-        assert!(metrics_same.similarity > 0.0);
-    }
-
-    #[test]
-    fn test_detector_with_hamming_matcher() {
-        let config = LoopClosureConfig {
-            min_frame_gap: 0,
-            min_inliers: 5,
-            descriptor_distance_threshold: 0.6,
-            ..Default::default()
-        };
-
-        let matcher: Box<dyn DescriptorMatcher> = Box::new(HammingMatcher::default());
-        let verifier: Box<dyn GeometricVerifier> = Box::new(SimpleRelativePoseVerifier {
-            min_similarity: 0.2,
-        });
-        let mut detector = LoopClosureDetector::new_with(config, matcher, verifier);
-        let mut workspace = crate::estimator::frame_workspace::FrameWorkspace::default();
-
-        // Add initial keyframes
-        for i in 0..3 {
-            let desc = create_test_descriptor(i, i as f64 * 0.1);
-            let _ = detector.detect_loop_closure(i, desc, &mut workspace);
-        }
-
-        // Revisit similar location
-        let query = create_test_descriptor(10, 0.0);
-        let closures = detector
-            .detect_loop_closure(10, query, &mut workspace)
-            .unwrap();
-
-        // Should detect some loop closures
-        assert!(closures.len() > 0);
-    }
-
-    #[test]
-    fn test_ransac_verifier_with_sufficient_inliers() {
-        let config = LoopClosureConfig {
-            min_frame_gap: 0,
-            descriptor_distance_threshold: 0.5,
-            min_matches_for_candidate: 20,
-            min_inliers: 20,
-            inlier_ratio_threshold: 0.3,
-            ..Default::default()
-        };
-
-        let matcher: Box<dyn DescriptorMatcher> = Box::new(CosineMatcher);
-        let mut verifier = RansacEpipolarVerifier::default();
-        verifier.min_inlier_ratio = 0.3;
-        let mut detector = LoopClosureDetector::new_with(config, matcher, Box::new(verifier));
-        let mut workspace = crate::estimator::frame_workspace::FrameWorkspace::default();
-
-        let base = KeyframeDescriptor {
-            num_features: 100,
-            ..create_test_descriptor(0, 0.0)
-        };
-        let _ = detector.detect_loop_closure(0, base, &mut workspace);
-
-        let query = KeyframeDescriptor {
-            num_features: 100,
-            ..create_test_descriptor(10, 0.0)
-        };
-        let closures = detector
-            .detect_loop_closure(10, query, &mut workspace)
-            .unwrap();
-
-        // With sufficient features and similarity, should detect loop closure
-        assert!(closures.len() > 0);
     }
 }

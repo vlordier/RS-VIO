@@ -598,8 +598,8 @@ mod tests {
                 );
             }
 
-            println!("✅ LightGlue model validation successful!");
-            println!("   Matches found: {}", matches.len());
+            log::info!("✅ LightGlue model validation successful!");
+            log::info!("   Matches found: {}", matches.len());
             println!(
                 "   Average confidence: {:.3}",
                 scores.iter().sum::<f32>() / scores.len() as f32

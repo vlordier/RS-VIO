@@ -2,7 +2,8 @@ use super::get_feature_color;
 use super::Viewer;
 use crate::datasets::config::VisualizationConfig;
 use crate::debug_log;
-use crate::types::{Array3, Float, Matrix3x3, Matrix4x4, ToArray};
+use crate::traits::Convert;
+use crate::types::{Array3, Float, Matrix3x3, Matrix4x4};
 use crate::{Result, VIOError};
 use image::{DynamicImage, ImageBuffer, Luma};
 use rerun::components::Color;
@@ -174,7 +175,7 @@ impl Viewer for RerunViewer {
             let rotation = Matrix3x3::from(t_w_b.fixed_view::<3, 3>(0, 0));
 
             // Convert rotation matrix to quaternion
-            let quat = matrix_to_quaternion(rotation.to_array());
+            let quat = matrix_to_quaternion(rotation.convert());
             let quaternion = rerun::Quaternion::from_xyzw([
                 quat[0] as f32,
                 quat[1] as f32,
@@ -569,7 +570,7 @@ impl Viewer for RerunViewer {
             rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
 
             // Log vibration levels as a bar chart
-            let vibration_data = vec![
+            let vibration_data = [
                 ("Gyro RMS", gyro_rms as f64),
                 ("Accel RMS", accel_rms as f64),
                 ("Covariance Scale", covariance_scale as f64),
@@ -631,7 +632,7 @@ impl Viewer for RerunViewer {
             let reliable = features.iter().filter(|f| f.quality.is_reliable).count();
 
             // Create quality distribution chart
-            let quality_data = vec![
+            let quality_data = [
                 ("High Quality", high_quality as f64),
                 ("Medium Quality", medium_quality as f64),
                 ("Low Quality", low_quality as f64),
@@ -735,8 +736,8 @@ impl Viewer for RerunViewer {
                 constraints
                     .iter()
                     .map(|c| c.information_matrix.trace())
-                    .sum::<f64>()
-                    / constraints.len() as f64
+                    .sum::<crate::types::Float>()
+                    / constraints.len() as crate::types::Float
             );
             if let Err(e) = rec.log(
                 format!("{}/stats", entity_path),
@@ -768,7 +769,7 @@ impl Viewer for RerunViewer {
             rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
 
             // Create comprehensive robustness metrics dashboard
-            let metrics = vec![
+            let metrics = [
                 ("PROSAC Inliers", prosac_inliers as f64),
                 ("PROSAC Outliers", prosac_outliers as f64),
                 ("Vibration Level", vibration_level as f64),

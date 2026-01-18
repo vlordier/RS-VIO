@@ -1,48 +1,5 @@
+use crate::traits::{StateTransform, StateView};
 use crate::types::{Float, Matrix4x4, Vector3};
-
-/// Trait for state operations.
-///
-/// This trait provides a unified interface for state manipulations,
-/// enabling consistent operations across different state representations
-/// and easier testing/mocking.
-///
-/// # Design Pattern
-/// Implements the **Strategy Pattern** to encapsulate state operations
-/// and make them interchangeable.
-pub trait StateOperations {
-    /// Get the world-from-body pose
-    fn pose(&self) -> Matrix4x4;
-
-    /// Get body linear velocity in world coordinates
-    fn velocity(&self) -> Vector3;
-
-    /// Get accelerometer bias
-    fn accel_bias(&self) -> Vector3;
-
-    /// Get gyroscope bias
-    fn gyro_bias(&self) -> Vector3;
-
-    /// Get camera extrinsics (body to left camera)
-    fn T_B_Cl(&self) -> Matrix4x4;
-
-    /// Get camera extrinsics (body to right camera)
-    fn T_B_Cr(&self) -> Matrix4x4;
-
-    /// Compose with another state (relative motion)
-    fn compose(&self, other: &Self) -> Self;
-
-    /// Invert the pose (world from body -> body from world)
-    fn inverse_pose(&self) -> Matrix4x4;
-
-    /// Interpolate between two states
-    fn interpolate(&self, other: &Self, alpha: f64) -> Self;
-
-    /// Get translation component of pose
-    fn translation(&self) -> Vector3;
-
-    /// Get rotation as unit quaternion
-    fn rotation(&self) -> crate::types::UnitQuaternion;
-}
 
 #[derive(Debug, Clone)]
 pub struct State {
@@ -62,31 +19,33 @@ pub struct State {
     pub gyro_bias: Vector3,
 }
 
-impl StateOperations for State {
-    fn pose(&self) -> Matrix4x4 {
-        self.T_W_B
+impl StateView for State {
+    fn pose(&self) -> &Matrix4x4 {
+        &self.T_W_B
     }
 
-    fn velocity(&self) -> Vector3 {
-        self.velocity
+    fn velocity(&self) -> &Vector3 {
+        &self.velocity
     }
 
-    fn accel_bias(&self) -> Vector3 {
-        self.accel_bias
+    fn accel_bias(&self) -> &Vector3 {
+        &self.accel_bias
     }
 
-    fn gyro_bias(&self) -> Vector3 {
-        self.gyro_bias
+    fn gyro_bias(&self) -> &Vector3 {
+        &self.gyro_bias
     }
 
-    fn T_B_Cl(&self) -> Matrix4x4 {
-        self.T_B_Cl
+    fn camera_left_extrinsics(&self) -> &Matrix4x4 {
+        &self.T_B_Cl
     }
 
-    fn T_B_Cr(&self) -> Matrix4x4 {
-        self.T_B_Cr
+    fn camera_right_extrinsics(&self) -> &Matrix4x4 {
+        &self.T_B_Cr
     }
+}
 
+impl StateTransform for State {
     fn compose(&self, other: &Self) -> Self {
         Self {
             T_W_B: self.T_W_B * other.T_W_B,
@@ -98,14 +57,20 @@ impl StateOperations for State {
         }
     }
 
-    fn inverse_pose(&self) -> Matrix4x4 {
-        self.T_W_B.try_inverse().unwrap_or(Matrix4x4::identity())
+    fn inverse(&self) -> Self {
+        let T_W_B_inv = self.T_W_B.try_inverse().unwrap_or(Matrix4x4::identity());
+        Self {
+            T_W_B: T_W_B_inv,
+            T_B_Cl: self.T_B_Cl,
+            T_B_Cr: self.T_B_Cr,
+            velocity: -self.velocity,
+            accel_bias: -self.accel_bias,
+            gyro_bias: -self.gyro_bias,
+        }
     }
 
-    fn interpolate(&self, other: &Self, alpha: f64) -> Self {
-        let alpha_float = alpha as Float;
-        let translation =
-            self.translation() + (other.translation() - self.translation()) * alpha_float;
+    fn interpolate(&self, other: &Self, alpha: Float) -> Self {
+        let translation = self.translation() + (other.translation() - self.translation()) * alpha;
 
         let mut pose = Matrix4x4::identity();
         pose[(0, 3)] = translation.x;
@@ -116,20 +81,10 @@ impl StateOperations for State {
             T_W_B: pose,
             T_B_Cl: self.T_B_Cl,
             T_B_Cr: self.T_B_Cr,
-            velocity: self.velocity + (other.velocity - self.velocity) * alpha_float,
+            velocity: self.velocity + (other.velocity - self.velocity) * alpha,
             accel_bias: self.accel_bias,
             gyro_bias: self.gyro_bias,
         }
-    }
-
-    fn translation(&self) -> Vector3 {
-        Vector3::new(self.T_W_B[(0, 3)], self.T_W_B[(1, 3)], self.T_W_B[(2, 3)])
-    }
-
-    fn rotation(&self) -> crate::types::UnitQuaternion {
-        let r = self.T_W_B.fixed_view::<3, 3>(0, 0);
-        let rotmat = nalgebra::Rotation3::from_matrix_unchecked(r.into_owned());
-        crate::types::UnitQuaternion::from_rotation_matrix(&rotmat)
     }
 }
 
@@ -155,5 +110,44 @@ impl State {
             accel_bias: Vector3::zeros(),
             gyro_bias: Vector3::zeros(),
         }
+    }
+
+    // ========================================================================
+    // Backward compatibility methods (delegate to traits)
+    // ========================================================================
+
+    /// Deprecated: Use StateView::pose() instead
+    pub fn pose(&self) -> Matrix4x4 {
+        *StateView::pose(self)
+    }
+
+    /// Deprecated: Use StateView::velocity() instead
+    pub fn velocity_vec(&self) -> Vector3 {
+        *StateView::velocity(self)
+    }
+
+    /// Deprecated: Use StateView::accel_bias() instead
+    pub fn accel_bias_vec(&self) -> Vector3 {
+        *StateView::accel_bias(self)
+    }
+
+    /// Deprecated: Use StateView::gyro_bias() instead
+    pub fn gyro_bias_vec(&self) -> Vector3 {
+        *StateView::gyro_bias(self)
+    }
+
+    /// Deprecated: Use StateView::camera_left_extrinsics() instead
+    pub fn T_B_Cl(&self) -> Matrix4x4 {
+        *StateView::camera_left_extrinsics(self)
+    }
+
+    /// Deprecated: Use StateView::camera_right_extrinsics() instead
+    pub fn T_B_Cr(&self) -> Matrix4x4 {
+        *StateView::camera_right_extrinsics(self)
+    }
+
+    /// Deprecated: Use StateTransform::inverse() instead
+    pub fn inverse_pose(&self) -> Matrix4x4 {
+        StateTransform::inverse(self).T_W_B
     }
 }

@@ -95,8 +95,7 @@ impl RollingShutterCompensator {
 
         features
             .iter()
-            .enumerate()
-            .map(|(_i, &(u, v))| {
+            .map(|&(u, v)| {
                 self.compensate_single_feature(u, v, imu_buffer, image_timestamp, current_pose)
             })
             .collect()

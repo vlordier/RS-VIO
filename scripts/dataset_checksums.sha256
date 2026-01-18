@@ -1,0 +1,10 @@
+# SHA256 checksums for dataset archives
+# Format: <sha256>  <filename>
+# Fill in the hashes for the archives you download locally.
+# Examples (replace with real values):
+# abc123...  MH_01_easy.zip
+# def456...  tum_vi_room1.tar
+# ghi789...  tum_vi_magistrale1.tar
+# jkl012...  recording_2021-05-10_19-15-19_imu_gnss.zip
+# mno345...  recording_2021-05-10_19-15-19_stereo_images_distorted.zip
+# pqr678...  recording_2021-05-10_19-15-19_reference_poses.zip

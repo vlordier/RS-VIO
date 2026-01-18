@@ -349,10 +349,8 @@ impl Estimator {
                     self.last_imu_timestamp = Some(imu_sample.timestamp);
                     self.imu_measurement_count += 1;
                 }
-            } else {
-                if should_log {
-                    debug_log!("[Estimator] IMU disabled via debug config");
-                }
+            } else if should_log {
+                debug_log!("[Estimator] IMU disabled via debug config");
             }
 
             // Use motion predictor for feature tracking
@@ -634,7 +632,7 @@ impl Estimator {
 
     /// Test hook: number of frames processed.
     pub fn frame_count(&self) -> u64 {
-        self.frame_id_counter
+        self.frame_count
     }
 
     /// Create a keyframe descriptor for loop-closure detection

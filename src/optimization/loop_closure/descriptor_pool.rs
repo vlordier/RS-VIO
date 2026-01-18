@@ -27,8 +27,49 @@
 //! - **`HybridDescriptorPool`**: Combined pool supporting both formats
 //! - **Ownership**: Owned by `LoopClosureDetector`, borrowed during matching
 
-use crate::types::Float;
+use crate::{traits::ResourcePool, types::Float};
 use std::sync::{Arc, Mutex as StdMutex};
+
+#[derive(Debug, Clone)]
+pub struct OrbBinaryPoolConfig {
+    pub capacity: usize,
+}
+
+impl Default for OrbBinaryPoolConfig {
+    fn default() -> Self {
+        Self { capacity: 128 }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FloatDescriptorPoolConfig {
+    pub buffer_size: usize,
+    pub max_concurrent: usize,
+}
+
+impl Default for FloatDescriptorPoolConfig {
+    fn default() -> Self {
+        Self {
+            buffer_size: 256,
+            max_concurrent: 128,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct HybridDescriptorPoolConfig {
+    pub orb_capacity: Option<usize>,
+    pub float_capacity: Option<(usize, usize)>,
+}
+
+impl Default for HybridDescriptorPoolConfig {
+    fn default() -> Self {
+        Self {
+            orb_capacity: Some(128),
+            float_capacity: Some((256, 128)),
+        }
+    }
+}
 
 /// Abstract descriptor buffer pool
 pub trait DescriptorPool: Send + Sync {
@@ -47,6 +88,116 @@ pub trait DescriptorPool: Send + Sync {
 
     /// Current utilization (for monitoring)
     fn utilization(&self) -> f32;
+}
+
+/// Unified resource type returned by `HybridDescriptorPool`.
+#[derive(Debug)]
+pub enum HybridDescriptorResource {
+    Binary(Vec<u8>),
+    Float(Vec<Float>),
+}
+
+impl ResourcePool for HybridDescriptorPool {
+    type Resource = HybridDescriptorResource;
+    type Config = HybridDescriptorPoolConfig;
+
+    fn new(config: Self::Config) -> Self {
+        Self::new(config.orb_capacity, config.float_capacity)
+    }
+
+    fn acquire(&self) -> Self::Resource {
+        // Prefer binary if available, fall back to float
+        if let Some(binary) = &self.binary_pool {
+            if let Some(buf) = binary.acquire_binary() {
+                return HybridDescriptorResource::Binary(buf);
+            }
+        }
+        if let Some(float) = &self.float_pool {
+            if let Some(buf) = float.acquire_float() {
+                return HybridDescriptorResource::Float(buf);
+            }
+        }
+        // If no pool configured or exhausted, allocate minimally
+        HybridDescriptorResource::Binary(vec![0u8; 32])
+    }
+
+    fn try_acquire(&self) -> Option<Self::Resource> {
+        if let Some(binary) = &self.binary_pool {
+            if let Some(buf) = binary.acquire_binary() {
+                return Some(HybridDescriptorResource::Binary(buf));
+            }
+        }
+        if let Some(float) = &self.float_pool {
+            if let Some(buf) = float.acquire_float() {
+                return Some(HybridDescriptorResource::Float(buf));
+            }
+        }
+        None
+    }
+
+    fn release(&self, resource: Self::Resource) {
+        match resource {
+            HybridDescriptorResource::Binary(buf) => {
+                if let Some(binary) = &self.binary_pool {
+                    binary.release_binary(buf);
+                }
+            },
+            HybridDescriptorResource::Float(buf) => {
+                if let Some(float) = &self.float_pool {
+                    float.release_float(buf);
+                }
+            },
+        }
+    }
+
+    fn reset(&self) {
+        if let Some(binary) = &self.binary_pool {
+            binary.reset();
+        }
+        if let Some(float) = &self.float_pool {
+            float.reset();
+        }
+    }
+
+    fn utilization(&self) -> f32 {
+        let mut total = 0.0;
+        let mut parts = 0;
+        if let Some(binary) = &self.binary_pool {
+            total += binary.utilization();
+            parts += 1;
+        }
+        if let Some(float) = &self.float_pool {
+            total += float.utilization();
+            parts += 1;
+        }
+        if parts == 0 {
+            0.0
+        } else {
+            total / parts as f32
+        }
+    }
+
+    fn capacity(&self) -> usize {
+        let mut cap = 0;
+        if let Some(binary) = &self.binary_pool {
+            cap += binary.capacity();
+        }
+        if let Some(float) = &self.float_pool {
+            cap += float.capacity();
+        }
+        cap
+    }
+
+    fn available(&self) -> usize {
+        let mut avail = 0;
+        if let Some(binary) = &self.binary_pool {
+            avail += binary.available();
+        }
+        if let Some(float) = &self.float_pool {
+            avail += float.available();
+        }
+        avail
+    }
 }
 
 /// ORB binary descriptor pool: stores reusable [u8; 32] buffers
@@ -104,6 +255,52 @@ impl OrbBinaryPool {
     /// Current number of acquired buffers
     pub fn acquired_count(&self) -> usize {
         self.acquired.load(std::sync::atomic::Ordering::Relaxed)
+    }
+}
+
+impl ResourcePool for OrbBinaryPool {
+    type Resource = Vec<u8>;
+    type Config = OrbBinaryPoolConfig;
+
+    fn new(config: Self::Config) -> Self {
+        OrbBinaryPool::new(config.capacity)
+    }
+
+    fn acquire(&self) -> Self::Resource {
+        self.acquire_binary().unwrap_or_else(|| vec![0u8; 32])
+    }
+
+    fn try_acquire(&self) -> Option<Self::Resource> {
+        self.acquire_binary()
+    }
+
+    fn release(&self, resource: Self::Resource) {
+        self.release_binary(resource);
+    }
+
+    fn reset(&self) {
+        let mut bufs = self.buffers.lock().expect("mutex poisoned");
+        bufs.clear();
+        for _ in 0..self.capacity {
+            bufs.push(vec![0u8; 32]);
+        }
+        self.acquired.store(0, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    fn utilization(&self) -> f32 {
+        if self.capacity == 0 {
+            return 0.0;
+        }
+        let acquired = self.acquired_count();
+        acquired as f32 / self.capacity as f32
+    }
+
+    fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    fn available(&self) -> usize {
+        self.buffers.lock().expect("mutex poisoned").len()
     }
 }
 
@@ -169,6 +366,53 @@ impl FloatDescriptorPool {
 
     /// Available buffers in pool
     pub fn available_count(&self) -> usize {
+        self.buffers.lock().expect("mutex poisoned").len()
+    }
+}
+
+impl ResourcePool for FloatDescriptorPool {
+    type Resource = Vec<Float>;
+    type Config = FloatDescriptorPoolConfig;
+
+    fn new(config: Self::Config) -> Self {
+        FloatDescriptorPool::new(config.buffer_size, config.max_concurrent)
+    }
+
+    fn acquire(&self) -> Self::Resource {
+        self.acquire_float()
+            .unwrap_or_else(|| Vec::with_capacity(self.buffer_size))
+    }
+
+    fn try_acquire(&self) -> Option<Self::Resource> {
+        self.acquire_float()
+    }
+
+    fn release(&self, resource: Self::Resource) {
+        self.release_float(resource);
+    }
+
+    fn reset(&self) {
+        let mut bufs = self.buffers.lock().expect("mutex poisoned");
+        bufs.clear();
+        for _ in 0..self.max_concurrent {
+            bufs.push(Vec::with_capacity(self.buffer_size));
+        }
+        self.acquired.store(0, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    fn utilization(&self) -> f32 {
+        if self.max_concurrent == 0 {
+            return 0.0;
+        }
+        let acquired = self.acquired_count();
+        acquired as f32 / self.max_concurrent as f32
+    }
+
+    fn capacity(&self) -> usize {
+        self.max_concurrent
+    }
+
+    fn available(&self) -> usize {
         self.buffers.lock().expect("mutex poisoned").len()
     }
 }

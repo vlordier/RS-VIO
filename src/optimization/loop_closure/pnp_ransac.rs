@@ -86,6 +86,7 @@ pub struct PnPRansacResult {
 }
 
 /// PnP-RANSAC solver for robust geometric verification
+#[derive(Debug)]
 pub struct PnPRansacSolver {
     config: PnPRansacConfig,
 }
@@ -141,7 +142,7 @@ impl PnPRansacSolver {
             }
 
             // Get a local copy of sampled indices for DLT
-            let sampled_indices: Vec<usize> = samples.iter().copied().collect();
+            let sampled_indices: Vec<usize> = samples.clone();
 
             // Try to solve PnP with this sample
             let sample_correspondences: Vec<Correspondence> = sampled_indices

@@ -5,9 +5,11 @@
 
 use super::vocabulary::Vocabulary;
 use super::{DescriptorMatcher, MatchMetrics};
+use crate::traits::Strategy;
 use std::collections::BTreeMap;
 
 /// BoW-based retriever for fast loop closure candidate detection
+#[derive(Debug)]
 pub struct BowRetriever {
     vocabulary: Option<Vocabulary>,
     /// Minimum histogram similarity threshold for candidate consideration
@@ -91,9 +93,16 @@ impl BowRetriever {
 }
 
 /// Hybrid matcher that uses BoW for retrieval then DescriptorMatcher for verification
+#[derive(Debug)]
 pub struct HybridMatcher {
     bow_retriever: BowRetriever,
     descriptor_matcher: Box<dyn DescriptorMatcher>,
+}
+
+impl Strategy for HybridMatcher {
+    fn name(&self) -> &str {
+        "HybridMatcher"
+    }
 }
 
 impl HybridMatcher {

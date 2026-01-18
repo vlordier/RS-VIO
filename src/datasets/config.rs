@@ -1,9 +1,6 @@
 use crate::{Result, VIOError};
 use serde::{Deserialize, Serialize};
 
-#[doc(inline)]
-pub use crate::optimization::marginalization::MarginalizationConfig;
-
 /// Main configuration structure for the VIO system.
 ///
 /// This struct holds all configuration parameters loaded from YAML files,
@@ -183,12 +180,12 @@ impl KeyframeManagementConfig {
             );
             self.rotation_threshold = 0.01;
         }
-        if self.rotation_threshold > 3.14 {
+        if self.rotation_threshold > std::f64::consts::PI {
             log::warn!(
                 "rotation_threshold {} too large, clamping to π",
                 self.rotation_threshold
             );
-            self.rotation_threshold = 3.14;
+            self.rotation_threshold = std::f64::consts::PI;
         }
 
         // Clamp processing timeout to [1, 10000] ms

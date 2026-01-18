@@ -43,6 +43,7 @@ macro_rules! fl {
 }
 
 // Re-export nalgebra types with the configured float precision
+use crate::traits::Convert;
 use nalgebra as na;
 pub type Matrix4x4 = na::Matrix4<Float>;
 pub type Matrix3x3 = na::Matrix3<Float>;
@@ -140,19 +141,14 @@ pub fn format_matrix3x3(mat: &Matrix3x3) -> String {
     }
     s
 }
+
 // ============================================================================
-// Conversion traits: Array -> Matrix / Vector and back
-// (kept to respect Rust orphan rules while providing ergonomic helpers)
+// Convert<T> implementations (unified conversion trait)
+// Replaces fragmented ToMatrix/ToVector/ToArray/ToArrayVec traits
 // ============================================================================
 
-pub trait ToMatrix {
-    type Output;
-    fn to_matrix(&self) -> Self::Output;
-}
-
-impl ToMatrix for Array4x4 {
-    type Output = Matrix4x4;
-    fn to_matrix(&self) -> Self::Output {
+impl Convert<Matrix4x4> for Array4x4 {
+    fn convert(&self) -> Matrix4x4 {
         na::Matrix4::from_row_slice(&[
             self[0][0], self[0][1], self[0][2], self[0][3], self[1][0], self[1][1], self[1][2],
             self[1][3], self[2][0], self[2][1], self[2][2], self[2][3], self[3][0], self[3][1],
@@ -161,9 +157,8 @@ impl ToMatrix for Array4x4 {
     }
 }
 
-impl ToMatrix for Array3x3 {
-    type Output = Matrix3x3;
-    fn to_matrix(&self) -> Self::Output {
+impl Convert<Matrix3x3> for Array3x3 {
+    fn convert(&self) -> Matrix3x3 {
         na::Matrix3::from_row_slice(&[
             self[0][0], self[0][1], self[0][2], self[1][0], self[1][1], self[1][2], self[2][0],
             self[2][1], self[2][2],
@@ -171,33 +166,20 @@ impl ToMatrix for Array3x3 {
     }
 }
 
-pub trait ToVector {
-    type Output;
-    fn to_vector(&self) -> Self::Output;
-}
-
-impl ToVector for Array3 {
-    type Output = Vector3;
-    fn to_vector(&self) -> Self::Output {
+impl Convert<Vector3> for Array3 {
+    fn convert(&self) -> Vector3 {
         na::Vector3::new(self[0], self[1], self[2])
     }
 }
 
-impl ToVector for Array2 {
-    type Output = Vector2;
-    fn to_vector(&self) -> Self::Output {
+impl Convert<Vector2> for Array2 {
+    fn convert(&self) -> Vector2 {
         na::Vector2::new(self[0], self[1])
     }
 }
 
-pub trait ToArray {
-    type Output;
-    fn to_array(&self) -> Self::Output;
-}
-
-impl ToArray for Matrix4x4 {
-    type Output = Array4x4;
-    fn to_array(&self) -> Self::Output {
+impl Convert<Array4x4> for Matrix4x4 {
+    fn convert(&self) -> Array4x4 {
         [
             [self[(0, 0)], self[(0, 1)], self[(0, 2)], self[(0, 3)]],
             [self[(1, 0)], self[(1, 1)], self[(1, 2)], self[(1, 3)]],
@@ -207,9 +189,8 @@ impl ToArray for Matrix4x4 {
     }
 }
 
-impl ToArray for Matrix3x3 {
-    type Output = Array3x3;
-    fn to_array(&self) -> Self::Output {
+impl Convert<Array3x3> for Matrix3x3 {
+    fn convert(&self) -> Array3x3 {
         [
             [self[(0, 0)], self[(0, 1)], self[(0, 2)]],
             [self[(1, 0)], self[(1, 1)], self[(1, 2)]],
@@ -218,21 +199,14 @@ impl ToArray for Matrix3x3 {
     }
 }
 
-pub trait ToArrayVec {
-    type Output;
-    fn to_array(&self) -> Self::Output;
-}
-
-impl ToArrayVec for Vector3 {
-    type Output = Array3;
-    fn to_array(&self) -> Self::Output {
+impl Convert<Array3> for Vector3 {
+    fn convert(&self) -> Array3 {
         [self[0], self[1], self[2]]
     }
 }
 
-impl ToArrayVec for Vector2 {
-    type Output = Array2;
-    fn to_array(&self) -> Self::Output {
+impl Convert<Array2> for Vector2 {
+    fn convert(&self) -> Array2 {
         [self[0], self[1]]
     }
 }

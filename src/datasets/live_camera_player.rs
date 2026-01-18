@@ -59,7 +59,7 @@ impl LiveCameraPlayer {
 }
 
 impl DatasetPlayer for LiveCameraPlayer {
-    fn run(&self, _config: PlayerConfig) -> Result<PlayerResult> {
+    fn run(&self, _config: &PlayerConfig) -> Result<PlayerResult> {
         Err(VIOError::Config(
             "Live camera capture not yet implemented. Requires camera backend (OpenCV, V4L2, or GStreamer)".to_string(),
         ))

@@ -15,6 +15,7 @@
 use super::lightglue::{LightGlueConfig, LightGlueMatcher};
 use super::pnp_ransac::{Correspondence, PnPRansacConfig, PnPRansacSolver};
 use super::{GeometricVerifier, KeyframeDescriptor, MatchMetrics, VerifiedMatch};
+use crate::traits::Strategy;
 use crate::types::Float;
 use nalgebra as na;
 
@@ -48,11 +49,18 @@ impl Default for EnhancedVerifierConfig {
 }
 
 /// Enhanced geometric verifier combining multiple verification strategies
+#[derive(Debug)]
 pub struct EnhancedGeometricVerifier {
     config: EnhancedVerifierConfig,
     pnp_solver: PnPRansacSolver,
     #[cfg(feature = "lightglue")]
     lightglue_matcher: Option<LightGlueMatcher>,
+}
+
+impl Strategy for EnhancedGeometricVerifier {
+    fn name(&self) -> &str {
+        "EnhancedGeometricVerifier"
+    }
 }
 
 impl EnhancedGeometricVerifier {

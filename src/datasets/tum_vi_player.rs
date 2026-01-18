@@ -25,7 +25,7 @@ impl TUMVIPlayer {
 }
 
 impl DatasetPlayer for TUMVIPlayer {
-    fn run(&self, config: PlayerConfig) -> crate::Result<PlayerResult> {
+    fn run(&self, config: &PlayerConfig) -> crate::Result<PlayerResult> {
         crate::datasets::player_trait::execute(self, config, "TUMVIPlayer")
     }
 
@@ -105,7 +105,7 @@ impl DatasetPlayer for TUMVIPlayer {
         let gray_img = img.to_luma8();
 
         // Return raw pixel data as Vec<u8>
-        let pixel_data = gray_img.as_raw().to_vec();
+        let pixel_data = gray_img.as_raw().clone();
 
         Ok(pixel_data)
     }

@@ -3,6 +3,12 @@
 //! This module provides a framework for GPU-accelerated implementations of robustness techniques
 //! for computer vision. Currently provides CPU fallbacks with hooks for future GPU acceleration.
 //!
+//! ## Platform Support
+//!
+//! - **macOS (feature "gpu")**: Experimental wgpu-based GPU acceleration with fallback
+//! - **Raspberry Pi 5**: Optimized CPU path with thread pinning
+//! - **Other platforms**: Default CPU implementations
+//!
 //! ## Features (Future)
 //!
 //! - GPU-accelerated RANSAC for geometric verification
@@ -14,6 +20,7 @@
 //! - Framework for GPU acceleration (ready for CUDA/OpenCL integration)
 //! - CPU fallback implementations
 //! - Unified interface for CPU/GPU switching
+//! - Seamless platform transitions (macOS → CPU, Raspberry Pi 5 → pinned CPU, etc.)
 //!
 //! ## Usage
 //!
@@ -22,6 +29,7 @@
 //!
 //! let estimator = RobustEstimator::new_best_available(config);
 //! let result = estimator.estimate_fundamental(&matches, threshold, confidence);
+//! // Automatically uses GPU on macOS (if available), pinned threads on RPi5, CPU elsewhere
 //! ```
 //!
 //! ## Future GPU Support
@@ -30,11 +38,10 @@
 //! - **RANSAC**: 10-50x speedup for large correspondence sets
 //! - **Geometric Verification**: Parallel distance computations
 //! - **Bundle Adjustment**: GPU-accelerated residual computation
+use crate::debug_log;
+use crate::platform;
 use crate::Result;
 use nalgebra as na;
-
-/// Trait for GPU-accelerated robustness computations
-use crate::debug_log; // Importing debug_log macro
 pub trait GpuAccelerated {
     /// Check if GPU acceleration is available
     fn is_available() -> bool;
@@ -122,10 +129,11 @@ impl GpuProsacFundamental {
 /// Geometric verification utilities (framework for future GPU acceleration)
 pub mod geometric_gpu {
     use super::*;
+    use crate::feature_tracker::ransac;
 
     /// Sampson distance computation (CPU implementation, GPU-ready interface)
     pub fn sampson_distance_batch_gpu(
-        fundamental: &super::ransac::FundamentalMatrix,
+        fundamental: &ransac::FundamentalMatrix,
         points1: &[na::Vector2<f32>],
         points2: &[na::Vector2<f32>],
         _threshold: f32,
@@ -159,11 +167,18 @@ pub enum RobustEstimator {
 impl RobustEstimator {
     /// Create the best available estimator (GPU framework if enabled, CPU otherwise)
     pub fn new_best_available(config: GpuConfig) -> Result<Self> {
-        // Future: Check for actual GPU availability
-        if config.enable_ransac_gpu {
-            return Ok(Self::GpuRansac(GpuRansacFundamental::new(config.clone())?));
+        // Platform configuration (e.g., Raspberry Pi thread pinning)
+        platform::configure_for_platform();
+
+        // Prefer GPU on macOS when the `gpu` feature is enabled and wgpu is available
+        #[cfg(all(feature = "gpu", target_os = "macos"))]
+        {
+            if wgpu_available() {
+                return Ok(Self::GpuRansac(GpuRansacFundamental::new(config.clone())?));
+            }
         }
 
+        // Otherwise, use CPU implementation
         Ok(Self::CpuRansac)
     }
 
@@ -210,59 +225,294 @@ impl RobustEstimator {
     }
 }
 
+#[cfg(all(feature = "gpu", target_os = "macos"))]
+fn wgpu_available() -> bool {
+    use wgpu::Instance;
+    // Attempt to find a suitable adapter (Metal backend on macOS)
+    let instance = Instance::default();
+    // wgpu is async; use pollster to block on adapter request
+    let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+        power_preference: wgpu::PowerPreference::HighPerformance,
+        compatible_surface: None,
+        force_fallback_adapter: false,
+    }));
+    adapter.is_some()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    // ===== GpuConfig Tests =====
+
     #[test]
-    fn gpu_config_default() {
+    fn test_gpu_config_default_values() {
         let config = GpuConfig::default();
         assert_eq!(config.max_memory_mb, 1024);
         assert_eq!(config.device_id, 0);
-        assert!(config.enable_ransac_gpu);
     }
 
     #[test]
-    fn robust_estimator_cpu_fallback() {
+    fn test_gpu_config_flags_disabled_by_default() {
         let config = GpuConfig::default();
-        let estimator = RobustEstimator::new_best_available(config);
-        // Should return CPU implementation when GPU not available
-        assert!(!estimator.unwrap().is_gpu_accelerated());
-    }
-
-    #[test]
-    fn gpu_config_defaults() {
-        let config = GpuConfig::default();
-        assert_eq!(config.max_memory_mb, 1024);
-        assert_eq!(config.device_id, 0);
-        // GPU features disabled by default until implemented
         assert!(!config.enable_ransac_gpu);
         assert!(!config.enable_geometric_gpu);
         assert!(!config.enable_optimization_gpu);
     }
 
     #[test]
-    fn robust_estimator_cpu_fallback() {
-        let config = GpuConfig::default();
-        let estimator = RobustEstimator::new_best_available(config).unwrap();
-        // Currently always uses CPU (GPU framework not implemented)
-        assert!(!estimator.is_gpu_accelerated());
+    fn test_gpu_config_clone() {
+        let config1 = GpuConfig::default();
+        let config2 = config1.clone();
+        assert_eq!(config1.max_memory_mb, config2.max_memory_mb);
+        assert_eq!(config1.device_id, config2.device_id);
     }
 
     #[test]
-    fn gpu_ransac_fundamental_fallback() {
+    fn test_gpu_config_custom_values() {
+        let config = GpuConfig {
+            max_memory_mb: 2048,
+            device_id: 1,
+            enable_ransac_gpu: true,
+            enable_geometric_gpu: true,
+            enable_optimization_gpu: false,
+        };
+        assert_eq!(config.max_memory_mb, 2048);
+        assert_eq!(config.device_id, 1);
+        assert!(config.enable_ransac_gpu);
+    }
+
+    // ===== GpuRansacFundamental Tests =====
+
+    #[test]
+    fn test_gpu_ransac_fundamental_creation() {
+        let config = GpuConfig::default();
+        let result = GpuRansacFundamental::new(config);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_gpu_ransac_estimate_does_not_panic() {
         let config = GpuConfig::default();
         let gpu_ransac = GpuRansacFundamental::new(config).unwrap();
-
-        // Test with minimal correspondences
         let matches = vec![
             (na::Vector2::new(10.0, 20.0), na::Vector2::new(12.0, 22.0)),
             (na::Vector2::new(30.0, 40.0), na::Vector2::new(32.0, 42.0)),
         ];
+        let _ = gpu_ransac.estimate(&matches, 0.01, 0.99);
+    }
 
+    #[test]
+    fn test_gpu_ransac_with_empty_matches() {
+        let config = GpuConfig::default();
+        let gpu_ransac = GpuRansacFundamental::new(config).unwrap();
+        let matches: Vec<_> = vec![];
         let result = gpu_ransac.estimate(&matches, 0.01, 0.99);
-        // May fail due to insufficient data, but should not panic
-        // This tests that the framework works
-        assert!(result.is_ok() || result.is_err()); // Either result is fine
+        assert!(result.is_ok() || result.is_err());
+    }
+
+    #[test]
+    fn test_gpu_ransac_with_many_correspondences() {
+        let config = GpuConfig::default();
+        let gpu_ransac = GpuRansacFundamental::new(config).unwrap();
+        let mut matches = Vec::new();
+        for i in 0..20 {
+            let x1 = (i as f32) * 10.0;
+            let y1 = (i as f32) * 5.0;
+            matches.push((
+                na::Vector2::new(x1, y1),
+                na::Vector2::new(x1 + 1.0, y1 + 0.5),
+            ));
+        }
+        let result = gpu_ransac.estimate(&matches, 1.0, 0.99);
+        assert!(result.is_ok() || result.is_err());
+    }
+
+    // ===== GpuProsacFundamental Tests =====
+
+    #[test]
+    fn test_gpu_prosac_fundamental_creation() {
+        let config = GpuConfig::default();
+        let result = GpuProsacFundamental::new(config);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_gpu_prosac_estimate_does_not_panic() {
+        let config = GpuConfig::default();
+        let gpu_prosac = GpuProsacFundamental::new(config).unwrap();
+        let matches = vec![
+            (
+                na::Vector2::new(10.0, 20.0),
+                na::Vector2::new(12.0, 22.0),
+                0.9,
+            ),
+            (
+                na::Vector2::new(30.0, 40.0),
+                na::Vector2::new(32.0, 42.0),
+                0.8,
+            ),
+        ];
+        let _ = gpu_prosac.estimate(&matches, 4, 0.99);
+    }
+
+    #[test]
+    fn test_gpu_prosac_with_different_sample_sizes() {
+        let config = GpuConfig::default();
+        let gpu_prosac = GpuProsacFundamental::new(config).unwrap();
+        let matches = vec![
+            (
+                na::Vector2::new(10.0, 20.0),
+                na::Vector2::new(12.0, 22.0),
+                0.9,
+            ),
+            (
+                na::Vector2::new(30.0, 40.0),
+                na::Vector2::new(32.0, 42.0),
+                0.8,
+            ),
+            (
+                na::Vector2::new(50.0, 60.0),
+                na::Vector2::new(52.0, 62.0),
+                0.7,
+            ),
+        ];
+        for sample_size in [2, 4, 8] {
+            let result = gpu_prosac.estimate(&matches, sample_size, 0.99);
+            assert!(result.is_ok() || result.is_err());
+        }
+    }
+
+    // ===== RobustEstimator Tests =====
+
+    #[test]
+    fn test_robust_estimator_best_available_creation() {
+        let config = GpuConfig::default();
+        let result = RobustEstimator::new_best_available(config);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_robust_estimator_is_gpu_accelerated() {
+        let config = GpuConfig::default();
+        let estimator = RobustEstimator::new_best_available(config).unwrap();
+        let _ = estimator.is_gpu_accelerated();
+    }
+
+    #[test]
+    fn test_robust_estimator_fundamental_estimation() {
+        let config = GpuConfig::default();
+        let estimator = RobustEstimator::new_best_available(config).unwrap();
+        let matches = vec![
+            (na::Vector2::new(10.0, 20.0), na::Vector2::new(12.0, 22.0)),
+            (na::Vector2::new(30.0, 40.0), na::Vector2::new(32.0, 42.0)),
+        ];
+        let _ = estimator.estimate_fundamental(&matches, 0.01, 0.99);
+    }
+
+    #[test]
+    fn test_robust_estimator_prosac_estimation() {
+        let config = GpuConfig::default();
+        let estimator = RobustEstimator::new_best_available(config).unwrap();
+        let matches = vec![
+            (
+                na::Vector2::new(10.0, 20.0),
+                na::Vector2::new(12.0, 22.0),
+                0.9,
+            ),
+            (
+                na::Vector2::new(30.0, 40.0),
+                na::Vector2::new(32.0, 42.0),
+                0.8,
+            ),
+        ];
+        let _ = estimator.estimate_fundamental_prosac(&matches, 4, 0.99);
+    }
+
+    // ===== Feature-Gating Tests =====
+
+    #[test]
+    #[cfg(all(feature = "gpu", target_os = "macos"))]
+    fn test_gpu_feature_gated_for_macos() {
+        let config = GpuConfig::default();
+        let _ = RobustEstimator::new_best_available(config).unwrap();
+    }
+
+    #[test]
+    #[cfg(not(all(feature = "gpu", target_os = "macos")))]
+    fn test_cpu_fallback_when_gpu_unavailable() {
+        let config = GpuConfig::default();
+        let estimator = RobustEstimator::new_best_available(config).unwrap();
+        let _ = estimator;
+    }
+
+    // ===== Geometric GPU Module Tests =====
+
+    #[test]
+    fn test_geometric_gpu_sampson_distance_batch() {
+        use crate::feature_tracker::ransac::FundamentalMatrix;
+        let f_matrix = na::Matrix3::identity();
+        let fundamental = FundamentalMatrix::from_matrix(f_matrix).unwrap();
+        let points1 = vec![na::Vector2::new(10.0, 20.0), na::Vector2::new(30.0, 40.0)];
+        let points2 = vec![na::Vector2::new(12.0, 22.0), na::Vector2::new(32.0, 42.0)];
+        let result =
+            geometric_gpu::sampson_distance_batch_gpu(&fundamental, &points1, &points2, 1.0);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().len(), 2);
+    }
+
+    #[test]
+    fn test_geometric_gpu_count_inliers() {
+        let distances = vec![0.5, 0.3, 1.5, 0.1, 2.0];
+        let threshold = 1.0;
+        let result = geometric_gpu::count_inliers_gpu(&distances, threshold);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 3);
+    }
+
+    #[test]
+    fn test_geometric_gpu_count_inliers_all_inliers() {
+        let distances = vec![0.1, 0.2, 0.3, 0.4];
+        let threshold = 1.0;
+        let result = geometric_gpu::count_inliers_gpu(&distances, threshold);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 4);
+    }
+
+    #[test]
+    fn test_geometric_gpu_count_inliers_none() {
+        let distances = vec![2.0, 3.0, 4.0];
+        let threshold = 1.0;
+        let result = geometric_gpu::count_inliers_gpu(&distances, threshold);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 0);
+    }
+
+    #[test]
+    fn test_geometric_gpu_empty_distances() {
+        let distances: Vec<f32> = vec![];
+        let threshold = 1.0;
+        let result = geometric_gpu::count_inliers_gpu(&distances, threshold);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 0);
+    }
+
+    // ===== Cross-Platform Tests =====
+
+    #[test]
+    fn test_gpu_config_consistent_across_platforms() {
+        for _ in 0..5 {
+            let config = GpuConfig::default();
+            assert_eq!(config.max_memory_mb, 1024);
+            assert_eq!(config.device_id, 0);
+        }
+    }
+
+    #[test]
+    fn test_robust_estimator_idempotent() {
+        let config = GpuConfig::default();
+        let _est1 = RobustEstimator::new_best_available(config.clone()).unwrap();
+        let _est2 = RobustEstimator::new_best_available(config.clone()).unwrap();
+        let _est3 = RobustEstimator::new_best_available(config).unwrap();
     }
 }

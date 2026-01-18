@@ -46,6 +46,7 @@ flame-graph.svg
 
 # Dataset samples
 rs-vio-samples/
+datasets/
 
 # OS files
 Thumbs.db

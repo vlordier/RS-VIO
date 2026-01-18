@@ -1,10 +1,12 @@
 use super::{DescriptorMatcher, MatchMetrics};
 use crate::optimization::loop_closure::descriptor_pool::OrbBinaryPool;
 use crate::optimization::loop_closure::KeyframeDescriptor;
+use crate::traits::Strategy;
 use crate::types::Float;
 use std::sync::Arc;
 
 /// ORB-based descriptor matcher using Hamming distance
+#[derive(Debug, Clone)]
 pub struct OrbMatcher {
     /// Maximum Hamming distance threshold (0-256)
     pub max_hamming_distance: u32,
@@ -16,15 +18,27 @@ pub struct OrbMatcher {
     pub binary_pool: Option<Arc<OrbBinaryPool>>,
 }
 
-impl OrbMatcher {
-    /// Create a new ORB matcher with default parameters
-    pub fn new() -> Self {
+impl Default for OrbMatcher {
+    fn default() -> Self {
         Self {
             max_hamming_distance: 64,
             use_ratio_test: true,
             ratio_threshold: 0.75,
             binary_pool: None,
         }
+    }
+}
+
+impl Strategy for OrbMatcher {
+    fn name(&self) -> &str {
+        "OrbMatcher"
+    }
+}
+
+impl OrbMatcher {
+    /// Create a new ORB matcher with default parameters
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Create a new ORB matcher with optional binary descriptor pool
@@ -124,8 +138,8 @@ mod tests {
         let matcher = OrbMatcher::new();
         assert!(matcher.descriptor_to_binary(&[]).is_err());
         assert!(matcher.descriptor_to_binary(&[0.0]).is_err());
-        assert!(matcher.descriptor_to_binary(&vec![0.0; 32]).is_ok());
-        assert!(matcher.descriptor_to_binary(&vec![1.0; 32]).is_ok());
+        assert!(matcher.descriptor_to_binary(&[0.0; 32]).is_ok());
+        assert!(matcher.descriptor_to_binary(&[1.0; 32]).is_ok());
         assert!(matcher.descriptor_to_binary(&vec![0.5; 1024]).is_ok());
 
         let extreme_desc = vec![

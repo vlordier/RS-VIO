@@ -162,15 +162,17 @@ pub fn init_logging() {
 
 pub mod camera;
 pub mod datasets;
-pub mod error_handling;
 pub mod estimator;
 pub mod feature_tracker;
 pub mod imu;
 pub mod logging;
 pub mod math;
 pub mod optimization;
-pub mod types;
 pub mod validation;
+pub mod platform;
+
+pub mod traits;
+pub mod types;
 pub mod viewers;
 
 // Re-export commonly used types for convenience

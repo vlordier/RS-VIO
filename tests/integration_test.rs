@@ -114,7 +114,8 @@ optimization:
 
 #[test]
 fn test_types_conversion() {
-    use rs_vio::types::*;
+  use rs_vio::traits::Convert;
+  use rs_vio::types::*;
 
     let array4x4 = [
         [1.0, 0.0, 0.0, 1.0],
@@ -123,14 +124,14 @@ fn test_types_conversion() {
         [0.0, 0.0, 0.0, 1.0],
     ];
 
-    let matrix = array4x4.to_matrix();
+    let matrix: Matrix4x4 = array4x4.convert();
     assert_eq!(matrix[(0, 3)], 1.0);
     assert_eq!(matrix[(1, 3)], 2.0);
 
-    let back_to_array = matrix.to_array();
+    let back_to_array: Array4x4 = matrix.convert();
     assert_eq!(back_to_array, array4x4);
 
-    let vector = [1.0, 2.0, 3.0].to_vector();
+    let vector: Vector3 = [1.0, 2.0, 3.0].convert();
     assert_eq!(vector[0], 1.0);
     assert_eq!(vector[2], 3.0);
 }

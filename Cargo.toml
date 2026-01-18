@@ -37,12 +37,17 @@ nalgebra = "0.33.2"
 nalgebra034 = { package = "nalgebra", version = "0.34.1" } # TODO improve this, now this is dirty (needed for camera-intrinsic-model for now)
 camera-intrinsic-model = "0.7.2"
 rayon = "1.10"  # Parallel iteration for multi-core feature tracking
+core_affinity = "0.8"  # Thread pinning support (used on Raspberry Pi)
+lazy_static = "1.4"  # For global workspace pool singleton
 # Note: Using git dependency for apex-solver to access Schur complement methods
 # Consider pinning to a specific commit when stable release is available
 apex-solver = { git = "https://github.com/amin-abouee/apex-solver", branch = "main" }
 # ONNX Runtime for LightGlue inference (optional feature) - requires manual setup
 ort = { version = "2.0.0-rc.11", optional = true }
 ndarray = { version = "0.16", optional = true }
+wgpu = { version = "0.20", optional = true }
+pollster = { version = "0.3", optional = true }
+
 
 
 [features]
@@ -53,7 +58,7 @@ lightglue = ["ort", "ndarray"]
 # Feature flag for memory profiling with dhat
 dhat-heap = []
 # Feature flag for GPU acceleration framework (placeholder for future CUDA/OpenCL support)
-gpu = []
+gpu = ["wgpu", "pollster"]
 # Feature flag to enable debug/trace logging in hot paths (default off)
 debug-logging = []
 
@@ -82,14 +87,25 @@ warnings = "deny"
 non_snake_case = "allow"  # Allow for transformation matrices (T_A_B convention)
 
 [lints.clippy]
-# Real-time safety lints - Critical for embedded systems
+# ============================================================================
+# CRITICAL SAFETY LINTS - NO EXCEPTIONS
+# ============================================================================
 unnecessary_unwrap = "deny"
 expect_used = "deny"  # NO expect() anywhere - use Result<T> instead
-unwrap_used = "warn"  # Allowed in tests (see test modules)
+unwrap_used = "deny"  # No unwrap() - must use proper error handling
 todo = "deny"  # TODO comments must be resolved before release
 unimplemented = "deny"  # No stub implementations
 panic = "deny"
 exit = "deny"  # Never call process::exit in library code
+dbg_macro = "deny"  # No debug prints in production
+
+# ============================================================================
+# EMBEDDED SYSTEMS SAFETY - Real-time predictability
+# ============================================================================
+missing_const_for_fn = "deny"  # All const-eligible functions must be const
+inefficient_to_string = "deny"  # Prevent unnecessary allocations
+clone_on_copy = "deny"  # No unnecessary clones on Copy types
+implicit_clone = "deny"  # Explicit clone() required
 
 # Allocation safety - must be predictable in realtime
 large_stack_arrays = "deny"  # Any large stack array is unacceptable
@@ -97,20 +113,18 @@ large_types_passed_by_value = "deny"  # Stack pressure must be minimal
 vec_box = "deny"  # Double indirection is unacceptable
 box_collection = "deny"  # NO Box<Vec<T>> - preallocate or use Vec directly
 rc_buffer = "deny"  # NO reference counted buffers in realtime code
+let_unit_value = "deny"  # let _ = ... is usually wrong
 
-# Correctness lints
+# ============================================================================
+# CORRECTNESS & NUMERIC SAFETY
+# ============================================================================
 float_cmp = "warn"  # Allow in tests where we know exact values
 float_cmp_const = "warn"  # Comparing floats to constants
-
-# Numeric safety for embedded systems
-cast_possible_truncation = "warn"  # Catch lossy casts - allow where intentional
-cast_precision_loss = "warn"  # Warn on float precision loss
-cast_sign_loss = "warn"  # Prevent sign loss in casts
-cast_lossless = "warn"  # Prefer From::from for lossless casts
-
-# Additional embedded safety
-missing_const_for_fn = "warn"  # Const functions enable compile-time computation
-inefficient_to_string = "warn"  # Use to_string() carefully on embedded
+cast_possible_truncation = "deny"  # Catch truncating casts (lossy with data loss)
+cast_precision_loss = "warn"  # Warn on float precision changes (f32↔f64 is common)
+cast_sign_loss = "deny"  # Prevent sign loss in casts (critical bug vector)
+cast_lossless = "deny"  # Prefer From::from for lossless casts
+transmute_ptr_to_ptr = "deny"  # Dangerous transmute patterns
 
 [profile.release]
 # Optimize for embedded/real-time performance

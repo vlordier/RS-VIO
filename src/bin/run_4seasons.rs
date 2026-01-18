@@ -28,7 +28,7 @@ fn main() {
 
     // Create and run EuRoC player
     let player = FourSeasonsPlayer::new();
-    match player.run(player_config) {
+    match player.run(&player_config) {
         Ok(result) => {
             info!("[Main] processing completed successfully!");
             info!(
