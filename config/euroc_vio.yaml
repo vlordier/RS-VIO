@@ -61,8 +61,7 @@ marginalization:
   landmark_age_limit: 50            # Maximum frames without observation before marginalizing
   use_fej: true                     # Use First-Estimate Jacobian for consistency
   damping: 1e-7                     # Damping factor for numerical stability
-  prior_weight: 1.0                 # Weight for marginalization prior
-  prior_info_scaling: 1.0           # Scaling factor for information matrix
+  prior_info_scale: 0.9             # Scaling factor for information matrix (downweight prior)
   hessian_approximator: "GaussNewton"  # Strategy: GaussNewton, Diagonal, LevenbergMarquardt, Exact, Identity
   gradient_computer: "Standard"     # Strategy: Standard, Zero
   prior_constructor: "Standard"     # Strategy: Standard, Regularized
