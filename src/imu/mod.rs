@@ -37,6 +37,7 @@
 
 pub mod initialization;
 pub mod learned_vibration;
+pub mod signal_analysis;
 pub mod vibration_filter;
 
 pub use initialization::{
@@ -46,6 +47,7 @@ pub use initialization::{
 pub use learned_vibration::{
     LearnedVibrationScheduler, RuleBasedVibrationScheduler, VibrationInputs, VibrationOutputs,
 };
+pub use signal_analysis::{HarmonicDecomposition, ImuSignalAnalyzer, SignalQuality};
 pub use vibration_filter::{
     NotchFilter, VibrationFilterConfig, VibrationNotchFilter, VibrationPeak,
 };

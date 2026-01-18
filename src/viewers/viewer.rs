@@ -116,4 +116,62 @@ pub trait Viewer: Send {
     ) {
         // Default implementation - no-op
     }
+
+    /// Log raw IMU measurements (accelerometer and gyroscope) before processing
+    /// accel_raw: raw accelerometer data [x, y, z] in m/s²
+    /// gyro_raw: raw gyroscope data [x, y, z] in rad/s
+    fn log_imu_raw(
+        &mut self,
+        _timestamp: i64,
+        _accel_raw: &[[f32; 3]],
+        _gyro_raw: &[[f32; 3]],
+        _entity_path: &str,
+    ) {
+        // Default implementation - no-op
+    }
+
+    /// Log processed IMU measurements after bias correction
+    /// accel_processed: bias-corrected accelerometer data [x, y, z] in m/s²
+    /// gyro_processed: bias-corrected gyroscope data [x, y, z] in rad/s
+    fn log_imu_processed(
+        &mut self,
+        _timestamp: i64,
+        _accel_processed: &[[f32; 3]],
+        _gyro_processed: &[[f32; 3]],
+        _entity_path: &str,
+    ) {
+        // Default implementation - no-op
+    }
+
+    /// Log harmonics deduced from IMU data (gravity, bias, and harmonic components)
+    /// gravity_component: estimated gravity component in sensor frame [x, y, z] in m/s²
+    /// bias_accel: estimated accelerometer bias [x, y, z] in m/s²
+    /// bias_gyro: estimated gyroscope bias [x, y, z] in rad/s
+    /// harmonic_accel: residual harmonic/noise components [x, y, z] in m/s²
+    fn log_imu_harmonics(
+        &mut self,
+        _timestamp: i64,
+        _gravity_component: [f32; 3],
+        _bias_accel: [f32; 3],
+        _bias_gyro: [f32; 3],
+        _harmonic_accel: &[[f32; 3]],
+        _entity_path: &str,
+    ) {
+        // Default implementation - no-op
+    }
+
+    /// Log IMU signal statistics and quality metrics
+    /// signal_snr: signal-to-noise ratio for each axis
+    /// signal_rms: RMS values for each axis
+    /// signal_peak: peak values for each axis
+    fn log_imu_signal_quality(
+        &mut self,
+        _timestamp: i64,
+        _signal_snr: [f32; 3],
+        _signal_rms: [f32; 3],
+        _signal_peak: [f32; 3],
+        _entity_path: &str,
+    ) {
+        // Default implementation - no-op
+    }
 }

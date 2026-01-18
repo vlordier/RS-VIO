@@ -553,6 +553,340 @@ impl Viewer for RerunViewer {
         }
     }
 
+    /// Log raw IMU measurements before processing
+    fn log_imu_raw(
+        &mut self,
+        _timestamp: i64,
+        accel_raw: &[[f32; 3]],
+        gyro_raw: &[[f32; 3]],
+        entity_path: &str,
+    ) {
+        if !self.initialized || (accel_raw.is_empty() && gyro_raw.is_empty()) {
+            return;
+        }
+
+        if let Some(ref rec) = self.rec {
+            rec.set_time_sequence("frame", self.frame_id);
+            rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
+
+            // Log raw accelerometer data as line strips (time series)
+            if !accel_raw.is_empty() {
+                let accel_3d: Vec<[f32; 3]> = accel_raw
+                    .iter()
+                    .enumerate()
+                    .map(|(i, &accel)| [i as f32 * 0.01, accel[0], accel[1]])
+                    .collect();
+
+                let accel_line = LineStrips3D::new([accel_3d])
+                    .with_colors([Color::from_rgb(255, 100, 100)]); // Light red
+
+                if let Err(e) = rec.log(format!("{}/accel_raw", entity_path), &accel_line) {
+                    log::debug!("[RerunViewer] Failed to log raw accel: {}", e);
+                }
+            }
+
+            // Log raw gyroscope data as line strips (time series)
+            if !gyro_raw.is_empty() {
+                let gyro_3d: Vec<[f32; 3]> = gyro_raw
+                    .iter()
+                    .enumerate()
+                    .map(|(i, &gyro)| [i as f32 * 0.01, gyro[0], gyro[1]])
+                    .collect();
+
+                let gyro_line = LineStrips3D::new([gyro_3d])
+                    .with_colors([Color::from_rgb(100, 100, 255)]); // Light blue
+
+                if let Err(e) = rec.log(format!("{}/gyro_raw", entity_path), &gyro_line) {
+                    log::debug!("[RerunViewer] Failed to log raw gyro: {}", e);
+                }
+            }
+
+            // Log statistics about raw measurements
+            if !accel_raw.is_empty() {
+                let accel_mag: f32 = accel_raw
+                    .iter()
+                    .map(|a| (a[0] * a[0] + a[1] * a[1] + a[2] * a[2]).sqrt())
+                    .sum::<f32>()
+                    / accel_raw.len() as f32;
+
+                let stats = format!(
+                    "Raw Accel Measurements: {} | Avg Magnitude: {:.3} m/s²",
+                    accel_raw.len(),
+                    accel_mag
+                );
+                if let Err(e) = rec.log(
+                    format!("{}/stats_raw", entity_path),
+                    &rerun::TextDocument::new(stats),
+                ) {
+                    log::debug!("[RerunViewer] Failed to log raw stats: {}", e);
+                }
+            }
+        }
+    }
+
+    /// Log processed IMU measurements after bias correction and filtering
+    fn log_imu_processed(
+        &mut self,
+        _timestamp: i64,
+        accel_processed: &[[f32; 3]],
+        gyro_processed: &[[f32; 3]],
+        entity_path: &str,
+    ) {
+        if !self.initialized || (accel_processed.is_empty() && gyro_processed.is_empty()) {
+            return;
+        }
+
+        if let Some(ref rec) = self.rec {
+            rec.set_time_sequence("frame", self.frame_id);
+            rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
+
+            // Log processed accelerometer data
+            if !accel_processed.is_empty() {
+                let accel_3d: Vec<[f32; 3]> = accel_processed
+                    .iter()
+                    .enumerate()
+                    .map(|(i, &accel)| [i as f32 * 0.01, accel[0], accel[1]])
+                    .collect();
+
+                let accel_line = LineStrips3D::new([accel_3d])
+                    .with_colors([Color::from_rgb(255, 0, 0)]); // Bright red
+
+                if let Err(e) = rec.log(format!("{}/accel_processed", entity_path), &accel_line)
+                {
+                    log::debug!("[RerunViewer] Failed to log processed accel: {}", e);
+                }
+            }
+
+            // Log processed gyroscope data
+            if !gyro_processed.is_empty() {
+                let gyro_3d: Vec<[f32; 3]> = gyro_processed
+                    .iter()
+                    .enumerate()
+                    .map(|(i, &gyro)| [i as f32 * 0.01, gyro[0], gyro[1]])
+                    .collect();
+
+                let gyro_line = LineStrips3D::new([gyro_3d])
+                    .with_colors([Color::from_rgb(0, 0, 255)]); // Bright blue
+
+                if let Err(e) = rec.log(format!("{}/gyro_processed", entity_path), &gyro_line) {
+                    log::debug!("[RerunViewer] Failed to log processed gyro: {}", e);
+                }
+            }
+
+            // Log processing improvement metrics
+            if !accel_processed.is_empty() {
+                let processed_mag: f32 = accel_processed
+                    .iter()
+                    .map(|a| (a[0] * a[0] + a[1] * a[1] + a[2] * a[2]).sqrt())
+                    .sum::<f32>()
+                    / accel_processed.len() as f32;
+
+                let stats = format!(
+                    "Processed Accel Measurements: {} | Avg Magnitude: {:.3} m/s²",
+                    accel_processed.len(),
+                    processed_mag
+                );
+                if let Err(e) = rec.log(
+                    format!("{}/stats_processed", entity_path),
+                    &rerun::TextDocument::new(stats),
+                ) {
+                    log::debug!("[RerunViewer] Failed to log processed stats: {}", e);
+                }
+            }
+        }
+    }
+
+    /// Log IMU harmonics: gravity, bias, and harmonic components
+    fn log_imu_harmonics(
+        &mut self,
+        _timestamp: i64,
+        gravity_component: [f32; 3],
+        bias_accel: [f32; 3],
+        bias_gyro: [f32; 3],
+        harmonic_accel: &[[f32; 3]],
+        entity_path: &str,
+    ) {
+        if !self.initialized {
+            return;
+        }
+
+        if let Some(ref rec) = self.rec {
+            rec.set_time_sequence("frame", self.frame_id);
+            rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
+
+            // Log gravity component as a vector at origin
+            let gravity_positions = vec![[0.0, 0.0, 0.0]];
+            let gravity_vectors = vec![[gravity_component[0], gravity_component[1], gravity_component[2]]];
+            
+            let gravity_arrows = rerun::Arrows3D::from_vectors(gravity_vectors)
+                .with_origins(gravity_positions)
+                .with_colors([Color::from_rgb(0, 255, 0)]); // Green for gravity
+
+            if let Err(e) = rec.log(format!("{}/gravity_component", entity_path), &gravity_arrows) {
+                log::debug!("[RerunViewer] Failed to log gravity component: {}", e);
+            }
+
+            // Log accel bias as a point in space
+            let bias_accel_pos = vec![[bias_accel[0], bias_accel[1], bias_accel[2]]];
+            if let Err(e) = rec.log(
+                format!("{}/bias_accel", entity_path),
+                &rerun::Points3D::new(bias_accel_pos)
+                    .with_colors([Color::from_rgb(255, 165, 0)]) // Orange
+                    .with_radii([0.05]),
+            ) {
+                log::debug!("[RerunViewer] Failed to log accel bias: {}", e);
+            }
+
+            // Log gyro bias information
+            let bias_text = format!(
+                "Accel Bias: [{:.4}, {:.4}, {:.4}] m/s²\nGyro Bias: [{:.4}, {:.4}, {:.4}] rad/s",
+                bias_accel[0], bias_accel[1], bias_accel[2],
+                bias_gyro[0], bias_gyro[1], bias_gyro[2]
+            );
+            if let Err(e) = rec.log(
+                format!("{}/bias_values", entity_path),
+                &rerun::TextDocument::new(bias_text),
+            ) {
+                log::debug!("[RerunViewer] Failed to log bias values: {}", e);
+            }
+
+            // Log harmonic components (residual noise after gravity and bias removal)
+            if !harmonic_accel.is_empty() {
+                let harmonic_3d: Vec<[f32; 3]> = harmonic_accel
+                    .iter()
+                    .enumerate()
+                    .map(|(i, &harmonic)| [i as f32 * 0.01, harmonic[0], harmonic[1]])
+                    .collect();
+
+                let harmonic_line = LineStrips3D::new([harmonic_3d])
+                    .with_colors([Color::from_rgb(255, 0, 255)]); // Magenta for harmonics/noise
+
+                if let Err(e) = rec.log(
+                    format!("{}/harmonic_components", entity_path),
+                    &harmonic_line,
+                ) {
+                    log::debug!("[RerunViewer] Failed to log harmonic components: {}", e);
+                }
+
+                // Log harmonic statistics
+                let harmonic_rms: f32 = harmonic_accel
+                    .iter()
+                    .map(|h| (h[0] * h[0] + h[1] * h[1] + h[2] * h[2]).sqrt())
+                    .sum::<f32>()
+                    / harmonic_accel.len() as f32;
+
+                let harmonic_stats = format!(
+                    "Harmonic Components: {} | RMS: {:.4} m/s²",
+                    harmonic_accel.len(),
+                    harmonic_rms
+                );
+                if let Err(e) = rec.log(
+                    format!("{}/harmonic_stats", entity_path),
+                    &rerun::TextDocument::new(harmonic_stats),
+                ) {
+                    log::debug!("[RerunViewer] Failed to log harmonic stats: {}", e);
+                }
+            }
+
+            // Log gravity magnitude
+            let gravity_mag = (gravity_component[0] * gravity_component[0]
+                + gravity_component[1] * gravity_component[1]
+                + gravity_component[2] * gravity_component[2])
+            .sqrt();
+
+            let gravity_info = format!(
+                "Gravity Magnitude: {:.3} m/s² | Direction: [{:.3}, {:.3}, {:.3}]",
+                gravity_mag, gravity_component[0], gravity_component[1], gravity_component[2]
+            );
+            if let Err(e) = rec.log(
+                format!("{}/gravity_info", entity_path),
+                &rerun::TextDocument::new(gravity_info),
+            ) {
+                log::debug!("[RerunViewer] Failed to log gravity info: {}", e);
+            }
+        }
+    }
+
+    /// Log IMU signal quality metrics
+    fn log_imu_signal_quality(
+        &mut self,
+        _timestamp: i64,
+        signal_snr: [f32; 3],
+        signal_rms: [f32; 3],
+        signal_peak: [f32; 3],
+        entity_path: &str,
+    ) {
+        if !self.initialized {
+            return;
+        }
+
+        if let Some(ref rec) = self.rec {
+            rec.set_time_sequence("frame", self.frame_id);
+            rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
+
+            // Log signal quality metrics as bar charts
+            let snr_bars = vec![signal_snr[0] as f64, signal_snr[1] as f64, signal_snr[2] as f64];
+            if let Err(e) = rec.log(
+                format!("{}/signal_snr", entity_path),
+                &rerun::BarChart::new(snr_bars),
+            ) {
+                log::debug!("[RerunViewer] Failed to log SNR: {}", e);
+            }
+
+            let rms_bars = vec![signal_rms[0] as f64, signal_rms[1] as f64, signal_rms[2] as f64];
+            if let Err(e) = rec.log(
+                format!("{}/signal_rms", entity_path),
+                &rerun::BarChart::new(rms_bars),
+            ) {
+                log::debug!("[RerunViewer] Failed to log RMS: {}", e);
+            }
+
+            let peak_bars = vec![signal_peak[0] as f64, signal_peak[1] as f64, signal_peak[2] as f64];
+            if let Err(e) = rec.log(
+                format!("{}/signal_peak", entity_path),
+                &rerun::BarChart::new(peak_bars),
+            ) {
+                log::debug!("[RerunViewer] Failed to log peak: {}", e);
+            }
+
+            // Log comprehensive signal quality report
+            let quality_report = format!(
+                "SNR (X, Y, Z): [{:.2}, {:.2}, {:.2}] dB\n\
+                 RMS (X, Y, Z): [{:.4}, {:.4}, {:.4}] m/s²\n\
+                 Peak (X, Y, Z): [{:.4}, {:.4}, {:.4}] m/s²",
+                signal_snr[0], signal_snr[1], signal_snr[2],
+                signal_rms[0], signal_rms[1], signal_rms[2],
+                signal_peak[0], signal_peak[1], signal_peak[2]
+            );
+            if let Err(e) = rec.log(
+                format!("{}/quality_report", entity_path),
+                &rerun::TextDocument::new(quality_report),
+            ) {
+                log::debug!("[RerunViewer] Failed to log quality report: {}", e);
+            }
+
+            // Determine overall signal quality
+            let avg_snr = (signal_snr[0] + signal_snr[1] + signal_snr[2]) / 3.0;
+            let quality_level = if avg_snr > 30.0 {
+                "Excellent"
+            } else if avg_snr > 20.0 {
+                "Good"
+            } else if avg_snr > 10.0 {
+                "Fair"
+            } else {
+                "Poor"
+            };
+
+            let quality_summary = format!("Signal Quality: {} (SNR: {:.1} dB)", quality_level, avg_snr);
+            if let Err(e) = rec.log(
+                format!("{}/quality_summary", entity_path),
+                &rerun::TextDocument::new(quality_summary),
+            ) {
+                log::debug!("[RerunViewer] Failed to log quality summary: {}", e);
+            }
+        }
+    }
+
     /// Visualize vibration metrics and adaptive covariance
     fn log_vibration_metrics(
         &mut self,
