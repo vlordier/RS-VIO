@@ -39,6 +39,8 @@ pub mod initialization;
 pub mod learned_vibration;
 pub mod signal_analysis;
 pub mod vibration_filter;
+pub mod denoise_filter;
+pub mod higher_order_filter;
 
 pub use initialization::{
     AdaptiveNoiseEstimator, BiasEstimate, ImuInitializationConfig, ImuInitializer,
@@ -50,6 +52,10 @@ pub use learned_vibration::{
 pub use signal_analysis::{HarmonicDecomposition, ImuSignalAnalyzer, SignalQuality};
 pub use vibration_filter::{
     NotchFilter, VibrationFilterConfig, VibrationNotchFilter, VibrationPeak,
+};
+pub use denoise_filter::{ImuDenoiseFilter, DenoiseConfig};
+pub use higher_order_filter::{
+    HigherOrderFilter, HigherOrderFilterConfig, HigherOrderOutput, JerkStats, SnapStats,
 };
 
 use crate::datasets::ImuData;

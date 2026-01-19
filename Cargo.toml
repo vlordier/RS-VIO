@@ -205,3 +205,10 @@ harness = false
 [[bench]]
 name = "fusion_benchmarks"
 harness = false
+
+[[bench]]
+name = "evaluation_metrics"
+harness = false
+[[bench]]
+name = "distance_speed_metrics"
+harness = false

@@ -47,7 +47,7 @@ pub mod orb_matcher;
 pub mod pnp_ransac;
 pub mod vocabulary;
 
-use crate::{traits::Strategy, types::Float, Result};
+use crate::{types::Float, Result};
 use nalgebra as na;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -74,46 +74,25 @@ pub struct VerifiedMatch {
     pub inlier_ratio: Float,
 }
 
-/// Trait for descriptor matching strategies (TOP-friendly for swapping implementations)
-pub trait DescriptorMatcher: Strategy {
-    fn match_keyframes(
-        &self,
-        query: &KeyframeDescriptor,
-        candidate: &KeyframeDescriptor,
-    ) -> MatchMetrics;
-}
+/// Compute match metrics between two keyframe descriptors
+pub fn compute_match_metrics(
+    query: &KeyframeDescriptor,
+    candidate: &KeyframeDescriptor,
+) -> MatchMetrics {
+    let similarity = query.similarity(candidate);
+    let overlapping_features = query.num_features.min(candidate.num_features).max(1);
+    let match_count = (similarity * overlapping_features as Float) as usize;
+    let match_ratio = match_count as Float / overlapping_features as Float;
 
-/// Simple cosine-similarity matcher producing heuristic match counts
-#[derive(Debug, Clone)]
-pub struct CosineMatcher;
-
-impl Strategy for CosineMatcher {
-    fn name(&self) -> &str {
-        "CosineMatcher"
+    MatchMetrics {
+        similarity,
+        match_count,
+        match_ratio,
     }
 }
 
-impl DescriptorMatcher for CosineMatcher {
-    fn match_keyframes(
-        &self,
-        query: &KeyframeDescriptor,
-        candidate: &KeyframeDescriptor,
-    ) -> MatchMetrics {
-        let similarity = query.similarity(candidate);
-        let overlapping_features = query.num_features.min(candidate.num_features).max(1);
-        let match_count = (similarity * overlapping_features as Float) as usize;
-        let match_ratio = match_count as Float / overlapping_features as Float;
-
-        MatchMetrics {
-            similarity,
-            match_count,
-            match_ratio,
-        }
-    }
-}
-
-/// Trait for geometric verification (e.g., RANSAC with epipolar or homography models)
-pub trait GeometricVerifier: Strategy {
+/// Trait for geometric verification (internal, used by submodules)
+pub trait GeometricVerifier: Send + Sync + std::fmt::Debug {
     fn verify(
         &self,
         query: &KeyframeDescriptor,
@@ -123,44 +102,47 @@ pub trait GeometricVerifier: Strategy {
     ) -> Option<VerifiedMatch>;
 }
 
-/// Minimal verifier that accepts matches meeting similarity/ratio thresholds and computes relative pose
-#[derive(Debug, Clone)]
-pub struct SimpleRelativePoseVerifier {
-    pub min_similarity: Float,
-}
-
-impl Strategy for SimpleRelativePoseVerifier {
-    fn name(&self) -> &str {
-        "SimpleRelativePoseVerifier"
-    }
-}
-
-impl GeometricVerifier for SimpleRelativePoseVerifier {
-    fn verify(
+/// Trait for descriptor matching (internal, used by submodules)
+pub trait DescriptorMatcher: Send + Sync + std::fmt::Debug {
+    fn match_keyframes(
         &self,
         query: &KeyframeDescriptor,
         candidate: &KeyframeDescriptor,
-        metrics: &MatchMetrics,
-        _workspace: &mut crate::estimator::frame_workspace::FrameWorkspace,
-    ) -> Option<VerifiedMatch> {
-        if metrics.similarity < self.min_similarity {
-            return None;
-        }
+    ) -> MatchMetrics;
+}
 
-        let relative_pose = query.pose.inverse() * candidate.pose;
-        Some(VerifiedMatch {
-            relative_pose,
-            inlier_count: metrics.match_count,
-            inlier_ratio: metrics.match_ratio,
-        })
+/// Simple cosine-similarity matcher implementation
+#[derive(Debug, Clone)]
+pub struct CosineMatcher;
+
+impl DescriptorMatcher for CosineMatcher {
+    fn match_keyframes(
+        &self,
+        query: &KeyframeDescriptor,
+        candidate: &KeyframeDescriptor,
+    ) -> MatchMetrics {
+        compute_match_metrics(query, candidate)
     }
 }
 
-// Note: RansacEpipolarVerifier removed (incomplete stub).
-// Use EnhancedGeometricVerifier for robust RANSAC-based verification.
+/// Verify match between keyframes if quality thresholds met
+pub fn verify_relative_pose(
+    query: &KeyframeDescriptor,
+    candidate: &KeyframeDescriptor,
+    metrics: &MatchMetrics,
+    min_similarity: Float,
+) -> Option<VerifiedMatch> {
+    if metrics.similarity < min_similarity {
+        return None;
+    }
 
-// Note: HammingMatcher removed (redundant/unused).
-// Use OrbMatcher for binary descriptors or CosineMatcher for floating-point descriptors.
+    let relative_pose = query.pose.inverse() * candidate.pose;
+    Some(VerifiedMatch {
+        relative_pose,
+        inlier_count: metrics.match_count,
+        inlier_ratio: metrics.match_ratio,
+    })
+}
 
 /// Configuration for loop closure detection
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -324,16 +306,15 @@ impl KeyframeDatabase {
         }
     }
 
-    /// Search for candidate matches in database using provided matcher
+    /// Search for candidate matches in database
     pub fn search_candidates(
         &self,
-        matcher: &dyn DescriptorMatcher,
         query: &KeyframeDescriptor,
     ) -> Vec<(u64, KeyframeDescriptor, MatchMetrics)> {
         let mut candidates = Vec::new();
 
         for (id, keyframe) in &self.keyframes {
-            let metrics = matcher.match_keyframes(query, keyframe);
+            let metrics = compute_match_metrics(query, keyframe);
 
             if metrics.similarity >= self.config.descriptor_distance_threshold {
                 candidates.push((*id, keyframe.clone(), metrics));
@@ -370,36 +351,16 @@ pub struct LoopClosureDetector {
     database: KeyframeDatabase,
     last_detection_keyframe_id: Option<u64>,
     last_detection_timestamp: Option<i64>,
-    matcher: Box<dyn DescriptorMatcher>,
-    verifier: Box<dyn GeometricVerifier>,
 }
 
 impl LoopClosureDetector {
-    /// Create new loop closure detector with default matcher/verifier
+    /// Create new loop closure detector
     pub fn new(config: LoopClosureConfig) -> Self {
-        Self::new_with(
-            config,
-            Box::new(CosineMatcher),
-            Box::new(SimpleRelativePoseVerifier {
-                min_similarity: 0.2,
-            }),
-        )
-    }
-
-    /// Create new loop closure detector with custom matcher/verifier
-    pub fn new_with(
-        config: LoopClosureConfig,
-        matcher: Box<dyn DescriptorMatcher>,
-        verifier: Box<dyn GeometricVerifier>,
-    ) -> Self {
-        let config_clone = config.clone();
         Self {
-            config,
-            database: KeyframeDatabase::new(config_clone),
+            config: config.clone(),
+            database: KeyframeDatabase::new(config),
             last_detection_keyframe_id: None,
             last_detection_timestamp: None,
-            matcher,
-            verifier,
         }
     }
 
@@ -408,57 +369,31 @@ impl LoopClosureDetector {
         &mut self,
         keyframe_id: u64,
         descriptor: KeyframeDescriptor,
-        workspace: &mut crate::estimator::frame_workspace::FrameWorkspace,
+        _workspace: &mut crate::estimator::frame_workspace::FrameWorkspace,
     ) -> Result<Vec<LoopClosureConstraint>> {
-        // Check minimum frame gap
-        if let Some(last_id) = self.last_detection_keyframe_id {
-            if keyframe_id - last_id < self.config.min_frame_gap as u64 {
-                self.database.add_keyframe(descriptor);
-                return Ok(Vec::new());
-            }
-        }
-
-        if let Some(last_ts) = self.last_detection_timestamp {
-            if descriptor.timestamp > last_ts {
-                let use_time_gating = self.config.min_time_gap_ns.is_some();
-                let min_gap_time = if let Some(ns) = self.config.min_time_gap_ns {
-                    ns
-                } else {
-                    // Fallback: approximate using 33.3ms per frame (30 FPS)
-                    (self.config.min_frame_gap as i64) * 33_333_333
-                };
-
-                let frame_gap_estimate = descriptor.timestamp - last_ts;
-                if use_time_gating && frame_gap_estimate < min_gap_time {
-                    self.database.add_keyframe(descriptor);
-                    return Ok(Vec::new());
-                }
-            }
+        // Check temporal gating: either frame gap or time gap
+        if !self.passes_temporal_gating(keyframe_id, descriptor.timestamp) {
+            self.database.add_keyframe(descriptor);
+            return Ok(Vec::new());
         }
 
         // Search for candidates
-        let candidates = self
-            .database
-            .search_candidates(self.matcher.as_ref(), &descriptor);
-
+        let candidates = self.database.search_candidates(&descriptor);
         let mut valid_closures = Vec::new();
 
         // Verify each candidate
-        for candidate in candidates {
-            let (candidate_id, keyframe, metrics) = candidate;
-
-            let passes_match_count = metrics.match_count >= self.config.min_matches_for_candidate;
-            let passes_ratio = metrics.match_ratio >= self.config.inlier_ratio_threshold;
-            let passes_min_inliers = metrics.match_count >= self.config.min_inliers;
-
-            if !(passes_match_count && passes_ratio && passes_min_inliers) {
+        for (candidate_id, keyframe, metrics) in candidates {
+            // Check all quality thresholds
+            if !self.passes_quality_checks(&metrics) {
                 continue;
             }
 
-            if let Some(verified) =
-                self.verifier
-                    .verify(&descriptor, &keyframe, &metrics, workspace)
-            {
+            if let Some(verified) = verify_relative_pose(
+                &descriptor,
+                &keyframe,
+                &metrics,
+                self.config.descriptor_distance_threshold,
+            ) {
                 let constraint = LoopClosureConstraint {
                     keyframe_id_1: keyframe_id,
                     keyframe_id_2: candidate_id,
@@ -471,14 +406,41 @@ impl LoopClosureDetector {
             }
         }
 
-        // Add keyframe to database
+        // Update tracking
         let timestamp = descriptor.timestamp;
         self.database.add_keyframe(descriptor);
         self.last_detection_keyframe_id = Some(keyframe_id);
-        self.last_detection_timestamp =
-            Some(self.last_detection_timestamp.unwrap_or(0).max(timestamp));
+        self.last_detection_timestamp = Some(timestamp);
 
         Ok(valid_closures)
+    }
+
+    /// Check if keyframe passes temporal gating (frame gap or time gap)
+    fn passes_temporal_gating(&self, keyframe_id: u64, timestamp: i64) -> bool {
+        // Check frame gap
+        if let Some(last_id) = self.last_detection_keyframe_id {
+            if keyframe_id - last_id < self.config.min_frame_gap as u64 {
+                return false;
+            }
+        }
+
+        // Check time gap if configured
+        if let Some(min_gap_ns) = self.config.min_time_gap_ns {
+            if let Some(last_ts) = self.last_detection_timestamp {
+                if timestamp - last_ts < min_gap_ns {
+                    return false;
+                }
+            }
+        }
+
+        true
+    }
+
+    /// Check if match metrics pass all quality thresholds
+    fn passes_quality_checks(&self, metrics: &MatchMetrics) -> bool {
+        metrics.match_count >= self.config.min_matches_for_candidate
+            && metrics.match_ratio >= self.config.inlier_ratio_threshold
+            && metrics.match_count >= self.config.min_inliers
     }
 
     /// Estimate anisotropic information matrix (inverse covariance) from match quality
@@ -592,8 +554,7 @@ mod tests {
 
         // Query with similar descriptor (similar to frame 0)
         let query = create_test_descriptor(100, 0.0);
-        let matcher = CosineMatcher;
-        let candidates = db.search_candidates(&matcher, &query);
+        let candidates = db.search_candidates(&query);
 
         // Should find candidates (frame 0 should be top)
         assert!(candidates.len() > 0);
@@ -686,8 +647,7 @@ mod tests {
             ..create_test_descriptor(100, 0.0)
         };
 
-        let matcher = CosineMatcher;
-        let candidates = db.search_candidates(&matcher, &query);
+        let candidates = db.search_candidates(&query);
         assert!(!candidates.is_empty());
         assert_eq!(candidates[0].0, 42);
     }
@@ -757,18 +717,14 @@ mod tests {
     #[test]
     fn test_verifier_rejects_low_similarity() {
         let config = LoopClosureConfig {
-            descriptor_distance_threshold: 0.1,
+            descriptor_distance_threshold: 0.9,
             min_frame_gap: 0,
             min_inliers: 1,
             min_matches_for_candidate: 1,
             ..Default::default()
         };
 
-        let matcher: Box<dyn DescriptorMatcher> = Box::new(CosineMatcher);
-        let verifier: Box<dyn GeometricVerifier> = Box::new(SimpleRelativePoseVerifier {
-            min_similarity: 0.9,
-        });
-        let mut detector = LoopClosureDetector::new_with(config, matcher, verifier);
+        let mut detector = LoopClosureDetector::new(config);
         let mut workspace = crate::estimator::frame_workspace::FrameWorkspace::default();
 
         let base = create_test_descriptor(0, 0.0);

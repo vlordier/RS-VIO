@@ -27,7 +27,7 @@ camera:
             0.0, 0.0, 0.0, 1.0]
 
 visualization:
-  enable_viewer: false        # Disable viewer for faster processing
+  enable_viewer: true         # Enable Rerun viewer for IMU visualization
 
 # Keyframe management configuration
 keyframe_management:
@@ -65,3 +65,11 @@ marginalization:
   hessian_approximator: "GaussNewton"  # Strategy: GaussNewton, Diagonal, LevenbergMarquardt, Exact, Identity
   gradient_computer: "Standard"     # Strategy: Standard, Zero
   prior_constructor: "Standard"     # Strategy: Standard, Regularized
+
+# Debug configuration for visualization and analysis
+debug:
+  use_imu: true                     # Enable IMU visualization in Rerun
+  use_feature_tracking: true
+  use_triangulation: true
+  use_fallback_depth: false
+  min_stereo_matches: 2

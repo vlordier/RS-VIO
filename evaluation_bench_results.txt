@@ -1,0 +1,128 @@
+   Compiling rs-vio v0.2.0 (/Users/vincent/Work/RS-VIO)
+    Finished `bench` profile [optimized] target(s) in 19.18s
+     Running benches/evaluation_metrics.rs (target/release/deps/evaluation_metrics-8b9f2b973a616efb)
+Gnuplot not found, using plotters backend
+Benchmarking trajectory_accuracy/baseline_ate
+Benchmarking trajectory_accuracy/baseline_ate: Warming up for 3.0000 s
+Benchmarking trajectory_accuracy/baseline_ate: Collecting 100 samples in estimated 5.0008 s (21M iterations)
+Benchmarking trajectory_accuracy/baseline_ate: Analyzing
+trajectory_accuracy/baseline_ate
+                        time:   [239.71 ns 242.60 ns 246.06 ns]
+Found 11 outliers among 100 measurements (11.00%)
+  10 (10.00%) high mild
+  1 (1.00%) high severe
+Benchmarking trajectory_accuracy/imu_only_ate
+Benchmarking trajectory_accuracy/imu_only_ate: Warming up for 3.0000 s
+Benchmarking trajectory_accuracy/imu_only_ate: Collecting 100 samples in estimated 5.0012 s (20M iterations)
+Benchmarking trajectory_accuracy/imu_only_ate: Analyzing
+trajectory_accuracy/imu_only_ate
+                        time:   [243.52 ns 245.69 ns 247.80 ns]
+Benchmarking trajectory_accuracy/super_res_only_ate
+Benchmarking trajectory_accuracy/super_res_only_ate: Warming up for 3.0000 s
+Benchmarking trajectory_accuracy/super_res_only_ate: Collecting 100 samples in estimated 5.0010 s (20M iterations)
+Benchmarking trajectory_accuracy/super_res_only_ate: Analyzing
+trajectory_accuracy/super_res_only_ate
+                        time:   [238.41 ns 240.59 ns 243.22 ns]
+Found 9 outliers among 100 measurements (9.00%)
+  2 (2.00%) low mild
+  2 (2.00%) high mild
+  5 (5.00%) high severe
+Benchmarking trajectory_accuracy/full_fusion_ate
+Benchmarking trajectory_accuracy/full_fusion_ate: Warming up for 3.0000 s
+Benchmarking trajectory_accuracy/full_fusion_ate: Collecting 100 samples in estimated 5.0007 s (19M iterations)
+Benchmarking trajectory_accuracy/full_fusion_ate: Analyzing
+trajectory_accuracy/full_fusion_ate
+                        time:   [239.99 ns 242.72 ns 245.78 ns]
+Found 15 outliers among 100 measurements (15.00%)
+  1 (1.00%) low mild
+  5 (5.00%) high mild
+  9 (9.00%) high severe
+
+Benchmarking depth_accuracy/baseline_depth_rmse
+Benchmarking depth_accuracy/baseline_depth_rmse: Warming up for 3.0000 s
+Benchmarking depth_accuracy/baseline_depth_rmse: Collecting 100 samples in estimated 5.0109 s (2.0M iterations)
+Benchmarking depth_accuracy/baseline_depth_rmse: Analyzing
+depth_accuracy/baseline_depth_rmse
+                        time:   [2.4883 µs 2.4974 µs 2.5072 µs]
+Benchmarking depth_accuracy/imu_only_depth_rmse
+Benchmarking depth_accuracy/imu_only_depth_rmse: Warming up for 3.0000 s
+Benchmarking depth_accuracy/imu_only_depth_rmse: Collecting 100 samples in estimated 5.0057 s (2.0M iterations)
+Benchmarking depth_accuracy/imu_only_depth_rmse: Analyzing
+depth_accuracy/imu_only_depth_rmse
+                        time:   [2.4869 µs 2.4936 µs 2.5008 µs]
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high severe
+Benchmarking depth_accuracy/super_res_only_depth_rmse
+Benchmarking depth_accuracy/super_res_only_depth_rmse: Warming up for 3.0000 s
+Benchmarking depth_accuracy/super_res_only_depth_rmse: Collecting 100 samples in estimated 5.0015 s (2.0M iterations)
+Benchmarking depth_accuracy/super_res_only_depth_rmse: Analyzing
+depth_accuracy/super_res_only_depth_rmse
+                        time:   [2.5162 µs 2.5257 µs 2.5356 µs]
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) low mild
+Benchmarking depth_accuracy/full_fusion_depth_rmse
+Benchmarking depth_accuracy/full_fusion_depth_rmse: Warming up for 3.0000 s
+Benchmarking depth_accuracy/full_fusion_depth_rmse: Collecting 100 samples in estimated 5.0092 s (2.0M iterations)
+Benchmarking depth_accuracy/full_fusion_depth_rmse: Analyzing
+depth_accuracy/full_fusion_depth_rmse
+                        time:   [2.5260 µs 2.5341 µs 2.5423 µs]
+
+Benchmarking feature_quality/baseline_reprojection
+Benchmarking feature_quality/baseline_reprojection: Warming up for 3.0000 s
+Benchmarking feature_quality/baseline_reprojection: Collecting 100 samples in estimated 5.0012 s (14M iterations)
+Benchmarking feature_quality/baseline_reprojection: Analyzing
+feature_quality/baseline_reprojection
+                        time:   [362.29 ns 366.93 ns 371.72 ns]
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+Benchmarking feature_quality/imu_only_reprojection
+Benchmarking feature_quality/imu_only_reprojection: Warming up for 3.0000 s
+Benchmarking feature_quality/imu_only_reprojection: Collecting 100 samples in estimated 5.0015 s (14M iterations)
+Benchmarking feature_quality/imu_only_reprojection: Analyzing
+feature_quality/imu_only_reprojection
+                        time:   [363.84 ns 367.07 ns 370.33 ns]
+Benchmarking feature_quality/super_res_only_reprojection
+Benchmarking feature_quality/super_res_only_reprojection: Warming up for 3.0000 s
+Benchmarking feature_quality/super_res_only_reprojection: Collecting 100 samples in estimated 5.0014 s (14M iterations)
+Benchmarking feature_quality/super_res_only_reprojection: Analyzing
+feature_quality/super_res_only_reprojection
+                        time:   [358.61 ns 361.65 ns 364.67 ns]
+Found 3 outliers among 100 measurements (3.00%)
+  3 (3.00%) high mild
+Benchmarking feature_quality/full_fusion_reprojection
+Benchmarking feature_quality/full_fusion_reprojection: Warming up for 3.0000 s
+Benchmarking feature_quality/full_fusion_reprojection: Collecting 100 samples in estimated 5.0014 s (14M iterations)
+Benchmarking feature_quality/full_fusion_reprojection: Analyzing
+feature_quality/full_fusion_reprojection
+                        time:   [361.35 ns 366.75 ns 372.61 ns]
+Found 6 outliers among 100 measurements (6.00%)
+  5 (5.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking robustness/baseline_robustness
+Benchmarking robustness/baseline_robustness: Warming up for 3.0000 s
+Benchmarking robustness/baseline_robustness: Collecting 100 samples in estimated 5.0009 s (3.6M iterations)
+Benchmarking robustness/baseline_robustness: Analyzing
+robustness/baseline_robustness
+                        time:   [1.3273 µs 1.3435 µs 1.3600 µs]
+Found 3 outliers among 100 measurements (3.00%)
+  3 (3.00%) high mild
+Benchmarking robustness/imu_only_robustness
+Benchmarking robustness/imu_only_robustness: Warming up for 3.0000 s
+Benchmarking robustness/imu_only_robustness: Collecting 100 samples in estimated 5.0069 s (3.7M iterations)
+Benchmarking robustness/imu_only_robustness: Analyzing
+robustness/imu_only_robustness
+                        time:   [1.3613 µs 1.3735 µs 1.3850 µs]
+Benchmarking robustness/super_res_only_robustness
+Benchmarking robustness/super_res_only_robustness: Warming up for 3.0000 s
+Benchmarking robustness/super_res_only_robustness: Collecting 100 samples in estimated 5.0014 s (3.6M iterations)
+Benchmarking robustness/super_res_only_robustness: Analyzing
+robustness/super_res_only_robustness
+                        time:   [1.3791 µs 1.3945 µs 1.4101 µs]
+Benchmarking robustness/full_fusion_robustness
+Benchmarking robustness/full_fusion_robustness: Warming up for 3.0000 s
+Benchmarking robustness/full_fusion_robustness: Collecting 100 samples in estimated 5.0040 s (3.7M iterations)
+Benchmarking robustness/full_fusion_robustness: Analyzing
+robustness/full_fusion_robustness
+                        time:   [1.3321 µs 1.3438 µs 1.3557 µs]
+

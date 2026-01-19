@@ -160,9 +160,11 @@ pub fn init_logging() {
         .init();
 }
 
+pub mod calibration;
 pub mod camera;
 pub mod datasets;
 pub mod estimator;
+pub mod evaluation;
 pub mod feature_tracker;
 pub mod imu;
 pub mod logging;

@@ -56,9 +56,11 @@
 
 pub mod rerun;
 pub mod viewer;
+pub mod screenshot_helper;
 
 pub use rerun::{create_viewer, RerunViewer};
 pub use viewer::Viewer;
+pub use screenshot_helper::{ScreenshotId, ScreenshotMetadata, ScreenshotResult, ViewScreenshotRequest, ScreenshotBatch};
 
 use std::collections::HashMap;
 use std::sync::Mutex;
