@@ -67,10 +67,10 @@ impl GravityModel {
 /// - Bias jacobians (for online bias refinement)
 ///
 /// State variables:
-/// - Keyframe i: [T_W_B_i, velocity_i, accel_bias_i, gyro_bias_i]
-/// - Keyframe j: [T_W_B_j, velocity_j, accel_bias_j, gyro_bias_j]
+/// - Keyframe i: [T_W_B_i (7D), velocity_i (3D)]
+/// - Keyframe j: [T_W_B_j (7D), velocity_j (3D)]
 ///
-/// Residual (6D):
+/// Residual (9D):
 /// - Position: p_W_B_j - (p_W_B_i + v_i*dt + 0.5*g*dt² + R_W_B_i * ∫∫ a_corrected)
 /// - Velocity: v_j - (v_i + g*dt + R_W_B_i * ∫ a_corrected)
 /// - Rotation: log(R_ij^T * R_W_B_i^T * R_W_B_j) (3D axis-angle)
@@ -82,24 +82,22 @@ pub struct InterKeyframeImuFactor {
     /// Preintegration data: integrated rotation, velocity, position
     pub preintegration: ImuPreintegration,
 
-    /// Jacobians w.r.t. biases (for online refinement)
-    pub jacobian_pos_bias: na::Matrix3<Float>, // ∂p/∂bias
-    pub jacobian_vel_bias: na::Matrix3<Float>, // ∂v/∂bias
-    pub jacobian_rot_bias: na::Matrix3<Float>, // ∂R/∂bias
-
-    /// Covariance of preintegration noise
-    pub covariance: na::Matrix6<Float>,
+    /// Covariance of preintegration noise (9x9: p, v, R)
+    pub covariance: DMatrix<Float>,
 
     /// Gravity model
     pub gravity: GravityModel,
 
     /// Information matrix (inverse covariance) for weighting
-    pub information: na::Matrix6<Float>,
+    pub information: DMatrix<Float>,
 }
 
 /// Preintegration result between two consecutive keyframes
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ImuPreintegration {
+    /// Time interval between keyframes (seconds)
+    pub dt: Float,
+
     /// Integrated rotation from IMU frame at i to frame at j: R_ij
     pub delta_R: na::Matrix3<Float>,
 
@@ -120,103 +118,41 @@ pub struct ImuPreintegration {
     pub cov_p_ba: na::Matrix3<Float>, // cov(Δp, δa_bias)
 }
 
+impl ImuPreintegration {
+    /// Get the time interval of this preintegration
+    pub fn delta_time(&self) -> Float {
+        self.dt
+    }
+}
+
 impl InterKeyframeImuFactor {
     /// Create inter-keyframe IMU factor from preintegration data
     pub fn new(dt: Float, preintegration: ImuPreintegration, gravity: GravityModel) -> Self {
-        // Build covariance matrix (6x6: p, v, R)
-        let mut cov = na::Matrix6::zeros();
+        // Build covariance matrix (9x9: p, v, R)
+        let mut cov = DMatrix::zeros(9, 9);
         cov.fixed_view_mut::<3, 3>(0, 0)
             .copy_from(&preintegration.cov_p);
         cov.fixed_view_mut::<3, 3>(3, 3)
             .copy_from(&preintegration.cov_v);
-        cov.fixed_view_mut::<3, 3>(3, 3)
+        cov.fixed_view_mut::<3, 3>(6, 6)
             .copy_from(&preintegration.cov_R);
 
         // Add small regularization to avoid singularity
         let reg = fl!(1e-8);
-        for i in 0..6 {
+        for i in 0..9 {
             cov[(i, i)] += reg;
         }
 
         // Information matrix (inverse of covariance)
-        let information = cov.try_inverse().unwrap_or(na::Matrix6::identity());
-
-        // Jacobians w.r.t. biases (for online refinement)
-        let jacobian_pos_bias = preintegration.cov_p_ba;
-        let jacobian_vel_bias = preintegration.cov_v_ba;
-        let jacobian_rot_bias = preintegration.cov_R_bw;
+        let information = cov.clone().try_inverse().unwrap_or(DMatrix::identity(9, 9));
 
         Self {
             dt,
             preintegration,
-            jacobian_pos_bias,
-            jacobian_vel_bias,
-            jacobian_rot_bias,
             covariance: cov,
             gravity,
             information,
         }
-    }
-
-    /// Compute residual: how well does the IMU prediction match the optimized poses?
-    ///
-    /// Residuals (6D):
-    /// - r_p (3D): position prediction error
-    /// - r_v (3D): velocity prediction error
-    pub fn compute_residual(
-        &self,
-        T_W_B_i: Matrix4x4, // Pose at keyframe i
-        v_i: Vector3,       // Velocity at keyframe i
-        _bias_a_i: Vector3, // Accel bias (should match bias_a_j)
-        _bias_w_i: Vector3, // Gyro bias (should match bias_w_j)
-
-        T_W_B_j: Matrix4x4, // Pose at keyframe j
-        v_j: Vector3,       // Velocity at keyframe j
-        _bias_a_j: Vector3, // Accel bias at j (for consistency check)
-        _bias_w_j: Vector3, // Gyro bias at j (for consistency check)
-    ) -> na::Vector6<f64> {
-        // Extract positions
-        let p_W_B_i = T_W_B_i.fixed_view::<3, 1>(0, 3).into_owned();
-        let p_W_B_j = T_W_B_j.fixed_view::<3, 1>(0, 3).into_owned();
-
-        // Extract rotations
-        let R_W_B_i = T_W_B_i.fixed_view::<3, 3>(0, 0).into_owned();
-        let R_W_B_j = T_W_B_j.fixed_view::<3, 3>(0, 0).into_owned();
-
-        // Gravity vector
-        let g = self.gravity.gravity_vector();
-
-        // Position prediction error:
-        // p_pred = p_i + v_i * dt + 0.5 * g * dt² + R_i * Δp
-        let dt2 = self.dt * self.dt;
-        let p_pred =
-            p_W_B_i + v_i * self.dt + fl!(0.5) * g * dt2 + R_W_B_i * self.preintegration.delta_p;
-        let r_p = p_W_B_j - p_pred;
-
-        // Velocity prediction error:
-        // v_pred = v_i + g * dt + R_i * Δv
-        let v_pred = v_i + g * self.dt + R_W_B_i * self.preintegration.delta_v;
-        let r_v = v_j - v_pred;
-
-        // Rotation prediction error:
-        // R_pred = R_i * ΔR
-        // Error = log((R_pred^T * R_j)) in axis-angle form
-        let R_pred = R_W_B_i * self.preintegration.delta_R;
-        let R_error = R_pred.transpose() * R_W_B_j;
-        let _r_R = matrix_to_axis_angle(&R_error);
-
-        // Combine residuals [p, v, R]
-        let mut residual = na::Vector6::zeros();
-        residual
-            .fixed_view_mut::<3, 1>(0, 0)
-            .copy_from(&r_p.cast::<f64>());
-        residual
-            .fixed_view_mut::<3, 1>(3, 0)
-            .copy_from(&r_v.cast::<f64>());
-
-        // For now, return 6D residual (position + velocity)
-        // Rotation residual is implicit in pose optimization
-        residual
     }
 }
 
@@ -372,17 +308,19 @@ impl TightCouplingInitializer {
 /// This factor enforces constraints between consecutive keyframes based on
 /// IMU preintegration. It models:
 /// - Position constraint: p_j ≈ p_i + v_i*dt + 0.5*g*dt² + ΔP
-/// - Velocity constraint: v_j ≈ v_i + g*dt + ΔV  
+/// - Velocity constraint: v_j ≈ v_i + g*dt + ΔV
 /// - Rotation constraint: R_j ≈ R_i * ΔR
 ///
 /// Variables (expected in order):
-/// - params[0]: Keyframe i state [T_W_B_i, v_i, bias_i] (15D: 6 + 3 + 3 + 3)
-/// - params[1]: Keyframe j state [T_W_B_j, v_j, bias_j] (15D: 6 + 3 + 3 + 3)
+/// - params[0]: Keyframe i pose (SE3: 7D: tx, ty, tz, qw, qx, qy, qz)
+/// - params[1]: Keyframe i velocity (3D: vx, vy, vz)
+/// - params[2]: Keyframe j pose (SE3: 7D: tx, ty, tz, qw, qx, qy, qz)
+/// - params[3]: Keyframe j velocity (3D: vx, vy, vz)
 ///
-/// Returns 6D residual: [Δp error; Δv error; Δθ error]
+/// Returns 9D residual: [Δp error; Δv error; Δθ error]
 impl Factor for InterKeyframeImuFactor {
     fn get_dimension(&self) -> usize {
-        6 // 6D residual: [Δp_error; Δv_error; Δθ_error]
+        9 // 9D residual: [Δp_error (3); Δv_error (3); Δθ_error (3)]
     }
 
     fn linearize(
@@ -390,21 +328,124 @@ impl Factor for InterKeyframeImuFactor {
         params: &[DVector<f64>],
         compute_jacobian: bool,
     ) -> (DVector<f64>, Option<DMatrix<f64>>) {
-        // Expect 2 parameter vectors: keyframe i and j
+        // Expect 4 parameter vectors: KF_i pose, VEL_i, KF_j pose, VEL_j
         assert_eq!(
             params.len(),
-            2,
-            "InterKeyframeImuFactor requires 2 parameter vectors (keyframe i and j)"
+            4,
+            "InterKeyframeImuFactor requires 4 parameter vectors (KF_i pose, VEL_i, KF_j pose, VEL_j)"
         );
 
-        // For now, implement simplified residual computation
-        // Full implementation would extract SE3 pose, velocity, and biases from params
+        // Extract keyframe i pose (SE3: [tx, ty, tz, qw, qx, qy, qz])
+        let p_i = &params[0];
+        let t_i = na::Vector3::new(p_i[0], p_i[1], p_i[2]);
+        // Storage format: [tx, ty, tz, qw, qx, qy, qz]
+        let q_i =
+            na::UnitQuaternion::new_normalize(na::Quaternion::new(p_i[3], p_i[4], p_i[5], p_i[6]));
 
-        // Extract state from first parameter (simplified: treat as SE3 pose only)
-        let residual = DVector::zeros(6);
+        // Extract velocity i (3D)
+        let v_i = na::Vector3::new(params[1][0], params[1][1], params[1][2]);
+
+        // Extract keyframe j pose (SE3)
+        let p_j = &params[2];
+        let t_j = na::Vector3::new(p_j[0], p_j[1], p_j[2]);
+        // Storage format: [tx, ty, tz, qw, qx, qy, qz]
+        let q_j =
+            na::UnitQuaternion::new_normalize(na::Quaternion::new(p_j[3], p_j[4], p_j[5], p_j[6]));
+
+        // Extract velocity j (3D)
+        let v_j = na::Vector3::new(params[3][0], params[3][1], params[3][2]);
+
+        let dt = self.dt as f64;
+        let g_vec = self.gravity.magnitude as f64;
+
+        // ========== Rotation Constraint ==========
+        // Rotation residual: log(R_ij_obs^T * ΔR) or equivalently axis-angle of q_error
+        // q_ij_obs = q_i^-1 * q_j (observed rotation from poses)
+        // q_delta = ΔR from IMU preintegration
+        // Error: how much we need to rotate q_delta to get q_ij_obs = q_delta^-1 * q_ij_obs
+        let delta_R_imu = self.preintegration.delta_R;
+        let q_delta = na::UnitQuaternion::from_matrix(&delta_R_imu.cast::<f64>());
+        let q_ij_obs = q_i.inverse() * q_j;
+        let q_error = q_delta.inverse() * q_ij_obs;
+        let rot_error_axis = q_error
+            .axis()
+            .map(|a| a.into_inner())
+            .unwrap_or(na::Vector3::zeros());
+        let rot_error_angle = q_error.angle();
+        let rot_error = rot_error_axis * rot_error_angle;
+
+        // ========== Velocity Constraint ==========
+        // v_j = v_i + g*dt + R_i * Δv
+        // Δv_imu is in IMU frame, rotate to world frame: R_W_B_i * Δv
+        let delta_v_imu: na::Vector3<f64> = self.preintegration.delta_v.cast::<f64>();
+        let delta_v_world = q_i * delta_v_imu;
+        let gravity_contribution = na::Vector3::new(0.0, 0.0, g_vec * dt);
+        let v_predicted = v_i + delta_v_world + gravity_contribution;
+        let vel_error = v_j - v_predicted;
+
+        // ========== Position Constraint ==========
+        // p_j = p_i + v_i*dt + 0.5*g*dt² + R_i * Δp
+        let delta_p_imu: na::Vector3<f64> = self.preintegration.delta_p.cast::<f64>();
+        let delta_p_world = q_i * delta_p_imu;
+        let gravity_pos_term = na::Vector3::new(0.0, 0.0, -0.5 * g_vec * dt * dt);
+        let p_predicted = t_i + v_i * dt + delta_p_world + gravity_pos_term;
+        let pos_error = t_j - p_predicted;
+
+        // ========== Build 9D Residual ==========
+        // Residual ordering: [pos; vel; rot]
+        // Return raw residuals - solver applies information matrix
+        let mut residual = DVector::zeros(9);
+        residual[0] = pos_error.x;
+        residual[1] = pos_error.y;
+        residual[2] = pos_error.z;
+        residual[3] = vel_error.x;
+        residual[4] = vel_error.y;
+        residual[5] = vel_error.z;
+        residual[6] = rot_error.x;
+        residual[7] = rot_error.y;
+        residual[8] = rot_error.z;
+
         let jacobian = if compute_jacobian {
-            // 6x14 Jacobian: 6 residuals, 7+7 pose dimensions (simplified)
-            Some(DMatrix::zeros(6, 14))
+            // 9x20 Jacobian: 9 residuals, 7+3+7+3 pose/velocity dimensions
+            // Return raw jacobians - solver applies information matrix
+            let mut jac = DMatrix::zeros(9, 20);
+
+            // Position w.r.t. KF_i pose: -I
+            jac[(0, 0)] = -1.0;
+            jac[(1, 1)] = -1.0;
+            jac[(2, 2)] = -1.0;
+
+            // Position w.r.t. VEL_i: -dt * I
+            jac[(0, 7)] = -dt;
+            jac[(1, 8)] = -dt;
+            jac[(2, 9)] = -dt;
+
+            // Position w.r.t. KF_j pose: +I
+            jac[(0, 10)] = 1.0;
+            jac[(1, 11)] = 1.0;
+            jac[(2, 12)] = 1.0;
+
+            // Velocity w.r.t. VEL_i: -I
+            jac[(3, 7)] = -1.0;
+            jac[(4, 8)] = -1.0;
+            jac[(5, 9)] = -1.0;
+
+            // Velocity w.r.t. VEL_j: +I
+            jac[(3, 17)] = 1.0;
+            jac[(4, 18)] = 1.0;
+            jac[(5, 19)] = 1.0;
+
+            // Rotation w.r.t. KF_i pose: -I
+            jac[(6, 3)] = -1.0;
+            jac[(7, 4)] = -1.0;
+            jac[(8, 5)] = -1.0;
+
+            // Rotation w.r.t. KF_j pose: +I
+            jac[(6, 13)] = 1.0;
+            jac[(7, 14)] = 1.0;
+            jac[(8, 15)] = 1.0;
+
+            Some(jac)
         } else {
             None
         };
@@ -417,7 +458,7 @@ impl Factor for InterKeyframeImuFactor {
 // UTILITY FUNCTIONS
 // ============================================================================
 
-/// Convert rotation matrix to axis-angle representation (3D vector)
+#[allow(dead_code)]
 fn matrix_to_axis_angle(R: &na::Matrix3<Float>) -> Vector3 {
     // Use Rodrigues' formula inverse
     let trace = R[(0, 0)] + R[(1, 1)] + R[(2, 2)];
@@ -485,6 +526,7 @@ fn matrix_to_axis_angle(R: &na::Matrix3<Float>) -> Vector3 {
 )]
 mod tests {
     use super::*;
+    use na::UnitQuaternion;
 
     #[test]
     fn test_gravity_model() {
@@ -495,8 +537,17 @@ mod tests {
     }
 
     #[test]
+    fn test_gravity_model_custom() {
+        let gravity = GravityModel::new(10.0);
+        let g_vec = gravity.gravity_vector();
+        assert!((g_vec.norm() - 10.0).abs() < 1e-6);
+        assert!(g_vec.z < 0.0);
+    }
+
+    #[test]
     fn test_inter_keyframe_factor_creation() {
         let preintegration = ImuPreintegration {
+            dt: 0.05,
             delta_R: na::Matrix3::identity(),
             delta_v: Vector3::zeros(),
             delta_p: Vector3::zeros(),
@@ -520,11 +571,318 @@ mod tests {
     }
 
     #[test]
+    fn test_inter_keyframe_factor_dimension() {
+        let preintegration = ImuPreintegration::default();
+        let factor = InterKeyframeImuFactor::new(0.1, preintegration, GravityModel::earth());
+        assert_eq!(factor.get_dimension(), 9); // 3 pos + 3 vel + 3 rot
+    }
+
+    #[test]
+    fn test_inter_keyframe_factor_zero_motion() {
+        // Test with zero motion - states should match IMU predictions
+        // Using zero gravity model to simplify the test
+        let dt = 0.05;
+
+        let preintegration = ImuPreintegration {
+            dt,
+            delta_R: na::Matrix3::identity(),
+            delta_v: Vector3::zeros(),
+            delta_p: Vector3::zeros(),
+            cov_R: na::Matrix3::identity() * 1e-8,
+            cov_v: na::Matrix3::identity() * 1e-8,
+            cov_p: na::Matrix3::identity() * 1e-8,
+            cov_R_bw: na::Matrix3::zeros(),
+            cov_v_ba: na::Matrix3::zeros(),
+            cov_p_ba: na::Matrix3::zeros(),
+        };
+
+        let zero_gravity = GravityModel { magnitude: 0.0 };
+        let factor = InterKeyframeImuFactor::new(dt, preintegration, zero_gravity);
+
+        // Create parameter blocks: KF_i pose, VEL_i, KF_j pose, VEL_j
+        // All at origin with identity rotation
+        let p_i = DVector::from_vec(vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]);
+        let v_i = DVector::from_vec(vec![0.0, 0.0, 0.0]);
+        let p_j = DVector::from_vec(vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]);
+        let v_j = DVector::from_vec(vec![0.0, 0.0, 0.0]);
+
+        let (residual, _) = factor.linearize(&[p_i, v_i, p_j, v_j], false);
+
+        // Residual should be zero for consistent states with zero gravity
+        assert!(
+            residual.norm() < 1e-6,
+            "Zero motion residual should be near zero: {}",
+            residual.norm()
+        );
+    }
+
+    #[test]
+    fn test_inter_keyframe_factor_constant_velocity_no_gravity() {
+        // Test with constant velocity motion, no gravity
+        let dt = 0.1;
+
+        let preintegration = ImuPreintegration {
+            dt,
+            delta_R: na::Matrix3::identity(),
+            delta_v: Vector3::zeros(), // No IMU-measured velocity change
+            delta_p: Vector3::zeros(), // No IMU-measured position change
+            cov_R: na::Matrix3::identity() * 1e-6,
+            cov_v: na::Matrix3::identity() * 1e-4,
+            cov_p: na::Matrix3::identity() * 1e-4,
+            cov_R_bw: na::Matrix3::zeros(),
+            cov_v_ba: na::Matrix3::zeros(),
+            cov_p_ba: na::Matrix3::zeros(),
+        };
+
+        let zero_gravity = GravityModel { magnitude: 0.0 };
+        let factor = InterKeyframeImuFactor::new(dt, preintegration, zero_gravity);
+
+        // Initial state: at origin with velocity v_i
+        let p_i = DVector::from_vec(vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]);
+        let v_i = DVector::from_vec(vec![1.0, 0.0, 0.0]);
+
+        // Final state: position = v_i * dt, same velocity (constant velocity)
+        let p_j = DVector::from_vec(vec![0.1, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]);
+        let v_j = DVector::from_vec(vec![1.0, 0.0, 0.0]);
+
+        let (residual, _) = factor.linearize(&[p_i, v_i, p_j, v_j], false);
+
+        // Residual should be zero for constant velocity with no gravity
+        assert!(
+            residual.norm() < 1e-6,
+            "Constant velocity residual should be near zero: {}",
+            residual.norm()
+        );
+    }
+
+    #[test]
+    fn test_inter_keyframe_factor_with_rotation_using_quaternions() {
+        // Test with rotation using properly constructed quaternions
+        // 90 degree rotation around Z axis
+        let dt = 0.1;
+        let angle = std::f64::consts::PI / 2.0;
+
+        // Create quaternion for 90 degree rotation around Z
+        let q_rot = UnitQuaternion::from_scaled_axis(nalgebra::Vector3::z() * angle);
+
+        // Verify the quaternion components
+        assert!(
+            (q_rot.w - 0.70710678).abs() < 1e-5,
+            "w should be ~0.707, got {}",
+            q_rot.w
+        );
+        assert!(
+            (q_rot.k - 0.70710678).abs() < 1e-5,
+            "k should be ~0.707, got {}",
+            q_rot.k
+        );
+        assert!(q_rot.i.abs() < 1e-10, "i should be ~0, got {}", q_rot.i);
+        assert!(q_rot.j.abs() < 1e-10, "j should be ~0, got {}", q_rot.j);
+
+        let preintegration = ImuPreintegration {
+            dt,
+            delta_R: q_rot.to_rotation_matrix().into(),
+            delta_v: Vector3::zeros(),
+            delta_p: Vector3::zeros(),
+            cov_R: na::Matrix3::identity() * 1e-4,
+            cov_v: na::Matrix3::identity() * 1e-4,
+            cov_p: na::Matrix3::identity() * 1e-4,
+            cov_R_bw: na::Matrix3::zeros(),
+            cov_v_ba: na::Matrix3::zeros(),
+            cov_p_ba: na::Matrix3::zeros(),
+        };
+
+        let zero_gravity = GravityModel { magnitude: 0.0 };
+        let factor = InterKeyframeImuFactor::new(dt, preintegration, zero_gravity);
+
+        // Initial pose at origin
+        let p_i = DVector::from_vec(vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]);
+        let v_i = DVector::from_vec(vec![0.0, 0.0, 0.0]);
+
+        // Final pose: use the same quaternion components as the IMU delta
+        // Storage format: [tx, ty, tz, qw, qx, qy, qz]
+        let p_j = DVector::from_vec(vec![0.0, 0.0, 0.0, q_rot.w, q_rot.i, q_rot.j, q_rot.k]);
+        let v_j = DVector::from_vec(vec![0.0, 0.0, 0.0]);
+
+        let (residual, _) = factor.linearize(&[p_i, v_i, p_j, v_j], false);
+
+        // Residual should be near zero for matching rotation
+        assert!(
+            residual.norm() < 1e-6,
+            "Rotation residual should be near zero: {}",
+            residual.norm()
+        );
+    }
+
+    #[test]
+    fn test_inter_keyframe_factor_jacobian_computation() {
+        let preintegration = ImuPreintegration {
+            dt: 0.05,
+            delta_R: na::Matrix3::identity(),
+            delta_v: Vector3::new(0.1, 0.0, 0.0),
+            delta_p: Vector3::new(0.005, 0.0, 0.0),
+            cov_R: na::Matrix3::identity() * 1e-4,
+            cov_v: na::Matrix3::identity() * 1e-4,
+            cov_p: na::Matrix3::identity() * 1e-6,
+            cov_R_bw: na::Matrix3::identity() * 1e-5,
+            cov_v_ba: na::Matrix3::identity() * 1e-5,
+            cov_p_ba: na::Matrix3::identity() * 1e-7,
+        };
+
+        let factor = InterKeyframeImuFactor::new(0.05, preintegration, GravityModel::earth());
+
+        let p_i = DVector::from_vec(vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]);
+        let v_i = DVector::from_vec(vec![0.0, 0.0, 0.0]);
+        let p_j = DVector::from_vec(vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]);
+        let v_j = DVector::from_vec(vec![0.1, 0.0, 0.0]);
+
+        let (_, jacobian) = factor.linearize(&[p_i, v_i, p_j, v_j], true);
+
+        assert!(jacobian.is_some());
+        let jac = jacobian.unwrap();
+        assert_eq!(jac.nrows(), 9);
+        assert_eq!(jac.ncols(), 20); // 7+3+7+3 = 20
+
+        // Check that Jacobian is finite
+        for i in 0..jac.nrows() {
+            for j in 0..jac.ncols() {
+                assert!(
+                    jac[(i, j)].is_finite(),
+                    "Jacobian element ({}, {}) is not finite",
+                    i,
+                    j
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_inter_keyframe_factor_edge_cases() {
+        // Test with very small dt
+        let preintegration = ImuPreintegration {
+            dt: 0.001,
+            delta_R: na::Matrix3::identity(),
+            delta_v: Vector3::zeros(),
+            delta_p: Vector3::zeros(),
+            cov_R: na::Matrix3::identity() * 1e-8,
+            cov_v: na::Matrix3::identity() * 1e-8,
+            cov_p: na::Matrix3::identity() * 1e-8,
+            cov_R_bw: na::Matrix3::zeros(),
+            cov_v_ba: na::Matrix3::zeros(),
+            cov_p_ba: na::Matrix3::zeros(),
+        };
+
+        let factor = InterKeyframeImuFactor::new(0.001, preintegration, GravityModel::earth());
+        assert_eq!(factor.dt, 0.001);
+
+        // Test with large dt (1 second)
+        let preintegration_large = ImuPreintegration {
+            dt: 1.0,
+            delta_R: na::Matrix3::identity(),
+            delta_v: Vector3::zeros(),
+            delta_p: Vector3::zeros(),
+            cov_R: na::Matrix3::identity() * 1e-2,
+            cov_v: na::Matrix3::identity() * 1e-2,
+            cov_p: na::Matrix3::identity() * 1e-2,
+            cov_R_bw: na::Matrix3::zeros(),
+            cov_v_ba: na::Matrix3::zeros(),
+            cov_p_ba: na::Matrix3::zeros(),
+        };
+
+        let factor_large =
+            InterKeyframeImuFactor::new(1.0, preintegration_large, GravityModel::earth());
+        assert_eq!(factor_large.dt, 1.0);
+    }
+
+    #[test]
+    fn test_inter_keyframe_factor_information_matrix() {
+        let preintegration = ImuPreintegration {
+            dt: 0.05,
+            delta_R: na::Matrix3::identity(),
+            delta_v: Vector3::zeros(),
+            delta_p: Vector3::zeros(),
+            cov_R: na::Matrix3::identity() * 1e-4,
+            cov_v: na::Matrix3::identity() * 1e-4,
+            cov_p: na::Matrix3::identity() * 1e-6,
+            cov_R_bw: na::Matrix3::identity() * 1e-5,
+            cov_v_ba: na::Matrix3::identity() * 1e-5,
+            cov_p_ba: na::Matrix3::identity() * 1e-7,
+        };
+
+        let factor = InterKeyframeImuFactor::new(0.05, preintegration, GravityModel::earth());
+
+        // Check that information matrix is positive definite (diagonal entries > 0)
+        for i in 0..9 {
+            assert!(
+                factor.information[(i, i)] > 0.0,
+                "Information matrix diagonal {} is not positive",
+                i
+            );
+        }
+
+        // Check that information matrix is symmetric
+        for i in 0..9 {
+            for j in 0..9 {
+                assert!(
+                    (factor.information[(i, j)] - factor.information[(j, i)]).abs() < 1e-10,
+                    "Information matrix is not symmetric at ({}, {})",
+                    i,
+                    j
+                );
+            }
+        }
+    }
+
+    #[test]
     fn test_bias_refinement() {
         let mut refinement = BiasRefinement::new();
         assert!(refinement.is_valid());
 
         refinement.accel_bias = Vector3::new(1.0, 0.0, 0.0);
         assert!(!refinement.is_valid()); // Exceeds max_accel_bias = 0.5
+    }
+
+    #[test]
+    fn test_bias_refinement_update() {
+        let mut refinement = BiasRefinement::new();
+
+        // Create a small residual
+        let residual = na::Vector6::new(0.01, 0.01, 0.01, 0.001, 0.001, 0.001);
+        let jacobian = na::Matrix6::identity();
+
+        refinement.update_from_residuals(&residual, &jacobian);
+
+        // Bias should have been updated slightly
+        assert!(refinement.accel_bias.norm() > 0.0);
+        assert!(refinement.gyro_bias.norm() > 0.0);
+
+        // But still within bounds
+        assert!(refinement.is_valid());
+    }
+
+    #[test]
+    fn test_tight_coupling_initializer() {
+        let gravity = GravityModel::earth();
+        let initializer = TightCouplingInitializer::new(gravity);
+
+        assert_eq!(initializer.min_frames, 5);
+        assert!((initializer.min_parallax - 30.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_imu_preintegration_default() {
+        let preintegration = ImuPreintegration::default();
+        assert_eq!(preintegration.dt, 0.0);
+        assert!(preintegration.delta_v.norm() < 1e-10);
+        assert!(preintegration.delta_p.norm() < 1e-10);
+    }
+
+    #[test]
+    fn test_imu_preintegration_delta_time() {
+        let preintegration = ImuPreintegration {
+            dt: 0.123,
+            ..Default::default()
+        };
+        assert!((preintegration.delta_time() - 0.123).abs() < 1e-10);
     }
 }

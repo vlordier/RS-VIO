@@ -1,7 +1,10 @@
+use crate::calibration::online_intrinsics::{CalibrationObservation, OnlineIntrinsicsRefiner};
 use crate::datasets::config::Config;
 use crate::datasets::CameraModelType;
 use crate::datasets::ImuData;
 use crate::debug_log;
+use crate::estimator::keyframe_culler::AggressiveCullingConfig;
+use crate::estimator::point_quality::PointQualityConfig;
 use crate::estimator::Frame;
 use crate::estimator::SlidingWindow;
 use crate::estimator::{FrameWorkspace, WorkspaceConfig};
@@ -16,19 +19,19 @@ use crate::imu::ImuMotionPrior;
 use crate::imu::ImuPreintegrator;
 use crate::imu::PreintegratedImu;
 use crate::imu::VelocityEstimator;
-use crate::imu::{ImuDenoiseFilter, DenoiseConfig};
+use crate::imu::{DenoiseConfig, ImuDenoiseFilter};
 use crate::imu::{HigherOrderFilter, HigherOrderFilterConfig};
-use crate::vision::{StereoSuperResolver, StereoSuperResolutionConfig};
 use crate::optimization::loop_closure::{
     KeyframeDescriptor, LoopClosureConfig, LoopClosureDetector,
 };
 use crate::types::{Float, Matrix4x4, Vector3};
 use crate::viewers::Viewer;
+use crate::vision::{StereoSuperResolutionConfig, StereoSuperResolver};
 use crate::{Result, VIOError};
 use image::GrayImage;
 use nalgebra as na;
-use std::time::{Duration, Instant};
 use std::io::Write;
+use std::time::{Duration, Instant};
 
 /// Placeholder estimator implementation.
 /// Currently mimics the control flow and logging structure of the C++ Estimator::process_frame,
@@ -100,6 +103,8 @@ pub struct Estimator {
     higher_order_filter: HigherOrderFilter,
     // Stereo super-resolution refinement using IMU confidence signals
     stereo_super_resolver: StereoSuperResolver,
+    // Online intrinsics refiner for self-calibration
+    intrinsics_refiner: Option<OnlineIntrinsicsRefiner>,
 }
 
 impl Estimator {
@@ -148,6 +153,51 @@ impl Estimator {
         let keyframe_window_size = config.keyframe_management.keyframe_window_size as usize;
         let processing_timeout_ms = config.keyframe_management.processing_timeout_ms;
 
+        // Initialize aggressive keyframe culling with tuned defaults.
+        // These are algorithm parameters that are typically set once during tuning
+        // rather than per-dataset configuration. See AggressiveCullingConfig for details.
+        let culling_config = Some(AggressiveCullingConfig {
+            min_parallax_rad: fl!(0.05),
+            min_observations: 20,
+            max_similar_poses: 3,
+            pose_similarity_translation: 0.1,
+            enable_parallax_culling: true,
+            enable_observation_culling: true,
+            enable_redundancy_culling: true,
+            enable_age_culling: true,
+            max_age: 10,
+            reserve_fraction: 0.7,
+        });
+
+        // Initialize point quality scorer with tuned defaults.
+        // These parameters control map point filtering and are platform-independent.
+        // See PointQualityConfig for parameter descriptions.
+        let quality_config = Some(PointQualityConfig {
+            min_track_length: 3,
+            min_parallax: 0.05,
+            max_point_age: 30,
+            min_baseline_diversity: 0.1,
+            quality_threshold: 0.3,
+            auto_cull: true,
+            cull_fraction: 0.2,
+            max_map_size: 2000,
+            detect_dynamic: true,
+            motion_inconsistency_threshold: 5.0,
+            min_angle_variance: 0.1,
+            max_reproj_error: 2.0,
+        });
+
+        // Initialize online intrinsics refiner
+        let initial_intrinsics = crate::calibration::CameraIntrinsics {
+            fx: config.camera.left_intrinsics[0] as f64,
+            fy: config.camera.left_intrinsics[1] as f64,
+            cx: config.camera.left_intrinsics[2] as f64,
+            cy: config.camera.left_intrinsics[3] as f64,
+            width: config.camera.image_width,
+            height: config.camera.image_height,
+        };
+        let intrinsics_refiner = Some(OnlineIntrinsicsRefiner::new(initial_intrinsics));
+
         // Initialize IMU components
         let imu_config = ImuConfig::default();
         // Initialize loop-closure detector with default config
@@ -158,7 +208,12 @@ impl Estimator {
             enable_debug_output: true,
             config: config.clone(),
             stereo_patch_tracker: StereoPatchTracker::<6>::from_config(&feature_config),
-            sliding_window: SlidingWindow::new(keyframe_window_size),
+            sliding_window: SlidingWindow::with_marginalization_config(
+                keyframe_window_size,
+                crate::optimization::marginalization::MarginalizationConfig::default(),
+                culling_config,
+                quality_config,
+            ),
             viewer,
             left_cam,
             right_cam,
@@ -224,6 +279,8 @@ impl Estimator {
             higher_order_filter: HigherOrderFilter::new(HigherOrderFilterConfig::default()),
             // Initialize stereo super-resolution refinement
             stereo_super_resolver: StereoSuperResolver::new(StereoSuperResolutionConfig::default()),
+            // Initialize online intrinsics refiner
+            intrinsics_refiner,
         }
     }
 
@@ -352,8 +409,16 @@ impl Estimator {
                         )
                     } else {
                         (
-                            na::Vector3::new(imu_sample.gyro[0], imu_sample.gyro[1], imu_sample.gyro[2]),
-                            na::Vector3::new(imu_sample.accel[0], imu_sample.accel[1], imu_sample.accel[2]),
+                            na::Vector3::new(
+                                imu_sample.gyro[0],
+                                imu_sample.gyro[1],
+                                imu_sample.gyro[2],
+                            ),
+                            na::Vector3::new(
+                                imu_sample.accel[0],
+                                imu_sample.accel[1],
+                                imu_sample.accel[2],
+                            ),
                         )
                     };
 
@@ -370,13 +435,14 @@ impl Estimator {
 
                     let accel_denoised = self.denoise_filter.process_accel(&accel_f32);
                     let gyro_denoised = self.denoise_filter.process_gyro(&gyro_f32);
-                    
+
                     // Get updated weight after processing
                     let current_weight = self.denoise_filter.weight_scale;
-                    
+
                     // Process acceleration through higher-order filter for jerk/snap and f0 analysis
-                    let higher_order_output = self.higher_order_filter.process_accel(accel_denoised);
-                    
+                    let higher_order_output =
+                        self.higher_order_filter.process_accel(accel_denoised);
+
                     // Use f0 confidence to further weight the measurement
                     // Combine denoise weight with f0 confidence
                     let f0_weighted = if self.higher_order_filter.config.enable_f0_weighting {
@@ -442,12 +508,10 @@ impl Estimator {
                 }
 
                 for sample in &filtered_imu {
-                    self.frame_workspace
-                        .push_imu_sample(sample)
-                        .map_err(|e| {
-                            log::warn!("[Estimator] IMU buffer overflow: {}", e);
-                            VIOError::Optimization(e)
-                        })?;
+                    self.frame_workspace.push_imu_sample(sample).map_err(|e| {
+                        log::warn!("[Estimator] IMU buffer overflow: {}", e);
+                        VIOError::Optimization(e)
+                    })?;
                 }
 
                 // Attach filtered IMU measurements to frame (clone from workspace)
@@ -524,14 +588,26 @@ impl Estimator {
 
         // Visualize IMU data (before and after processing)
         if let Some(imu) = imu_data {
-            eprintln!("[IMU_VIZ] Frame {}: Received {} IMU samples, use_imu={}", 
-                     self.frame_count, imu.len(), self.config.debug.use_imu);
+            eprintln!(
+                "[IMU_VIZ] Frame {}: Received {} IMU samples, use_imu={}",
+                self.frame_count,
+                imu.len(),
+                self.config.debug.use_imu
+            );
             if self.config.debug.use_imu {
-                if let (Some(accel), Some(gyro)) = (processed_accel.as_ref(), processed_gyro.as_ref()) {
-                    eprintln!("[IMU_VIZ] Frame {}: Calling view_imu_results() with {} samples", 
-                             self.frame_count, imu.len());
+                if let (Some(accel), Some(gyro)) =
+                    (processed_accel.as_ref(), processed_gyro.as_ref())
+                {
+                    eprintln!(
+                        "[IMU_VIZ] Frame {}: Calling view_imu_results() with {} samples",
+                        self.frame_count,
+                        imu.len()
+                    );
                     self.view_imu_results(imu, accel, gyro, timestamp_ns);
-                    eprintln!("[IMU_VIZ] Frame {}: Finished IMU visualization", self.frame_count);
+                    eprintln!(
+                        "[IMU_VIZ] Frame {}: Finished IMU visualization",
+                        self.frame_count
+                    );
                 } else {
                     eprintln!(
                         "[IMU_VIZ] Frame {}: Skipping visualization (no processed IMU data available)",
@@ -540,10 +616,53 @@ impl Estimator {
                 }
             }
         } else {
-            eprintln!("[IMU_VIZ] Frame {}: NO IMU DATA RECEIVED (imu_data is None)", self.frame_count);
+            eprintln!(
+                "[IMU_VIZ] Frame {}: NO IMU DATA RECEIVED (imu_data is None)",
+                self.frame_count
+            );
         }
 
         // Patch tracking
+        if let Some(imu) = imu_data {
+            let fx = self
+                .config
+                .camera
+                .left_intrinsics
+                .get(0)
+                .copied()
+                .unwrap_or(500.0) as f32;
+            let fy = self
+                .config
+                .camera
+                .left_intrinsics
+                .get(1)
+                .copied()
+                .unwrap_or(500.0) as f32;
+            let cx = self
+                .config
+                .camera
+                .left_intrinsics
+                .get(2)
+                .copied()
+                .unwrap_or(320.0) as f32;
+            let cy = self
+                .config
+                .camera
+                .left_intrinsics
+                .get(3)
+                .copied()
+                .unwrap_or(240.0) as f32;
+
+            // Always set calibrated intrinsics for geometric gating
+            self.stereo_patch_tracker
+                .set_camera_intrinsics(fx, fy, cx, cy);
+
+            if self.config.debug.use_imu {
+                self.stereo_patch_tracker
+                    .set_imu_rotation_hint(imu, (fx, fy, cx, cy));
+            }
+        }
+
         let tracking_start = Instant::now();
         self.stereo_patch_tracker
             .process_frame(&left_img, &right_img, &mut current_frame);
@@ -554,12 +673,13 @@ impl Estimator {
         // This refines subpixel disparities using confidence from IMU noise/motion analysis
         if !current_frame.left_features.is_empty() && !current_frame.right_features.is_empty() {
             let _superres_start = Instant::now();
-            
+
             // Compute IMU confidence metric from denoise and higher-order filters
             let denoise_weight = self.denoise_filter.weight_scale;
             let f0_confidence = self.higher_order_filter.f0_confidence;
-            let imu_confidence = ((denoise_weight as Float) * (f0_confidence as Float)).clamp(0.0, 1.0);
-            
+            let imu_confidence =
+                ((denoise_weight as Float) * (f0_confidence as Float)).clamp(0.0, 1.0);
+
             // Estimate motion state from acceleration magnitude
             let accel_magnitude = if let Some(accel) = processed_accel.as_ref() {
                 if !accel.is_empty() {
@@ -574,13 +694,13 @@ impl Estimator {
             } else {
                 0.0
             };
-            
+
             let motion_state = match accel_magnitude {
                 x if x < 1.0 => "hover",
                 x if x < 3.0 => "moving",
                 _ => "accelerating",
             };
-            
+
             // Get current acceleration for motion compensation
             let current_accel = if let Some(accel) = processed_accel.as_ref() {
                 if !accel.is_empty() {
@@ -592,30 +712,30 @@ impl Estimator {
             } else {
                 [0.0 as Float, 0.0, 0.0]
             };
-            
+
             // Collect feature coordinates for refinement
             let left_coords: Vec<(Float, Float)> = current_frame
                 .left_features
                 .iter()
                 .map(|f| (f.pixel_coord[0] as Float, f.pixel_coord[1] as Float))
                 .collect();
-            
+
             let right_coords: Vec<(Float, Float)> = current_frame
                 .right_features
                 .iter()
                 .map(|f| (f.pixel_coord[0] as Float, f.pixel_coord[1] as Float))
                 .collect();
-            
+
             let feature_ids: Vec<usize> = current_frame
                 .left_features
                 .iter()
                 .map(|f| f.feature_id)
                 .collect();
-            
+
             if left_coords.len() == right_coords.len() && !left_coords.is_empty() {
                 let left_data = left_img.as_raw();
                 let right_data = right_img.as_raw();
-                
+
                 let refined_features = self.stereo_super_resolver.refine_features(
                     left_data,
                     right_data,
@@ -628,7 +748,7 @@ impl Estimator {
                     motion_state,
                     &current_accel,
                 );
-                
+
                 // Apply refined coordinates to features
                 for (idx, (left_feat, right_feat)) in current_frame
                     .left_features
@@ -643,7 +763,7 @@ impl Estimator {
                         right_feat.pixel_coord[1] = refined_features[idx].right_y_refined as f32;
                     }
                 }
-                
+
                 if should_log {
                     debug_log!(
                         "[Estimator] Stereo super-resolution: refined {} features (IMU confidence: {:.3}, motion: {})",
@@ -794,7 +914,11 @@ impl Estimator {
                 }
             }
 
-            self.sliding_window.add_frame(current_frame);
+            self.sliding_window.add_frame(current_frame.clone());
+
+            // Add observations to intrinsics refiner for self-calibration
+            self.add_intrinsics_observations(&current_frame);
+
             // Provide IMU motion prior to optimizer when available
             let imu_prior = if self.config.optimization.imu_prior_enable {
                 self.get_imu_motion_prior()
@@ -814,6 +938,29 @@ impl Estimator {
             } else {
                 None
             };
+
+            // Store IMU preintegration for tight coupling BEFORE optimization
+            // This ensures the most recent preintegration (between last two KFs) is available
+            let preintegration_for_storage = if self.config.optimization.imu_prior_enable {
+                self.imu_preintegrator
+                    .create_tight_coupling_preintegration()
+            } else {
+                None
+            };
+
+            // Add IMU preintegration to sliding window BEFORE optimization
+            // This enables tight-coupled IMU factors in the optimization
+            if let Some(ref preint) = preintegration_for_storage {
+                let prev_kf_idx = self.sliding_window.len().saturating_sub(2);
+                if prev_kf_idx < self.sliding_window.len() {
+                    self.sliding_window.add_imu_preintegration(
+                        prev_kf_idx,
+                        prev_kf_idx + 1,
+                        preint.clone(),
+                    );
+                }
+            }
+
             if let Err(e) =
                 self.sliding_window
                     .optimize_with_imu(imu_prior, imu_weights, imu_huber_delta)
@@ -821,6 +968,18 @@ impl Estimator {
                 log::error!("[Estimator] Bundle adjustment optimization failed: {:?}", e);
                 // Continue execution even if optimization fails
             }
+
+            // Reset IMU preintegrator after optimization for next interval
+            if self.config.optimization.imu_prior_enable {
+                self.imu_preintegrator.reset();
+            }
+
+            // Update camera intrinsics from online refiner after optimization
+            self.update_intrinsics_from_refiner();
+
+            // Update extrinsics from calibrator periodically
+            self.update_extrinsics_from_calibrator();
+
             _optimization_time_ms = optimization_start.elapsed().as_secs_f64() * 1000.0;
             self.view_optimization_results(frame_timestamp);
         }
@@ -1149,7 +1308,10 @@ impl Estimator {
             return;
         }
 
-        debug_log!("[Estimator] Logging {} IMU samples to Rerun viewer", imu_data.len());
+        debug_log!(
+            "[Estimator] Logging {} IMU samples to Rerun viewer",
+            imu_data.len()
+        );
 
         // Convert IMU data to format for visualization (don't hold mutable borrow of self)
         let mut raw_accel = Vec::with_capacity(imu_data.len());
@@ -1175,34 +1337,60 @@ impl Estimator {
         let processed_gyro_f32: Vec<[f32; 3]> = processed_gyro.to_vec();
 
         // Compute decomposition before getting viewer mutable borrow
-        let decomp_result = self.compute_imu_decomposition(&processed_accel_f32, &processed_gyro_f32);
+        let decomp_result =
+            self.compute_imu_decomposition(&processed_accel_f32, &processed_gyro_f32);
         let fundamental_freq = self.estimate_fundamental_frequency(&processed_gyro_f32);
-        
+
         // Log denoising filter quality
         let _filter_quality = self.denoise_filter.quality();
-        debug_log!("[DENOISE] Frame {}: quality={:.2}, samples={}", 
-            self.frame_count, _filter_quality, imu_data.len());
+        debug_log!(
+            "[DENOISE] Frame {}: quality={:.2}, samples={}",
+            self.frame_count,
+            _filter_quality,
+            imu_data.len()
+        );
 
         // Log f0 to CSV file
         if let Ok(mut writer) = self.f0_log_writer.lock() {
             if let Some(ref mut f) = *writer {
-                let _ = writeln!(f, "{},{},{:.2}", self.frame_count, timestamp_ns, fundamental_freq);
+                let _ = writeln!(
+                    f,
+                    "{},{},{:.2}",
+                    self.frame_count, timestamp_ns, fundamental_freq
+                );
                 let _ = f.flush();
             }
         }
 
         // Log gyroscope spectrum (RMS values per axis) to CSV file
-        let gyro_x_rms = (processed_gyro_f32.iter().map(|g| g[0] * g[0]).sum::<f32>() / processed_gyro_f32.len() as f32).sqrt();
-        let gyro_y_rms = (processed_gyro_f32.iter().map(|g| g[1] * g[1]).sum::<f32>() / processed_gyro_f32.len() as f32).sqrt();
-        let gyro_z_rms = (processed_gyro_f32.iter().map(|g| g[2] * g[2]).sum::<f32>() / processed_gyro_f32.len() as f32).sqrt();
-        let gyro_mag_rms = (processed_gyro_f32.iter()
+        let gyro_x_rms = (processed_gyro_f32.iter().map(|g| g[0] * g[0]).sum::<f32>()
+            / processed_gyro_f32.len() as f32)
+            .sqrt();
+        let gyro_y_rms = (processed_gyro_f32.iter().map(|g| g[1] * g[1]).sum::<f32>()
+            / processed_gyro_f32.len() as f32)
+            .sqrt();
+        let gyro_z_rms = (processed_gyro_f32.iter().map(|g| g[2] * g[2]).sum::<f32>()
+            / processed_gyro_f32.len() as f32)
+            .sqrt();
+        let gyro_mag_rms = (processed_gyro_f32
+            .iter()
             .map(|g| g[0] * g[0] + g[1] * g[1] + g[2] * g[2])
-            .sum::<f32>() / processed_gyro_f32.len() as f32).sqrt();
+            .sum::<f32>()
+            / processed_gyro_f32.len() as f32)
+            .sqrt();
 
         if let Ok(mut writer) = self.spectrum_log_writer.lock() {
             if let Some(ref mut f) = *writer {
-                let _ = writeln!(f, "{},{},{:.6},{:.6},{:.6},{:.6}",
-                    self.frame_count, timestamp_ns, gyro_x_rms, gyro_y_rms, gyro_z_rms, gyro_mag_rms);
+                let _ = writeln!(
+                    f,
+                    "{},{},{:.6},{:.6},{:.6},{:.6}",
+                    self.frame_count,
+                    timestamp_ns,
+                    gyro_x_rms,
+                    gyro_y_rms,
+                    gyro_z_rms,
+                    gyro_mag_rms
+                );
                 let _ = f.flush();
             }
         }
@@ -1210,12 +1398,7 @@ impl Estimator {
         // Now get mutable borrow for viewer
         if let Some(v) = &mut self.viewer {
             // Log raw IMU data
-            v.log_imu_raw(
-                timestamp_ns,
-                &raw_accel_f32,
-                &raw_gyro_f32,
-                "imu/raw",
-            );
+            v.log_imu_raw(timestamp_ns, &raw_accel_f32, &raw_gyro_f32, "imu/raw");
 
             // Log processed (bias-corrected) IMU data
             v.log_imu_processed(
@@ -1282,10 +1465,7 @@ impl Estimator {
 
         // Remove DC component (subtract mean)
         let mean = magnitudes.iter().sum::<f32>() / magnitudes.len() as f32;
-        let centered: Vec<f32> = magnitudes
-            .iter()
-            .map(|&m| m - mean)
-            .collect();
+        let centered: Vec<f32> = magnitudes.iter().map(|&m| m - mean).collect();
 
         // Simple peak detection: count local maxima (simplified zero-crossing on derivative)
         let mut peak_count = 0;
@@ -1305,7 +1485,7 @@ impl Estimator {
             let rms = (centered.iter().map(|x| x * x).sum::<f32>() / centered.len() as f32).sqrt();
             // Map RMS to rough frequency (typical sensor vibration 5-50 Hz)
             if rms > 0.01 {
-                5.0 + rms * 100.0  // Simple linear mapping
+                5.0 + rms * 100.0 // Simple linear mapping
             } else {
                 0.0
             }
@@ -1313,7 +1493,11 @@ impl Estimator {
     }
 
     /// Decompose processed IMU data into gravity and vibration components
-    fn compute_imu_decomposition(&self, accel: &[[f32; 3]], _gyro: &[[f32; 3]]) -> Option<([f32; 3], [f32; 3])> {
+    fn compute_imu_decomposition(
+        &self,
+        accel: &[[f32; 3]],
+        _gyro: &[[f32; 3]],
+    ) -> Option<([f32; 3], [f32; 3])> {
         if accel.is_empty() {
             return None;
         }
@@ -1330,7 +1514,8 @@ impl Estimator {
         gravity[2] /= accel.len() as f32;
 
         // Normalize gravity to standard gravity (9.81 m/s²)
-        let gravity_mag = (gravity[0] * gravity[0] + gravity[1] * gravity[1] + gravity[2] * gravity[2]).sqrt();
+        let gravity_mag =
+            (gravity[0] * gravity[0] + gravity[1] * gravity[1] + gravity[2] * gravity[2]).sqrt();
         if gravity_mag > 0.1 {
             gravity[0] = gravity[0] / gravity_mag * 9.81;
             gravity[1] = gravity[1] / gravity_mag * 9.81;
@@ -1383,27 +1568,26 @@ impl Estimator {
     /// Returns the preintegrated IMU measurements between the last two keyframes,
     /// useful for adding IMU constraints to bundle adjustment.
     pub fn get_imu_motion_prior(&self) -> Option<ImuMotionPrior> {
-        let preint = self.imu_preintegrator.get();
+        // Check if we have valid preintegrated measurements
+        if !self.imu_preintegrator.is_valid() {
+            log::trace!("[Estimator] No valid IMU preintegration for prior");
+            return None;
+        }
 
         // Get last keyframe pose from sliding window
         let keyframe_poses = self.sliding_window.get_keyframe_poses();
         let last_keyframe_pose = keyframe_poses.last()?;
 
         // Get current velocity
-        let velocity = if self.velocity_estimator.is_initialized() {
+        let velocity = if self.velocity_estimator_initialized {
             self.velocity_estimator.get_velocity()
         } else {
             self.current_velocity
         };
 
-        let gravity = na::Vector3::new(fl!(0.0), fl!(0.0), fl!(-9.81));
-
-        Some(ImuMotionPrior::from_preintegration(
-            preint,
-            *last_keyframe_pose,
-            velocity,
-            gravity,
-        ))
+        // Use the preintegrator's method to create the prior with proper config
+        self.imu_preintegrator
+            .create_motion_prior(*last_keyframe_pose, velocity)
     }
 
     /// Reset IMU-aided keyframe selector (e.g., after loop closure)
@@ -1417,6 +1601,80 @@ impl Estimator {
             self.imu_measurement_count as f64 / self.frame_id_counter as f64
         } else {
             0.0
+        }
+    }
+
+    /// Update camera intrinsics from online refiner if available
+    fn update_intrinsics_from_refiner(&mut self) {
+        if let Some(refiner) = &self.intrinsics_refiner {
+            if refiner.is_converged() {
+                debug_log!(
+                    "[Estimator] Intrinsics converged after {} observations",
+                    refiner.total_observations()
+                );
+            }
+        }
+    }
+
+    /// Update camera extrinsics from online extrinsic calibrator if available
+    ///
+    /// Called periodically to apply calibrated IMU-to-camera extrinsics.
+    /// The calibrator accumulates pose measurements and refines T_BC.
+    fn update_extrinsics_from_calibrator(&mut self) {
+        let measurement_count = self.extrinsic_calibrator.measurement_count();
+
+        // Only apply after collecting enough measurements
+        if measurement_count < 100 {
+            return;
+        }
+
+        // Run calibration periodically (every 100 measurements after initial collection)
+        if measurement_count % 100 == 0 {
+            let _error = self.extrinsic_calibrator.calibrate_iteration();
+            debug_log!(
+                "[Estimator] IMU extrinsic calibration iteration {}, error: {:.6} rad",
+                self.extrinsic_calibrator.iterations(),
+                _error
+            );
+        }
+
+        // Apply calibrated extrinsics periodically
+        if self.extrinsic_calibrator.iterations() > 0 && measurement_count % 500 == 0 {
+            let calibrated_T_BC = self.extrinsic_calibrator.get_extrinsics();
+
+            // Update the stored extrinsics
+            self.T_B_Cl = calibrated_T_BC;
+
+            // Also update in all frame states if window has frames
+            for frame in self.sliding_window.keyframes_mut() {
+                frame.state.T_B_Cl = calibrated_T_BC;
+            }
+
+            debug_log!(
+                "[Estimator] Applied calibrated extrinsics: T_B_Cl updated (iterations: {})",
+                self.extrinsic_calibrator.iterations()
+            );
+        }
+    }
+
+    /// Add observations to intrinsics refiner for self-calibration
+    fn add_intrinsics_observations(&mut self, frame: &Frame) {
+        if let Some(ref mut refiner) = self.intrinsics_refiner {
+            let observations: Vec<CalibrationObservation> = frame
+                .left_features
+                .iter()
+                .filter(|f| f.undistorted_coord[0] >= 0.0 && f.undistorted_coord[1] >= 0.0)
+                .map(|f| CalibrationObservation {
+                    observation_2d: na::Vector2::new(
+                        f.undistorted_coord[0] as Float,
+                        f.undistorted_coord[1] as Float,
+                    ),
+                    ..Default::default()
+                })
+                .collect();
+            if !observations.is_empty() {
+                refiner.update(&observations);
+            }
         }
     }
 }

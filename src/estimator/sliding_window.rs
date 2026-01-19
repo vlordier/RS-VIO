@@ -1,9 +1,15 @@
+use crate::estimator::keyframe_culler::{AggressiveCullingConfig, AggressiveKeyframeCuller};
+use crate::estimator::point_quality::PointQualityScorer;
 use crate::estimator::Frame;
 use crate::imu::ImuMotionPrior;
 use crate::optimization::factors::{
     BundleAdjustmentFactor, ImuPriorFactor, LoopClosurePoseFactor, PnPFactor, PriorFactor,
 };
 use crate::optimization::loop_closure::LoopClosureConstraint;
+use crate::optimization::tight_coupling::ImuPreintegration;
+use crate::vision::motion_aware_depth_optimization::{
+    MotionAwareDepthOptimizer, TriangulationConstraints,
+};
 
 use crate::debug_log;
 use crate::{
@@ -61,6 +67,7 @@ pub trait WindowManager: Send {
 /// Maintains a fixed-size window of keyframes and manages the optimization
 /// of poses and 3D points across these frames.
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct SlidingWindow {
     /// Maximum number of keyframes in the sliding window.
     max_frames: usize,
@@ -83,6 +90,16 @@ pub struct SlidingWindow {
 
     /// Loop-closure constraints linking keyframes inside the window
     loop_closure_constraints: Vec<LoopClosureConstraint>,
+
+    /// Aggressive keyframe culler for intelligent frame removal
+    keyframe_culler: Option<AggressiveKeyframeCuller>,
+
+    /// Point quality scorer for filtering map points
+    point_scorer: Option<PointQualityScorer>,
+
+    /// IMU preintegrations between consecutive keyframes
+    /// Key: from_keyframe_idx, Value: ImuPreintegration to next keyframe
+    imu_preintegrations: Vec<ImuPreintegration>,
 }
 
 impl SlidingWindow {
@@ -95,6 +112,8 @@ impl SlidingWindow {
         Self::with_marginalization_config(
             max_frames,
             crate::optimization::marginalization::MarginalizationConfig::default(),
+            None,
+            None,
         )
     }
 
@@ -103,14 +122,21 @@ impl SlidingWindow {
     /// # Arguments
     /// * `max_frames` - Maximum number of keyframes to keep in the window
     /// * `marg_config` - Marginalization configuration options
+    /// * `culling_config` - Optional aggressive keyframe culling configuration
+    /// * `quality_config` - Optional point quality scorer configuration
     pub fn with_marginalization_config(
         max_frames: usize,
         marg_config: crate::optimization::marginalization::MarginalizationConfig,
+        culling_config: Option<AggressiveCullingConfig>,
+        quality_config: Option<crate::estimator::point_quality::PointQualityConfig>,
     ) -> Self {
         const DEFAULT_MAX_MAP_POINTS: usize = 2000;
 
         let marg_manager =
             crate::optimization::marginalization::MarginalizationManager::new(marg_config);
+
+        let keyframe_culler = culling_config.map(AggressiveKeyframeCuller::new);
+        let point_scorer = quality_config.map(PointQualityScorer::new);
 
         Self {
             max_frames,
@@ -120,6 +146,9 @@ impl SlidingWindow {
             map_point_observations: HashMap::with_capacity(DEFAULT_MAX_MAP_POINTS),
             marginalization_manager: marg_manager,
             loop_closure_constraints: Vec::new(),
+            keyframe_culler,
+            point_scorer,
+            imu_preintegrations: Vec::new(),
         }
     }
 
@@ -145,6 +174,8 @@ impl SlidingWindow {
         Self::with_marginalization_config(
             config.keyframe_management.keyframe_window_size as usize,
             marg_config,
+            None,
+            None,
         )
     }
 
@@ -257,6 +288,64 @@ impl SlidingWindow {
         self.loop_closure_constraints.extend(constraints);
     }
 
+    /// Add IMU preintegration data between two keyframes
+    ///
+    /// Stores the preintegration for use in tight-coupled optimization.
+    /// The preintegration links keyframe `from_keyframe_idx` to the next keyframe.
+    pub fn add_imu_preintegration(
+        &mut self,
+        from_keyframe_idx: usize,
+        _to_keyframe_idx: usize,
+        preintegration: ImuPreintegration,
+    ) {
+        // Ensure we have enough capacity in the vector
+        if from_keyframe_idx >= self.imu_preintegrations.len() {
+            self.imu_preintegrations.resize(
+                from_keyframe_idx + 1,
+                ImuPreintegration {
+                    dt: 0.0,
+                    delta_R: na::Matrix3::identity(),
+                    delta_v: Vector3::zeros(),
+                    delta_p: Vector3::zeros(),
+                    cov_R: na::Matrix3::zeros(),
+                    cov_v: na::Matrix3::zeros(),
+                    cov_p: na::Matrix3::zeros(),
+                    cov_R_bw: na::Matrix3::zeros(),
+                    cov_v_ba: na::Matrix3::zeros(),
+                    cov_p_ba: na::Matrix3::zeros(),
+                },
+            );
+        }
+        self.imu_preintegrations[from_keyframe_idx] = preintegration;
+        debug_log!(
+            "[SlidingWindow] Stored IMU preintegration for keyframe {} (dt={:.3}s)",
+            from_keyframe_idx,
+            self.imu_preintegrations[from_keyframe_idx].dt
+        );
+    }
+
+    /// Clean up IMU preintegrations after marginalization
+    ///
+    /// Called after marginalizing the oldest keyframe to remove stale preintegrations
+    /// and shift indices. This ensures IMU factors remain correctly aligned.
+    pub fn cleanup_after_marginalization(&mut self, marginalized_keyframe_idx: usize) {
+        if self.imu_preintegrations.is_empty() {
+            return;
+        }
+
+        // Remove preintegration for the marginalized keyframe
+        if marginalized_keyframe_idx < self.imu_preintegrations.len() {
+            self.imu_preintegrations.remove(marginalized_keyframe_idx);
+        }
+
+        // Shift remaining preintegration indices down by 1
+        // This is necessary because keyframe indices shift after marginalization
+        debug_log!(
+            "[SlidingWindow] Cleaned up IMU preintegrations after marginalization (removed idx {})",
+            marginalized_keyframe_idx
+        );
+    }
+
     /// Get the current number of keyframes in the window.
     pub fn len(&self) -> usize {
         self.keyframes.len()
@@ -275,6 +364,11 @@ impl SlidingWindow {
     /// Get a reference to a specific keyframe by index.
     pub fn get_frame(&self, index: usize) -> Option<&Frame> {
         self.keyframes.get(index)
+    }
+
+    /// Get mutable references to all keyframes (e.g., for updating extrinsics)
+    pub fn keyframes_mut(&mut self) -> impl Iterator<Item = &mut Frame> {
+        self.keyframes.iter_mut()
     }
 
     pub fn get_keyframe_poses(&self) -> Vec<Matrix4x4> {
@@ -443,6 +537,65 @@ impl SlidingWindow {
         Some(p_W)
     }
 
+    /// Triangulate with motion-aware depth optimization using IMU constraints
+    ///
+    /// This improves triangulation accuracy by using IMU velocity to weight
+    /// triangulation confidence and apply motion-based constraint refinement.
+    #[allow(dead_code)]
+    fn triangulate_stereo_motion_aware(
+        left_obs: Vector3,
+        right_obs: Vector3,
+        T_W_B: Matrix4x4,
+        T_B_Cl: Matrix4x4,
+        T_B_Cr: Matrix4x4,
+        velocity: Vector3,
+        angular_velocity: Vector3,
+    ) -> Option<Vector3> {
+        // First try standard triangulation
+        let baseline = T_B_Cl
+            .try_inverse()
+            .and_then(|T_Cl_B| Some((T_Cl_B * T_B_Cr).fixed_view::<3, 1>(0, 3).into_owned()))
+            .map(|t| t.norm())
+            .unwrap_or(0.1);
+
+        let constraints = TriangulationConstraints::from_motion(
+            na::Vector3::new(velocity.x as f64, velocity.y as f64, velocity.z as f64),
+            na::Vector3::new(
+                angular_velocity.x as f64,
+                angular_velocity.y as f64,
+                angular_velocity.z as f64,
+            ),
+            baseline,
+            0.01,
+        );
+
+        // Perform standard triangulation first
+        let standard_result = Self::triangulate_stereo(left_obs, right_obs, T_W_B, T_B_Cl, T_B_Cr)?;
+
+        // Apply motion-aware refinement
+        let mut optimizer = MotionAwareDepthOptimizer::new();
+        let position = na::Point3::new(
+            standard_result.x as f64,
+            standard_result.y as f64,
+            standard_result.z as f64,
+        );
+        let velocity_magnitude =
+            (velocity.x.powi(2) + velocity.y.powi(2) + velocity.z.powi(2)).sqrt() as f32;
+        let constrained_depth =
+            optimizer.optimize_depth(position, 0.1, &constraints, velocity_magnitude);
+
+        // If constrained depth has high confidence, use it
+        if constrained_depth.confidence > 0.7 {
+            Some(na::Vector3::new(
+                constrained_depth.position.x as Float,
+                constrained_depth.position.y as Float,
+                constrained_depth.position.z as Float,
+            ))
+        } else {
+            Some(standard_result)
+        }
+    }
+
     /// Optimize window with optional IMU prior on the latest keyframe pose
     pub fn optimize_with_imu(
         &mut self,
@@ -557,6 +710,15 @@ impl SlidingWindow {
             ]);
             // println!("KF_{} initial pose: {:?}", frame.frame_id, se3_data);
             initial_values.insert(kf_var.clone(), (ManifoldType::SE3, se3_data.cast::<f64>()));
+
+            // Add velocity variable for tight-coupled VIO
+            let vel_var = format!("VEL_{}", id_frame);
+            let vel_data = DVector::from_vec(vec![
+                frame.state.velocity.x as f64,
+                frame.state.velocity.y as f64,
+                frame.state.velocity.z as f64,
+            ]);
+            initial_values.insert(vel_var.clone(), (ManifoldType::RN, vel_data));
 
             // Process features from both cameras
             let camera_features = [
@@ -731,6 +893,101 @@ impl SlidingWindow {
         }
         self.loop_closure_constraints = retained_constraints;
 
+        // Add tight-coupled IMU factors between consecutive keyframes
+        if !self.imu_preintegrations.is_empty() && self.keyframes.len() >= 2 {
+            use crate::optimization::tight_coupling::{GravityModel, InterKeyframeImuFactor};
+
+            let gravity = GravityModel::earth();
+            let n_keyframes = self.keyframes.len();
+
+            for i in 0..n_keyframes - 1 {
+                // Check if we have a preintegration for this keyframe pair
+                if i >= self.imu_preintegrations.len() {
+                    continue;
+                }
+
+                let preintegration = &self.imu_preintegrations[i];
+
+                // Skip invalid preintegrations
+                if preintegration.dt <= 0.0 || preintegration.dt > 10.0 {
+                    debug_log!(
+                        "[SlidingWindow] Skipping IMU factor for pair ({}, {}): invalid dt={:.3}",
+                        i,
+                        i + 1,
+                        preintegration.dt
+                    );
+                    continue;
+                }
+
+                // Check if we have valid delta values
+                let delta_v_norm = preintegration.delta_v.norm();
+                let delta_p_norm = preintegration.delta_p.norm();
+                if delta_v_norm > 1000.0 || delta_p_norm > 1000.0 {
+                    debug_log!(
+                        "[SlidingWindow] Skipping IMU factor for pair ({}, {}): large deltas (v={:.2}, p={:.2})",
+                        i,
+                        i + 1,
+                        delta_v_norm,
+                        delta_p_norm
+                    );
+                    continue;
+                }
+
+                // Create variable names
+                let kf_i_var = format!("KF_{}", i);
+                let vel_i_var = format!("VEL_{}", i);
+                let kf_j_var = format!("KF_{}", i + 1);
+                let vel_j_var = format!("VEL_{}", i + 1);
+
+                // Check that all variables exist
+                if !initial_values.contains_key(&kf_i_var)
+                    || !initial_values.contains_key(&vel_i_var)
+                    || !initial_values.contains_key(&kf_j_var)
+                    || !initial_values.contains_key(&vel_j_var)
+                {
+                    debug_log!(
+                        "[SlidingWindow] Skipping IMU factor for pair ({}, {}): missing variables",
+                        i,
+                        i + 1
+                    );
+                    continue;
+                }
+
+                // Create the IMU factor
+                let imu_factor =
+                    InterKeyframeImuFactor::new(preintegration.dt, preintegration.clone(), gravity);
+
+                // Add with Huber loss for robustness
+                let imu_huber_delta = 2.0; // Use moderate Huber threshold
+                let imu_loss = match HuberLoss::new(imu_huber_delta) {
+                    Ok(l) => Some(Box::new(l)
+                        as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>),
+                    Err(e) => {
+                        log::warn!(
+                            "[SlidingWindow] Invalid IMU Huber delta ({}): {}",
+                            imu_huber_delta,
+                            e
+                        );
+                        None
+                    },
+                };
+
+                // Add the 4-parameter residual block
+                problem.add_residual_block(
+                    &[&kf_i_var, &vel_i_var, &kf_j_var, &vel_j_var],
+                    Box::new(imu_factor),
+                    imu_loss,
+                );
+
+                debug_log!(
+                    "[SlidingWindow] Added InterKeyframeImuFactor for pair ({}, {}) with dt={:.3}s",
+                    i,
+                    i + 1,
+                    preintegration.dt
+                );
+            }
+        }
+
         // If IMU prior is available, add a residual on the latest keyframe pose
         if let Some(prior) = imu_prior {
             let last_index = self.keyframes.len().saturating_sub(1);
@@ -787,6 +1044,9 @@ impl SlidingWindow {
                 let var_name = match param_id {
                     crate::optimization::marginalization::ParamId::KeyframePose(i) => {
                         format!("KF_{}", i)
+                    },
+                    crate::optimization::marginalization::ParamId::KeyframeVelocity(i) => {
+                        format!("VEL_{}", i)
                     },
                     crate::optimization::marginalization::ParamId::Landmark(i) => {
                         format!("LM_{}", i)
@@ -914,22 +1174,35 @@ impl SlidingWindow {
                 // Identify which parameters to keep and which to marginalize
                 // Keep all current keyframes and landmarks, marginalize oldest
                 let n_keyframes = self.keyframes.len();
-                let _n_keep_keyframes = if n_keyframes > 1 { n_keyframes - 1 } else { 0 };
                 let marg_keyframe_idx = 0; // Marginalize oldest keyframe
 
                 let mut keep_ids = Vec::new();
                 let mut marg_ids = Vec::new();
 
                 // Keyframes to keep: all except the oldest
+                // Include both pose AND velocity for each keyframe
                 for i in marg_keyframe_idx + 1..n_keyframes {
                     keep_ids.push(crate::optimization::marginalization::ParamId::KeyframePose(
                         i,
                     ));
+                    keep_ids
+                        .push(crate::optimization::marginalization::ParamId::KeyframeVelocity(i));
                 }
-                // Oldest keyframe to marginalize
+                // Oldest keyframe to marginalize (pose AND velocity)
                 marg_ids.push(crate::optimization::marginalization::ParamId::KeyframePose(
                     marg_keyframe_idx,
                 ));
+                marg_ids.push(
+                    crate::optimization::marginalization::ParamId::KeyframeVelocity(
+                        marg_keyframe_idx,
+                    ),
+                );
+
+                debug_log!(
+                    "[SlidingWindow] Marginalizing keyframe {} (pose + velocity), keeping {} keyframes",
+                    marg_keyframe_idx,
+                    n_keyframes - 1
+                );
 
                 // All landmarks to keep (we'll marginalize old ones later based on age)
                 for (fid, _) in &self.map_points {
@@ -952,6 +1225,9 @@ impl SlidingWindow {
                     );
                     // Store the prior for use in subsequent optimizations
                     self.marginalization_manager.set_prior(prior);
+
+                    // Clean up IMU preintegrations after marginalization
+                    self.cleanup_after_marginalization(marg_keyframe_idx);
                 } else {
                     log::warn!("[SlidingWindow] Marginalization failed, skipping");
                 }
@@ -1012,7 +1288,13 @@ impl SlidingWindow {
     /// Build parameter blocks for marginalization
     ///
     /// This method constructs the parameter block data structure needed by MarginalizationManager.
-    /// It's called when the sliding window is full to prepare for marginalizing old states.
+    /// It includes keyframe poses, velocities, biases (if enabled), and landmarks.
+    ///
+    /// For tight-coupled VIO, we marginalize:
+    /// - Oldest keyframe pose (7D SE3)
+    /// - Oldest keyframe velocity (3D)
+    /// - Oldest keyframe biases (6D accel + gyro, if enabled)
+    /// - Old landmarks that fall below observation thresholds
     fn build_param_blocks_for_marginalization(
         &self,
     ) -> HashMap<
@@ -1023,15 +1305,16 @@ impl SlidingWindow {
 
         let mut param_blocks = HashMap::new();
 
-        // Add keyframe pose parameters
+        // Add keyframe pose and velocity parameters
         for (i, frame) in self.keyframes.iter().enumerate() {
-            let pose_dim = 7; // SE3: 3 translation + 4 quaternion
+            // Pose (SE3: 3 translation + 4 quaternion)
+            let pose_dim = 7;
             let t_W_B = frame.state.T_W_B;
             let R_W_B = t_W_B.fixed_view::<3, 3>(0, 0).into_owned();
             let t_W_B_vec = t_W_B.fixed_view::<3, 1>(0, 3).into_owned();
             let q = na::UnitQuaternion::from_matrix(&R_W_B);
 
-            let linearization_point = na::DVector::from_vec(vec![
+            let pose_linearization_point = na::DVector::from_vec(vec![
                 t_W_B_vec.x as f64,
                 t_W_B_vec.y as f64,
                 t_W_B_vec.z as f64,
@@ -1046,7 +1329,24 @@ impl SlidingWindow {
                 ParamBlock {
                     id: ParamId::KeyframePose(i),
                     dimension: pose_dim,
-                    linearization_point,
+                    linearization_point: pose_linearization_point,
+                },
+            );
+
+            // Velocity (3D in world frame)
+            let vel_dim = 3;
+            let vel_linearization_point = na::DVector::from_vec(vec![
+                frame.state.velocity.x as f64,
+                frame.state.velocity.y as f64,
+                frame.state.velocity.z as f64,
+            ]);
+
+            param_blocks.insert(
+                ParamId::KeyframeVelocity(i),
+                ParamBlock {
+                    id: ParamId::KeyframeVelocity(i),
+                    dimension: vel_dim,
+                    linearization_point: vel_linearization_point,
                 },
             );
         }
@@ -1210,6 +1510,23 @@ impl SlidingWindow {
                                 log::warn!("[SlidingWindow] Optimized T_B_W matrix is singular for KF_{}, keeping previous pose", frame_id);
                             }
                         }
+                    }
+                }
+            }
+            // Update velocity states (for tight-coupled VIO)
+            else if let Some(frame_id_str) = var_name.strip_prefix("VEL_") {
+                if let Ok(frame_id) = frame_id_str.parse::<i32>() {
+                    let vec = value.to_vector();
+                    if let Some(frame) = self.keyframes.get_mut(frame_id as usize) {
+                        frame.state.velocity = na::Vector3::new(
+                            vec[0] as Float,
+                            vec[1] as Float,
+                            vec[2] as Float,
+                        );
+                        debug_log!(
+                            "[SlidingWindow] Updated VEL_{} from optimization: [{:.2}, {:.2}, {:.2}]",
+                            frame_id, vec[0], vec[1], vec[2]
+                        );
                     }
                 }
             }
@@ -1451,5 +1768,218 @@ mod tests {
         let result = SlidingWindow::triangulate_stereo(left_obs, right_obs, T_W_B, T_B_Cl, T_B_Cr);
 
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn add_imu_preintegration_stores_data() {
+        let mut window = SlidingWindow::new(4);
+
+        let preintegration = ImuPreintegration {
+            dt: 0.05,
+            delta_R: na::Matrix3::identity(),
+            delta_v: Vector3::new(0.1, 0.0, 0.0),
+            delta_p: Vector3::new(0.005, 0.0, 0.0),
+            cov_R: na::Matrix3::identity() * 1e-4,
+            cov_v: na::Matrix3::identity() * 1e-4,
+            cov_p: na::Matrix3::identity() * 1e-6,
+            cov_R_bw: na::Matrix3::zeros(),
+            cov_v_ba: na::Matrix3::zeros(),
+            cov_p_ba: na::Matrix3::zeros(),
+        };
+
+        window.add_imu_preintegration(0, 1, preintegration.clone());
+
+        assert_eq!(window.imu_preintegrations.len(), 1);
+        assert!((window.imu_preintegrations[0].dt - 0.05).abs() < 1e-10);
+        assert!((window.imu_preintegrations[0].delta_v.x - 0.1).abs() < 1e-10);
+    }
+
+    #[test]
+    fn add_imu_preintegration_multiple_pairs() {
+        let mut window = SlidingWindow::new(5);
+
+        for i in 0..3 {
+            let preintegration = ImuPreintegration {
+                dt: 0.1 * (i as f64 + 1.0),
+                delta_R: na::Matrix3::identity(),
+                delta_v: Vector3::new(0.1 * (i as f64 + 1.0), 0.0, 0.0),
+                delta_p: Vector3::new(0.005 * (i as f64 + 1.0), 0.0, 0.0),
+                cov_R: na::Matrix3::identity() * 1e-4,
+                cov_v: na::Matrix3::identity() * 1e-4,
+                cov_p: na::Matrix3::identity() * 1e-6,
+                cov_R_bw: na::Matrix3::zeros(),
+                cov_v_ba: na::Matrix3::zeros(),
+                cov_p_ba: na::Matrix3::zeros(),
+            };
+
+            window.add_imu_preintegration(i, i + 1, preintegration);
+        }
+
+        assert_eq!(window.imu_preintegrations.len(), 3);
+
+        // Verify values
+        assert!((window.imu_preintegrations[0].dt - 0.1).abs() < 1e-10);
+        assert!((window.imu_preintegrations[1].dt - 0.2).abs() < 1e-10);
+        assert!((window.imu_preintegrations[2].dt - 0.3).abs() < 1e-10);
+    }
+
+    #[test]
+    fn add_imu_preintegration_overwrites_existing() {
+        let mut window = SlidingWindow::new(4);
+
+        let preintegration1 = ImuPreintegration {
+            dt: 0.05,
+            delta_R: na::Matrix3::identity(),
+            delta_v: Vector3::zeros(),
+            delta_p: Vector3::zeros(),
+            cov_R: na::Matrix3::identity() * 1e-4,
+            cov_v: na::Matrix3::identity() * 1e-4,
+            cov_p: na::Matrix3::identity() * 1e-6,
+            cov_R_bw: na::Matrix3::zeros(),
+            cov_v_ba: na::Matrix3::zeros(),
+            cov_p_ba: na::Matrix3::zeros(),
+        };
+
+        window.add_imu_preintegration(0, 1, preintegration1.clone());
+
+        let preintegration2 = ImuPreintegration {
+            dt: 0.1,
+            delta_R: na::Matrix3::identity(),
+            delta_v: Vector3::new(0.5, 0.0, 0.0),
+            delta_p: Vector3::new(0.05, 0.0, 0.0),
+            cov_R: na::Matrix3::identity() * 1e-4,
+            cov_v: na::Matrix3::identity() * 1e-4,
+            cov_p: na::Matrix3::identity() * 1e-6,
+            cov_R_bw: na::Matrix3::zeros(),
+            cov_v_ba: na::Matrix3::zeros(),
+            cov_p_ba: na::Matrix3::zeros(),
+        };
+
+        window.add_imu_preintegration(0, 1, preintegration2.clone());
+
+        // Should still have only one entry
+        assert_eq!(window.imu_preintegrations.len(), 1);
+        // But with updated values
+        assert!((window.imu_preintegrations[0].dt - 0.1).abs() < 1e-10);
+        assert!((window.imu_preintegrations[0].delta_v.x - 0.5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn imu_preintegrations_empty_initially() {
+        let window = SlidingWindow::new(4);
+        assert!(window.imu_preintegrations.is_empty());
+    }
+
+    #[test]
+    fn sliding_window_with_velocity_states() {
+        let mut window = SlidingWindow::new(4);
+
+        // Create a frame with velocity
+        let frame = Frame::from_stereo_images(
+            0,
+            0,
+            crate::types::CameraFactory::opencv5(
+                500.0, 500.0, 320.0, 240.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0,
+            ),
+            crate::types::CameraFactory::opencv5(
+                500.0, 500.0, 320.0, 240.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0,
+            ),
+            Matrix4x4::identity(),
+            Matrix4x4::identity(),
+        );
+
+        assert!(window.add_frame(frame));
+        assert_eq!(window.len(), 1);
+    }
+
+    #[test]
+    fn build_param_blocks_includes_velocity() {
+        use crate::optimization::marginalization::ParamId;
+
+        let mut window = SlidingWindow::new(4);
+
+        // Create a frame with non-zero velocity
+        let frame = Frame::from_stereo_images(
+            0,
+            0,
+            crate::types::CameraFactory::opencv5(
+                500.0, 500.0, 320.0, 240.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0,
+            ),
+            crate::types::CameraFactory::opencv5(
+                500.0, 500.0, 320.0, 240.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0,
+            ),
+            Matrix4x4::identity(),
+            Matrix4x4::identity(),
+        );
+
+        window.add_frame(frame);
+
+        let param_blocks = window.build_param_blocks_for_marginalization();
+
+        // Should have both pose and velocity for keyframe 0
+        assert!(param_blocks.contains_key(&ParamId::KeyframePose(0)));
+        assert!(param_blocks.contains_key(&ParamId::KeyframeVelocity(0)));
+
+        // Velocity should have dimension 3
+        let vel_block = param_blocks.get(&ParamId::KeyframeVelocity(0)).unwrap();
+        assert_eq!(vel_block.dimension, 3);
+    }
+
+    #[test]
+    fn cleanup_after_marginalization_removes_stale_preintegration() {
+        let mut window = SlidingWindow::new(4);
+
+        // Add some preintegrations
+        for i in 0..3 {
+            let preintegration = ImuPreintegration {
+                dt: 0.1 * (i + 1) as f64,
+                delta_R: na::Matrix3::identity(),
+                delta_v: Vector3::zeros(),
+                delta_p: Vector3::zeros(),
+                cov_R: na::Matrix3::identity() * 1e-4,
+                cov_v: na::Matrix3::identity() * 1e-4,
+                cov_p: na::Matrix3::identity() * 1e-6,
+                cov_R_bw: na::Matrix3::zeros(),
+                cov_v_ba: na::Matrix3::zeros(),
+                cov_p_ba: na::Matrix3::zeros(),
+            };
+            window.add_imu_preintegration(i, i + 1, preintegration);
+        }
+
+        assert_eq!(window.imu_preintegrations.len(), 3);
+
+        // Clean up after marginalizing keyframe 0
+        window.cleanup_after_marginalization(0);
+
+        // Should now have 2 preintegrations (indices 1,2 shifted to 0,1)
+        assert_eq!(window.imu_preintegrations.len(), 2);
+
+        // The first one should be what was previously at index 1
+        assert!((window.imu_preintegrations[0].dt - 0.2).abs() < 1e-10);
+    }
+
+    #[test]
+    fn cleanup_after_marginalization_empty_when_no_preintegrations() {
+        let mut window = SlidingWindow::new(4);
+        assert!(window.imu_preintegrations.is_empty());
+
+        // Should not panic
+        window.cleanup_after_marginalization(0);
+
+        assert!(window.imu_preintegrations.is_empty());
+    }
+
+    #[test]
+    fn param_id_variants_are_correct() {
+        use crate::optimization::marginalization::ParamId;
+
+        // Test that all variants can be created and compared
+        let pose = ParamId::KeyframePose(0);
+        let vel = ParamId::KeyframeVelocity(0);
+        let landmark = ParamId::Landmark(0);
+
+        assert_ne!(pose, vel);
+        assert_ne!(vel, landmark);
+        assert_ne!(pose, landmark);
     }
 }
