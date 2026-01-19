@@ -16,6 +16,9 @@ use crate::imu::ImuMotionPrior;
 use crate::imu::ImuPreintegrator;
 use crate::imu::PreintegratedImu;
 use crate::imu::VelocityEstimator;
+use crate::imu::{ImuDenoiseFilter, DenoiseConfig};
+use crate::imu::{HigherOrderFilter, HigherOrderFilterConfig};
+use crate::vision::{StereoSuperResolver, StereoSuperResolutionConfig};
 use crate::optimization::loop_closure::{
     KeyframeDescriptor, LoopClosureConfig, LoopClosureDetector,
 };
@@ -25,6 +28,7 @@ use crate::{Result, VIOError};
 use image::GrayImage;
 use nalgebra as na;
 use std::time::{Duration, Instant};
+use std::io::Write;
 
 /// Placeholder estimator implementation.
 /// Currently mimics the control flow and logging structure of the C++ Estimator::process_frame,
@@ -86,6 +90,16 @@ pub struct Estimator {
     frame_workspace: FrameWorkspace,
     // Frame counter for sampled logging (log every N frames to reduce overhead)
     frame_count: u64,
+    // File writer for f0 fundamental frequency logging
+    f0_log_writer: std::sync::Mutex<Option<std::fs::File>>,
+    // File writer for spectral analysis (gyro power spectrum)
+    spectrum_log_writer: std::sync::Mutex<Option<std::fs::File>>,
+    // Real-time IMU denoising filter
+    denoise_filter: ImuDenoiseFilter,
+    // Higher-order filtering (jerk, snap) and f0 analysis
+    higher_order_filter: HigherOrderFilter,
+    // Stereo super-resolution refinement using IMU confidence signals
+    stereo_super_resolver: StereoSuperResolver,
 }
 
 impl Estimator {
@@ -188,6 +202,28 @@ impl Estimator {
                 capacity_headroom: 1.2,
             }),
             frame_count: 0,
+            f0_log_writer: std::sync::Mutex::new(
+                std::fs::File::create("/tmp/f0_data.csv")
+                    .ok()
+                    .and_then(|mut f| {
+                        let _ = writeln!(f, "frame,timestamp_ns,f0_hz");
+                        Some(f)
+                    })
+            ),
+            spectrum_log_writer: std::sync::Mutex::new(
+                std::fs::File::create("/tmp/gyro_spectrum.csv")
+                    .ok()
+                    .and_then(|mut f| {
+                        let _ = writeln!(f, "frame,timestamp_ns,gyro_x_rms,gyro_y_rms,gyro_z_rms,gyro_magnitude_rms");
+                        Some(f)
+                    })
+            ),
+            // Initialize IMU denoising filter with default configuration
+            denoise_filter: ImuDenoiseFilter::new(DenoiseConfig::default()),
+            // Initialize higher-order filter for jerk/snap and f0 analysis
+            higher_order_filter: HigherOrderFilter::new(HigherOrderFilterConfig::default()),
+            // Initialize stereo super-resolution refinement
+            stereo_super_resolver: StereoSuperResolver::new(StereoSuperResolutionConfig::default()),
         }
     }
 
@@ -290,30 +326,108 @@ impl Estimator {
             self.T_B_Cr,
         );
 
+        let mut processed_accel: Option<Vec<[f32; 3]>> = None;
+        let mut processed_gyro: Option<Vec<[f32; 3]>> = None;
+
         // Process IMU measurements
         if let Some(imu) = imu_data {
             // Check if IMU is enabled in debug config
             if self.config.debug.use_imu {
-                // Load IMU samples into workspace buffer
-                for imu_sample in imu.iter() {
-                    self.frame_workspace
-                        .push_imu_sample(imu_sample)
-                        .map_err(|e| {
-                            log::warn!("[Estimator] IMU buffer overflow: {}", e);
-                            VIOError::Optimization(e)
-                        })?;
-                }
+                let imu_len = imu.len();
+                let mut filtered_imu: Vec<ImuData> = Vec::with_capacity(imu_len);
+                let mut accel_filtered: Vec<[f32; 3]> = Vec::with_capacity(imu_len);
+                let mut gyro_filtered: Vec<[f32; 3]> = Vec::with_capacity(imu_len);
 
-                // Attach IMU measurements to frame (clone from workspace)
-                current_frame.imu_from_last_frame = self.frame_workspace.imu_samples().to_vec();
-                // During initialization, collect IMU samples for bias estimation
-                if self.is_initializing {
-                    for imu_sample in imu {
+                let bias_initialized = self.bias_estimator.is_initialized;
+
+                for imu_sample in imu.iter() {
+                    if self.is_initializing {
                         self.bias_estimator.add_sample(imu_sample, true);
                     }
 
-                    // Check if bias estimation is complete (need enough samples)
-                    if self.bias_estimator.sample_count() >= 100 {
+                    let (gyro_corrected, accel_corrected) = if bias_initialized {
+                        (
+                            self.bias_estimator.correct_gyro(imu_sample),
+                            self.bias_estimator.correct_accel(imu_sample),
+                        )
+                    } else {
+                        (
+                            na::Vector3::new(imu_sample.gyro[0], imu_sample.gyro[1], imu_sample.gyro[2]),
+                            na::Vector3::new(imu_sample.accel[0], imu_sample.accel[1], imu_sample.accel[2]),
+                        )
+                    };
+
+                    let gyro_f32 = [
+                        gyro_corrected[0] as f32,
+                        gyro_corrected[1] as f32,
+                        gyro_corrected[2] as f32,
+                    ];
+                    let accel_f32 = [
+                        accel_corrected[0] as f32,
+                        accel_corrected[1] as f32,
+                        accel_corrected[2] as f32,
+                    ];
+
+                    let accel_denoised = self.denoise_filter.process_accel(&accel_f32);
+                    let gyro_denoised = self.denoise_filter.process_gyro(&gyro_f32);
+                    
+                    // Get updated weight after processing
+                    let current_weight = self.denoise_filter.weight_scale;
+                    
+                    // Process acceleration through higher-order filter for jerk/snap and f0 analysis
+                    let higher_order_output = self.higher_order_filter.process_accel(accel_denoised);
+                    
+                    // Use f0 confidence to further weight the measurement
+                    // Combine denoise weight with f0 confidence
+                    let f0_weighted = if self.higher_order_filter.config.enable_f0_weighting {
+                        current_weight * higher_order_output.f0_confidence
+                    } else {
+                        current_weight
+                    };
+
+                    let accel_scaled = [
+                        accel_denoised[0] * f0_weighted,
+                        accel_denoised[1] * f0_weighted,
+                        accel_denoised[2] * f0_weighted,
+                    ];
+                    let gyro_scaled = [
+                        gyro_denoised[0] * f0_weighted,
+                        gyro_denoised[1] * f0_weighted,
+                        gyro_denoised[2] * f0_weighted,
+                    ];
+
+                    accel_filtered.push(accel_scaled);
+                    gyro_filtered.push(gyro_scaled);
+
+                    // Direct conversion to f64 for preintegration
+                    let accel_vec = na::Vector3::new(
+                        accel_scaled[0] as f64,
+                        accel_scaled[1] as f64,
+                        accel_scaled[2] as f64,
+                    );
+                    let gyro_vec = na::Vector3::new(
+                        gyro_scaled[0] as f64,
+                        gyro_scaled[1] as f64,
+                        gyro_scaled[2] as f64,
+                    );
+
+                    if let Some(last_ts) = self.last_imu_timestamp {
+                        let dt = (imu_sample.timestamp - last_ts) as f64 / 1e9;
+                        if dt > 0.0 {
+                            self.imu_preintegrator
+                                .propagate_corrected(gyro_vec, accel_vec, dt);
+                        }
+                    }
+                    self.last_imu_timestamp = Some(imu_sample.timestamp);
+                    self.imu_measurement_count += 1;
+
+                    filtered_imu.push(ImuData {
+                        timestamp: imu_sample.timestamp,
+                        gyro: [gyro_vec[0], gyro_vec[1], gyro_vec[2]],
+                        accel: [accel_vec[0], accel_vec[1], accel_vec[2]],
+                    });
+
+                    if self.is_initializing && self.bias_estimator.sample_count() >= 100 {
                         self.is_initializing = false;
                         log::info!(
                             "[Estimator] IMU initialization complete. Gyro bias: [{:.4}, {:.4}, {:.4}] rad/s, Accel bias: [{:.4}, {:.4}, {:.4}] m/s²",
@@ -327,95 +441,107 @@ impl Estimator {
                     }
                 }
 
-                // Propagate IMU preintegrator with bias-corrected measurements
-                for imu_sample in imu {
-                    if let Some(last_ts) = self.last_imu_timestamp {
-                        let dt = (imu_sample.timestamp - last_ts) as f64 / 1e9;
-                        if dt > 0.0 {
-                            // Apply bias correction if available
-                            if self.bias_estimator.is_initialized {
-                                let gyro_corrected = self.bias_estimator.correct_gyro(imu_sample);
-                                let accel_corrected = self.bias_estimator.correct_accel(imu_sample);
-                                self.imu_preintegrator.propagate_corrected(
-                                    gyro_corrected,
-                                    accel_corrected,
-                                    dt,
-                                );
-                            } else {
-                                self.imu_preintegrator.propagate(imu_sample, dt);
-                            }
+                for sample in &filtered_imu {
+                    self.frame_workspace
+                        .push_imu_sample(sample)
+                        .map_err(|e| {
+                            log::warn!("[Estimator] IMU buffer overflow: {}", e);
+                            VIOError::Optimization(e)
+                        })?;
+                }
+
+                // Attach filtered IMU measurements to frame (clone from workspace)
+                current_frame.imu_from_last_frame = self.frame_workspace.imu_samples().to_vec();
+                processed_accel = Some(accel_filtered);
+                processed_gyro = Some(gyro_filtered);
+
+                // Use motion predictor for feature tracking
+                let focal_length = self.config.camera.left_intrinsics[0] as f64;
+                for feature in &mut current_frame.left_features {
+                    let (du, dv) = self.imu_motion_predictor.predict_feature_displacement(
+                        &filtered_imu,
+                        (feature.pixel_coord[0] as f64, feature.pixel_coord[1] as f64),
+                        focal_length,
+                    );
+                    // Apply predicted displacement as initial guess for optical flow
+                    feature.pixel_coord[0] = (feature.pixel_coord[0] as f64 + du) as f32;
+                    feature.pixel_coord[1] = (feature.pixel_coord[1] as f64 + dv) as f32;
+                }
+
+                // Update velocity estimator
+                let dt = if let Some(last_ts) = self.last_imu_timestamp {
+                    (timestamp_ns - last_ts) as f64 / 1e9
+                } else {
+                    0.01
+                };
+
+                // Initialize velocity estimator on first IMU batch
+                if !self.velocity_estimator_initialized && !filtered_imu.is_empty() {
+                    let initial_orientation = na::UnitQuaternion::identity();
+                    self.velocity_estimator
+                        .initialize_from_imu(&filtered_imu, &initial_orientation);
+                    self.velocity_estimator_initialized = true;
+                    if should_log {
+                        debug_log!(
+                            "[Estimator] Velocity estimator initialized with {} IMU samples",
+                            filtered_imu.len()
+                        );
+                    }
+                }
+
+                // Update velocity estimator
+                self.velocity_estimator.update(&filtered_imu, dt);
+
+                // Accumulate for extrinsic calibration
+                if self.sliding_window.is_full() {
+                    let keyframe_poses = self.sliding_window.get_keyframe_poses();
+                    if let Some(T_W_B) = keyframe_poses.last() {
+                        let T_W_B_copy = *T_W_B;
+                        let rotmat = na::Rotation3::from_matrix_unchecked(
+                            T_W_B_copy.fixed_view::<3, 3>(0, 0).into_owned(),
+                        );
+                        let R_W_B = na::UnitQuaternion::from_rotation_matrix(&rotmat);
+                        self.extrinsic_calibrator
+                            .add_measurement(&T_W_B_copy, R_W_B);
+
+                        // Run calibration periodically
+                        if self.imu_measurement_count % 100 == 0 {
+                            // Temporarily disabled due to NaN issues
+                            // let error = self.extrinsic_calibrator.calibrate_iteration();
+                            // log::debug!(
+                            //     "[Estimator] IMU extrinsic calibration error: {:.6} rad",
+                            //     error
+                            // );
                         }
                     }
-                    self.last_imu_timestamp = Some(imu_sample.timestamp);
-                    self.imu_measurement_count += 1;
                 }
             } else if should_log {
                 debug_log!("[Estimator] IMU disabled via debug config");
             }
-
-            // Use motion predictor for feature tracking
-            let focal_length = self.config.camera.left_intrinsics[0] as f64;
-            for feature in &mut current_frame.left_features {
-                let (du, dv) = self.imu_motion_predictor.predict_feature_displacement(
-                    imu,
-                    (feature.pixel_coord[0] as f64, feature.pixel_coord[1] as f64),
-                    focal_length,
-                );
-                // Apply predicted displacement as initial guess for optical flow
-                feature.pixel_coord[0] = (feature.pixel_coord[0] as f64 + du) as f32;
-                feature.pixel_coord[1] = (feature.pixel_coord[1] as f64 + dv) as f32;
-            }
-
-            // Update velocity estimator
-            let dt = if let Some(last_ts) = self.last_imu_timestamp {
-                (timestamp_ns - last_ts) as f64 / 1e9
-            } else {
-                0.01
-            };
-
-            // Initialize velocity estimator on first IMU batch
-            if !self.velocity_estimator_initialized && !imu.is_empty() {
-                let initial_orientation = na::UnitQuaternion::identity();
-                self.velocity_estimator
-                    .initialize_from_imu(imu, &initial_orientation);
-                self.velocity_estimator_initialized = true;
-                if should_log {
-                    debug_log!(
-                        "[Estimator] Velocity estimator initialized with {} IMU samples",
-                        imu.len()
-                    );
-                }
-            }
-
-            // Update velocity estimator
-            self.velocity_estimator.update(imu, dt);
-
-            // Accumulate for extrinsic calibration
-            if self.sliding_window.is_full() {
-                let keyframe_poses = self.sliding_window.get_keyframe_poses();
-                if let Some(T_W_B) = keyframe_poses.last() {
-                    let T_W_B_copy = *T_W_B;
-                    let rotmat = na::Rotation3::from_matrix_unchecked(
-                        T_W_B_copy.fixed_view::<3, 3>(0, 0).into_owned(),
-                    );
-                    let R_W_B = na::UnitQuaternion::from_rotation_matrix(&rotmat);
-                    self.extrinsic_calibrator
-                        .add_measurement(&T_W_B_copy, R_W_B);
-
-                    // Run calibration periodically
-                    if self.imu_measurement_count % 100 == 0 {
-                        // Temporarily disabled due to NaN issues
-                        // let error = self.extrinsic_calibrator.calibrate_iteration();
-                        // log::debug!(
-                        //     "[Estimator] IMU extrinsic calibration error: {:.6} rad",
-                        //     error
-                        // );
-                    }
-                }
-            }
         }
 
         _frame_creation_time_ms = frame_creation_start.elapsed().as_secs_f64() * 1000.0;
+
+        // Visualize IMU data (before and after processing)
+        if let Some(imu) = imu_data {
+            eprintln!("[IMU_VIZ] Frame {}: Received {} IMU samples, use_imu={}", 
+                     self.frame_count, imu.len(), self.config.debug.use_imu);
+            if self.config.debug.use_imu {
+                if let (Some(accel), Some(gyro)) = (processed_accel.as_ref(), processed_gyro.as_ref()) {
+                    eprintln!("[IMU_VIZ] Frame {}: Calling view_imu_results() with {} samples", 
+                             self.frame_count, imu.len());
+                    self.view_imu_results(imu, accel, gyro, timestamp_ns);
+                    eprintln!("[IMU_VIZ] Frame {}: Finished IMU visualization", self.frame_count);
+                } else {
+                    eprintln!(
+                        "[IMU_VIZ] Frame {}: Skipping visualization (no processed IMU data available)",
+                        self.frame_count
+                    );
+                }
+            }
+        } else {
+            eprintln!("[IMU_VIZ] Frame {}: NO IMU DATA RECEIVED (imu_data is None)", self.frame_count);
+        }
 
         // Patch tracking
         let tracking_start = Instant::now();
@@ -423,6 +549,111 @@ impl Estimator {
             .process_frame(&left_img, &right_img, &mut current_frame);
         _patch_tracking_time_ms = tracking_start.elapsed().as_secs_f64() * 1000.0;
         self.view_patch_tracking_results(&current_frame, &left_img, &right_img, img_w, img_h);
+
+        // Stereo super-resolution refinement with IMU confidence weighting
+        // This refines subpixel disparities using confidence from IMU noise/motion analysis
+        if !current_frame.left_features.is_empty() && !current_frame.right_features.is_empty() {
+            let _superres_start = Instant::now();
+            
+            // Compute IMU confidence metric from denoise and higher-order filters
+            let denoise_weight = self.denoise_filter.weight_scale;
+            let f0_confidence = self.higher_order_filter.f0_confidence;
+            let imu_confidence = ((denoise_weight as Float) * (f0_confidence as Float)).clamp(0.0, 1.0);
+            
+            // Estimate motion state from acceleration magnitude
+            let accel_magnitude = if let Some(accel) = processed_accel.as_ref() {
+                if !accel.is_empty() {
+                    let last_accel = accel[accel.len() - 1];
+                    (last_accel[0] * last_accel[0]
+                        + last_accel[1] * last_accel[1]
+                        + last_accel[2] * last_accel[2])
+                        .sqrt()
+                } else {
+                    0.0
+                }
+            } else {
+                0.0
+            };
+            
+            let motion_state = match accel_magnitude {
+                x if x < 1.0 => "hover",
+                x if x < 3.0 => "moving",
+                _ => "accelerating",
+            };
+            
+            // Get current acceleration for motion compensation
+            let current_accel = if let Some(accel) = processed_accel.as_ref() {
+                if !accel.is_empty() {
+                    let last = accel[accel.len() - 1];
+                    [last[0] as Float, last[1] as Float, last[2] as Float]
+                } else {
+                    [0.0 as Float, 0.0, 0.0]
+                }
+            } else {
+                [0.0 as Float, 0.0, 0.0]
+            };
+            
+            // Collect feature coordinates for refinement
+            let left_coords: Vec<(Float, Float)> = current_frame
+                .left_features
+                .iter()
+                .map(|f| (f.pixel_coord[0] as Float, f.pixel_coord[1] as Float))
+                .collect();
+            
+            let right_coords: Vec<(Float, Float)> = current_frame
+                .right_features
+                .iter()
+                .map(|f| (f.pixel_coord[0] as Float, f.pixel_coord[1] as Float))
+                .collect();
+            
+            let feature_ids: Vec<usize> = current_frame
+                .left_features
+                .iter()
+                .map(|f| f.feature_id)
+                .collect();
+            
+            if left_coords.len() == right_coords.len() && !left_coords.is_empty() {
+                let left_data = left_img.as_raw();
+                let right_data = right_img.as_raw();
+                
+                let refined_features = self.stereo_super_resolver.refine_features(
+                    left_data,
+                    right_data,
+                    img_w,
+                    img_h,
+                    &left_coords,
+                    &right_coords,
+                    &feature_ids,
+                    imu_confidence,
+                    motion_state,
+                    &current_accel,
+                );
+                
+                // Apply refined coordinates to features
+                for (idx, (left_feat, right_feat)) in current_frame
+                    .left_features
+                    .iter_mut()
+                    .zip(current_frame.right_features.iter_mut())
+                    .enumerate()
+                {
+                    if idx < refined_features.len() && refined_features[idx].is_valid {
+                        left_feat.pixel_coord[0] = refined_features[idx].left_x_refined as f32;
+                        left_feat.pixel_coord[1] = refined_features[idx].left_y_refined as f32;
+                        right_feat.pixel_coord[0] = refined_features[idx].right_x_refined as f32;
+                        right_feat.pixel_coord[1] = refined_features[idx].right_y_refined as f32;
+                    }
+                }
+                
+                if should_log {
+                    debug_log!(
+                        "[Estimator] Stereo super-resolution: refined {} features (IMU confidence: {:.3}, motion: {})",
+                        refined_features.len(),
+                        imu_confidence,
+                        motion_state
+                    );
+                }
+            }
+        }
 
         // Return image buffers to workspace for reuse
         let left_buf_back = left_img.into_raw();
@@ -904,6 +1135,217 @@ impl Estimator {
                 self.trajectory.iter().map(|(_, pose)| *pose).collect();
             v.log_trajectory(&trajectory_poses, "trajectory/path");
         }
+    }
+
+    /// Visualize IMU data: raw measurements, bias-corrected data, and harmonic decomposition
+    fn view_imu_results(
+        &mut self,
+        imu_data: &[crate::datasets::ImuData],
+        processed_accel: &[[f32; 3]],
+        processed_gyro: &[[f32; 3]],
+        timestamp_ns: i64,
+    ) {
+        if imu_data.is_empty() {
+            return;
+        }
+
+        debug_log!("[Estimator] Logging {} IMU samples to Rerun viewer", imu_data.len());
+
+        // Convert IMU data to format for visualization (don't hold mutable borrow of self)
+        let mut raw_accel = Vec::with_capacity(imu_data.len());
+        let mut raw_gyro = Vec::with_capacity(imu_data.len());
+
+        for imu_sample in imu_data {
+            raw_accel.push([
+                imu_sample.accel[0] as f32,
+                imu_sample.accel[1] as f32,
+                imu_sample.accel[2] as f32,
+            ]);
+            raw_gyro.push([
+                imu_sample.gyro[0] as f32,
+                imu_sample.gyro[1] as f32,
+                imu_sample.gyro[2] as f32,
+            ]);
+        }
+
+        // Convert to f32 slices for visualization
+        let raw_accel_f32: Vec<[f32; 3]> = raw_accel;
+        let raw_gyro_f32: Vec<[f32; 3]> = raw_gyro;
+        let processed_accel_f32: Vec<[f32; 3]> = processed_accel.to_vec();
+        let processed_gyro_f32: Vec<[f32; 3]> = processed_gyro.to_vec();
+
+        // Compute decomposition before getting viewer mutable borrow
+        let decomp_result = self.compute_imu_decomposition(&processed_accel_f32, &processed_gyro_f32);
+        let fundamental_freq = self.estimate_fundamental_frequency(&processed_gyro_f32);
+        
+        // Log denoising filter quality
+        let _filter_quality = self.denoise_filter.quality();
+        debug_log!("[DENOISE] Frame {}: quality={:.2}, samples={}", 
+            self.frame_count, _filter_quality, imu_data.len());
+
+        // Log f0 to CSV file
+        if let Ok(mut writer) = self.f0_log_writer.lock() {
+            if let Some(ref mut f) = *writer {
+                let _ = writeln!(f, "{},{},{:.2}", self.frame_count, timestamp_ns, fundamental_freq);
+                let _ = f.flush();
+            }
+        }
+
+        // Log gyroscope spectrum (RMS values per axis) to CSV file
+        let gyro_x_rms = (processed_gyro_f32.iter().map(|g| g[0] * g[0]).sum::<f32>() / processed_gyro_f32.len() as f32).sqrt();
+        let gyro_y_rms = (processed_gyro_f32.iter().map(|g| g[1] * g[1]).sum::<f32>() / processed_gyro_f32.len() as f32).sqrt();
+        let gyro_z_rms = (processed_gyro_f32.iter().map(|g| g[2] * g[2]).sum::<f32>() / processed_gyro_f32.len() as f32).sqrt();
+        let gyro_mag_rms = (processed_gyro_f32.iter()
+            .map(|g| g[0] * g[0] + g[1] * g[1] + g[2] * g[2])
+            .sum::<f32>() / processed_gyro_f32.len() as f32).sqrt();
+
+        if let Ok(mut writer) = self.spectrum_log_writer.lock() {
+            if let Some(ref mut f) = *writer {
+                let _ = writeln!(f, "{},{},{:.6},{:.6},{:.6},{:.6}",
+                    self.frame_count, timestamp_ns, gyro_x_rms, gyro_y_rms, gyro_z_rms, gyro_mag_rms);
+                let _ = f.flush();
+            }
+        }
+
+        // Now get mutable borrow for viewer
+        if let Some(v) = &mut self.viewer {
+            // Log raw IMU data
+            v.log_imu_raw(
+                timestamp_ns,
+                &raw_accel_f32,
+                &raw_gyro_f32,
+                "imu/raw",
+            );
+
+            // Log processed (bias-corrected) IMU data
+            v.log_imu_processed(
+                timestamp_ns,
+                &processed_accel_f32,
+                &processed_gyro_f32,
+                "imu/processed",
+            );
+
+            // Log harmonic decomposition if available
+            if let Some((gravity, vibration)) = decomp_result {
+                // Log harmonic decomposition (gravity, bias, harmonics)
+                let bias_accel = [
+                    self.bias_estimator.accel_bias[0] as f32,
+                    self.bias_estimator.accel_bias[1] as f32,
+                    self.bias_estimator.accel_bias[2] as f32,
+                ];
+                let bias_gyro = [
+                    self.bias_estimator.gyro_bias[0] as f32,
+                    self.bias_estimator.gyro_bias[1] as f32,
+                    self.bias_estimator.gyro_bias[2] as f32,
+                ];
+
+                v.log_imu_harmonics(
+                    timestamp_ns,
+                    gravity,
+                    bias_accel,
+                    bias_gyro,
+                    &[vibration],
+                    "imu/harmonics",
+                );
+
+                // Log signal quality metrics (including fundamental frequency f0)
+                let snr_values = [1.0_f32, 1.0_f32, 1.0_f32]; // Placeholder
+                let rms_values = [0.5_f32, 0.5_f32, 0.5_f32]; // Placeholder
+                let peak_values = [1.0_f32, 1.0_f32, 1.0_f32]; // Placeholder
+                v.log_imu_signal_quality(
+                    timestamp_ns,
+                    snr_values,
+                    rms_values,
+                    peak_values,
+                    "running",
+                    fundamental_freq,
+                    "imu/quality",
+                );
+            }
+        }
+    }
+
+    /// Estimate the fundamental frequency (f0) from accelerometer data
+    fn estimate_fundamental_frequency(&self, gyro_data: &[[f32; 3]]) -> f32 {
+        if gyro_data.len() < 2 {
+            return 0.0;
+        }
+
+        // Sample rate from IMU (EuRoC is typically 200 Hz)
+        let sample_rate = 200.0_f32; // Hz
+
+        // Compute magnitude of gyro vector
+        let magnitudes: Vec<f32> = gyro_data
+            .iter()
+            .map(|g| (g[0] * g[0] + g[1] * g[1] + g[2] * g[2]).sqrt())
+            .collect();
+
+        // Remove DC component (subtract mean)
+        let mean = magnitudes.iter().sum::<f32>() / magnitudes.len() as f32;
+        let centered: Vec<f32> = magnitudes
+            .iter()
+            .map(|&m| m - mean)
+            .collect();
+
+        // Simple peak detection: count local maxima (simplified zero-crossing on derivative)
+        let mut peak_count = 0;
+        for i in 1..centered.len().saturating_sub(1) {
+            if centered[i] > centered[i - 1] && centered[i] > centered[i + 1] {
+                peak_count += 1;
+            }
+        }
+
+        // Frequency = peaks * (sample_rate / window_duration)
+        // With 2 peaks per cycle: f0 = (peak_count / 2) * sample_rate / duration
+        if peak_count > 0 {
+            let duration_seconds = centered.len() as f32 / sample_rate;
+            (peak_count as f32 / 2.0) / duration_seconds
+        } else {
+            // Fallback: estimate from RMS of signal as approximate frequency indicator
+            let rms = (centered.iter().map(|x| x * x).sum::<f32>() / centered.len() as f32).sqrt();
+            // Map RMS to rough frequency (typical sensor vibration 5-50 Hz)
+            if rms > 0.01 {
+                5.0 + rms * 100.0  // Simple linear mapping
+            } else {
+                0.0
+            }
+        }
+    }
+
+    /// Decompose processed IMU data into gravity and vibration components
+    fn compute_imu_decomposition(&self, accel: &[[f32; 3]], _gyro: &[[f32; 3]]) -> Option<([f32; 3], [f32; 3])> {
+        if accel.is_empty() {
+            return None;
+        }
+
+        // Estimate gravity as mean of acceleration (assuming motion is small)
+        let mut gravity = [0.0_f32; 3];
+        for acc in accel {
+            gravity[0] += acc[0];
+            gravity[1] += acc[1];
+            gravity[2] += acc[2];
+        }
+        gravity[0] /= accel.len() as f32;
+        gravity[1] /= accel.len() as f32;
+        gravity[2] /= accel.len() as f32;
+
+        // Normalize gravity to standard gravity (9.81 m/s²)
+        let gravity_mag = (gravity[0] * gravity[0] + gravity[1] * gravity[1] + gravity[2] * gravity[2]).sqrt();
+        if gravity_mag > 0.1 {
+            gravity[0] = gravity[0] / gravity_mag * 9.81;
+            gravity[1] = gravity[1] / gravity_mag * 9.81;
+            gravity[2] = gravity[2] / gravity_mag * 9.81;
+        } else {
+            gravity = [0.0, 0.0, -9.81];
+        }
+
+        let vibration = [
+            gravity[0] - accel.get(0).map(|a| a[0]).unwrap_or(0.0),
+            gravity[1] - accel.get(0).map(|a| a[1]).unwrap_or(0.0),
+            gravity[2] - accel.get(0).map(|a| a[2]).unwrap_or(0.0),
+        ];
+
+        Some((gravity, vibration))
     }
 
     /// Get the current trajectory (list of keyframe poses with timestamps)

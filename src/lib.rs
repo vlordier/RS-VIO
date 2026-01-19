@@ -170,6 +170,7 @@ pub mod math;
 pub mod optimization;
 pub mod validation;
 pub mod platform;
+pub mod vision;
 
 pub mod traits;
 pub mod types;
