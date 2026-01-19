@@ -201,3 +201,7 @@ harness = false
 [[bench]]
 name = "loop_closure"
 harness = false
+
+[[bench]]
+name = "fusion_benchmarks"
+harness = false

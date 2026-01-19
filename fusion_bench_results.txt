@@ -1,0 +1,185 @@
+    Finished `bench` profile [optimized] target(s) in 0.36s
+     Running benches/fusion_benchmarks.rs (target/release/deps/fusion_benchmarks-f143298084fdc4dd)
+Gnuplot not found, using plotters backend
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_OFF_hover
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_OFF_hover: Warming up for 3.0000 s
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_OFF_hover: Collecting 100 samples in estimated 5.0086 s (434k iterations)
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_OFF_hover: Analyzing
+fusion_configurations/frame_processing/imu_OFF_superres_OFF_hover
+                        time:   [15.935 µs 17.229 µs 18.445 µs]
+                        change: [-3.8523% +4.0690% +13.492%] (p = 0.36 > 0.05)
+                        No change in performance detected.
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_OFF_hover
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_OFF_hover: Warming up for 3.0000 s
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_OFF_hover: Collecting 100 samples in estimated 5.0335 s (308k iterations)
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_OFF_hover: Analyzing
+fusion_configurations/frame_processing/imu_ON_superres_OFF_hover
+                        time:   [15.509 µs 16.374 µs 17.202 µs]
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_ON_hover
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_ON_hover: Warming up for 3.0000 s
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_ON_hover: Collecting 100 samples in estimated 5.0136 s (247k iterations)
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_ON_hover: Analyzing
+fusion_configurations/frame_processing/imu_OFF_superres_ON_hover
+                        time:   [15.522 µs 16.296 µs 17.055 µs]
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_ON_hover
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_ON_hover: Warming up for 3.0000 s
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_ON_hover: Collecting 100 samples in estimated 5.0042 s (308k iterations)
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_ON_hover: Analyzing
+fusion_configurations/frame_processing/imu_ON_superres_ON_hover
+                        time:   [15.183 µs 16.022 µs 16.838 µs]
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_OFF_gentle_motion
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_OFF_gentle_motion: Warming up for 3.0000 s
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_OFF_gentle_motion: Collecting 100 samples in estimated 5.0215 s (268k iterations)
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_OFF_gentle_motion: Analyzing
+fusion_configurations/frame_processing/imu_OFF_superres_OFF_gentle_motion
+                        time:   [14.827 µs 15.866 µs 16.926 µs]
+Found 9 outliers among 100 measurements (9.00%)
+  9 (9.00%) high mild
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_OFF_gentle_motion
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_OFF_gentle_motion: Warming up for 3.0000 s
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_OFF_gentle_motion: Collecting 100 samples in estimated 5.0727 s (247k iterations)
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_OFF_gentle_motion: Analyzing
+fusion_configurations/frame_processing/imu_ON_superres_OFF_gentle_motion
+                        time:   [14.959 µs 15.964 µs 16.956 µs]
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_ON_gentle_motion
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_ON_gentle_motion: Warming up for 3.0000 s
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_ON_gentle_motion: Collecting 100 samples in estimated 5.0257 s (247k iterations)
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_ON_gentle_motion: Analyzing
+fusion_configurations/frame_processing/imu_OFF_superres_ON_gentle_motion
+                        time:   [15.523 µs 16.479 µs 17.378 µs]
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_ON_gentle_motion
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_ON_gentle_motion: Warming up for 3.0000 s
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_ON_gentle_motion: Collecting 100 samples in estimated 5.0147 s (242k iterations)
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_ON_gentle_motion: Analyzing
+fusion_configurations/frame_processing/imu_ON_superres_ON_gentle_motion
+                        time:   [15.459 µs 16.476 µs 17.428 µs]
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_OFF_aggressive_motion
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_OFF_aggressive_motion: Warming up for 3.0000 s
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_OFF_aggressive_motion: Collecting 100 samples in estimated 5.0235 s (242k iterations)
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_OFF_aggressive_motion: Analyzing
+fusion_configurations/frame_processing/imu_OFF_superres_OFF_aggressive_motion
+                        time:   [15.309 µs 16.261 µs 17.225 µs]
+Found 3 outliers among 100 measurements (3.00%)
+  3 (3.00%) high mild
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_OFF_aggressive_motion
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_OFF_aggressive_motion: Warming up for 3.0000 s
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_OFF_aggressive_motion: Collecting 100 samples in estimated 5.0400 s (247k iterations)
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_OFF_aggressive_motion: Analyzing
+fusion_configurations/frame_processing/imu_ON_superres_OFF_aggressive_motion
+                        time:   [14.857 µs 15.816 µs 16.753 µs]
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_ON_aggressive_motion
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_ON_aggressive_motion: Warming up for 3.0000 s
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_ON_aggressive_motion: Collecting 100 samples in estimated 5.0282 s (247k iterations)
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_ON_aggressive_motion: Analyzing
+fusion_configurations/frame_processing/imu_OFF_superres_ON_aggressive_motion
+                        time:   [16.834 µs 17.605 µs 18.399 µs]
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_ON_aggressive_motion
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_ON_aggressive_motion: Warming up for 3.0000 s
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_ON_aggressive_motion: Collecting 100 samples in estimated 5.0122 s (247k iterations)
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_ON_aggressive_motion: Analyzing
+fusion_configurations/frame_processing/imu_ON_superres_ON_aggressive_motion
+                        time:   [16.979 µs 17.780 µs 18.567 µs]
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_OFF_noisy
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_OFF_noisy: Warming up for 3.0000 s
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_OFF_noisy: Collecting 100 samples in estimated 5.0654 s (232k iterations)
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_OFF_noisy: Analyzing
+fusion_configurations/frame_processing/imu_OFF_superres_OFF_noisy
+                        time:   [17.073 µs 18.045 µs 19.027 µs]
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_OFF_noisy
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_OFF_noisy: Warming up for 3.0000 s
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_OFF_noisy: Collecting 100 samples in estimated 5.0896 s (232k iterations)
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_OFF_noisy: Analyzing
+fusion_configurations/frame_processing/imu_ON_superres_OFF_noisy
+                        time:   [16.622 µs 17.473 µs 18.372 µs]
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) high mild
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_ON_noisy
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_ON_noisy: Warming up for 3.0000 s
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_ON_noisy: Collecting 100 samples in estimated 5.0349 s (232k iterations)
+Benchmarking fusion_configurations/frame_processing/imu_OFF_superres_ON_noisy: Analyzing
+fusion_configurations/frame_processing/imu_OFF_superres_ON_noisy
+                        time:   [18.320 µs 19.335 µs 20.350 µs]
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_ON_noisy
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_ON_noisy: Warming up for 3.0000 s
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_ON_noisy: Collecting 100 samples in estimated 5.0718 s (242k iterations)
+Benchmarking fusion_configurations/frame_processing/imu_ON_superres_ON_noisy: Analyzing
+fusion_configurations/frame_processing/imu_ON_superres_ON_noisy
+                        time:   [17.961 µs 18.978 µs 19.990 µs]
+
+Benchmarking imu_filtering/denoise_higher_order/hover
+Benchmarking imu_filtering/denoise_higher_order/hover: Warming up for 3.0000 s
+Benchmarking imu_filtering/denoise_higher_order/hover: Collecting 100 samples in estimated 5.0168 s (1.1M iterations)
+Benchmarking imu_filtering/denoise_higher_order/hover: Analyzing
+imu_filtering/denoise_higher_order/hover
+                        time:   [4.5343 µs 4.5407 µs 4.5467 µs]
+Found 9 outliers among 100 measurements (9.00%)
+  2 (2.00%) low severe
+  6 (6.00%) low mild
+  1 (1.00%) high mild
+Benchmarking imu_filtering/denoise_higher_order/gentle_motion
+Benchmarking imu_filtering/denoise_higher_order/gentle_motion: Warming up for 3.0000 s
+Benchmarking imu_filtering/denoise_higher_order/gentle_motion: Collecting 100 samples in estimated 5.0022 s (1.1M iterations)
+Benchmarking imu_filtering/denoise_higher_order/gentle_motion: Analyzing
+imu_filtering/denoise_higher_order/gentle_motion
+                        time:   [4.5638 µs 4.5707 µs 4.5777 µs]
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) low mild
+Benchmarking imu_filtering/denoise_higher_order/aggressive_motion
+Benchmarking imu_filtering/denoise_higher_order/aggressive_motion: Warming up for 3.0000 s
+Benchmarking imu_filtering/denoise_higher_order/aggressive_motion: Collecting 100 samples in estimated 5.0041 s (1.1M iterations)
+Benchmarking imu_filtering/denoise_higher_order/aggressive_motion: Analyzing
+imu_filtering/denoise_higher_order/aggressive_motion
+                        time:   [4.5566 µs 4.5633 µs 4.5697 µs]
+Found 4 outliers among 100 measurements (4.00%)
+  4 (4.00%) low mild
+Benchmarking imu_filtering/denoise_higher_order/noisy
+Benchmarking imu_filtering/denoise_higher_order/noisy: Warming up for 3.0000 s
+Benchmarking imu_filtering/denoise_higher_order/noisy: Collecting 100 samples in estimated 5.0182 s (1.1M iterations)
+Benchmarking imu_filtering/denoise_higher_order/noisy: Analyzing
+imu_filtering/denoise_higher_order/noisy
+                        time:   [4.4780 µs 4.4855 µs 4.4929 µs]
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) low mild
+
+Benchmarking super_resolution/refine_features/low_confidence
+Benchmarking super_resolution/refine_features/low_confidence: Warming up for 3.0000 s
+Benchmarking super_resolution/refine_features/low_confidence: Collecting 100 samples in estimated 5.0411 s (45k iterations)
+Benchmarking super_resolution/refine_features/low_confidence: Analyzing
+super_resolution/refine_features/low_confidence
+                        time:   [108.70 µs 111.04 µs 113.21 µs]
+Benchmarking super_resolution/refine_features/medium_confidence
+Benchmarking super_resolution/refine_features/medium_confidence: Warming up for 3.0000 s
+Benchmarking super_resolution/refine_features/medium_confidence: Collecting 100 samples in estimated 5.5911 s (30k iterations)
+Benchmarking super_resolution/refine_features/medium_confidence: Analyzing
+super_resolution/refine_features/medium_confidence
+                        time:   [180.65 µs 183.65 µs 186.66 µs]
+Benchmarking super_resolution/refine_features/high_confidence
+Benchmarking super_resolution/refine_features/high_confidence: Warming up for 3.0000 s
+Benchmarking super_resolution/refine_features/high_confidence: Collecting 100 samples in estimated 5.9596 s (20k iterations)
+Benchmarking super_resolution/refine_features/high_confidence: Analyzing
+super_resolution/refine_features/high_confidence
+                        time:   [290.20 µs 293.47 µs 296.78 µs]
+
+Benchmarking complete_pipeline/baseline_no_filtering_no_superres
+Benchmarking complete_pipeline/baseline_no_filtering_no_superres: Warming up for 3.0000 s
+Benchmarking complete_pipeline/baseline_no_filtering_no_superres: Collecting 100 samples in estimated 5.0706 s (222k iterations)
+Benchmarking complete_pipeline/baseline_no_filtering_no_superres: Analyzing
+complete_pipeline/baseline_no_filtering_no_superres
+                        time:   [17.967 µs 18.958 µs 19.880 µs]
+Benchmarking complete_pipeline/with_imu_filtering_only
+Benchmarking complete_pipeline/with_imu_filtering_only: Warming up for 3.0000 s
+Benchmarking complete_pipeline/with_imu_filtering_only: Collecting 100 samples in estimated 5.0521 s (232k iterations)
+Benchmarking complete_pipeline/with_imu_filtering_only: Analyzing
+complete_pipeline/with_imu_filtering_only
+                        time:   [18.433 µs 19.292 µs 20.116 µs]
+Benchmarking complete_pipeline/full_fusion_imu_and_superres
+Benchmarking complete_pipeline/full_fusion_imu_and_superres: Warming up for 3.0000 s
+Benchmarking complete_pipeline/full_fusion_imu_and_superres: Collecting 100 samples in estimated 5.0180 s (212k iterations)
+Benchmarking complete_pipeline/full_fusion_imu_and_superres: Analyzing
+complete_pipeline/full_fusion_imu_and_superres
+                        time:   [18.070 µs 19.208 µs 20.321 µs]
+
