@@ -23,7 +23,9 @@ pub use robustness_metrics::{RobustnessMetrics, track_failure_rate};
 pub use results::{Configuration, ConfigurationResults, compare_configurations};
 pub use distance_speed_metrics::{
     DistanceBinnedMetrics, SpeedBinnedMetrics, BinMetrics, DistanceSpeedMatrix,
-    DistanceSpeedAnalysis, DistanceSpeedAnalyzer,
+    DistanceSpeedAnalysis, DistanceSpeedAnalyzer, CalibrationAwareMetrics,
+    CalibrationAwareAnalyzer, WeightedResidualStats, TrackSurvivalStats,
+    DistanceBinnedImprovement, SpeedBinnedImprovement,
 };
 pub use calibration_quality::{
     CalibrationConfidenceFactors, CalibrationQualityStats, CalibrationImprovementMetrics,
