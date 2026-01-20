@@ -1,25 +1,19 @@
 //! Float precision configuration for SLAM system
 //!
-//! This module provides a configurable float type that can be switched between
-//! f32 and f64 using Cargo features.
+//! This module provides the numeric type for VIO/SLAM computations.
+//! All computations use f64 (double precision) for accuracy and stability
+//! in visual-inertial fusion algorithms.
 //!
+//! # Precision Selection
 //!
-//! # Compile-time selection
-//!
-//! - Default: Uses `f64` (double precision)
-//! - With `use_f32` feature: Uses `f32` (single precision)
-//!
-//! Build with f32:
-//! ```bash
-//! cargo build --features use_f32
-//! ```
+//! - f64: Double precision (default, required for camera calibration accuracy)
+//! - f32: Not recommended for VIO (insufficient precision for pose accumulation)
 
-#[cfg(feature = "use_f32")]
-/// Float type for SLAM computations (f32 precision)
-pub type Float = f32;
-
-#[cfg(not(feature = "use_f32"))]
-/// Float type for SLAM computations (f64 precision, default)
+/// Float type for SLAM computations (f64 precision)
+/// Double precision is necessary for:
+/// - Accumulating small pose corrections without drift
+/// - Matching camera intrinsic parameters (typically specified in double)
+/// - Numerical stability in matrix inversions and decompositions
 pub type Float = f64;
 
 /// Float constants that work with both f32 and f64
