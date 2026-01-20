@@ -33,6 +33,10 @@ mod comprehensive_tests {
             feature_id: id,
             pixel_coord: [x, y],
             undistorted_coord: [x * 0.99, y * 0.99],
+            disparity: None,
+            disparity_uncertainty: None,
+            photometric_error: None,
+            peak_sharpness: None,
             quality: Default::default(),
         }
     }
@@ -223,6 +227,10 @@ mod comprehensive_tests {
             feature_id: 1,
             pixel_coord: [100.0, 100.0],
             undistorted_coord: [-1.0, -1.0], // Will be computed by add_left_feature
+            disparity: None,
+            disparity_uncertainty: None,
+            photometric_error: None,
+            peak_sharpness: None,
             quality: Default::default(),
         };
 

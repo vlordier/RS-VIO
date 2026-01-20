@@ -182,7 +182,7 @@ impl ImuSignalAnalyzer {
             motor_on_threshold: DEFAULT_MOTOR_THRESHOLD,
         }
     }
-    
+
     /// Create analyzer with custom motor detection threshold
     pub fn new_with_threshold(window_size: usize, motor_threshold: f32) -> Self {
         let mut analyzer = Self::new(window_size);
@@ -204,7 +204,7 @@ impl ImuSignalAnalyzer {
             self._update_bias_estimates();
         }
     }
-    
+
     /// Add measurement to rolling history windows
     fn _add_to_history(&mut self, accel: Vector3, gyro: Vector3, timestamp: i64) {
         self.accel_history.push_back(accel);
@@ -240,7 +240,7 @@ impl ImuSignalAnalyzer {
             motor_state: self.motor_state,
         }
     }
-    
+
     /// Compute residuals (accel - gravity - bias)
     fn _compute_residuals(&self) -> Vec<Vector3> {
         self.accel_history
@@ -248,7 +248,7 @@ impl ImuSignalAnalyzer {
             .map(|accel| accel - self.gravity_estimate - self.accel_bias_estimate)
             .collect()
     }
-    
+
     /// Compute mean of vector samples
     fn _compute_mean(samples: &[Vector3]) -> Vector3 {
         if samples.is_empty() {
@@ -257,17 +257,17 @@ impl ImuSignalAnalyzer {
         let sum: Vector3 = samples.iter().sum();
         sum / samples.len() as f64
     }
-    
+
     /// Extract harmonics based on motor state
     fn _extract_harmonics(&self, residuals: &[Vector3]) -> (Vector3, Vec<Vector3>) {
         let fundamental = Self::_compute_mean(residuals);
-        
+
         let extraction_coeff = match self.motor_state {
-            MotorState::Off => 0.0, // No rotor harmonics
+            MotorState::Off => 0.0,                        // No rotor harmonics
             MotorState::Running => HARMONIC_COEFF_RUNNING, // f0 extraction
             MotorState::Transitioning => HARMONIC_COEFF_TRANSITIONING, // Conservative
         };
-        
+
         let residual_harmonics: Vec<Vector3> = if extraction_coeff == 0.0 {
             // Motors off: all residuals are noise
             residuals.to_vec()
@@ -278,7 +278,7 @@ impl ImuSignalAnalyzer {
                 .map(|r| r - fundamental * extraction_coeff)
                 .collect()
         };
-        
+
         (fundamental, residual_harmonics)
     }
 
@@ -286,50 +286,48 @@ impl ImuSignalAnalyzer {
     fn _detect_motor_state(&mut self) {
         let vibration_rms = self._compute_vibration_rms();
         let motor_off_threshold = self.motor_on_threshold * MOTOR_OFF_HYSTERESIS;
-        
+
         self.motor_state = match self.motor_state {
-            MotorState::Off if vibration_rms > self.motor_on_threshold => {
-                MotorState::Transitioning
-            }
-            MotorState::Running if vibration_rms < motor_off_threshold => {
-                MotorState::Transitioning
-            }
+            MotorState::Off if vibration_rms > self.motor_on_threshold => MotorState::Transitioning,
+            MotorState::Running if vibration_rms < motor_off_threshold => MotorState::Transitioning,
             MotorState::Transitioning if vibration_rms > self.motor_on_threshold => {
                 self._estimate_fundamental_frequency();
                 MotorState::Running
-            }
+            },
             MotorState::Transitioning if vibration_rms < motor_off_threshold => {
                 self.fundamental_freq_hz = 0.0;
                 MotorState::Off
-            }
+            },
             state => state, // No change
         };
     }
-    
+
     /// Compute RMS vibration magnitude
     fn _compute_vibration_rms(&self) -> f32 {
         let samples: Vec<Vector3> = self.accel_history.iter().copied().collect();
         let mean = Self::_compute_mean(&samples);
-        
-        let vibration_sum: f64 = self.accel_history
+
+        let vibration_sum: f64 = self
+            .accel_history
             .iter()
             .map(|accel| (accel - mean).norm())
             .sum();
-        
+
         (vibration_sum / self.accel_history.len() as f64) as f32
     }
 
     /// Estimate fundamental rotor frequency when motors are running
     fn _estimate_fundamental_frequency(&mut self) {
-        if self.accel_history.len() < MIN_SAMPLES_FOR_FREQUENCY 
-            || self.timestamp_history.len() < MIN_SAMPLES_FOR_FREQUENCY {
+        if self.accel_history.len() < MIN_SAMPLES_FOR_FREQUENCY
+            || self.timestamp_history.len() < MIN_SAMPLES_FOR_FREQUENCY
+        {
             return;
         }
 
         let samples: Vec<Vector3> = self.accel_history.iter().copied().collect();
         let accel_mean = Self::_compute_mean(&samples);
         let peak_intervals = self._detect_peak_intervals(&accel_mean);
-        
+
         if let Some(frequency) = self._compute_frequency_from_peaks(&peak_intervals) {
             if Self::_is_valid_frequency(frequency) {
                 self.fundamental_freq_hz = frequency;
@@ -338,7 +336,7 @@ impl ImuSignalAnalyzer {
             }
         }
     }
-    
+
     /// Detect intervals between peaks in residual signal
     fn _detect_peak_intervals(&self, mean: &Vector3) -> Vec<f32> {
         let mut peak_intervals = Vec::new();
@@ -350,14 +348,16 @@ impl ImuSignalAnalyzer {
             if i >= n - 1 {
                 break;
             }
-            
+
             let residual = (accel - mean).norm();
             let prev = (self.accel_history[i - 1] - mean).norm();
             let next = (self.accel_history[i + 1] - mean).norm();
-            
+
             // Local maximum detection
-            if residual > prev && residual > next 
-                && residual > last_peak_val * PEAK_DETECTION_THRESHOLD {
+            if residual > prev
+                && residual > next
+                && residual > last_peak_val * PEAK_DETECTION_THRESHOLD
+            {
                 if last_peak_idx > 0 {
                     peak_intervals.push((i - last_peak_idx) as f32);
                 }
@@ -365,34 +365,35 @@ impl ImuSignalAnalyzer {
                 last_peak_val = residual;
             }
         }
-        
+
         peak_intervals
     }
-    
+
     /// Compute frequency from peak intervals
     fn _compute_frequency_from_peaks(&self, peak_intervals: &[f32]) -> Option<f32> {
         if peak_intervals.is_empty() || self.timestamp_history.len() < 2 {
             return None;
         }
-        
+
         let avg_interval = peak_intervals.iter().sum::<f32>() / peak_intervals.len() as f32;
         let sample_rate = self._compute_sample_rate();
         let period_seconds = avg_interval as f64 / sample_rate;
-        
+
         if period_seconds > 0.0 {
             Some((1.0 / period_seconds) as f32)
         } else {
             None
         }
     }
-    
+
     /// Compute sample rate from timestamp history
     fn _compute_sample_rate(&self) -> f64 {
-        let time_span = (self.timestamp_history.back().unwrap() 
-                       - self.timestamp_history.front().unwrap()) as f64 / NS_TO_SECONDS;
+        let time_span = (self.timestamp_history.back().unwrap()
+            - self.timestamp_history.front().unwrap()) as f64
+            / NS_TO_SECONDS;
         self.timestamp_history.len() as f64 / time_span
     }
-    
+
     /// Check if frequency is within valid range for drone rotors
     fn _is_valid_frequency(freq: f32) -> bool {
         freq >= MIN_VALID_FREQUENCY && freq <= MAX_VALID_FREQUENCY
@@ -402,34 +403,34 @@ impl ImuSignalAnalyzer {
     fn _update_bias_estimates(&mut self) {
         let samples: Vec<Vector3> = self.accel_history.iter().copied().collect();
         let accel_mean = Self::_compute_mean(&samples);
-        
+
         self._update_gravity_estimate(&accel_mean);
         self._update_accel_bias_estimate(&accel_mean);
     }
-    
+
     /// Update gravity direction estimate from accelerometer mean
     fn _update_gravity_estimate(&mut self, accel_mean: &Vector3) {
         let gravity_mag = accel_mean.norm();
-        
+
         if gravity_mag > MIN_GRAVITY_FOR_ESTIMATION {
             self.gravity_estimate = (accel_mean / gravity_mag) * GRAVITY_MAG;
         }
     }
-    
+
     /// Update accelerometer bias estimate (motor-state adaptive)
     fn _update_accel_bias_estimate(&mut self, accel_mean: &Vector3) {
         let bias_candidate = accel_mean - self.gravity_estimate;
-        
+
         self.accel_bias_estimate = match self.motor_state {
             MotorState::Off => {
                 // Fast update when stationary
                 bias_candidate
-            }
+            },
             MotorState::Running | MotorState::Transitioning => {
                 // Slow filtered update during flight
-                self.accel_bias_estimate * BIAS_FILTER_COEFF_MOTORS_RUNNING 
+                self.accel_bias_estimate * BIAS_FILTER_COEFF_MOTORS_RUNNING
                     + bias_candidate * BIAS_UPDATE_RATE_MOTORS_RUNNING
-            }
+            },
         };
     }
 
@@ -451,15 +452,15 @@ impl ImuSignalAnalyzer {
             snr[axis] = self._compute_snr(axis_rms);
         }
 
-        SignalQuality { 
-            snr, 
-            rms, 
+        SignalQuality {
+            snr,
+            rms,
             peak,
             motor_state: self.motor_state,
             fundamental_freq_hz: self.fundamental_freq_hz,
         }
     }
-    
+
     /// Create empty signal quality for edge cases
     fn _empty_quality(motor_state: MotorState, freq: f32) -> SignalQuality {
         SignalQuality {
@@ -470,7 +471,7 @@ impl ImuSignalAnalyzer {
             fundamental_freq_hz: freq,
         }
     }
-    
+
     /// Compute RMS and peak for a single axis
     fn _compute_axis_metrics(&self, axis: usize) -> (f32, f32) {
         let mut sum_sq = 0.0_f32;
@@ -486,14 +487,14 @@ impl ImuSignalAnalyzer {
         let rms = (sum_sq / n).sqrt();
         (rms, max_abs)
     }
-    
+
     /// Compute SNR with motor-state-aware noise floor
     fn _compute_snr(&self, rms: f32) -> f32 {
         let noise_floor = self._get_noise_floor();
         let signal_power = rms.max(0.1_f32);
         20.0_f32 * (signal_power / noise_floor).log10()
     }
-    
+
     /// Get noise floor adjusted for motor state
     fn _get_noise_floor(&self) -> f32 {
         let multiplier = match self.motor_state {
@@ -569,7 +570,7 @@ mod tests {
             let vibration_x = 1.5 * ((i % 7) as f64 / 7.0 - 0.5);
             let vibration_y = 1.2 * ((i % 5) as f64 / 5.0 - 0.5);
             let vibration_z = 0.8 * ((i % 3) as f64 / 3.0 - 0.5);
-            
+
             let imu = ImuData {
                 timestamp: (i * 5_000_000) as i64,
                 accel: [vibration_x, vibration_y, -9.81 + vibration_z],
@@ -581,51 +582,61 @@ mod tests {
         let decomp = analyzer.decompose_harmonics();
         // Should detect motors running (or transitioning after high vibration)
         assert!(
-            matches!(decomp.motor_state, MotorState::Running | MotorState::Transitioning),
-            "Expected motors running/transitioning, got {:?} with vibration", decomp.motor_state
+            matches!(
+                decomp.motor_state,
+                MotorState::Running | MotorState::Transitioning
+            ),
+            "Expected motors running/transitioning, got {:?} with vibration",
+            decomp.motor_state
         );
     }
 
     #[test]
     fn test_motor_state_hysteresis() {
         let mut analyzer = ImuSignalAnalyzer::new(50);
-        
+
         // Start with high vibration (motors on)
         for i in 0..40 {
-            let vib = 2.5 * ((i % 10) as f64 / 10.0 - 0.5);  // Vibration >> 0.5 threshold
+            let vib = 2.5 * ((i % 10) as f64 / 10.0 - 0.5); // Vibration >> 0.5 threshold
             analyzer.process_measurement(&ImuData {
                 timestamp: (i * 5_000_000) as i64,
                 accel: [vib, vib, -9.81],
                 gyro: [0.0, 0.0, 0.0],
             });
         }
-        
+
         // Should be running or transitioning
         let decomp1 = analyzer.decompose_harmonics();
         // With high vibration (RMS >> 0.5), should detect motors
-        assert!(decomp1.quality.rms[0] > 0.5 || decomp1.quality.rms[1] > 0.5,
-            "Should have significant vibration: {:?}", decomp1.quality.rms);
-        
+        assert!(
+            decomp1.quality.rms[0] > 0.5 || decomp1.quality.rms[1] > 0.5,
+            "Should have significant vibration: {:?}",
+            decomp1.quality.rms
+        );
+
         // Reduce vibration slightly but keep above hysteresis threshold
         for i in 40..80 {
             analyzer.process_measurement(&ImuData {
                 timestamp: (i * 5_000_000) as i64,
-                accel: [0.0, 0.0, -9.81],  // Completely stationary
+                accel: [0.0, 0.0, -9.81], // Completely stationary
                 gyro: [0.0, 0.0, 0.0],
             });
         }
-        
+
         // Should remain in running state due to hysteresis
         let decomp2 = analyzer.decompose_harmonics();
         // With stationary signal, should eventually return to Off
-        assert_eq!(decomp2.motor_state, MotorState::Off, 
-               "Should transition to Off with no vibration");
+        assert_eq!(
+            decomp2.motor_state,
+            MotorState::Off,
+            "Should transition to Off with no vibration"
+        );
     }
 
     #[test]
     fn test_signal_quality_computation() {
         let mut analyzer = ImuSignalAnalyzer::new(50);
-        
+
         // Feed clean stationary signal
         for _ in 0..50 {
             analyzer.process_measurement(&ImuData {
@@ -634,25 +645,35 @@ mod tests {
                 gyro: [0.0, 0.0, 0.0],
             });
         }
-        
+
         let quality = analyzer.decompose_harmonics().quality;
-        
+
         // Check RMS is close to gravity magnitude
-        assert!(quality.rms[2] > 9.0 && quality.rms[2] < 10.0, 
-                "RMS should be close to gravity: {}", quality.rms[2]);
-        
+        assert!(
+            quality.rms[2] > 9.0 && quality.rms[2] < 10.0,
+            "RMS should be close to gravity: {}",
+            quality.rms[2]
+        );
+
         // Check peak is also close to gravity
-        assert!(quality.peak[2] > 9.0 && quality.peak[2] < 10.0,
-                "Peak should be close to gravity: {}", quality.peak[2]);
-        
+        assert!(
+            quality.peak[2] > 9.0 && quality.peak[2] < 10.0,
+            "Peak should be close to gravity: {}",
+            quality.peak[2]
+        );
+
         // SNR should be high for clean signal
-        assert!(quality.snr[2] > 30.0, "SNR should be high for clean signal: {}", quality.snr[2]);
+        assert!(
+            quality.snr[2] > 30.0,
+            "SNR should be high for clean signal: {}",
+            quality.snr[2]
+        );
     }
 
     #[test]
     fn test_noise_floor_adaptation() {
         let mut analyzer = ImuSignalAnalyzer::new(50);
-        
+
         // Feed stationary data
         for _ in 0..30 {
             analyzer.process_measurement(&ImuData {
@@ -661,9 +682,9 @@ mod tests {
                 gyro: [0.0, 0.0, 0.0],
             });
         }
-        
+
         let _snr_off = analyzer.decompose_harmonics().quality.snr[2];
-        
+
         // Add vibration to trigger motor state change
         for i in 0..30 {
             let vib = 1.5 * ((i % 5) as f64 / 5.0 - 0.5);
@@ -673,53 +694,62 @@ mod tests {
                 gyro: [0.0, 0.0, 0.0],
             });
         }
-        
+
         let quality_on = analyzer.decompose_harmonics().quality;
-        
+
         // SNR should be lower when motors running (higher noise floor)
         // But should still be finite and positive
-        assert!(quality_on.snr[0].is_finite() && quality_on.snr[0] > 0.0,
-                "SNR should be finite and positive: {}", quality_on.snr[0]);
+        assert!(
+            quality_on.snr[0].is_finite() && quality_on.snr[0] > 0.0,
+            "SNR should be finite and positive: {}",
+            quality_on.snr[0]
+        );
     }
 
     #[test]
     fn test_frequency_estimation_range() {
         let mut analyzer = ImuSignalAnalyzer::new(100);
-        
+
         // Create periodic signal at ~250 Hz
         let sample_rate = 200.0; // 200 Hz
         let target_freq = 250.0; // Target frequency in signal
-        
+
         for i in 0..100 {
             let t = i as f64 / sample_rate;
             // Simulated rotor vibration at target frequency
             let vibration = 2.0 * (2.0 * std::f64::consts::PI * target_freq * t).sin();
-            
+
             analyzer.process_measurement(&ImuData {
                 timestamp: (i as f64 * 5_000_000.0) as i64, // 5ms intervals = 200Hz
                 accel: [vibration, 0.0, -9.81],
                 gyro: [0.0, 0.0, 0.0],
             });
         }
-        
+
         let decomp = analyzer.decompose_harmonics();
-        
+
         // Frequency estimation might not be exact but should be in valid range
         if decomp.quality.fundamental_freq_hz > 0.0 {
-            assert!(decomp.quality.fundamental_freq_hz >= MIN_VALID_FREQUENCY,
-                    "Frequency too low: {}", decomp.quality.fundamental_freq_hz);
-            assert!(decomp.quality.fundamental_freq_hz <= MAX_VALID_FREQUENCY,
-                    "Frequency too high: {}", decomp.quality.fundamental_freq_hz);
+            assert!(
+                decomp.quality.fundamental_freq_hz >= MIN_VALID_FREQUENCY,
+                "Frequency too low: {}",
+                decomp.quality.fundamental_freq_hz
+            );
+            assert!(
+                decomp.quality.fundamental_freq_hz <= MAX_VALID_FREQUENCY,
+                "Frequency too high: {}",
+                decomp.quality.fundamental_freq_hz
+            );
         }
     }
 
     #[test]
     fn test_bias_estimation_convergence() {
         let mut analyzer = ImuSignalAnalyzer::new(100);
-        
+
         let true_bias = [0.2, -0.15, 0.1];
         let true_gravity = -9.81;
-        
+
         // Feed biased measurements
         for _ in 0..150 {
             analyzer.process_measurement(&ImuData {
@@ -732,19 +762,27 @@ mod tests {
                 gyro: [0.0, 0.0, 0.0],
             });
         }
-        
+
         let (bias_accel, _bias_gyro) = analyzer.get_bias_estimates();
-        
+
         // Bias should converge close to true bias (within noise and algorithm error)
         // Note: The algorithm subtracts gravity first, so we're checking the residual bias
-        assert!(bias_accel.x.abs() < 1.0, "X bias should be small: {}", bias_accel.x);
-        assert!(bias_accel.y.abs() < 1.0, "Y bias should be small: {}", bias_accel.y);
+        assert!(
+            bias_accel.x.abs() < 1.0,
+            "X bias should be small: {}",
+            bias_accel.x
+        );
+        assert!(
+            bias_accel.y.abs() < 1.0,
+            "Y bias should be small: {}",
+            bias_accel.y
+        );
     }
 
     #[test]
     fn test_harmonic_decomposition_motors_off() {
         let mut analyzer = ImuSignalAnalyzer::new(50);
-        
+
         // Pure stationary signal
         for _ in 0..50 {
             analyzer.process_measurement(&ImuData {
@@ -753,18 +791,24 @@ mod tests {
                 gyro: [0.0, 0.0, 0.0],
             });
         }
-        
+
         let decomp = analyzer.decompose_harmonics();
-        
+
         // With stationary signal, there should be minimal harmonics
         // Just verify motor state is correctly detected as off
-        assert_eq!(decomp.motor_state, MotorState::Off,
-               "Motor state should be Off");
-        
+        assert_eq!(
+            decomp.motor_state,
+            MotorState::Off,
+            "Motor state should be Off"
+        );
+
         // Vibration RMS should be very low
-        assert!(decomp.quality.rms[0] < 0.5 && decomp.quality.rms[1] < 0.5,
-            "Vibration should be minimal: {:?}", decomp.quality.rms);
-        
+        assert!(
+            decomp.quality.rms[0] < 0.5 && decomp.quality.rms[1] < 0.5,
+            "Vibration should be minimal: {:?}",
+            decomp.quality.rms
+        );
+
         // Motor state should be off
         assert_eq!(decomp.motor_state, MotorState::Off);
     }
@@ -772,7 +816,7 @@ mod tests {
     #[test]
     fn test_harmonic_decomposition_motors_running() {
         let mut analyzer = ImuSignalAnalyzer::new(100);
-        
+
         // Add strong periodic vibration
         for i in 0..100 {
             let vib = 3.0 * ((i % 10) as f64 / 10.0 - 0.5);
@@ -782,21 +826,26 @@ mod tests {
                 gyro: [0.0, 0.0, 0.0],
             });
         }
-        
+
         let decomp = analyzer.decompose_harmonics();
-        
+
         // Should detect motors running
-        assert!(matches!(decomp.motor_state, MotorState::Running | MotorState::Transitioning));
-        
+        assert!(matches!(
+            decomp.motor_state,
+            MotorState::Running | MotorState::Transitioning
+        ));
+
         // Residual harmonics should exist
-        assert!(!decomp.residual_harmonics.is_empty(),
-                "Should have residual harmonics");
+        assert!(
+            !decomp.residual_harmonics.is_empty(),
+            "Should have residual harmonics"
+        );
     }
 
     #[test]
     fn test_empty_history_handling() {
         let analyzer = ImuSignalAnalyzer::new(50);
-        
+
         // Should handle empty history gracefully
         let (bias_a, bias_g) = analyzer.get_bias_estimates();
         assert_eq!(bias_a.norm(), 0.0);
@@ -806,13 +855,13 @@ mod tests {
     #[test]
     fn test_single_measurement() {
         let mut analyzer = ImuSignalAnalyzer::new(50);
-        
+
         analyzer.process_measurement(&ImuData {
             timestamp: 0,
             accel: [0.0, 0.0, -9.81],
             gyro: [0.0, 0.0, 0.0],
         });
-        
+
         // Should not crash with single measurement
         let decomp = analyzer.decompose_harmonics();
         assert_eq!(decomp.motor_state, MotorState::Off);
@@ -829,10 +878,10 @@ mod tests {
                 gyro: [0.0, 0.0, 0.0],
             });
         }
-        
+
         let decomp_small = analyzer_small.decompose_harmonics();
         assert!(decomp_small.quality.snr[0].is_finite());
-        
+
         // Large window
         let mut analyzer_large = ImuSignalAnalyzer::new(200);
         for i in 0..250 {
@@ -842,7 +891,7 @@ mod tests {
                 gyro: [0.0, 0.0, 0.0],
             });
         }
-        
+
         let decomp_large = analyzer_large.decompose_harmonics();
         assert!(decomp_large.quality.snr[0].is_finite());
     }
@@ -851,7 +900,7 @@ mod tests {
     fn test_custom_motor_threshold() {
         // Very sensitive threshold
         let mut analyzer_sensitive = ImuSignalAnalyzer::new_with_threshold(50, 0.2);
-        
+
         for i in 0..50 {
             let small_vib = 0.3 * ((i % 5) as f64 / 5.0 - 0.5);
             analyzer_sensitive.process_measurement(&ImuData {
@@ -860,16 +909,19 @@ mod tests {
                 gyro: [0.0, 0.0, 0.0],
             });
         }
-        
+
         // Should detect with lower threshold
         let decomp_sensitive = analyzer_sensitive.decompose_harmonics();
         // With low threshold (0.2) and vibration of ~0.3, should detect motion
         // But detection depends on sustained vibration pattern, so just verify non-zero quality
-        assert!(decomp_sensitive.quality.rms[0] > 0.0, "Should have measured vibration");
-        
+        assert!(
+            decomp_sensitive.quality.rms[0] > 0.0,
+            "Should have measured vibration"
+        );
+
         // High threshold
         let mut analyzer_tolerant = ImuSignalAnalyzer::new_with_threshold(50, 2.0);
-        
+
         for i in 0..50 {
             let small_vib = 0.3 * ((i % 5) as f64 / 5.0 - 0.5);
             analyzer_tolerant.process_measurement(&ImuData {
@@ -878,20 +930,23 @@ mod tests {
                 gyro: [0.0, 0.0, 0.0],
             });
         }
-        
+
         // Should NOT detect with higher threshold
         let state_tolerant = analyzer_tolerant.decompose_harmonics().motor_state;
-        assert_eq!(state_tolerant, MotorState::Off,
-                   "Tolerant threshold should not detect small vibrations");
+        assert_eq!(
+            state_tolerant,
+            MotorState::Off,
+            "Tolerant threshold should not detect small vibrations"
+        );
     }
 
     #[test]
     fn test_noise_floor_update() {
         let mut analyzer = ImuSignalAnalyzer::new(50);
-        
+
         // Update noise floor
         analyzer.update_noise_floor(0.05);
-        
+
         for _ in 0..50 {
             analyzer.process_measurement(&ImuData {
                 timestamp: 0,
@@ -899,9 +954,9 @@ mod tests {
                 gyro: [0.0, 0.0, 0.0],
             });
         }
-        
+
         let quality = analyzer.decompose_harmonics().quality;
-        
+
         // SNR should reflect updated noise floor
         assert!(quality.snr[2].is_finite() && quality.snr[2] > 0.0);
     }
@@ -909,12 +964,12 @@ mod tests {
     #[test]
     fn test_gravity_direction_estimation() {
         let mut analyzer = ImuSignalAnalyzer::new(50);
-        
+
         // Tilted orientation (gravity not aligned with Z)
         // Simulate sensor tilted 45 degrees
         let angle = std::f64::consts::PI / 4.0;
         let g = 9.81;
-        
+
         for _ in 0..100 {
             analyzer.process_measurement(&ImuData {
                 timestamp: 0,
@@ -922,37 +977,43 @@ mod tests {
                 gyro: [0.0, 0.0, 0.0],
             });
         }
-        
+
         let decomp = analyzer.decompose_harmonics();
-        
+
         // Gravity magnitude should still be ~9.81
         let gravity_mag = decomp.gravity.norm();
-        assert!((gravity_mag - 9.81).abs() < 0.5,
-                "Gravity magnitude should be ~9.81: {}", gravity_mag);
+        assert!(
+            (gravity_mag - 9.81).abs() < 0.5,
+            "Gravity magnitude should be ~9.81: {}",
+            gravity_mag
+        );
     }
 
     #[test]
     fn test_multi_axis_vibration() {
         let mut analyzer = ImuSignalAnalyzer::new(100);
-        
+
         // Vibration on all axes
         for i in 0..100 {
             let vib_x = 1.0 * (i as f64 * 0.1).sin();
             let vib_y = 1.2 * (i as f64 * 0.15).sin();
             let vib_z = 0.8 * (i as f64 * 0.12).sin();
-            
+
             analyzer.process_measurement(&ImuData {
                 timestamp: (i * 5_000_000) as i64,
                 accel: [vib_x, vib_y, -9.81 + vib_z],
                 gyro: [0.0, 0.0, 0.0],
             });
         }
-        
+
         let decomp = analyzer.decompose_harmonics();
-        
+
         // Should detect as running
-        assert!(matches!(decomp.motor_state, MotorState::Running | MotorState::Transitioning));
-        
+        assert!(matches!(
+            decomp.motor_state,
+            MotorState::Running | MotorState::Transitioning
+        ));
+
         // Quality metrics should be computed for all axes
         for axis in 0..3 {
             assert!(decomp.quality.rms[axis] > 0.0);
@@ -969,7 +1030,7 @@ mod performance_tests {
     #[test]
     fn test_large_dataset_processing() {
         let mut analyzer = ImuSignalAnalyzer::new(100);
-        
+
         // Process 1,000 samples (reduced to avoid overflow)
         for i in 0..1_000_u32 {
             analyzer.process_measurement(&ImuData {
@@ -978,7 +1039,7 @@ mod performance_tests {
                 gyro: [0.0, 0.0, 0.0],
             });
         }
-        
+
         // Should complete without issues
         let decomp = analyzer.decompose_harmonics();
         assert!(decomp.quality.snr[0].is_finite());
@@ -987,7 +1048,7 @@ mod performance_tests {
     #[test]
     fn test_rapid_state_transitions() {
         let mut analyzer = ImuSignalAnalyzer::new(50);
-        
+
         // Alternate between high and low vibration
         for cycle in 0..5 {
             // High vibration
@@ -999,7 +1060,7 @@ mod performance_tests {
                     gyro: [0.0, 0.0, 0.0],
                 });
             }
-            
+
             // Low vibration
             for i in 0..30 {
                 analyzer.process_measurement(&ImuData {
@@ -1009,7 +1070,7 @@ mod performance_tests {
                 });
             }
         }
-        
+
         // Should handle transitions without crashing
         let decomp = analyzer.decompose_harmonics();
         assert!(decomp.quality.snr[0].is_finite());

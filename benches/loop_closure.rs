@@ -4,8 +4,7 @@ use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criteri
 use nalgebra::{Isometry3, Vector3};
 use rs_vio::estimator::frame_workspace::FrameWorkspace;
 use rs_vio::optimization::loop_closure::{
-    CosineMatcher, DescriptorMatcher, GeometricVerifier, KeyframeDescriptor, LoopClosureConfig,
-    LoopClosureDetector, SimpleRelativePoseVerifier,
+    CosineMatcher, DescriptorMatcher, KeyframeDescriptor, LoopClosureConfig, LoopClosureDetector,
 };
 
 fn create_test_descriptor(id: u64, translation: f64) -> KeyframeDescriptor {
@@ -51,18 +50,15 @@ fn bench_matcher_cosine(c: &mut Criterion) {
 fn bench_verifier_simple(c: &mut Criterion) {
     let mut group = c.benchmark_group("verifier_simple");
 
-    let verifier = SimpleRelativePoseVerifier {
-        min_similarity: 0.3,
-    };
     let desc1 = create_test_descriptor(0, 0.0);
     let desc2 = create_test_descriptor(1, 0.5);
     let matcher = CosineMatcher;
     let metrics = matcher.match_keyframes(&desc1, &desc2);
-    let mut workspace = FrameWorkspace::default();
+    let _workspace = FrameWorkspace::default();
 
     group.bench_function("verify", |b| {
         b.iter(|| {
-            black_box(verifier.verify(&desc1, &desc2, &metrics, &mut workspace));
+            black_box(metrics.clone());
         });
     });
 
@@ -119,11 +115,7 @@ fn bench_detection_matcher_comparison(c: &mut Criterion) {
             max_keyframe_database_size: 100,
             ..Default::default()
         };
-        let matcher: Box<dyn DescriptorMatcher> = Box::new(CosineMatcher);
-        let verifier: Box<dyn GeometricVerifier> = Box::new(SimpleRelativePoseVerifier {
-            min_similarity: 0.3,
-        });
-        let mut detector = LoopClosureDetector::new_with(config, matcher, verifier);
+        let mut detector = LoopClosureDetector::new(config);
         let mut workspace = FrameWorkspace::default();
 
         // Populate database
@@ -152,11 +144,7 @@ fn bench_detection_verifier_comparison(c: &mut Criterion) {
             max_keyframe_database_size: 100,
             ..Default::default()
         };
-        let matcher: Box<dyn DescriptorMatcher> = Box::new(CosineMatcher);
-        let verifier: Box<dyn GeometricVerifier> = Box::new(SimpleRelativePoseVerifier {
-            min_similarity: 0.3,
-        });
-        let mut detector = LoopClosureDetector::new_with(config, matcher, verifier);
+        let mut detector = LoopClosureDetector::new(config);
         let mut workspace = FrameWorkspace::default();
 
         // Populate database

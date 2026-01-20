@@ -100,6 +100,8 @@ pub mod frame;
 pub mod frame_processor;
 pub mod frame_workspace;
 pub mod imu_processor;
+pub mod keyframe_culler;
+pub mod point_quality;
 pub mod sliding_window;
 pub mod state;
 pub mod workspace_pool;
@@ -112,6 +114,13 @@ pub use frame_processor::{
 };
 pub use frame_workspace::{FrameWorkspace, WorkspaceConfig};
 pub use imu_processor::{ImuProcessingResult, ImuProcessor, ImuStatistics};
+pub use keyframe_culler::{
+    AggressiveCullingConfig, AggressiveKeyframeCuller, CullingAnalysis, CullingReason,
+};
+pub use point_quality::{
+    MapQuality, PointObservation, PointQuality, PointQualityConfig, PointQualityScorer,
+    TrackedPoint,
+};
 pub use sliding_window::SlidingWindow;
 pub use state::State;
 pub use workspace_pool::{global_pool, PooledFrameWorkspace, WorkspacePool};

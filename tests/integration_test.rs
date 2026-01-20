@@ -114,8 +114,8 @@ optimization:
 
 #[test]
 fn test_types_conversion() {
-  use rs_vio::traits::Convert;
-  use rs_vio::types::*;
+    use rs_vio::traits::Convert;
+    use rs_vio::types::*;
 
     let array4x4 = [
         [1.0, 0.0, 0.0, 1.0],

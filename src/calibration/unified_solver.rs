@@ -1,17 +1,16 @@
+use crate::calibration::rolling_shutter::RollingShutterDetector;
+use crate::calibration::time_offset::{CameraMeasurement, TimeOffsetEstimator};
+use crate::calibration::types::{
+    AcceptanceThresholds, CalibrationQualityReport, CalibrationResult, CameraIMUExtrinsics,
+    CameraIntrinsics, DistortionModel, IMUIntrinsics, TimingQuality,
+};
 /// Unified calibration solver that handles all cases (global/rolling, sync/unsync).
-/// 
+///
 /// This is the "camera-agnostic" approach: always estimate all parameters,
 /// but regularize those that shouldn't be present to zero.
 /// Decide afterward based on evidence: if t_readout ~ 0 and RS significance low → global shutter.
-
-use nalgebra::{Vector3, Isometry3, Point3};
+use nalgebra::{Isometry3, Point3, Vector3};
 use std::collections::HashMap;
-use crate::calibration::types::{
-    CameraIntrinsics, DistortionModel, CameraIMUExtrinsics, IMUIntrinsics,
-    CalibrationResult, AcceptanceThresholds, CalibrationQualityReport, TimingQuality,
-};
-use crate::calibration::time_offset::{TimeOffsetEstimator, CameraMeasurement};
-use crate::calibration::rolling_shutter::RollingShutterDetector;
 
 /// Unified calibration configuration
 #[derive(Clone, Debug)]
@@ -105,7 +104,8 @@ impl UnifiedCalibrationSolver {
         for camera_id in camera_intrinsics.keys() {
             let mut estimator = TimeOffsetEstimator::new(0.0, self.config.allow_rolling_shutter);
             estimator.enable_rolling_shutter = self.config.allow_rolling_shutter;
-            self.time_offset_estimators.insert(camera_id.clone(), estimator);
+            self.time_offset_estimators
+                .insert(camera_id.clone(), estimator);
 
             let detector = RollingShutterDetector::new();
             self.rs_detectors.insert(camera_id.clone(), detector);
@@ -161,7 +161,8 @@ impl UnifiedCalibrationSolver {
                     if let Some(intrinsics) = camera_intrinsics.get(camera_id) {
                         if let Some(distortion) = camera_distortions.get(camera_id) {
                             if let Some(extrinsics) = camera_imu_extrinsics.get(camera_id) {
-                                let image_height = dataset.image_heights.get(camera_id).copied().unwrap_or(480);
+                                let image_height =
+                                    dataset.image_heights.get(camera_id).copied().unwrap_or(480);
 
                                 // Optimize for this point
                                 let measurements = vec![(measurement.clone(), *point_world)];
@@ -183,10 +184,7 @@ impl UnifiedCalibrationSolver {
         }
     }
 
-    fn phase_detect_rolling_shutter(
-        &mut self,
-        _dataset: &CalibrationDataset,
-    ) {
+    fn phase_detect_rolling_shutter(&mut self, _dataset: &CalibrationDataset) {
         // In real implementation, would analyze edge features from calibration frames
         // For now, estimators already have RS readout estimates
         eprintln!("[UnifiedSolver] Rolling shutter detection would analyze edge straightness here");
@@ -217,7 +215,8 @@ impl UnifiedCalibrationSolver {
                             }
 
                             if !measurements.is_empty() {
-                                let image_height = dataset.image_heights.get(camera_id).copied().unwrap_or(480);
+                                let image_height =
+                                    dataset.image_heights.get(camera_id).copied().unwrap_or(480);
                                 let _ = estimator.optimization_step(
                                     &measurements,
                                     &Isometry3::identity(),
@@ -235,7 +234,10 @@ impl UnifiedCalibrationSolver {
         }
     }
 
-    fn generate_quality_report(&self, thresholds: &AcceptanceThresholds) -> CalibrationQualityReport {
+    fn generate_quality_report(
+        &self,
+        thresholds: &AcceptanceThresholds,
+    ) -> CalibrationQualityReport {
         let mut metrics = Vec::new();
         let mut passed = true;
 
@@ -279,7 +281,10 @@ impl UnifiedCalibrationSolver {
             metrics.push((
                 format!("Time offset uncertainty ({})", camera_id),
                 uncertainty_passed,
-                format!("{:.6}s (max: {:.6}s)", estimator.time_offset_uncertainty, thresholds.time_jitter_max),
+                format!(
+                    "{:.6}s (max: {:.6}s)",
+                    estimator.time_offset_uncertainty, thresholds.time_jitter_max
+                ),
             ));
         }
 

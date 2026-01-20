@@ -281,6 +281,9 @@ pub struct BundleAdjustmentFactor {
 
     /// Fixed pose T_B_W (SE3 transform from W to B) if provided, None if pose is optimized
     pub fixed_pose: Option<Matrix4<f64>>,
+
+    /// Optional per-measurement weight (sqrt information). Defaults to 1.0.
+    pub weight: f64,
 }
 
 impl BundleAdjustmentFactor {
@@ -289,6 +292,7 @@ impl BundleAdjustmentFactor {
             observation,
             T_C_B,
             fixed_pose: None,
+            weight: 1.0,
         }
     }
 
@@ -296,6 +300,13 @@ impl BundleAdjustmentFactor {
     /// When set, the pose is not optimized and only the 3D point is optimized.
     pub fn with_fixed_pose(mut self, T_B_W: Matrix4<f64>) -> Self {
         self.fixed_pose = Some(T_B_W);
+        self
+    }
+
+    /// Apply a scalar weight to the residual (sqrt information).
+    pub fn with_weight(mut self, weight: f64) -> Self {
+        // Avoid zeroing out residuals/Jacobians while still allowing down-weighting.
+        self.weight = weight.max(1e-6);
         self
     }
 
@@ -382,20 +393,31 @@ impl Factor for BundleAdjustmentFactor {
         // A proper implementation would use a soft constraint or reject the measurement.
         if p_C.z <= 0.0 {
             // log::warn!("3D point is behind the camera, skipping optimization");
-            let residuals = DVector::from_vec(vec![1e6, 1e6]);
+            let mut residuals = DVector::from_vec(vec![1e6, 1e6]);
+
+            if (self.weight - 1.0).abs() > f64::EPSILON {
+                residuals *= self.weight;
+            }
+
             if self.fixed_pose.is_some() {
                 // Only optimize 3D point
-                let jac = DMatrix::zeros(2, 3);
+                let mut jac = DMatrix::zeros(2, 3);
+                if (self.weight - 1.0).abs() > f64::EPSILON {
+                    jac *= self.weight;
+                }
                 return (residuals, Some(jac));
             } else {
-                let jac = DMatrix::zeros(2, 9);
+                let mut jac = DMatrix::zeros(2, 9);
+                if (self.weight - 1.0).abs() > f64::EPSILON {
+                    jac *= self.weight;
+                }
                 return (residuals, Some(jac));
             }
         }
 
         // Project and compute residuals
         let proj = self.project_normalized(p_C);
-        let residuals = DVector::from_vec(vec![
+        let mut residuals = DVector::from_vec(vec![
             proj[0] - self.observation[0],
             proj[1] - self.observation[1],
         ]);
@@ -433,6 +455,17 @@ impl Factor for BundleAdjustmentFactor {
         } else {
             None
         };
+
+        if (self.weight - 1.0).abs() > f64::EPSILON {
+            residuals *= self.weight;
+        }
+
+        let jacobian_matrix = jacobian_matrix.map(|mut jac| {
+            if (self.weight - 1.0).abs() > f64::EPSILON {
+                jac *= self.weight;
+            }
+            jac
+        });
 
         (residuals, jacobian_matrix)
     }

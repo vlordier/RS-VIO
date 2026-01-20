@@ -40,6 +40,7 @@ NC := \033[0m
 	run run-euroc run-tum run-4seasons \
 	docker docker-build docker-test docker-push \
 	ci benchmark-all \
+	viz viz-demo viz-tum viz-install-python viz-plots viz-plots-tum \
 	info clean-all
 
 # ============================================================================
@@ -74,6 +75,14 @@ help:
 	@echo "  $(COLOR_YELLOW)run-euroc$(NC)             - Run EuRoC benchmark"
 	@echo "  $(COLOR_YELLOW)run-tum$(NC)               - Run TUM-VI benchmark"
 	@echo "  $(COLOR_YELLOW)run-4seasons$(NC)          - Run 4Seasons benchmark"
+	@echo ""
+	@echo "$(COLOR_GREEN)VISUALIZATION$(NC)"
+	@echo "  $(COLOR_YELLOW)viz$(NC)                   - Generate all visualizations (demo + TUM-VI + plots)"
+	@echo "  $(COLOR_YELLOW)viz-demo$(NC)              - Generate synthetic demo visualization"
+	@echo "  $(COLOR_YELLOW)viz-tum$(NC)               - Generate TUM-VI dataset visualization"
+	@echo "  $(COLOR_YELLOW)viz-install-python$(NC)    - Install Python plotting dependencies"
+	@echo "  $(COLOR_YELLOW)viz-plots$(NC)             - Generate plots from demo data"
+	@echo "  $(COLOR_YELLOW)viz-plots-tum$(NC)         - Generate plots from TUM-VI data"
 	@echo ""
 	@echo "$(COLOR_GREEN)DOCKER$(NC)"
 	@echo "  $(COLOR_YELLOW)docker$(NC)                - Build Docker image"
@@ -297,6 +306,74 @@ benchmark-all:
 		bash $(SCRIPT_DIR)/orchestrate.sh all; \
 	else \
 		echo "$(COLOR_RED)✗ orchestrate.sh not found$(NC)"; \
+		exit 1; \
+	fi
+
+# ============================================================================
+# Visualization Targets
+# ============================================================================
+
+viz: viz-demo viz-tum viz-plots viz-plots-tum
+	@echo "$(COLOR_GREEN)═══════════════════════════════════════════════════════════$(NC)"
+	@echo "$(COLOR_GREEN)✓ All visualizations generated!$(NC)"
+	@echo "$(COLOR_GREEN)═══════════════════════════════════════════════════════════$(NC)"
+	@echo ""
+	@echo "$(COLOR_YELLOW)Synthetic Demo Results:$(NC)"
+	@echo "  ./plot_output/*.png"
+	@echo ""
+	@echo "$(COLOR_YELLOW)TUM-VI Dataset Results:$(NC)"
+	@echo "  ./tum_vi_results/*.png"
+	@echo ""
+
+viz-demo:
+	@echo "$(COLOR_GREEN)Generating synthetic demonstration data...$(NC)"
+	cargo run --example plot_vio_comparisons
+	@echo "$(COLOR_GREEN)✓ Demo data generated in ./plot_output/$(NC)"
+
+viz-tum:
+	@echo "$(COLOR_GREEN)Processing TUM-VI dataset...$(NC)"
+	@if [ -d "$(DATASET_DIR)/tum_vi/room1" ]; then \
+		cargo run --example plot_tum_vi_comparison -- $(DATASET_DIR)/tum_vi/room1; \
+		echo "$(COLOR_GREEN)✓ TUM-VI data generated in ./tum_vi_results/$(NC)"; \
+	else \
+		echo "$(COLOR_YELLOW)⚠ TUM-VI dataset not found at $(DATASET_DIR)/tum_vi/room1$(NC)"; \
+		echo "  Download from: https://vision.in.tum.de/data/datasets/visual-inertial-dataset"; \
+		echo "  Or run: make download-datasets"; \
+		exit 1; \
+	fi
+
+viz-install-python:
+	@echo "$(COLOR_GREEN)Installing Python plotting dependencies...$(NC)"
+	@if command -v pip3 &> /dev/null; then \
+		pip3 install pandas matplotlib numpy; \
+		echo "$(COLOR_GREEN)✓ Python dependencies installed$(NC)"; \
+	elif command -v pip &> /dev/null; then \
+		pip install pandas matplotlib numpy; \
+		echo "$(COLOR_GREEN)✓ Python dependencies installed$(NC)"; \
+	else \
+		echo "$(COLOR_RED)✗ pip not found. Please install Python 3$(NC)"; \
+		exit 1; \
+	fi
+
+viz-plots:
+	@echo "$(COLOR_GREEN)Generating plots from demo data...$(NC)"
+	@if [ -f "./plot_output/plot_comparisons.py" ]; then \
+		cd plot_output && python3 plot_comparisons.py; \
+		echo "$(COLOR_GREEN)✓ Plots generated in ./plot_output/$(NC)"; \
+		ls -lh ./plot_output/*.png 2>/dev/null || echo "$(COLOR_YELLOW)No PNG files generated (check for errors)$(NC)"; \
+	else \
+		echo "$(COLOR_RED)✗ Demo data not found. Run 'make viz-demo' first$(NC)"; \
+		exit 1; \
+	fi
+
+viz-plots-tum:
+	@echo "$(COLOR_GREEN)Generating plots from TUM-VI data...$(NC)"
+	@if [ -f "./tum_vi_results/plot_comparisons.py" ]; then \
+		cd tum_vi_results && python3 plot_comparisons.py; \
+		echo "$(COLOR_GREEN)✓ Plots generated in ./tum_vi_results/$(NC)"; \
+		ls -lh ./tum_vi_results/*.png 2>/dev/null || echo "$(COLOR_YELLOW)No PNG files generated (check for errors)$(NC)"; \
+	else \
+		echo "$(COLOR_RED)✗ TUM-VI data not found. Run 'make viz-tum' first$(NC)"; \
 		exit 1; \
 	fi
 

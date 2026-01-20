@@ -212,3 +212,19 @@ harness = false
 [[bench]]
 name = "distance_speed_metrics"
 harness = false
+
+[[bench]]
+name = "calibration_integration_bench"
+harness = false
+
+[[bench]]
+name = "calibration_sensitivity"
+harness = false
+
+[[bench]]
+name = "imu_tracking_fast_rotation"
+harness = false
+
+[[bench]]
+name = "rolling_shutter_extended"
+harness = false

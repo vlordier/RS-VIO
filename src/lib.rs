@@ -170,8 +170,8 @@ pub mod imu;
 pub mod logging;
 pub mod math;
 pub mod optimization;
-pub mod validation;
 pub mod platform;
+pub mod validation;
 pub mod vision;
 
 pub mod traits;

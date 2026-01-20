@@ -577,8 +577,8 @@ impl Viewer for RerunViewer {
                     .map(|(i, &accel)| [i as f32 * 0.01, accel[0], accel[1]])
                     .collect();
 
-                let accel_line = LineStrips3D::new([accel_3d])
-                    .with_colors([Color::from_rgb(255, 100, 100)]); // Light red
+                let accel_line =
+                    LineStrips3D::new([accel_3d]).with_colors([Color::from_rgb(255, 100, 100)]); // Light red
 
                 if let Err(e) = rec.log(format!("{}/accel_raw", entity_path), &accel_line) {
                     log::debug!("[RerunViewer] Failed to log raw accel: {}", e);
@@ -593,8 +593,8 @@ impl Viewer for RerunViewer {
                     .map(|(i, &gyro)| [i as f32 * 0.01, gyro[0], gyro[1]])
                     .collect();
 
-                let gyro_line = LineStrips3D::new([gyro_3d])
-                    .with_colors([Color::from_rgb(100, 100, 255)]); // Light blue
+                let gyro_line =
+                    LineStrips3D::new([gyro_3d]).with_colors([Color::from_rgb(100, 100, 255)]); // Light blue
 
                 if let Err(e) = rec.log(format!("{}/gyro_raw", entity_path), &gyro_line) {
                     log::debug!("[RerunViewer] Failed to log raw gyro: {}", e);
@@ -648,11 +648,10 @@ impl Viewer for RerunViewer {
                     .map(|(i, &accel)| [i as f32 * 0.01, accel[0], accel[1]])
                     .collect();
 
-                let accel_line = LineStrips3D::new([accel_3d])
-                    .with_colors([Color::from_rgb(255, 0, 0)]); // Bright red
+                let accel_line =
+                    LineStrips3D::new([accel_3d]).with_colors([Color::from_rgb(255, 0, 0)]); // Bright red
 
-                if let Err(e) = rec.log(format!("{}/accel_processed", entity_path), &accel_line)
-                {
+                if let Err(e) = rec.log(format!("{}/accel_processed", entity_path), &accel_line) {
                     log::debug!("[RerunViewer] Failed to log processed accel: {}", e);
                 }
             }
@@ -665,8 +664,8 @@ impl Viewer for RerunViewer {
                     .map(|(i, &gyro)| [i as f32 * 0.01, gyro[0], gyro[1]])
                     .collect();
 
-                let gyro_line = LineStrips3D::new([gyro_3d])
-                    .with_colors([Color::from_rgb(0, 0, 255)]); // Bright blue
+                let gyro_line =
+                    LineStrips3D::new([gyro_3d]).with_colors([Color::from_rgb(0, 0, 255)]); // Bright blue
 
                 if let Err(e) = rec.log(format!("{}/gyro_processed", entity_path), &gyro_line) {
                     log::debug!("[RerunViewer] Failed to log processed gyro: {}", e);
@@ -716,13 +715,20 @@ impl Viewer for RerunViewer {
 
             // Log gravity component as a vector at origin
             let gravity_positions = vec![[0.0, 0.0, 0.0]];
-            let gravity_vectors = vec![[gravity_component[0], gravity_component[1], gravity_component[2]]];
-            
+            let gravity_vectors = vec![[
+                gravity_component[0],
+                gravity_component[1],
+                gravity_component[2],
+            ]];
+
             let gravity_arrows = rerun::Arrows3D::from_vectors(gravity_vectors)
                 .with_origins(gravity_positions)
                 .with_colors([Color::from_rgb(0, 255, 0)]); // Green for gravity
 
-            if let Err(e) = rec.log(format!("{}/gravity_component", entity_path), &gravity_arrows) {
+            if let Err(e) = rec.log(
+                format!("{}/gravity_component", entity_path),
+                &gravity_arrows,
+            ) {
                 log::debug!("[RerunViewer] Failed to log gravity component: {}", e);
             }
 
@@ -738,7 +744,8 @@ impl Viewer for RerunViewer {
             }
 
             // Log gyro bias information
-            let bias_text = format!(
+            let bias_text =
+                format!(
                 "Accel Bias: [{:.4}, {:.4}, {:.4}] m/s²\nGyro Bias: [{:.4}, {:.4}, {:.4}] rad/s",
                 bias_accel[0], bias_accel[1], bias_accel[2],
                 bias_gyro[0], bias_gyro[1], bias_gyro[2]
@@ -758,8 +765,8 @@ impl Viewer for RerunViewer {
                     .map(|(i, &harmonic)| [i as f32 * 0.01, harmonic[0], harmonic[1]])
                     .collect();
 
-                let harmonic_line = LineStrips3D::new([harmonic_3d])
-                    .with_colors([Color::from_rgb(255, 0, 255)]); // Magenta for harmonics/noise
+                let harmonic_line =
+                    LineStrips3D::new([harmonic_3d]).with_colors([Color::from_rgb(255, 0, 255)]); // Magenta for harmonics/noise
 
                 if let Err(e) = rec.log(
                     format!("{}/harmonic_components", entity_path),
@@ -792,7 +799,7 @@ impl Viewer for RerunViewer {
             let gravity_mag = (gravity_component[0] * gravity_component[0]
                 + gravity_component[1] * gravity_component[1]
                 + gravity_component[2] * gravity_component[2])
-            .sqrt();
+                .sqrt();
 
             let gravity_info = format!(
                 "Gravity Magnitude: {:.3} m/s² | Direction: [{:.3}, {:.3}, {:.3}]",
@@ -828,10 +835,10 @@ impl Viewer for RerunViewer {
 
             // Log motor state prominently
             let _motor_state_color = match motor_state {
-                "Off" => [0, 255, 0], // Green
-                "Running" => [255, 0, 0], // Red  
+                "Off" => [0, 255, 0],             // Green
+                "Running" => [255, 0, 0],         // Red
                 "Transitioning" => [255, 165, 0], // Orange
-                _ => [128, 128, 128], // Gray for unknown
+                _ => [128, 128, 128],             // Gray for unknown
             };
 
             if let Err(e) = rec.log(
@@ -846,14 +853,21 @@ impl Viewer for RerunViewer {
             if fundamental_freq_hz > 0.0 {
                 if let Err(e) = rec.log(
                     format!("{}/freq_text", entity_path),
-                    &rerun::TextDocument::new(format!("Rotor Frequency f₀: {:.1} Hz", fundamental_freq_hz)),
+                    &rerun::TextDocument::new(format!(
+                        "Rotor Frequency f₀: {:.1} Hz",
+                        fundamental_freq_hz
+                    )),
                 ) {
                     log::debug!("[RerunViewer] Failed to log frequency text: {}", e);
                 }
             }
 
             // Log signal quality metrics as bar charts
-            let snr_bars = vec![signal_snr[0] as f64, signal_snr[1] as f64, signal_snr[2] as f64];
+            let snr_bars = vec![
+                signal_snr[0] as f64,
+                signal_snr[1] as f64,
+                signal_snr[2] as f64,
+            ];
             if let Err(e) = rec.log(
                 format!("{}/signal_snr", entity_path),
                 &rerun::BarChart::new(snr_bars),
@@ -861,7 +875,11 @@ impl Viewer for RerunViewer {
                 log::debug!("[RerunViewer] Failed to log SNR: {}", e);
             }
 
-            let rms_bars = vec![signal_rms[0] as f64, signal_rms[1] as f64, signal_rms[2] as f64];
+            let rms_bars = vec![
+                signal_rms[0] as f64,
+                signal_rms[1] as f64,
+                signal_rms[2] as f64,
+            ];
             if let Err(e) = rec.log(
                 format!("{}/signal_rms", entity_path),
                 &rerun::BarChart::new(rms_bars),
@@ -869,7 +887,11 @@ impl Viewer for RerunViewer {
                 log::debug!("[RerunViewer] Failed to log RMS: {}", e);
             }
 
-            let peak_bars = vec![signal_peak[0] as f64, signal_peak[1] as f64, signal_peak[2] as f64];
+            let peak_bars = vec![
+                signal_peak[0] as f64,
+                signal_peak[1] as f64,
+                signal_peak[2] as f64,
+            ];
             if let Err(e) = rec.log(
                 format!("{}/signal_peak", entity_path),
                 &rerun::BarChart::new(peak_bars),
@@ -886,9 +908,15 @@ impl Viewer for RerunViewer {
                  Peak (X, Y, Z): [{:.4}, {:.4}, {:.4}] m/s²",
                 motor_state,
                 fundamental_freq_hz,
-                signal_snr[0], signal_snr[1], signal_snr[2],
-                signal_rms[0], signal_rms[1], signal_rms[2],
-                signal_peak[0], signal_peak[1], signal_peak[2]
+                signal_snr[0],
+                signal_snr[1],
+                signal_snr[2],
+                signal_rms[0],
+                signal_rms[1],
+                signal_rms[2],
+                signal_peak[0],
+                signal_peak[1],
+                signal_peak[2]
             );
             if let Err(e) = rec.log(
                 format!("{}/quality_report", entity_path),
@@ -899,7 +927,7 @@ impl Viewer for RerunViewer {
 
             // Determine overall signal quality (adjusted for motor state)
             let avg_snr = (signal_snr[0] + signal_snr[1] + signal_snr[2]) / 3.0;
-            
+
             // SNR thresholds differ based on motor state
             let (quality_level, context) = match motor_state {
                 "Off" => {
@@ -914,7 +942,7 @@ impl Viewer for RerunViewer {
                         "Poor"
                     };
                     (level, "stationary")
-                }
+                },
                 "Running" => {
                     // Lower SNR acceptable when motors running
                     let level = if avg_snr > 25.0 {
@@ -927,7 +955,7 @@ impl Viewer for RerunViewer {
                         "Poor"
                     };
                     (level, "in-flight")
-                }
+                },
                 _ => {
                     let level = if avg_snr > 20.0 {
                         "Good"
@@ -937,11 +965,11 @@ impl Viewer for RerunViewer {
                         "Poor"
                     };
                     (level, "transitioning")
-                }
+                },
             };
 
             let quality_summary = format!(
-                "Signal Quality: {} ({}) - SNR: {:.1} dB", 
+                "Signal Quality: {} ({}) - SNR: {:.1} dB",
                 quality_level, context, avg_snr
             );
             if let Err(e) = rec.log(

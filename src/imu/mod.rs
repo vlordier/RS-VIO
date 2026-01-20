@@ -35,13 +35,17 @@
 //! - Lupton & Sukkarieh, "Visual-Inertial-Aided Navigation for
 //!   High-Dynamic Motion in GPS-Denied Environments", 2011
 
+pub mod denoise_filter;
+pub mod higher_order_filter;
 pub mod initialization;
 pub mod learned_vibration;
 pub mod signal_analysis;
 pub mod vibration_filter;
-pub mod denoise_filter;
-pub mod higher_order_filter;
 
+pub use denoise_filter::{DenoiseConfig, ImuDenoiseFilter};
+pub use higher_order_filter::{
+    HigherOrderFilter, HigherOrderFilterConfig, HigherOrderOutput, JerkStats, SnapStats,
+};
 pub use initialization::{
     AdaptiveNoiseEstimator, BiasEstimate, ImuInitializationConfig, ImuInitializer,
     InitializationState,
@@ -52,10 +56,6 @@ pub use learned_vibration::{
 pub use signal_analysis::{HarmonicDecomposition, ImuSignalAnalyzer, SignalQuality};
 pub use vibration_filter::{
     NotchFilter, VibrationFilterConfig, VibrationNotchFilter, VibrationPeak,
-};
-pub use denoise_filter::{ImuDenoiseFilter, DenoiseConfig};
-pub use higher_order_filter::{
-    HigherOrderFilter, HigherOrderFilterConfig, HigherOrderOutput, JerkStats, SnapStats,
 };
 
 use crate::datasets::ImuData;
@@ -224,6 +224,98 @@ impl ImuPreintegrator {
     /// Get current preintegrated measurements
     pub fn get(&self) -> &PreintegratedImu {
         &self.current
+    }
+
+    /// Check if we have valid preintegrated measurements
+    pub fn is_valid(&self) -> bool {
+        self.current.delta_time > 0.0 && self.has_initial_measurement
+    }
+
+    /// Create an IMU motion prior from current preintegration state
+    ///
+    /// This should be called after processing IMU measurements between two keyframes
+    /// to create a prior for bundle adjustment.
+    ///
+    /// # Arguments
+    /// * `initial_pose` - Pose at the start of the interval (T_W_B at time i)
+    /// * `initial_velocity` - Velocity at the start of the interval
+    ///
+    /// # Returns
+    /// Some(ImuMotionPrior) if valid preintegration exists, None otherwise
+    pub fn create_motion_prior(
+        &self,
+        initial_pose: na::Matrix4<Float>,
+        initial_velocity: na::Vector3<Float>,
+    ) -> Option<ImuMotionPrior> {
+        if !self.is_valid() {
+            return None;
+        }
+
+        let gravity = na::Vector3::new(
+            self.config.gravity[0] as Float,
+            self.config.gravity[1] as Float,
+            self.config.gravity[2] as Float,
+        );
+
+        Some(ImuMotionPrior::from_preintegration(
+            &self.current,
+            initial_pose,
+            initial_velocity,
+            gravity,
+        ))
+    }
+
+    /// Create preintegration data for tight-coupled VIO
+    ///
+    /// This creates the data structure needed by InterKeyframeImuFactor
+    /// for true tight coupling between consecutive keyframes.
+    ///
+    /// # Returns
+    /// Some(ImuPreintegration) if valid data exists, None otherwise
+    pub fn create_tight_coupling_preintegration(
+        &self,
+    ) -> Option<crate::optimization::tight_coupling::ImuPreintegration> {
+        if !self.is_valid() {
+            return None;
+        }
+
+        Some(crate::optimization::tight_coupling::ImuPreintegration {
+            dt: self.current.delta_time as Float,
+            delta_R: self
+                .current
+                .delta_rotation
+                .to_rotation_matrix()
+                .into_inner()
+                .cast::<Float>(),
+            delta_v: self.current.delta_velocity.cast::<Float>(),
+            delta_p: self.current.delta_position.cast::<Float>(),
+            cov_R: self
+                .current
+                .covariance
+                .fixed_view::<3, 3>(0, 0)
+                .into_owned()
+                .cast::<Float>(),
+            cov_v: self
+                .current
+                .covariance
+                .fixed_view::<3, 3>(3, 3)
+                .into_owned()
+                .cast::<Float>(),
+            cov_p: self
+                .current
+                .covariance
+                .fixed_view::<3, 3>(6, 6)
+                .into_owned()
+                .cast::<Float>(),
+            cov_R_bw: self.current.jacobian_wrt_gyro_bias.cast::<Float>(),
+            cov_v_ba: self.current.jacobian_wrt_accel_bias.cast::<Float>(),
+            cov_p_ba: na::Matrix3::zeros(),
+        })
+    }
+
+    /// Get the time interval of preintegrated measurements
+    pub fn delta_time(&self) -> Float {
+        self.current.delta_time as Float
     }
 
     /// Reset preintegrator
@@ -621,6 +713,11 @@ impl ExtrinsicCalibrator {
     /// Number of accumulated measurements
     pub fn measurement_count(&self) -> usize {
         self.accumulated_rotations.len()
+    }
+
+    /// Number of calibration iterations run
+    pub fn iterations(&self) -> usize {
+        self.iterations
     }
 }
 

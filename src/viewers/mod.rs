@@ -55,12 +55,14 @@
 //! - [`crate::feature_tracker::StereoPatchTracker`] - Feature tracking
 
 pub mod rerun;
-pub mod viewer;
 pub mod screenshot_helper;
+pub mod viewer;
 
 pub use rerun::{create_viewer, RerunViewer};
+pub use screenshot_helper::{
+    ScreenshotBatch, ScreenshotId, ScreenshotMetadata, ScreenshotResult, ViewScreenshotRequest,
+};
 pub use viewer::Viewer;
-pub use screenshot_helper::{ScreenshotId, ScreenshotMetadata, ScreenshotResult, ViewScreenshotRequest, ScreenshotBatch};
 
 use std::collections::HashMap;
 use std::sync::Mutex;

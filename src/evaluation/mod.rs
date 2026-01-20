@@ -1,5 +1,12 @@
+pub mod calibration_monitor;
+pub mod calibration_quality;
+pub mod depth_metrics;
+pub mod distance_speed_metrics;
+pub mod feature_metrics;
+pub mod results;
+pub mod robustness_metrics;
 /// VIO evaluation metrics and benchmarking tools
-/// 
+///
 /// Provides comprehensive evaluation of:
 /// - Trajectory accuracy (ATE, RPE)
 /// - Depth/disparity accuracy  
@@ -7,26 +14,22 @@
 /// - Robustness metrics
 /// - Motion estimation error
 /// - Distance and speed-aware metrics
-
 pub mod trajectory_metrics;
-pub mod depth_metrics;
-pub mod feature_metrics;
-pub mod robustness_metrics;
-pub mod results;
-pub mod distance_speed_metrics;
-pub mod calibration_quality;
 
-pub use trajectory_metrics::{TrajectoryMetrics, compute_ate, compute_rpe};
-pub use depth_metrics::{DepthMetrics, compute_depth_rmse};
-pub use feature_metrics::{FeatureMetrics, compute_reprojection_error};
-pub use robustness_metrics::{RobustnessMetrics, track_failure_rate};
-pub use results::{Configuration, ConfigurationResults, compare_configurations};
-pub use distance_speed_metrics::{
-    DistanceBinnedMetrics, SpeedBinnedMetrics, BinMetrics, DistanceSpeedMatrix,
-    DistanceSpeedAnalysis, DistanceSpeedAnalyzer, CalibrationAwareMetrics,
-    CalibrationAwareAnalyzer, WeightedResidualStats, TrackSurvivalStats,
-    DistanceBinnedImprovement, SpeedBinnedImprovement,
+pub use calibration_monitor::{
+    CalibrationHealth, CalibrationHealthAssessment, CalibrationHealthThresholds,
+    CalibrationMonitor, CalibrationTrend, HealthIssue, IssueSeverity,
 };
 pub use calibration_quality::{
-    CalibrationConfidenceFactors, CalibrationQualityStats, CalibrationImprovementMetrics,
+    CalibrationConfidenceFactors, CalibrationImprovementMetrics, CalibrationQualityStats,
 };
+pub use depth_metrics::{compute_depth_rmse, DepthMetrics};
+pub use distance_speed_metrics::{
+    BinMetrics, CalibrationAwareAnalyzer, CalibrationAwareMetrics, DistanceBinnedImprovement,
+    DistanceBinnedMetrics, DistanceSpeedAnalysis, DistanceSpeedAnalyzer, DistanceSpeedMatrix,
+    SpeedBinnedImprovement, SpeedBinnedMetrics, TrackSurvivalStats, WeightedResidualStats,
+};
+pub use feature_metrics::{compute_reprojection_error, FeatureMetrics};
+pub use results::{compare_configurations, Configuration, ConfigurationResults};
+pub use robustness_metrics::{track_failure_rate, RobustnessMetrics};
+pub use trajectory_metrics::{compute_ate, compute_rpe, TrajectoryMetrics};

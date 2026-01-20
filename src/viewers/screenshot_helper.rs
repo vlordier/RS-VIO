@@ -70,8 +70,7 @@ impl ScreenshotResult {
     /// Save the screenshot to a PNG file
     pub fn save_to_file(&self, path: impl AsRef<std::path::Path>) -> Result<(), String> {
         let png_data = self.to_png()?;
-        std::fs::write(path, png_data)
-            .map_err(|e| format!("Failed to write PNG file: {}", e))
+        std::fs::write(path, png_data).map_err(|e| format!("Failed to write PNG file: {}", e))
     }
 }
 

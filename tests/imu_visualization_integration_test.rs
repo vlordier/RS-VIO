@@ -50,14 +50,20 @@ fn test_imu_signal_analyzer_basic_workflow() {
 
     // Verify bias estimates exist
     assert!(decomp.accel_bias.norm() < 15.0); // Reasonable bias magnitude (includes gravity estimation error)
-    assert!(decomp.gyro_bias.norm() < 1.0);  // Reasonable gyro bias
+    assert!(decomp.gyro_bias.norm() < 1.0); // Reasonable gyro bias
 
-    println!("✓ Gravity: [{:.3}, {:.3}, {:.3}] m/s²", 
-             decomp.gravity.x, decomp.gravity.y, decomp.gravity.z);
-    println!("✓ Accel Bias: [{:.4}, {:.4}, {:.4}] m/s²", 
-             decomp.accel_bias.x, decomp.accel_bias.y, decomp.accel_bias.z);
-    println!("✓ Signal Quality SNR: [{:.1}, {:.1}, {:.1}] dB", 
-             decomp.quality.snr[0], decomp.quality.snr[1], decomp.quality.snr[2]);
+    println!(
+        "✓ Gravity: [{:.3}, {:.3}, {:.3}] m/s²",
+        decomp.gravity.x, decomp.gravity.y, decomp.gravity.z
+    );
+    println!(
+        "✓ Accel Bias: [{:.4}, {:.4}, {:.4}] m/s²",
+        decomp.accel_bias.x, decomp.accel_bias.y, decomp.accel_bias.z
+    );
+    println!(
+        "✓ Signal Quality SNR: [{:.1}, {:.1}, {:.1}] dB",
+        decomp.quality.snr[0], decomp.quality.snr[1], decomp.quality.snr[2]
+    );
 }
 
 #[test]
@@ -90,8 +96,10 @@ fn test_imu_signal_quality_computation() {
         );
     }
 
-    println!("✓ Clean signal RMS: [{:.4}, {:.4}, {:.4}]", 
-             decomp.quality.rms[0], decomp.quality.rms[1], decomp.quality.rms[2]);
+    println!(
+        "✓ Clean signal RMS: [{:.4}, {:.4}, {:.4}]",
+        decomp.quality.rms[0], decomp.quality.rms[1], decomp.quality.rms[2]
+    );
 }
 
 #[test]
@@ -127,10 +135,14 @@ fn test_bias_estimation_convergence() {
         bias_gyro.norm()
     );
 
-    println!("✓ Estimated accel bias: [{:.4}, {:.4}, {:.4}]", 
-             bias_accel.x, bias_accel.y, bias_accel.z);
-    println!("✓ Estimated gyro bias: [{:.4}, {:.4}, {:.4}]", 
-             bias_gyro.x, bias_gyro.y, bias_gyro.z);
+    println!(
+        "✓ Estimated accel bias: [{:.4}, {:.4}, {:.4}]",
+        bias_accel.x, bias_accel.y, bias_accel.z
+    );
+    println!(
+        "✓ Estimated gyro bias: [{:.4}, {:.4}, {:.4}]",
+        bias_gyro.x, bias_gyro.y, bias_gyro.z
+    );
 }
 
 #[test]
@@ -169,8 +181,14 @@ fn test_harmonic_extraction() {
         "Fundamental harmonic should have non-zero magnitude"
     );
 
-    println!("✓ Fundamental harmonic magnitude: {:.4} m/s²", fundamental_mag);
-    println!("✓ Residual harmonics count: {}", decomp.residual_harmonics.len());
+    println!(
+        "✓ Fundamental harmonic magnitude: {:.4} m/s²",
+        fundamental_mag
+    );
+    println!(
+        "✓ Residual harmonics count: {}",
+        decomp.residual_harmonics.len()
+    );
 }
 
 #[test]
@@ -201,10 +219,14 @@ fn test_window_size_impact() {
     assert!((large_decomp.gravity.z + 9.81).abs() < 1.5);
 
     // Larger window typically gives smoother estimates (lower RMS)
-    println!("✓ Small window gravity: [{:.3}, {:.3}, {:.3}]", 
-             small_decomp.gravity.x, small_decomp.gravity.y, small_decomp.gravity.z);
-    println!("✓ Large window gravity: [{:.3}, {:.3}, {:.3}]", 
-             large_decomp.gravity.x, large_decomp.gravity.y, large_decomp.gravity.z);
+    println!(
+        "✓ Small window gravity: [{:.3}, {:.3}, {:.3}]",
+        small_decomp.gravity.x, small_decomp.gravity.y, small_decomp.gravity.z
+    );
+    println!(
+        "✓ Large window gravity: [{:.3}, {:.3}, {:.3}]",
+        large_decomp.gravity.x, large_decomp.gravity.y, large_decomp.gravity.z
+    );
 }
 
 #[test]

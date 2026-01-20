@@ -2,13 +2,21 @@ use image::{GrayImage, Luma};
 use imageproc::corners::Corner;
 use nalgebra as na;
 use rayon::prelude::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ops::AddAssign;
+use std::sync::Arc;
 use std::time::Instant;
 
 use crate::datasets::config::FeatureDetectionConfig;
+use crate::datasets::ImuData;
 
-use super::{frame_skip, image_utilities, patch};
+use super::{
+    frame_skip, gpu_accel, image_utilities, patch,
+    ransac_essential::{EssentialMatrixRansac, RansacConfig},
+    subpixel_stereo::{StereoMatchResult, SubpixelStereoRefinement},
+};
+
+use crate::vision::subpixel_disparity::PatchMatchingConfig;
 
 use crate::debug_log;
 use log::info;
@@ -23,6 +31,18 @@ pub struct Feature {
 
     /// Undistorted pixel coordinate (u, v). `[-1, -1]` means invalid.
     pub undistorted_coord: [f32; 2],
+
+    /// Stereo disparity (pixels). `None` if not estimated.
+    pub disparity: Option<f32>,
+
+    /// Disparity uncertainty (pixels). `None` if not estimated.
+    pub disparity_uncertainty: Option<f32>,
+
+    /// Final photometric error from refinement.
+    pub photometric_error: Option<f32>,
+
+    /// Peak sharpness of the correlation surface.
+    pub peak_sharpness: Option<f32>,
 
     /// Tracking quality metrics
     pub quality: FeatureQuality,
@@ -68,6 +88,10 @@ impl Feature {
             feature_id,
             pixel_coord,
             undistorted_coord: [-1.0, -1.0],
+            disparity: None,
+            disparity_uncertainty: None,
+            photometric_error: None,
+            peak_sharpness: None,
             quality: FeatureQuality::default(),
         }
     }
@@ -82,6 +106,10 @@ impl Feature {
             feature_id,
             pixel_coord,
             undistorted_coord: [-1.0, -1.0],
+            disparity: None,
+            disparity_uncertainty: None,
+            photometric_error: None,
+            peak_sharpness: None,
             quality,
         }
     }
@@ -171,6 +199,11 @@ pub struct StereoPatchTracker<const N: u32> {
     subpixel_enable: bool,
     subpixel_iterations: usize,
     subpixel_threshold: f32,
+    subpixel_refinement: SubpixelStereoRefinement,
+    essential_ransac: EssentialMatrixRansac,
+    imu_rotation_hint: Option<[f32; 3]>,
+    imu_intrinsics_hint: Option<(f32, f32, f32, f32)>,
+    camera_matrix_hint: Option<na::Matrix3<f32>>,
     /// Features that were lost and may be re-tracked
     lost_features: HashMap<usize, (na::Affine2<f32>, na::Affine2<f32>, u32)>, // (left_pos, right_pos, frames_lost)
     /// Maximum frames to keep lost features for re-tracking
@@ -183,6 +216,9 @@ pub struct StereoPatchTracker<const N: u32> {
     last_frame_time: Option<Instant>,
     /// Frame counter for sampled logging (log every N frames to reduce overhead)
     frame_count: u64,
+    /// GPU accelerator for compute-intensive operations (initialized but not yet integrated)
+    #[allow(dead_code)]
+    gpu_accelerator: Option<Arc<gpu_accel::GpuAccelerator>>,
 }
 
 impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
@@ -203,6 +239,13 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
         optical_flow_max_iterations: u32,
         optical_flow_convergence_threshold: f64,
     ) -> Self {
+        let gpu_config = gpu_accel::GpuConfig::default();
+        let gpu_accelerator = if gpu_config.enable_gpu {
+            Some(Arc::new(gpu_accel::GpuAccelerator::new(gpu_config)))
+        } else {
+            None
+        };
+
         Self {
             last_keypoint_id: 0,
             tracked_points_map_cam0: HashMap::new(),
@@ -217,12 +260,19 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             subpixel_enable: true,
             subpixel_iterations: 15,
             subpixel_threshold: 0.0005,
+            subpixel_refinement: SubpixelStereoRefinement::new(PatchMatchingConfig::default())
+                .with_quality_gates(35.0, 0.02),
+            essential_ransac: EssentialMatrixRansac::new(RansacConfig::default()),
+            imu_rotation_hint: None,
+            imu_intrinsics_hint: None,
+            camera_matrix_hint: None,
             lost_features: HashMap::new(),
             max_lost_frames: 5, // Keep lost features for 5 frames
             feature_velocities: HashMap::new(),
             frame_skipper: frame_skip::AdaptiveFrameSkipper::new(30.0, 5, 2.0),
             last_frame_time: None,
             frame_count: 0,
+            gpu_accelerator,
         }
     }
 
@@ -236,9 +286,46 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
         tracker.subpixel_enable = config.subpixel_enable;
         tracker.subpixel_iterations = config.subpixel_iterations as usize;
         tracker.subpixel_threshold = config.subpixel_threshold as f32;
+        tracker.subpixel_refinement = SubpixelStereoRefinement::new(PatchMatchingConfig {
+            max_iterations: config.subpixel_iterations as usize,
+            convergence_tolerance: config.subpixel_threshold,
+            ..PatchMatchingConfig::default()
+        })
+        .with_quality_gates(30.0, 0.05);
         tracker.max_lost_frames = 5; // Could be made configurable later
         tracker.feature_velocities = HashMap::new();
         tracker
+    }
+
+    /// Set calibrated camera intrinsics for geometric gating and projection.
+    pub fn set_camera_intrinsics(&mut self, fx: f32, fy: f32, cx: f32, cy: f32) {
+        self.camera_matrix_hint = Some(na::Matrix3::new(fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0));
+    }
+
+    /// Provide an IMU rotation hint (integrated gyro) to seed optical flow.
+    /// `imu_samples` should span prev→current frame. Intrinsics are in pixels.
+    pub fn set_imu_rotation_hint(
+        &mut self,
+        imu_samples: &[ImuData],
+        intrinsics: (f32, f32, f32, f32), // (fx, fy, cx, cy)
+    ) {
+        if imu_samples.is_empty() {
+            self.imu_rotation_hint = None;
+            return;
+        }
+
+        let mut omega = [0.0f32; 3];
+        let mut last_ts = imu_samples[0].timestamp;
+        for sample in imu_samples {
+            let dt = ((sample.timestamp - last_ts) as f64 / 1e9).max(0.0);
+            omega[0] += (sample.gyro[0] * dt) as f32;
+            omega[1] += (sample.gyro[1] * dt) as f32;
+            omega[2] += (sample.gyro[2] * dt) as f32;
+            last_ts = sample.timestamp;
+        }
+
+        self.imu_rotation_hint = Some(omega);
+        self.imu_intrinsics_hint = Some(intrinsics);
     }
 
     /// Process a stereo frame and update feature tracking
@@ -301,6 +388,14 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
 
         // not initialized
         if !self.previous_image_pyramid0.is_empty() {
+            // Apply IMU rotation hint to seed optical flow
+            if let (Some(omega), Some((fx, fy, cx, cy))) = (
+                self.imu_rotation_hint.take(),
+                self.imu_intrinsics_hint.take(),
+            ) {
+                self.apply_imu_prediction(&omega, fx, fy, cx, cy);
+            }
+
             if should_log {
                 debug_log!(
                     "[FeatureTracker] Frame {}: {} old points in cam0",
@@ -375,8 +470,164 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
 
         // Update feature velocities and validate temporal consistency
         self.update_temporal_consistency();
+        // For stereo triangulation to work, we need left/right features with the SAME ID
+        // AND corresponding pixel positions. OLD tracked points have different IDs in each camera
+        // (tracked independently), so only NEW stereo-matched points are reliable for triangulation.
 
-        // swap current <-> previous to reuse allocations next frame
+        // Find intersection of common IDs with new IDs
+        let left_ids: HashSet<usize> = self.tracked_points_map_cam0.keys().copied().collect();
+        let right_ids: HashSet<usize> = self.tracked_points_map_cam1.keys().copied().collect();
+        let common_ids: HashSet<usize> = left_ids.intersection(&right_ids).copied().collect();
+
+        // Only use IDs that were stereo-matched this frame (new points)
+        let valid_ids: HashSet<usize> = common_ids.intersection(&new_ids).copied().collect();
+
+        if should_log {
+            debug_log!(
+                "[FeatureTracker] Frame {}: Left={}, Right={}, Common={}, Valid={}",
+                self.frame_count,
+                left_ids.len(),
+                right_ids.len(),
+                common_ids.len(),
+                valid_ids.len()
+            );
+        }
+
+        // Synchronize tracked_points_map to only keep valid IDs
+        self.tracked_points_map_cam0
+            .retain(|id, _| valid_ids.contains(id));
+        self.tracked_points_map_cam1
+            .retain(|id, _| valid_ids.contains(id));
+
+        // Build candidate stereo pairs for refinement
+        let candidate_matches: Vec<(usize, na::Affine2<f32>, na::Affine2<f32>)> = valid_ids
+            .iter()
+            .filter_map(|id| {
+                let left = self.tracked_points_map_cam0.get(id)?;
+                let right = self.tracked_points_map_cam1.get(id)?;
+                Some((*id, *left, *right))
+            })
+            .collect();
+
+        let mut refined_matches: Vec<StereoMatchResult> = if self.subpixel_enable {
+            self.subpixel_refinement.refine_matches(
+                &self.current_image_pyramid0[0],
+                &self.current_image_pyramid1[0],
+                &candidate_matches,
+            )
+        } else {
+            candidate_matches
+                .iter()
+                .map(|(id, left_pos, right_pos)| StereoMatchResult {
+                    id: *id,
+                    left_pos: *left_pos,
+                    right_pos: *right_pos,
+                    disparity: left_pos.matrix().m13 - right_pos.matrix().m13,
+                    disparity_uncertainty: 1.0,
+                    photometric_error: 0.0,
+                    peak_sharpness: 1.0,
+                })
+                .collect()
+        };
+
+        // Fallback to integer matches if refinement gated everything out
+        if refined_matches.is_empty() && !candidate_matches.is_empty() {
+            refined_matches = candidate_matches
+                .iter()
+                .map(|(id, left_pos, right_pos)| StereoMatchResult {
+                    id: *id,
+                    left_pos: *left_pos,
+                    right_pos: *right_pos,
+                    disparity: left_pos.matrix().m13 - right_pos.matrix().m13,
+                    disparity_uncertainty: 5.0,
+                    photometric_error: 1e6,
+                    peak_sharpness: 0.0,
+                })
+                .collect();
+        }
+
+        // Geometric filtering with essential-matrix RANSAC
+        let camera_matrix = self.make_camera_matrix(w0, h0);
+        let ransac_inliers = if refined_matches.len() >= 8 {
+            let left_points: Vec<[f32; 2]> = refined_matches
+                .iter()
+                .map(|m| [m.left_pos.matrix().m13, m.left_pos.matrix().m23])
+                .collect();
+            let right_points: Vec<[f32; 2]> = refined_matches
+                .iter()
+                .map(|m| [m.right_pos.matrix().m13, m.right_pos.matrix().m23])
+                .collect();
+
+            let inliers =
+                self.essential_ransac
+                    .find_inliers(&left_points, &right_points, &camera_matrix);
+
+            if inliers.len() >= 4 {
+                Some(inliers)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let final_matches: Vec<StereoMatchResult> = refined_matches
+            .into_iter()
+            .enumerate()
+            .filter(|(idx, _)| {
+                ransac_inliers
+                    .as_ref()
+                    .map(|s| s.contains(idx))
+                    .unwrap_or(true)
+            })
+            .map(|(_, m)| m)
+            .collect();
+
+        let retained_ids: HashSet<usize> = final_matches.iter().map(|m| m.id).collect();
+        self.tracked_points_map_cam0
+            .retain(|id, _| retained_ids.contains(id));
+        self.tracked_points_map_cam1
+            .retain(|id, _| retained_ids.contains(id));
+
+        // Populate the frame's feature lists with refined matches
+        for m in &final_matches {
+            let mut left_feature =
+                Feature::new(m.id, [m.left_pos.matrix().m13, m.left_pos.matrix().m23]);
+            left_feature.disparity = Some(m.disparity);
+            left_feature.disparity_uncertainty = Some(m.disparity_uncertainty.max(1e-4));
+            left_feature.photometric_error = Some(m.photometric_error);
+            left_feature.peak_sharpness = Some(m.peak_sharpness);
+            frame.add_left_feature(left_feature);
+
+            let mut right_feature =
+                Feature::new(m.id, [m.right_pos.matrix().m13, m.right_pos.matrix().m23]);
+            right_feature.disparity = Some(m.disparity);
+            right_feature.disparity_uncertainty = Some(m.disparity_uncertainty.max(1e-4));
+            right_feature.photometric_error = Some(m.photometric_error);
+            right_feature.peak_sharpness = Some(m.peak_sharpness);
+            frame.add_right_feature(right_feature);
+
+            if let Some(right_entry) = self.tracked_points_map_cam1.get_mut(&m.id) {
+                right_entry.matrix_mut_unchecked().m13 = m.right_pos.matrix().m13;
+                right_entry.matrix_mut_unchecked().m23 = m.right_pos.matrix().m23;
+            }
+        }
+
+        // Ensure a minimum number of features in static scenes by supplementing with retained points
+        if frame.left_features.len() < 3 {
+            for (id, left_pos) in self.tracked_points_map_cam0.iter() {
+                if frame.left_features.len() >= 3 {
+                    break;
+                }
+                if !retained_ids.contains(id) {
+                    continue;
+                }
+                let f = Feature::new(*id, [left_pos.matrix().m13, left_pos.matrix().m23]);
+                frame.add_left_feature(f);
+            }
+        }
+
+        // swap current <-> previous to reuse allocations next frame (after refinement usage)
         std::mem::swap(
             &mut self.previous_image_pyramid0,
             &mut self.current_image_pyramid0,
@@ -385,91 +636,6 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             &mut self.previous_image_pyramid1,
             &mut self.current_image_pyramid1,
         );
-
-        // Get tracked points from both cameras
-        let [tracked_left, tracked_right] = self.get_track_points();
-
-        // Sampled debug: log a few sample points to see raw pixel coordinates
-        if should_log {
-            if let Some((sample_id, _left_coord)) = tracked_left.iter().next() {
-                let _right_coord = tracked_right.get(sample_id).unwrap_or(&(-999.0, -999.0));
-                debug_log!(
-                    "[FeatureTracker] Frame {} sample feature {}: left=({:.1}, {:.1}), right=({:.1}, {:.1})",
-                    self.frame_count,
-                    sample_id,
-                    _left_coord.0,
-                    _left_coord.1,
-                    _right_coord.0,
-                    _right_coord.1
-                );
-            }
-        }
-
-        // For stereo triangulation to work, we need left/right features with the SAME ID
-        // AND corresponding pixel positions. OLD tracked points have different IDs in each camera
-        // (tracked independently), so only NEW stereo-matched points are reliable for triangulation.
-
-        // Find intersection of common IDs with new IDs
-        let left_ids: std::collections::HashSet<usize> = tracked_left.keys().copied().collect();
-        let right_ids: std::collections::HashSet<usize> = tracked_right.keys().copied().collect();
-        let common_ids: std::collections::HashSet<usize> =
-            left_ids.intersection(&right_ids).copied().collect();
-
-        // Only use IDs that were stereo-matched this frame (new points)
-        let valid_ids: std::collections::HashSet<usize> =
-            common_ids.intersection(&new_ids).copied().collect();
-
-        if should_log {
-            debug_log!(
-                "[FeatureTracker] Frame {}: Left={}, Right={}, Common={}, Valid={}",
-                self.frame_count,
-                tracked_left.len(),
-                tracked_right.len(),
-                common_ids.len(),
-                valid_ids.len()
-            );
-        }
-
-        // Synchronize tracked_points_map to only keep valid IDs
-        for id in left_ids.iter() {
-            if !valid_ids.contains(id) {
-                self.tracked_points_map_cam0.remove(id);
-            }
-        }
-        for id in right_ids.iter() {
-            if !valid_ids.contains(id) {
-                self.tracked_points_map_cam1.remove(id);
-            }
-        }
-
-        // Populate the frame's feature lists with ONLY new stereo-matched features
-        for (&id, &(x, y)) in tracked_left.iter() {
-            if valid_ids.contains(&id) {
-                let f = Feature::new(id, [x, y]);
-                frame.add_left_feature(f);
-            }
-        }
-
-        for (&id, &(x, y)) in tracked_right.iter() {
-            if valid_ids.contains(&id) {
-                let f = Feature::new(id, [x, y]);
-                frame.add_right_feature(f);
-            }
-        }
-
-        // Ensure a minimum number of features in static scenes by supplementing with tracked points
-        // when new stereo-matched points are scarce. This keeps downstream tests stable.
-        if frame.left_features.len() < 3 {
-            for (&id, &(x, y)) in tracked_left.iter() {
-                if !valid_ids.contains(&id) {
-                    let f = Feature::new(id, [x, y]);
-                    frame.add_left_feature(f);
-                    if frame.left_features.len() >= 3 {
-                        break;
-                    }
-                }
-            }
-        }
 
         // Record processing time for adaptive frame skipping
         let frame_duration = frame_start.elapsed();
@@ -612,6 +778,56 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
 }
 
 impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
+    /// Apply a small-angle rotation prediction to all tracked points to widen LK convergence.
+    fn apply_imu_prediction(&mut self, omega: &[f32; 3], fx: f32, fy: f32, cx: f32, cy: f32) {
+        let rotate_point = |pt: &mut na::Affine2<f32>| {
+            let u = pt.matrix().m13;
+            let v = pt.matrix().m23;
+
+            // Normalize ray
+            let x = (u - cx) / fx;
+            let y = (v - cy) / fy;
+            let z = 1.0f32;
+
+            // Small-angle rotation using Rodrigues (first-order)
+            let wx = omega[0];
+            let wy = omega[1];
+            let wz = omega[2];
+
+            let rx = x + (-wz * y + wy * z);
+            let ry = y + (wz * x - wx * z);
+            let rz = z + (-wy * x + wx * y);
+
+            // Project back
+            if rz.abs() > 1e-6 {
+                let u_new = fx * (rx / rz) + cx;
+                let v_new = fy * (ry / rz) + cy;
+                pt.matrix_mut_unchecked().m13 = u_new;
+                pt.matrix_mut_unchecked().m23 = v_new;
+            }
+        };
+
+        self.tracked_points_map_cam0
+            .values_mut()
+            .for_each(|pt| rotate_point(pt));
+        self.tracked_points_map_cam1
+            .values_mut()
+            .for_each(|pt| rotate_point(pt));
+    }
+
+    fn make_camera_matrix(&self, width: u32, height: u32) -> na::Matrix3<f32> {
+        if let Some(k) = self.camera_matrix_hint {
+            return k;
+        }
+
+        // Fallback approximation if calibrated intrinsics are not yet provided
+        let fx = width as f32 * 0.9;
+        let fy = height as f32 * 0.9;
+        let cx = width as f32 * 0.5;
+        let cy = height as f32 * 0.5;
+        na::Matrix3::new(fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0)
+    }
+
     fn ensure_pyramids_allocated(&mut self, w0: u32, h0: u32) {
         if self.current_image_pyramid0.len() as u32 != LEVELS
             || self.current_image_pyramid1.len() as u32 != LEVELS
@@ -670,6 +886,7 @@ fn add_points(
         num_points_in_cell,
     )
 }
+#[inline]
 fn track_points<const LEVELS: u32>(
     image_pyramid0: &[GrayImage],
     image_pyramid1: &[GrayImage],
@@ -677,42 +894,43 @@ fn track_points<const LEVELS: u32>(
     optical_flow_max_iterations: usize,
     optical_flow_convergence_threshold: f32,
 ) -> HashMap<usize, na::Affine2<f32>> {
-    // Use parallel iteration for multi-core performance boost
-    // Each point tracking is independent and can be parallelized
-    let results: Vec<(usize, na::Affine2<f32>)> = transform_maps0
-        .par_iter()
-        .filter_map(|(k, v)| {
-            if let Some(new_v) = track_one_point::<LEVELS>(
-                image_pyramid0,
-                image_pyramid1,
-                v,
-                optical_flow_max_iterations,
-                optical_flow_convergence_threshold,
-            ) {
-                // return Some((k.clone(), new_v));
-                if let Some(old_v) = track_one_point::<LEVELS>(
-                    image_pyramid1,
+    // Sequential for small datasets (common case < 100 features) - rayon has overhead
+    // Parallel for large datasets where thread spawning pays off
+    let use_parallel = transform_maps0.len() > 64;
+
+    let results: Vec<(usize, na::Affine2<f32>)> = if use_parallel {
+        transform_maps0
+            .par_iter()
+            .filter_map(|(k, v)| {
+                track_one_point::<LEVELS>(
                     image_pyramid0,
-                    &new_v,
+                    image_pyramid1,
+                    v,
                     optical_flow_max_iterations,
                     optical_flow_convergence_threshold,
-                ) {
-                    if (v.matrix() - old_v.matrix())
-                        .fixed_view::<2, 1>(0, 2)
-                        .norm_squared()
-                        < 0.4
-                    {
-                        return Some((*k, new_v));
-                    }
-                }
-            }
-            None
-        })
-        .collect();
+                )
+                .map(|new_v| (*k, new_v))
+            })
+            .collect()
+    } else {
+        transform_maps0
+            .iter()
+            .filter_map(|(k, v)| {
+                track_one_point::<LEVELS>(
+                    image_pyramid0,
+                    image_pyramid1,
+                    v,
+                    optical_flow_max_iterations,
+                    optical_flow_convergence_threshold,
+                )
+                .map(|new_v| (*k, new_v))
+            })
+            .collect()
+    };
 
-    // Convert Vec to HashMap for compatibility
     results.into_iter().collect()
 }
+#[inline]
 fn track_one_point<const LEVELS: u32>(
     image_pyramid0: &[GrayImage],
     image_pyramid1: &[GrayImage],
@@ -765,6 +983,7 @@ fn track_one_point<const LEVELS: u32>(
     Some(transform1)
 }
 
+#[inline]
 pub fn track_point_at_level(
     grayscale_image: &GrayImage,
     dp: &patch::Pattern52,

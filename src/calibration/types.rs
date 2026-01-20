@@ -1,13 +1,12 @@
 /// Core types for camera + IMU calibration pipeline.
-/// 
+///
 /// This module provides data structures for:
 /// - Camera intrinsics and distortion models
 /// - Stereo extrinsics and rectification
 /// - IMU intrinsic parameters and noise models
 /// - Camera-IMU extrinsics (spatial) and time offset (temporal)
 /// - Quality metrics and acceptance thresholds
-
-use nalgebra::{Matrix3, Vector3, Isometry3};
+use nalgebra::{Isometry3, Matrix3, Vector3};
 use std::collections::HashMap;
 
 /// Camera intrinsic parameters (K matrix: focal length, principal point).
@@ -30,19 +29,21 @@ pub struct CameraIntrinsics {
 impl CameraIntrinsics {
     /// Build intrinsic matrix K (3×3)
     pub fn k_matrix(&self) -> Matrix3<f64> {
-        Matrix3::new(
-            self.fx, 0.0, self.cx,
-            0.0, self.fy, self.cy,
-            0.0, 0.0, 1.0,
-        )
+        Matrix3::new(self.fx, 0.0, self.cx, 0.0, self.fy, self.cy, 0.0, 0.0, 1.0)
     }
 
     /// Inverse intrinsic matrix K^{-1}
     pub fn k_matrix_inv(&self) -> Matrix3<f64> {
         Matrix3::new(
-            1.0 / self.fx, 0.0, -self.cx / self.fx,
-            0.0, 1.0 / self.fy, -self.cy / self.fy,
-            0.0, 0.0, 1.0,
+            1.0 / self.fx,
+            0.0,
+            -self.cx / self.fx,
+            0.0,
+            1.0 / self.fy,
+            -self.cy / self.fy,
+            0.0,
+            0.0,
+            1.0,
         )
     }
 
@@ -328,7 +329,11 @@ pub enum TimingQuality {
     /// Perfect sync, stable offset
     Stable { offset_s: f64, jitter_s: f64 },
     /// Offset drifts linearly: t_camera = t_imu + dt0 + α*t
-    Drifting { offset_s: f64, drift_rate: f64, jitter_s: f64 },
+    Drifting {
+        offset_s: f64,
+        drift_rate: f64,
+        jitter_s: f64,
+    },
     /// High jitter, timestamps unreliable
     Jittery { jitter_s: f64 },
 }
@@ -369,7 +374,7 @@ impl CalibrationResult {
     pub fn quality_report(&self, thresholds: &AcceptanceThresholds) -> CalibrationQualityReport {
         let mut metrics = Vec::new();
         let mut scores = Vec::new();
-        
+
         // Check camera reprojection quality
         for (camera_id, camera) in &self.cameras {
             let passed = camera.reprojection_rms < thresholds.reprojection_rms_max;
@@ -381,11 +386,12 @@ impl CalibrationResult {
                 format!("{:.3} px", camera.reprojection_rms),
             ));
         }
-        
+
         // Check stereo quality
         if let Some(stereo) = &self.stereo {
             let passed = stereo.vertical_disparity_rms < thresholds.vertical_disparity_rms_max;
-            let score = 1.0 - (stereo.vertical_disparity_rms / thresholds.vertical_disparity_rms_max).min(1.0);
+            let score = 1.0
+                - (stereo.vertical_disparity_rms / thresholds.vertical_disparity_rms_max).min(1.0);
             scores.push(score);
             metrics.push((
                 "vertical_disparity".to_string(),
@@ -393,7 +399,7 @@ impl CalibrationResult {
                 format!("{:.3} px", stereo.vertical_disparity_rms),
             ));
         }
-        
+
         // Check timing quality
         for (camera_id, extrinsics) in &self.camera_imu_extrinsics {
             let passed = extrinsics.timing_observability > thresholds.timing_observability_min;
@@ -405,11 +411,15 @@ impl CalibrationResult {
                 format!("observability: {:.2}", extrinsics.timing_observability),
             ));
         }
-        
+
         // Check rolling shutter handling
         for (camera_id, rs) in &self.rolling_shutter {
             let passed = !rs.is_significant || rs.significance_score > 0.8;
-            let score = if !rs.is_significant { 1.0 } else { rs.significance_score };
+            let score = if !rs.is_significant {
+                1.0
+            } else {
+                rs.significance_score
+            };
             scores.push(score);
             metrics.push((
                 format!("rolling_shutter_{}", camera_id),
@@ -417,22 +427,25 @@ impl CalibrationResult {
                 if !rs.is_significant {
                     "Not significant (global shutter)".to_string()
                 } else {
-                    format!("Readout: {:.1} ms, significance: {:.2}", 
-                           rs.readout_time * 1000.0, rs.significance_score)
+                    format!(
+                        "Readout: {:.1} ms, significance: {:.2}",
+                        rs.readout_time * 1000.0,
+                        rs.significance_score
+                    )
                 },
             ));
         }
-        
+
         // Overall score: average of all individual scores
         let overall_score = if scores.is_empty() {
             0.5
         } else {
             scores.iter().sum::<f64>() / scores.len() as f64
         };
-        
+
         // Pass if overall score is good and no critical failures
         let passed = overall_score > 0.7 && metrics.iter().all(|(_, p, _)| *p);
-        
+
         CalibrationQualityReport {
             passed,
             metrics,

@@ -22,7 +22,10 @@ fn rerun_cli_screenshot_smoke() -> Result<(), Box<dyn std::error::Error>> {
         // Use the Rerun SDK to log a simple scene
         let rec = rerun::RecordingStreamBuilder::new("rs_vio_rerun_test").save(&rrd_path)?;
         // Log a box so we have visible content
-        rec.log("scene/box", &rerun::Boxes3D::from_half_sizes([(2.0, 2.0, 1.0)]))?;
+        rec.log(
+            "scene/box",
+            &rerun::Boxes3D::from_half_sizes([(2.0, 2.0, 1.0)]),
+        )?;
         // Log a text annotation
         rec.log("scene/text", &rerun::TextLog::new("Screenshot smoke test"))?;
         // Drop to flush
@@ -38,10 +41,17 @@ fn rerun_cli_screenshot_smoke() -> Result<(), Box<dyn std::error::Error>> {
 
     // Some builds may panic after saving; accept non-zero status if file exists
     let meta = std::fs::metadata(&png_path)?;
-    assert!(meta.len() > 10_000, "Screenshot appears too small ({} bytes)", meta.len());
+    assert!(
+        meta.len() > 10_000,
+        "Screenshot appears too small ({} bytes)",
+        meta.len()
+    );
 
     // Ensure CLI didn't hang
-    assert!(status.success() || meta.len() > 0, "rerun CLI failed before saving screenshot");
+    assert!(
+        status.success() || meta.len() > 0,
+        "rerun CLI failed before saving screenshot"
+    );
 
     Ok(())
 }

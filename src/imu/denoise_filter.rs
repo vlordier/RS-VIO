@@ -1,7 +1,6 @@
 /// Real-time IMU denoising filter for VIO systems
 /// Handles camera frame rates (30-60 fps) vs IMU sampling (200 Hz)
 /// Incorporates notch filtering for identified resonances (0.06 Hz, 1.46 Hz)
-
 use nalgebra as na;
 use std::collections::VecDeque;
 
@@ -60,10 +59,10 @@ impl Default for DenoiseConfig {
         Self {
             imu_sample_rate: 200.0,
             camera_frame_rate: 30.0,
-            highpass_cutoff: 0.5,      // Remove drift below 0.5 Hz
-            lowpass_cutoff: 50.0,      // Remove noise above 50 Hz
+            highpass_cutoff: 0.5, // Remove drift below 0.5 Hz
+            lowpass_cutoff: 50.0, // Remove noise above 50 Hz
             enable_notch_filter: true,
-            notch_frequencies: vec![0.06, 1.46],  // From resonance analysis
+            notch_frequencies: vec![0.06, 1.46], // From resonance analysis
             notch_q: 5.0,
             enable_vision_fusion: true,
             vision_trust: 0.3,
@@ -91,19 +90,29 @@ impl Default for DenoiseConfig {
 /// Second-order Butterworth filter stage
 #[derive(Debug, Clone)]
 struct BiquadFilter {
-    b0: f32, b1: f32, b2: f32,  // Numerator coefficients
-    a1: f32, a2: f32,            // Denominator coefficients
-    x1: f32, x2: f32,            // Input history
-    y1: f32, y2: f32,            // Output history
+    b0: f32,
+    b1: f32,
+    b2: f32, // Numerator coefficients
+    a1: f32,
+    a2: f32, // Denominator coefficients
+    x1: f32,
+    x2: f32, // Input history
+    y1: f32,
+    y2: f32, // Output history
 }
 
 impl BiquadFilter {
     fn identity() -> Self {
         Self {
-            b0: 1.0, b1: 0.0, b2: 0.0,
-            a1: 0.0, a2: 0.0,
-            x1: 0.0, x2: 0.0,
-            y1: 0.0, y2: 0.0,
+            b0: 1.0,
+            b1: 0.0,
+            b2: 0.0,
+            a1: 0.0,
+            a2: 0.0,
+            x1: 0.0,
+            x2: 0.0,
+            y1: 0.0,
+            y2: 0.0,
         }
     }
 
@@ -112,20 +121,25 @@ impl BiquadFilter {
         let wc = 2.0 * std::f32::consts::PI * cutoff_hz / sample_rate;
         let c = wc.cos();
         let s = wc.sin();
-        let alpha = s / (2.0 * 0.707);  // Q = 0.707 for Butterworth
-        
+        let alpha = s / (2.0 * 0.707); // Q = 0.707 for Butterworth
+
         let b0 = (1.0 + c) / 2.0;
         let b1 = -(1.0 + c);
         let b2 = (1.0 + c) / 2.0;
         let a0 = 1.0 + alpha;
         let a1 = -2.0 * c / a0;
         let a2 = (1.0 - alpha) / a0;
-        
+
         Self {
-            b0: b0 / a0, b1: b1 / a0, b2: b2 / a0,
-            a1, a2,
-            x1: 0.0, x2: 0.0,
-            y1: 0.0, y2: 0.0,
+            b0: b0 / a0,
+            b1: b1 / a0,
+            b2: b2 / a0,
+            a1,
+            a2,
+            x1: 0.0,
+            x2: 0.0,
+            y1: 0.0,
+            y2: 0.0,
         }
     }
 
@@ -134,20 +148,25 @@ impl BiquadFilter {
         let wc = 2.0 * std::f32::consts::PI * cutoff_hz / sample_rate;
         let c = wc.cos();
         let s = wc.sin();
-        let alpha = s / (2.0 * 0.707);  // Q = 0.707 for Butterworth
-        
+        let alpha = s / (2.0 * 0.707); // Q = 0.707 for Butterworth
+
         let b0 = (1.0 - c) / 2.0;
         let b1 = 1.0 - c;
         let b2 = (1.0 - c) / 2.0;
         let a0 = 1.0 + alpha;
         let a1 = -2.0 * c / a0;
         let a2 = (1.0 - alpha) / a0;
-        
+
         Self {
-            b0: b0 / a0, b1: b1 / a0, b2: b2 / a0,
-            a1, a2,
-            x1: 0.0, x2: 0.0,
-            y1: 0.0, y2: 0.0,
+            b0: b0 / a0,
+            b1: b1 / a0,
+            b2: b2 / a0,
+            a1,
+            a2,
+            x1: 0.0,
+            x2: 0.0,
+            y1: 0.0,
+            y2: 0.0,
         }
     }
 
@@ -157,32 +176,38 @@ impl BiquadFilter {
         let c = wc.cos();
         let s = wc.sin();
         let alpha = s / (2.0 * q);
-        
+
         let b0 = 1.0;
         let b1 = -2.0 * c;
         let b2 = 1.0;
         let a0 = 1.0 + alpha;
         let a1 = -2.0 * c / a0;
         let a2 = (1.0 - alpha) / a0;
-        
+
         Self {
-            b0: b0 / a0, b1: b1 / a0, b2: b2 / a0,
-            a1, a2,
-            x1: 0.0, x2: 0.0,
-            y1: 0.0, y2: 0.0,
+            b0: b0 / a0,
+            b1: b1 / a0,
+            b2: b2 / a0,
+            a1,
+            a2,
+            x1: 0.0,
+            x2: 0.0,
+            y1: 0.0,
+            y2: 0.0,
         }
     }
 
     /// Apply filter to a single sample
     fn process(&mut self, x: f32) -> f32 {
         let y = self.b0 * x + self.b1 * self.x1 + self.b2 * self.x2
-              - self.a1 * self.y1 - self.a2 * self.y2;
-        
+            - self.a1 * self.y1
+            - self.a2 * self.y2;
+
         self.x2 = self.x1;
         self.x1 = x;
         self.y2 = self.y1;
         self.y1 = y;
-        
+
         y
     }
 }
@@ -190,22 +215,22 @@ impl BiquadFilter {
 /// Real-time IMU denoising filter
 pub struct ImuDenoiseFilter {
     config: DenoiseConfig,
-    
+
     // High-pass and low-pass filters (per axis)
     highpass_filters: [BiquadFilter; 3],
     lowpass_filters: [BiquadFilter; 3],
     notch_filters: Vec<[BiquadFilter; 3]>,
-    
+
     // Complementary filter state
     vision_accel: na::Vector3<f32>,
     imu_accel: na::Vector3<f32>,
-    
+
     // IMU preintegration buffer
     imu_buffer: VecDeque<(f32, na::Vector3<f32>)>,
     last_camera_frame_time: Option<f32>,
-    
+
     // Statistics
-    pub signal_quality: f32,  // 0.0-1.0: estimate of output quality
+    pub signal_quality: f32, // 0.0-1.0: estimate of output quality
 
     // Motion-mode FSM
     mode: MotionMode,
@@ -274,7 +299,10 @@ impl ImuDenoiseFilter {
     fn rebuild_filters(&mut self, mode: MotionMode) {
         let (hp, lp) = match mode {
             MotionMode::Hover => (self.config.hover_highpass_hz, self.config.hover_lowpass_hz),
-            MotionMode::Aggressive => (self.config.aggressive_highpass_hz, self.config.aggressive_lowpass_hz),
+            MotionMode::Aggressive => (
+                self.config.aggressive_highpass_hz,
+                self.config.aggressive_lowpass_hz,
+            ),
         };
 
         self.highpass_filters = [
@@ -296,23 +324,49 @@ impl ImuDenoiseFilter {
                 .map(|arr| arr.iter().map(|v| v.len()).max().unwrap_or(0))
                 .unwrap_or(self.config.notch_frequencies.len());
 
-            (0..max_stages).map(|stage_idx| {
-                let mut freqs = [None, None, None];
-                for axis in 0..3 {
-                    if let Some(arr) = per_axis {
-                        if stage_idx < arr[axis].len() {
-                            freqs[axis] = Some(arr[axis][stage_idx]);
+            (0..max_stages)
+                .map(|stage_idx| {
+                    let mut freqs = [None, None, None];
+                    for axis in 0..3 {
+                        if let Some(arr) = per_axis {
+                            if stage_idx < arr[axis].len() {
+                                freqs[axis] = Some(arr[axis][stage_idx]);
+                            }
+                        } else if stage_idx < self.config.notch_frequencies.len() {
+                            freqs[axis] = Some(self.config.notch_frequencies[stage_idx]);
                         }
-                    } else if stage_idx < self.config.notch_frequencies.len() {
-                        freqs[axis] = Some(self.config.notch_frequencies[stage_idx]);
                     }
-                }
-                [
-                    freqs[0].map(|f| BiquadFilter::notch(self.config.imu_sample_rate, f, self.current_notch_q)).unwrap_or_else(BiquadFilter::identity),
-                    freqs[1].map(|f| BiquadFilter::notch(self.config.imu_sample_rate, f, self.current_notch_q)).unwrap_or_else(BiquadFilter::identity),
-                    freqs[2].map(|f| BiquadFilter::notch(self.config.imu_sample_rate, f, self.current_notch_q)).unwrap_or_else(BiquadFilter::identity),
-                ]
-            }).collect()
+                    [
+                        freqs[0]
+                            .map(|f| {
+                                BiquadFilter::notch(
+                                    self.config.imu_sample_rate,
+                                    f,
+                                    self.current_notch_q,
+                                )
+                            })
+                            .unwrap_or_else(BiquadFilter::identity),
+                        freqs[1]
+                            .map(|f| {
+                                BiquadFilter::notch(
+                                    self.config.imu_sample_rate,
+                                    f,
+                                    self.current_notch_q,
+                                )
+                            })
+                            .unwrap_or_else(BiquadFilter::identity),
+                        freqs[2]
+                            .map(|f| {
+                                BiquadFilter::notch(
+                                    self.config.imu_sample_rate,
+                                    f,
+                                    self.current_notch_q,
+                                )
+                            })
+                            .unwrap_or_else(BiquadFilter::identity),
+                    ]
+                })
+                .collect()
         } else {
             Vec::new()
         };
@@ -347,7 +401,8 @@ impl ImuDenoiseFilter {
             return;
         }
         let thresh = self.config.clip_threshold_rads;
-        let clipped = sample[0].abs() > thresh || sample[1].abs() > thresh || sample[2].abs() > thresh;
+        let clipped =
+            sample[0].abs() > thresh || sample[1].abs() > thresh || sample[2].abs() > thresh;
         self.clip_count -= self.clip_window[self.clip_head] as usize;
         self.clip_window[self.clip_head] = clipped;
         self.clip_count += clipped as usize;
@@ -399,15 +454,14 @@ impl ImuDenoiseFilter {
     /// Process a single IMU acceleration sample (gyro in this context)
     #[inline]
     pub fn process_gyro(&mut self, gyro: &[f32; 3]) -> [f32; 3] {
-        let medianed = Self::spike_filter(
-            &mut self.gyro_hist,
-            *gyro,
-            self.config.spike_window >= 3,
-        );
+        let medianed =
+            Self::spike_filter(&mut self.gyro_hist, *gyro, self.config.spike_window >= 3);
         self.update_clipping(&medianed);
 
         // Inline RMS calculation
-        let rms = (medianed[0] * medianed[0] + medianed[1] * medianed[1] + medianed[2] * medianed[2]).sqrt();
+        let rms =
+            (medianed[0] * medianed[0] + medianed[1] * medianed[1] + medianed[2] * medianed[2])
+                .sqrt();
         self.update_rms_and_mode(rms);
         self.update_adaptive_notch(rms);
         self.samples_since_rebuild += 1;
@@ -437,15 +491,14 @@ impl ImuDenoiseFilter {
     /// Process a single IMU acceleration sample
     #[inline]
     pub fn process_accel(&mut self, accel: &[f32; 3]) -> [f32; 3] {
-        let medianed = Self::spike_filter(
-            &mut self.accel_hist,
-            *accel,
-            self.config.spike_window >= 3,
-        );
+        let medianed =
+            Self::spike_filter(&mut self.accel_hist, *accel, self.config.spike_window >= 3);
         self.update_clipping(&medianed);
 
         // Inline RMS calculation (accel doesn't update adaptive notch)
-        let rms = (medianed[0] * medianed[0] + medianed[1] * medianed[1] + medianed[2] * medianed[2]).sqrt();
+        let rms =
+            (medianed[0] * medianed[0] + medianed[1] * medianed[1] + medianed[2] * medianed[2])
+                .sqrt();
         self.update_rms_and_mode(rms);
 
         let mut filtered = medianed;
@@ -484,7 +537,8 @@ impl ImuDenoiseFilter {
 
     /// Buffer IMU sample for preintegration between camera frames
     pub fn buffer_imu_sample(&mut self, time_ms: f32, gyro: &[f32; 3]) {
-        self.imu_buffer.push_back((time_ms, na::Vector3::from_row_slice(gyro)));
+        self.imu_buffer
+            .push_back((time_ms, na::Vector3::from_row_slice(gyro)));
     }
 
     /// Process a camera frame and get integrated IMU measurements
@@ -556,7 +610,7 @@ mod tests {
             filter.process_gyro(&dc_signal);
         }
         let output = filter.process_gyro(&dc_signal);
-        
+
         assert!(output[0].abs() < 0.15, "High-pass should remove DC");
     }
 
@@ -565,7 +619,7 @@ mod tests {
         let mut config = DenoiseConfig::default();
         config.notch_frequencies = vec![0.06, 1.46];
         let filter = ImuDenoiseFilter::new(config);
-        
+
         assert_eq!(filter.notch_filters.len(), 2, "Should have 2 notch stages");
     }
 
@@ -578,20 +632,23 @@ mod tests {
         // Feed normal samples
         filter.process_gyro(&[0.1, 0.1, 0.1]);
         filter.process_gyro(&[0.11, 0.11, 0.11]);
-        
+
         // Feed spike (much larger than previous samples)
         let spike_sample = [5.0, 5.0, 5.0];
         let output = filter.process_gyro(&spike_sample);
-        
+
         // Output should be attenuated compared to raw spike
         // Median-of-3 should use middle value from [0.11, 5.0, next_sample]
         // Since we haven't provided next sample yet, behavior depends on history
-        assert!(output[0].abs() < spike_sample[0], "Spike should be attenuated");
-        
+        assert!(
+            output[0].abs() < spike_sample[0],
+            "Spike should be attenuated"
+        );
+
         // Feed another normal sample
         let normal = [0.12, 0.12, 0.12];
         let output2 = filter.process_gyro(&normal);
-        
+
         // Should recover to normal processing
         assert!(output2[0].abs() < 1.0, "Should recover from spike");
     }
@@ -610,26 +667,40 @@ mod tests {
         for _ in 0..50 {
             filter.process_gyro(&[0.5, 0.5, 0.5]);
         }
-        assert!(filter.weight_scale > 0.9, "Weight should stay high for normal samples");
+        assert!(
+            filter.weight_scale > 0.9,
+            "Weight should stay high for normal samples"
+        );
 
         // Feed clipping samples (above threshold)
         for _ in 0..30 {
             filter.process_gyro(&[4.0, 4.0, 4.0]);
         }
-        
+
         // Weight should decrease due to clipping
         // With 30 clipped samples in 100-sample window, ratio = 0.3
         // weight_scale = 0.2 + 0.8 * (1 - 0.3) = 0.2 + 0.56 = 0.76
-        assert!(filter.weight_scale < 0.85, "Weight should decrease with clipping: {}", filter.weight_scale);
-        assert!(filter.weight_scale >= 0.2, "Weight should not go below 0.2: {}", filter.weight_scale);
+        assert!(
+            filter.weight_scale < 0.85,
+            "Weight should decrease with clipping: {}",
+            filter.weight_scale
+        );
+        assert!(
+            filter.weight_scale >= 0.2,
+            "Weight should not go below 0.2: {}",
+            filter.weight_scale
+        );
 
         // Feed normal samples to recover
         for _ in 0..100 {
             filter.process_gyro(&[0.5, 0.5, 0.5]);
         }
-        
+
         // Weight should recover as clipped samples leave the window
-        assert!(filter.weight_scale > 0.9, "Weight should recover after normal samples");
+        assert!(
+            filter.weight_scale > 0.9,
+            "Weight should recover after normal samples"
+        );
     }
 
     #[test]
@@ -646,20 +717,32 @@ mod tests {
         for _ in 0..60 {
             filter.process_gyro(&[0.1, 0.1, 0.1]);
         }
-        assert_eq!(filter.mode, MotionMode::Hover, "Should stay in hover for low motion");
+        assert_eq!(
+            filter.mode,
+            MotionMode::Hover,
+            "Should stay in hover for low motion"
+        );
 
         // Feed high-motion samples to trigger aggressive mode
         // Need enough samples to overcome debouncing (50 samples minimum)
         for _ in 0..100 {
             filter.process_gyro(&[1.0, 1.0, 1.0]);
         }
-        assert_eq!(filter.mode, MotionMode::Aggressive, "Should switch to aggressive mode");
+        assert_eq!(
+            filter.mode,
+            MotionMode::Aggressive,
+            "Should switch to aggressive mode"
+        );
 
         // Feed low-motion samples to return to hover
         for _ in 0..100 {
             filter.process_gyro(&[0.1, 0.1, 0.1]);
         }
-        assert_eq!(filter.mode, MotionMode::Hover, "Should return to hover mode");
+        assert_eq!(
+            filter.mode,
+            MotionMode::Hover,
+            "Should return to hover mode"
+        );
     }
 
     #[test]
@@ -682,17 +765,20 @@ mod tests {
         // Q should increase towards max (but debouncing limits changes)
         // After sufficient samples, should trend toward higher Q
         let q_after_low = filter.current_notch_q;
-        
+
         // Feed high-amplitude samples (above ref, should decrease Q)
         for _ in 0..60 {
             filter.process_gyro(&[1.2, 1.2, 1.2]);
         }
         // Q should decrease towards min
         let q_after_high = filter.current_notch_q;
-        
+
         // Verify Q adjusted in expected direction
         // Due to debouncing, changes are gradual
-        assert!(q_after_high <= q_after_low + 0.5, "Q should decrease or stay similar for high amplitude");
+        assert!(
+            q_after_high <= q_after_low + 0.5,
+            "Q should decrease or stay similar for high amplitude"
+        );
     }
 
     #[test]
@@ -700,15 +786,15 @@ mod tests {
         let mut config = DenoiseConfig::default();
         config.enable_notch_filter = true;
         config.notch_frequencies_per_axis = Some([
-            vec![0.06, 1.46],      // X-axis: 2 frequencies
-            vec![0.06],            // Y-axis: 1 frequency
-            vec![1.46, 2.5, 3.0],  // Z-axis: 3 frequencies
+            vec![0.06, 1.46],     // X-axis: 2 frequencies
+            vec![0.06],           // Y-axis: 1 frequency
+            vec![1.46, 2.5, 3.0], // Z-axis: 3 frequencies
         ]);
         let filter = ImuDenoiseFilter::new(config);
 
         // Should create 3 stages (max across axes)
         assert_eq!(filter.notch_filters.len(), 3, "Should have 3 notch stages");
-        
+
         // Each stage should have 3 filters (one per axis)
         for stage in &filter.notch_filters {
             assert_eq!(stage.len(), 3, "Each stage should have 3 axis filters");
@@ -718,83 +804,92 @@ mod tests {
     #[test]
     fn test_lowpass_attenuates_high_frequency() {
         let mut config = DenoiseConfig::default();
-        config.lowpass_cutoff = 10.0;  // Low cutoff to make effect obvious
+        config.lowpass_cutoff = 10.0; // Low cutoff to make effect obvious
         config.imu_sample_rate = 200.0;
-        config.enable_notch_filter = false;  // Disable to isolate lowpass effect
+        config.enable_notch_filter = false; // Disable to isolate lowpass effect
         let mut filter = ImuDenoiseFilter::new(config);
 
         // Generate high-frequency oscillation (50 Hz, well above 10 Hz cutoff)
         // At 200 Hz sample rate, 50 Hz means period of 4 samples
         let mut sum_output = 0.0;
         let mut sum_input = 0.0;
-        
+
         for i in 0..100 {
             let t = i as f32 / 200.0;
             let high_freq = (2.0 * std::f32::consts::PI * 50.0 * t).sin();
             let input = [high_freq, 0.0, 0.0];
             let output = filter.process_gyro(&input);
-            
-            if i > 50 {  // Skip transient
+
+            if i > 50 {
+                // Skip transient
                 sum_input += input[0].abs();
                 sum_output += output[0].abs();
             }
         }
-        
+
         // Average output amplitude should be significantly less than input
-        assert!(sum_output < sum_input * 0.3, "Lowpass should attenuate high frequency");
+        assert!(
+            sum_output < sum_input * 0.3,
+            "Lowpass should attenuate high frequency"
+        );
     }
 
     #[test]
     fn test_notch_attenuates_resonance() {
         let mut config = DenoiseConfig::default();
         config.enable_notch_filter = true;
-        config.notch_frequencies = vec![10.0];  // Notch at 10 Hz
-        config.notch_q = 5.0;  // Narrow notch
+        config.notch_frequencies = vec![10.0]; // Notch at 10 Hz
+        config.notch_q = 5.0; // Narrow notch
         config.imu_sample_rate = 200.0;
-        config.adaptive_notch_q = false;  // Disable adaptive for consistent test
+        config.adaptive_notch_q = false; // Disable adaptive for consistent test
         let mut filter = ImuDenoiseFilter::new(config.clone());
 
         // Generate signal at notch frequency (10 Hz)
         let mut sum_output_at_notch = 0.0;
         let mut sum_input_at_notch = 0.0;
-        
+
         for i in 0..200 {
             let t = i as f32 / 200.0;
             let signal = (2.0 * std::f32::consts::PI * 10.0 * t).sin();
             let input = [signal, 0.0, 0.0];
             let output = filter.process_gyro(&input);
-            
-            if i > 100 {  // Skip filter transient
+
+            if i > 100 {
+                // Skip filter transient
                 sum_input_at_notch += input[0].abs();
                 sum_output_at_notch += output[0].abs();
             }
         }
-        
+
         // Output should be much smaller than input at notch frequency
-        assert!(sum_output_at_notch < sum_input_at_notch * 0.5, 
-                "Notch filter should attenuate resonance frequency");
-        
+        assert!(
+            sum_output_at_notch < sum_input_at_notch * 0.5,
+            "Notch filter should attenuate resonance frequency"
+        );
+
         // Now test off-notch frequency (5 Hz, well away from 10 Hz)
-        filter = ImuDenoiseFilter::new(config);  // Reset filter state
+        filter = ImuDenoiseFilter::new(config); // Reset filter state
         let mut sum_output_off_notch = 0.0;
         let mut sum_input_off_notch = 0.0;
-        
+
         for i in 0..200 {
             let t = i as f32 / 200.0;
             let signal = (2.0 * std::f32::consts::PI * 5.0 * t).sin();
             let input = [signal, 0.0, 0.0];
             let output = filter.process_gyro(&input);
-            
+
             if i > 100 {
                 sum_input_off_notch += input[0].abs();
                 sum_output_off_notch += output[0].abs();
             }
         }
-        
+
         // Off-notch frequency should pass through with minimal attenuation
         // (allowing for some attenuation from HP/LP filters)
-        assert!(sum_output_off_notch > sum_input_off_notch * 0.6,
-                "Frequencies away from notch should pass through");
+        assert!(
+            sum_output_off_notch > sum_input_off_notch * 0.6,
+            "Frequencies away from notch should pass through"
+        );
     }
 
     #[test]
@@ -803,12 +898,12 @@ mod tests {
         let mut filter = ImuDenoiseFilter::new(config);
 
         // Test that accelerometer processing works
-        let accel = [0.0, 0.0, 9.81];  // Gravity
+        let accel = [0.0, 0.0, 9.81]; // Gravity
         let output = filter.process_accel(&accel);
-        
+
         // Should process without crashing
         assert!(output.len() == 3, "Should return 3-element array");
-        
+
         // Process dynamic acceleration (oscillating around gravity)
         // This has AC component that should pass through
         let mut max_output: f32 = 0.0;
@@ -817,14 +912,15 @@ mod tests {
             let dynamic_accel = [
                 0.0,
                 0.0,
-                9.81 + 0.5 * (2.0 * std::f32::consts::PI * 2.0 * t).sin()  // 2 Hz oscillation
+                9.81 + 0.5 * (2.0 * std::f32::consts::PI * 2.0 * t).sin(), // 2 Hz oscillation
             ];
             let out = filter.process_accel(&dynamic_accel);
-            if i > 100 {  // Skip transient
+            if i > 100 {
+                // Skip transient
                 max_output = max_output.max(out[2].abs());
             }
         }
-        
+
         // The AC component should pass through (not the DC gravity)
         // We should see some non-zero output from the oscillation
         assert!(max_output > 0.1, "Should pass AC component of acceleration");
@@ -872,8 +968,10 @@ mod tests {
             filter.process_gyro(&[5.0, 5.0, 5.0]);
         }
         // Should hit minimum weight (0.2)
-        assert!((filter.weight_scale - 0.2).abs() < 0.01, 
-                "Weight should be 0.2 when all samples clipped");
+        assert!(
+            (filter.weight_scale - 0.2).abs() < 0.01,
+            "Weight should be 0.2 when all samples clipped"
+        );
 
         // Reset with no clipping
         filter = ImuDenoiseFilter::new(config.clone());
@@ -881,8 +979,10 @@ mod tests {
             filter.process_gyro(&[0.1, 0.1, 0.1]);
         }
         // Should stay at maximum weight (1.0)
-        assert!((filter.weight_scale - 1.0).abs() < 0.01,
-                "Weight should be 1.0 when no clipping");
+        assert!(
+            (filter.weight_scale - 1.0).abs() < 0.01,
+            "Weight should be 1.0 when no clipping"
+        );
     }
 
     #[test]
@@ -895,11 +995,11 @@ mod tests {
 
         // Simulate realistic flight: takeoff -> hover -> aggressive maneuver -> hover -> landing
         let scenarios = [
-            ("takeoff", 50, [0.5, 0.5, 0.8]),      // Moderate motion
-            ("hover", 100, [0.1, 0.1, 0.15]),      // Low motion
-            ("maneuver", 80, [1.5, 1.2, 1.8]),     // Aggressive motion
-            ("hover2", 150, [0.12, 0.15, 0.1]),    // Return to hover (longer for mode transition)
-            ("landing", 50, [0.4, 0.6, 0.7]),      // Moderate motion
+            ("takeoff", 50, [0.5, 0.5, 0.8]),   // Moderate motion
+            ("hover", 100, [0.1, 0.1, 0.15]),   // Low motion
+            ("maneuver", 80, [1.5, 1.2, 1.8]),  // Aggressive motion
+            ("hover2", 150, [0.12, 0.15, 0.1]), // Return to hover (longer for mode transition)
+            ("landing", 50, [0.4, 0.6, 0.7]),   // Moderate motion
         ];
 
         for (phase, samples, base_gyro) in scenarios.iter() {
@@ -916,20 +1016,35 @@ mod tests {
                     base_gyro[1] + noise[1],
                     base_gyro[2] + noise[2],
                 ];
-                
+
                 let output = filter.process_gyro(&gyro);
-                
+
                 // Verify output is reasonable
-                assert!(output[0].is_finite(), "Output should be finite in {}", phase);
-                assert!(output[1].is_finite(), "Output should be finite in {}", phase);
-                assert!(output[2].is_finite(), "Output should be finite in {}", phase);
+                assert!(
+                    output[0].is_finite(),
+                    "Output should be finite in {}",
+                    phase
+                );
+                assert!(
+                    output[1].is_finite(),
+                    "Output should be finite in {}",
+                    phase
+                );
+                assert!(
+                    output[2].is_finite(),
+                    "Output should be finite in {}",
+                    phase
+                );
             }
         }
 
         // Should have processed through various motion states successfully
         // Final mode depends on landing phase motion which is moderate
         // Don't assert specific mode since landing motion (0.4-0.7 rad/s) is borderline
-        assert!(filter.weight_scale > 0.8, "Weight should be high for clean signal");
+        assert!(
+            filter.weight_scale > 0.8,
+            "Weight should be high for clean signal"
+        );
     }
 
     #[test]
@@ -974,10 +1089,18 @@ mod tests {
                 0.25 * (2.0 * std::f32::consts::PI * 0.8 * t).sin(),
             ];
             let output = filter.process_gyro(&gyro);
-            
+
             // Verify stability over long duration
-            assert!(output[0].is_finite(), "Should remain stable at sample {}", i);
-            assert!(output[0].abs() < 10.0, "Output should be bounded at sample {}", i);
+            assert!(
+                output[0].is_finite(),
+                "Should remain stable at sample {}",
+                i
+            );
+            assert!(
+                output[0].abs() < 10.0,
+                "Output should be bounded at sample {}",
+                i
+            );
         }
     }
 
@@ -997,21 +1120,25 @@ mod tests {
         // Oscillate around threshold - should not switch rapidly due to debouncing
         let mut mode_changes = 0;
         let mut last_mode = filter.mode;
-        
+
         for i in 0..200 {
             // Alternate between just below and just above aggressive threshold
             let amp = if i % 2 == 0 { 0.75 } else { 0.85 };
             filter.process_gyro(&[amp, amp, amp]);
-            
+
             if filter.mode != last_mode {
                 mode_changes += 1;
                 last_mode = filter.mode;
             }
         }
-        
+
         // With debouncing (50 samples minimum), should have very few mode changes
         // Even with 100 oscillations, debouncing prevents rapid switching
-        assert!(mode_changes < 4, "Debouncing should prevent rapid mode switching: {} changes", mode_changes);
+        assert!(
+            mode_changes < 4,
+            "Debouncing should prevent rapid mode switching: {} changes",
+            mode_changes
+        );
     }
 
     #[test]
@@ -1025,47 +1152,56 @@ mod tests {
         // Test attenuation at each notch frequency independently
         for &freq in &[5.0, 15.0, 25.0] {
             let mut filter_local = ImuDenoiseFilter::new(config.clone());
-            
+
             let mut sum_input: f32 = 0.0;
             let mut sum_output: f32 = 0.0;
-            
+
             for i in 0..300 {
                 let t = i as f32 / 200.0;
                 let signal = (2.0 * std::f32::consts::PI * freq * t).sin();
                 let input = [signal, 0.0, 0.0];
                 let output = filter_local.process_gyro(&input);
-                
+
                 if i > 150 {
                     sum_input += input[0].abs();
                     sum_output += output[0].abs();
                 }
             }
-            
+
             let attenuation = sum_output / sum_input.max(1e-6);
-            assert!(attenuation < 0.5, "Should attenuate {} Hz: ratio={}", freq, attenuation);
+            assert!(
+                attenuation < 0.5,
+                "Should attenuate {} Hz: ratio={}",
+                freq,
+                attenuation
+            );
         }
 
         // Test pass-through at intermediate frequency (10 Hz, between 5 and 15)
         let mut filter_pass = ImuDenoiseFilter::new(config.clone());
         let mut sum_input: f32 = 0.0;
         let mut sum_output: f32 = 0.0;
-        
+
         for i in 0..300 {
             let t = i as f32 / 200.0;
             let signal = (2.0 * std::f32::consts::PI * 10.0 * t).sin();
             let input = [signal, 0.0, 0.0];
             let output = filter_pass.process_gyro(&input);
-            
+
             if i > 150 {
                 sum_input += input[0].abs();
                 sum_output += output[0].abs();
             }
         }
-        
+
         let passthrough = sum_output / sum_input.max(1e-6);
         // Should have less attenuation at intermediate frequency
         // (though still some from HP/LP filters)
-        assert!(passthrough > 0.4, "Should pass 10 Hz better than notch frequencies: ratio={}", passthrough);
+        assert!(
+            passthrough > 0.4,
+            "Should pass 10 Hz better than notch frequencies: ratio={}",
+            passthrough
+        );
     }
 }
 
@@ -1074,20 +1210,20 @@ pub fn example_usage() {
     let mut config = DenoiseConfig::default();
     config.imu_sample_rate = 200.0;
     config.camera_frame_rate = 30.0;
-    config.highpass_cutoff = 0.5;    // Remove platform sway
+    config.highpass_cutoff = 0.5; // Remove platform sway
     config.lowpass_cutoff = 50.0;
     config.enable_notch_filter = true;
-    config.notch_frequencies = vec![0.06, 1.46];  // Our identified resonances
+    config.notch_frequencies = vec![0.06, 1.46]; // Our identified resonances
     config.notch_q = 5.0;
     config.enable_vision_fusion = true;
-    config.vision_trust = 0.3;  // Trust vision 30%, IMU 70%
+    config.vision_trust = 0.3; // Trust vision 30%, IMU 70%
 
     let mut filter = ImuDenoiseFilter::new(config);
 
     // Simulate 200 Hz IMU stream
     for sample in 0..200 {
         let time_ms = sample as f32 / 200.0 * 1000.0;
-        let gyro = [0.1, 0.15, 0.09];  // Simulated gyro data
+        let gyro = [0.1, 0.15, 0.09]; // Simulated gyro data
 
         // Process raw measurement through filter
         let filtered_gyro = filter.process_gyro(&gyro);

@@ -71,14 +71,22 @@
 
 pub mod feature_tracker;
 pub mod frame_skip;
-#[cfg(feature = "gpu")]
-pub mod gpu;
+pub mod gpu_accel;
 pub mod image_utilities;
+pub mod parallel_tracking;
 pub mod patch;
 pub mod patch_simd;
 pub mod ransac;
+pub mod ransac_essential;
+pub mod subpixel_stereo;
 
 pub use feature_tracker::*;
 pub use frame_skip::AdaptiveFrameSkipper;
+pub use gpu_accel::{GpuAccelerator, GpuBackend, GpuConfig, GpuDeviceInfo};
+pub use parallel_tracking::{
+    build_pyramids_parallel, track_points_parallel, ParallelTrackingConfig, ParallelTrackingResult,
+};
 pub use patch::Pattern52;
 pub use patch_simd::compute_residuals_simd;
+pub use ransac_essential::{EssentialMatrixRansac, RansacConfig};
+pub use subpixel_stereo::{StereoMatchResult, SubpixelStereoRefinement};

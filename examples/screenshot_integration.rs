@@ -8,21 +8,21 @@ mod integration_example {
     use std::path::PathBuf;
 
     /// Mock integration test that captures multiple screenshots
-    /// 
+    ///
     /// In a real scenario, this would run your VIO pipeline and capture
     /// screenshots at key stages for visual validation.
     #[test]
     fn example_vio_pipeline_with_screenshots() {
         // Note: This is a documentation example showing the pattern
         // In actual use, import from tests/test_screenshot_artifacts.rs
-        
+
         // Pattern:
         // 1. Create artifacts manager for your test
         // let mut artifacts = ScreenshotArtifacts::new_test("vio_integration")?;
         //
         // 2. Run your VIO pipeline or viewer setup
         // viewer.initialize()?;
-        // 
+        //
         // 3. Capture screenshots at key checkpoints
         // - Initial state (empty scene)
         // - After first frame
@@ -44,7 +44,7 @@ mod integration_example {
         //
         // 6. Finalize (writes manifest with all artifacts)
         // artifacts.finalize()?;
-        // 
+        //
         // The test now has organized screenshots in:
         // target/test-artifacts/vio_integration/
         //   ├── 3D View.png
@@ -78,7 +78,7 @@ mod integration_example {
         //
         // 3. Store in artifacts
         // fs::copy(&png_path, artifacts.test_dir().join("final_state.png"))?;
-        
+
         println!("Example: CLI-based screenshot pattern documented");
     }
 

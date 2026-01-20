@@ -1,13 +1,12 @@
+use crate::calibration::types::{CameraIMUExtrinsics, CameraIntrinsics, DistortionModel};
 /// Time offset and rolling shutter estimation for camera-IMU systems.
-/// 
+///
 /// This module solves for camera↔IMU time offset and rolling shutter readout time
 /// by minimizing visual reprojection residuals under IMU motion constraints.
-/// 
+///
 /// Key insight: Timing is "hidden multiplier" - without solving it well, you can't
 /// achieve 10-30× accuracy improvement even with everything else perfect.
-
-use nalgebra::{Vector3, Isometry3, Point3};
-use crate::calibration::types::{CameraIntrinsics, DistortionModel, CameraIMUExtrinsics};
+use nalgebra::{Isometry3, Point3, Vector3};
 
 /// A camera measurement (pixel detection + metadata)
 #[derive(Clone, Debug)]
@@ -123,10 +122,7 @@ impl TimeOffsetEstimator {
             if gyro_norm > 1e-6 {
                 let axis = imu_data[i].gyro / gyro_norm;
                 let angle = gyro_norm * dt;
-                let rot_increment = Isometry3::<f64>::new(
-                    axis * angle,
-                    Vector3::zeros(),
-                );
+                let rot_increment = Isometry3::<f64>::new(axis * angle, Vector3::zeros());
                 delta_rotation = delta_rotation * rot_increment;
             }
 
@@ -152,7 +148,7 @@ impl TimeOffsetEstimator {
     /// - IMU pose at frame time (world → IMU)
     /// - Camera intrinsics and distortion
     /// - Camera measurement (pixel + timestamp)
-    /// 
+    ///
     /// Returns: reprojection error (pixels)
     pub fn reprojection_residual(
         &self,
@@ -214,16 +210,15 @@ impl TimeOffsetEstimator {
         let mut cost = 0.0;
 
         for (measurement, point_world) in measurements {
-            let residual =
-                self.reprojection_residual(
-                    point_world,
-                    t_world_to_imu,
-                    camera_extrinsics,
-                    camera_intrinsics,
-                    camera_distortion,
-                    measurement,
-                    image_height,
-                );
+            let residual = self.reprojection_residual(
+                point_world,
+                t_world_to_imu,
+                camera_extrinsics,
+                camera_intrinsics,
+                camera_distortion,
+                measurement,
+                image_height,
+            );
 
             cost += residual * residual;
         }
@@ -231,19 +226,18 @@ impl TimeOffsetEstimator {
         // Simple update: perturb estimate and measure improvement
         let cost_initial = cost;
         self.time_offset_estimate += learning_rate;
-        
+
         let mut new_cost = 0.0;
         for (measurement, point_world) in measurements {
-            let residual =
-                self.reprojection_residual(
-                    point_world,
-                    t_world_to_imu,
-                    camera_extrinsics,
-                    camera_intrinsics,
-                    camera_distortion,
-                    measurement,
-                    image_height,
-                );
+            let residual = self.reprojection_residual(
+                point_world,
+                t_world_to_imu,
+                camera_extrinsics,
+                camera_intrinsics,
+                camera_distortion,
+                measurement,
+                image_height,
+            );
             new_cost += residual * residual;
         }
 

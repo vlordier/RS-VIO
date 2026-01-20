@@ -29,17 +29,16 @@ pub fn example_imu_visualization(
     // Process each IMU measurement
     for imu in imu_measurements {
         analyzer.process_measurement(imu);
-        raw_accel.push([imu.accel[0] as f32, imu.accel[1] as f32, imu.accel[2] as f32]);
+        raw_accel.push([
+            imu.accel[0] as f32,
+            imu.accel[1] as f32,
+            imu.accel[2] as f32,
+        ]);
         raw_gyro.push([imu.gyro[0] as f32, imu.gyro[1] as f32, imu.gyro[2] as f32]);
     }
 
     // Step 1: Log raw measurements (before processing)
-    viewer.log_imu_raw(
-        timestamp_ns,
-        &raw_accel,
-        &raw_gyro,
-        "imu/raw",
-    );
+    viewer.log_imu_raw(timestamp_ns, &raw_accel, &raw_gyro, "imu/raw");
 
     // Step 2: Get bias estimates
     let (bias_accel, bias_gyro) = analyzer.get_bias_estimates();
@@ -90,7 +89,8 @@ pub fn example_imu_visualization(
         harmonic_decomp.gyro_bias.y as f32,
         harmonic_decomp.gyro_bias.z as f32,
     ];
-    let harmonics: Vec<[f32; 3]> = harmonic_decomp.residual_harmonics
+    let harmonics: Vec<[f32; 3]> = harmonic_decomp
+        .residual_harmonics
         .iter()
         .map(|h| [h.x as f32, h.y as f32, h.z as f32])
         .collect();
@@ -137,7 +137,7 @@ pub fn example_imu_visualization(
                     avg_snr
                 );
             }
-        }
+        },
         rs_vio::imu::signal_analysis::MotorState::Running => {
             if avg_snr < 10.0 {
                 log::warn!(
@@ -147,13 +147,14 @@ pub fn example_imu_visualization(
             } else {
                 log::info!(
                     "[IMU] In-flight mode detected: f₀={:.1} Hz, SNR={:.1} dB",
-                    harmonic_decomp.quality.fundamental_freq_hz, avg_snr
+                    harmonic_decomp.quality.fundamental_freq_hz,
+                    avg_snr
                 );
             }
-        }
+        },
         rs_vio::imu::signal_analysis::MotorState::Transitioning => {
             log::info!("[IMU] Motor state transitioning...");
-        }
+        },
     }
 }
 
@@ -199,10 +200,14 @@ pub fn analyze_sensor_health(imu_measurements: &[ImuData]) -> String {
     let (bias_a, bias_g) = analyzer.get_bias_estimates();
 
     // Analyze harmonics
-    let harmonic_rms: f32 = decomp.residual_harmonics
+    let harmonic_rms: f32 = decomp
+        .residual_harmonics
         .iter()
-        .map(|h| (h.x as f32 * h.x as f32 + h.y as f32 * h.y as f32 + h.z as f32 * h.z as f32).sqrt())
-        .sum::<f32>() / decomp.residual_harmonics.len().max(1) as f32;
+        .map(|h| {
+            (h.x as f32 * h.x as f32 + h.y as f32 * h.y as f32 + h.z as f32 * h.z as f32).sqrt()
+        })
+        .sum::<f32>()
+        / decomp.residual_harmonics.len().max(1) as f32;
 
     let avg_snr = (decomp.quality.snr[0] + decomp.quality.snr[1] + decomp.quality.snr[2]) / 3.0;
 
@@ -222,19 +227,37 @@ Harmonic Analysis:
   Fundamental:         [{:.4}, {:.4}, {:.4}] m/s²
 Quality Assessment:    {}
 "#,
-        decomp.gravity.x, decomp.gravity.y, decomp.gravity.z,
+        decomp.gravity.x,
+        decomp.gravity.y,
+        decomp.gravity.z,
         decomp.gravity.norm(),
-        bias_a.x, bias_a.y, bias_a.z,
+        bias_a.x,
+        bias_a.y,
+        bias_a.z,
         bias_a.norm(),
-        bias_g.x, bias_g.y, bias_g.z,
+        bias_g.x,
+        bias_g.y,
+        bias_g.z,
         avg_snr,
-        decomp.quality.rms[0], decomp.quality.rms[1], decomp.quality.rms[2],
-        decomp.quality.peak[0], decomp.quality.peak[1], decomp.quality.peak[2],
+        decomp.quality.rms[0],
+        decomp.quality.rms[1],
+        decomp.quality.rms[2],
+        decomp.quality.peak[0],
+        decomp.quality.peak[1],
+        decomp.quality.peak[2],
         harmonic_rms,
         decomp.fundamental_harmonic.x,
         decomp.fundamental_harmonic.y,
         decomp.fundamental_harmonic.z,
-        if avg_snr > 30.0 { "✓ Excellent" } else if avg_snr > 20.0 { "✓ Good" } else if avg_snr > 10.0 { "⚠ Fair" } else { "✗ Poor" }
+        if avg_snr > 30.0 {
+            "✓ Excellent"
+        } else if avg_snr > 20.0 {
+            "✓ Good"
+        } else if avg_snr > 10.0 {
+            "⚠ Fair"
+        } else {
+            "✗ Poor"
+        }
     )
 }
 
@@ -248,7 +271,11 @@ mod tests {
         let imu_data: Vec<ImuData> = (0..100)
             .map(|i| ImuData {
                 timestamp: (i * 10000) as i64, // 100 Hz
-                accel: [0.01 * (i as f64 % 10.0), 0.01 * ((i as f64 + 3.0) % 10.0), -9.81],
+                accel: [
+                    0.01 * (i as f64 % 10.0),
+                    0.01 * ((i as f64 + 3.0) % 10.0),
+                    -9.81,
+                ],
                 gyro: [0.001, 0.001, 0.001],
             })
             .collect();
