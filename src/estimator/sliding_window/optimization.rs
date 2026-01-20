@@ -20,7 +20,7 @@ use apex_solver::linalg::{LinearSolverType, SchurPreconditioner, SchurVariant};
 use apex_solver::manifold::ManifoldType;
 use apex_solver::optimizer::levenberg_marquardt::{LevenbergMarquardt, LevenbergMarquardtConfig};
 use apex_solver::optimizer::SolverResult;
-use na::{DVector, UnitQuaternion};
+use na::{DMatrix, DVector, UnitQuaternion};
 use nalgebra as na;
 use std::collections::HashMap;
 
@@ -523,12 +523,12 @@ impl SlidingWindow {
                 marg_prior.residual_dim
             );
 
-            // Collect variable names and dimensions for all kept parameters
-            let mut var_names: Vec<String> = Vec::new();
-            let mut param_dims: Vec<usize> = Vec::new();
-            let mut linearization_points: Vec<DVector<f64>> = Vec::new();
-
-            for param_id in &marg_prior.param_ids {
+            // Build mapping of which parameters from prior exist in workspace
+            // and compute their positions in both the prior and workspace
+            let mut param_mapping: Vec<(String, usize)> = Vec::new(); // (var_name, dim)
+            let mut prior_param_indices: Vec<usize> = Vec::new(); // indices in marg_prior.param_ids
+            
+            for (param_idx, param_id) in marg_prior.param_ids.iter().enumerate() {
                 let var_name = match param_id {
                     ParamId::KeyframePose(i) => format!("KF_{}", i),
                     ParamId::KeyframeVelocity(i) => format!("VEL_{}", i),
@@ -536,52 +536,77 @@ impl SlidingWindow {
                     _ => continue,
                 };
 
-                // Only include parameters that exist in the optimization problem
+                // Check if this parameter exists in the workspace
                 if let Some((_, param_val)) = workspace.initial_values.get(&var_name) {
-                    // Get linearization point for this parameter
-                    if let Some(lin_point) = marg_prior
-                        .linearization_points
-                        .get(param_id)
-                        .cloned()
-                    {
-                        var_names.push(var_name);
-                        param_dims.push(param_val.len());
-                        linearization_points.push(lin_point);
-                    }
+                    param_mapping.push((var_name, param_val.len()));
+                    prior_param_indices.push(param_idx);
                 }
             }
 
-            // Only add prior if we have kept parameters
-            if !var_names.is_empty() {
-                // Concatenate linearization points
-                let total_dim: usize = param_dims.iter().sum();
+            // Only add prior if we have kept parameters that exist in workspace
+            if !param_mapping.is_empty() {
+                // Compute original offsets in the information matrix
+                let mut orig_offsets = vec![0];
+                let mut offset = 0;
+                for param_id in &marg_prior.param_ids {
+                    if let Some(lin_pt) = marg_prior.linearization_points.get(param_id) {
+                        offset += lin_pt.len();
+                    }
+                    orig_offsets.push(offset);
+                }
                 
-                // Verify dimension matches Schur complement
-                assert_eq!(
-                    total_dim,
-                    marg_prior.information.nrows(),
-                    "Concatenated parameter dimension {} must match information matrix dimension {}",
-                    total_dim,
-                    marg_prior.information.nrows()
-                );
+                // Extract rows and columns from information matrix for existing params
+                let mut info_rows = Vec::new();
+                let mut info_cols = Vec::new();
+                for &param_idx in &prior_param_indices {
+                    let start = orig_offsets[param_idx];
+                    let end = orig_offsets[param_idx + 1];
+                    for i in start..end {
+                        info_rows.push(i);
+                        info_cols.push(i);
+                    }
+                }
                 
+                // Build reduced information matrix
+                let total_dim = info_rows.len();
+                let mut info_reduced = DMatrix::zeros(total_dim, total_dim);
+                for (new_i, &old_i) in info_rows.iter().enumerate() {
+                    for (new_j, &old_j) in info_cols.iter().enumerate() {
+                        info_reduced[(new_i, new_j)] = marg_prior.information[(old_i, old_j)];
+                    }
+                }
+                
+                // Extract residual for existing parameters
+                let mut residual_reduced = DVector::zeros(total_dim);
+                for (new_i, &old_i) in info_rows.iter().enumerate() {
+                    residual_reduced[new_i] = marg_prior.residual[old_i];
+                }
+                
+                // Collect linearization points in order of existing parameters
                 let mut lin_point_concat = DVector::zeros(total_dim);
                 let mut offset = 0;
-                for lp in &linearization_points {
-                    let dim = lp.len();
-                    lin_point_concat.rows_mut(offset, dim).copy_from(lp);
-                    offset += dim;
+                for &param_idx in &prior_param_indices {
+                    let param_id = &marg_prior.param_ids[param_idx];
+                    if let Some(lin_point) = marg_prior.linearization_points.get(param_id) {
+                        let dim = lin_point.len();
+                        lin_point_concat.rows_mut(offset, dim).copy_from(lin_point);
+                        offset += dim;
+                    }
                 }
+                
+                // Collect dimension info and variable names
+                let var_names: Vec<String> = param_mapping.iter().map(|x| x.0.clone()).collect();
+                let param_dims: Vec<usize> = param_mapping.iter().map(|x| x.1).collect();
 
-                // Create joint prior factor
+                // Create joint prior factor with reduced dimensions
                 let joint_prior = JointPriorFactor::new(
                     lin_point_concat,
-                    marg_prior.information.clone(),
+                    info_reduced,
                     marg_prior.damping,
                     param_dims,
                 );
 
-                // Add as single residual block with all variables
+                // Add as single residual block with existing variables
                 let var_refs: Vec<&str> = var_names.iter().map(|s| s.as_str()).collect();
                 workspace.problem.add_residual_block(
                     &var_refs.iter().map(|s| *s).collect::<Vec<_>>(),
