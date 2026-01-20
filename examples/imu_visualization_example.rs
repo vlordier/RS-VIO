@@ -107,9 +107,9 @@ pub fn example_imu_visualization(
 
     // Step 5: Log signal quality metrics with motor state
     let motor_state_str = match harmonic_decomp.motor_state {
-        rs_vio::imu::signal_analysis::MotorState::Off => "Off",
-        rs_vio::imu::signal_analysis::MotorState::Running => "Running",
-        rs_vio::imu::signal_analysis::MotorState::Transitioning => "Transitioning",
+        rs_vio::imu::MotorState::Off => "Off",
+        rs_vio::imu::MotorState::Running => "Running",
+        rs_vio::imu::MotorState::Transitioning => "Transitioning",
     };
 
     viewer.log_imu_signal_quality(
@@ -130,7 +130,7 @@ pub fn example_imu_visualization(
 
     // Adjust warnings based on motor state
     match harmonic_decomp.motor_state {
-        rs_vio::imu::signal_analysis::MotorState::Off => {
+            rs_vio::imu::MotorState::Off => {
             if avg_snr < 20.0 {
                 log::warn!(
                     "[IMU] Low signal quality in stationary mode (SNR: {:.1} dB), check sensor calibration",
@@ -138,7 +138,7 @@ pub fn example_imu_visualization(
                 );
             }
         },
-        rs_vio::imu::signal_analysis::MotorState::Running => {
+            rs_vio::imu::MotorState::Running => {
             if avg_snr < 10.0 {
                 log::warn!(
                     "[IMU] Very high vibration during flight (SNR: {:.1} dB), f₀={:.1} Hz - consider vibration damping",
@@ -152,7 +152,7 @@ pub fn example_imu_visualization(
                 );
             }
         },
-        rs_vio::imu::signal_analysis::MotorState::Transitioning => {
+            rs_vio::imu::MotorState::Transitioning => {
             log::info!("[IMU] Motor state transitioning...");
         },
     }

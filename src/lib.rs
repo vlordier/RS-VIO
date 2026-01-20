@@ -162,6 +162,7 @@ pub fn init_logging() {
 
 pub mod calibration;
 pub mod camera;
+pub mod common;
 pub mod datasets;
 pub mod estimator;
 pub mod evaluation;
@@ -171,12 +172,11 @@ pub mod logging;
 pub mod math;
 pub mod optimization;
 pub mod platform;
-pub mod validation;
-pub mod vision;
-
 pub mod traits;
 pub mod types;
+pub mod validation;
 pub mod viewers;
+pub mod vision;
 
 // Re-export commonly used types for convenience
 pub use datasets::config::Config;
@@ -184,3 +184,4 @@ pub use datasets::euroc_player::EurocPlayer;
 pub use datasets::fourseasons_player::FourSeasonsPlayer;
 pub use datasets::tum_vi_player::TUMVIPlayer;
 pub use datasets::{PlayerConfig, PlayerResult};
+pub use optimization::marginalization::MarginalizationPrior;

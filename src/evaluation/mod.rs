@@ -1,8 +1,8 @@
 pub mod calibration_monitor;
 pub mod calibration_quality;
 pub mod depth_metrics;
-pub mod distance_speed_metrics;
 pub mod feature_metrics;
+pub mod metrics;
 pub mod results;
 pub mod robustness_metrics;
 /// VIO evaluation metrics and benchmarking tools
@@ -24,12 +24,12 @@ pub use calibration_quality::{
     CalibrationConfidenceFactors, CalibrationImprovementMetrics, CalibrationQualityStats,
 };
 pub use depth_metrics::{compute_depth_rmse, DepthMetrics};
-pub use distance_speed_metrics::{
+pub use feature_metrics::{compute_reprojection_error, FeatureMetrics};
+pub use metrics::{
     BinMetrics, CalibrationAwareAnalyzer, CalibrationAwareMetrics, DistanceBinnedImprovement,
     DistanceBinnedMetrics, DistanceSpeedAnalysis, DistanceSpeedAnalyzer, DistanceSpeedMatrix,
     SpeedBinnedImprovement, SpeedBinnedMetrics, TrackSurvivalStats, WeightedResidualStats,
 };
-pub use feature_metrics::{compute_reprojection_error, FeatureMetrics};
 pub use results::{compare_configurations, Configuration, ConfigurationResults};
 pub use robustness_metrics::{track_failure_rate, RobustnessMetrics};
 pub use trajectory_metrics::{compute_ate, compute_rpe, TrajectoryMetrics};

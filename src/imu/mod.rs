@@ -35,14 +35,15 @@
 //! - Lupton & Sukkarieh, "Visual-Inertial-Aided Navigation for
 //!   High-Dynamic Motion in GPS-Denied Environments", 2011
 
-pub mod denoise_filter;
+pub mod analysis;
+pub mod denoise;
 pub mod higher_order_filter;
 pub mod initialization;
 pub mod learned_vibration;
-pub mod signal_analysis;
 pub mod vibration_filter;
 
-pub use denoise_filter::{DenoiseConfig, ImuDenoiseFilter};
+pub use analysis::{HarmonicDecomposition, ImuSignalAnalyzer, MotorState, SignalQuality};
+pub use denoise::{DenoiseConfig, ImuDenoiseFilter};
 pub use higher_order_filter::{
     HigherOrderFilter, HigherOrderFilterConfig, HigherOrderOutput, JerkStats, SnapStats,
 };
@@ -52,8 +53,8 @@ pub use initialization::{
 };
 pub use learned_vibration::{
     LearnedVibrationScheduler, RuleBasedVibrationScheduler, VibrationInputs, VibrationOutputs,
+    VibrationTrainingSample,
 };
-pub use signal_analysis::{HarmonicDecomposition, ImuSignalAnalyzer, SignalQuality};
 pub use vibration_filter::{
     NotchFilter, VibrationFilterConfig, VibrationNotchFilter, VibrationPeak,
 };

@@ -222,6 +222,13 @@ impl LearnedVibrationScheduler {
         self.vibration_filter.as_mut()
     }
 
+    /// Reset scheduler state (clear history and training data)
+    pub fn reset(&mut self) {
+        self.vibration_history.clear();
+        self.training_data.clear();
+        self.weights = VibrationWeights::default();
+    }
+
     // Private helper methods for learned model
 
     fn update_weights(&mut self) {

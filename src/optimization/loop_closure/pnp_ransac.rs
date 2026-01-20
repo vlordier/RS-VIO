@@ -174,7 +174,7 @@ impl PnPRansacSolver {
                     );
 
                     let error = (reprojected - corr.point_2d).norm();
-                    residuals[idx] = error;
+                    residuals[idx] = error as crate::types::Float;
 
                     if error < self.config.reprojection_threshold {
                         inlier_mask[idx] = true;
@@ -234,8 +234,11 @@ impl PnPRansacSolver {
 
         // Compute final mean error from best pose
         let residuals = workspace.ransac_residuals();
-        let mean_error =
-            best_inliers.iter().map(|&idx| residuals[idx]).sum::<f64>() / best_inliers.len() as f64;
+        let mean_error = best_inliers
+            .iter()
+            .map(|&idx| residuals[idx])
+            .sum::<crate::types::Float>() as f64
+            / best_inliers.len() as f64;
 
         Ok(PnPRansacResult {
             pose: best_pose,
