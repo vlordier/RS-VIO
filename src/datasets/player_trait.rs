@@ -452,4 +452,23 @@ pub fn save_statistics_common(result: &PlayerResult, stats_path: &Path) {
         )
         .ok();
     }
+
+    // Also emit a simple CSV for per-frame timing if available
+    if !result.frame_processing_times.is_empty() {
+        if let Some(stem) = stats_path.file_stem() {
+            let csv_path = stats_path.with_file_name(stem);
+            // Append suffix before extension (or just add .csv if none)
+            let mut csv_os = csv_path.into_os_string();
+            csv_os.push("_frames.csv");
+            let csv_path = std::path::PathBuf::from(csv_os);
+
+            if let Ok(mut csv_file) = std::fs::File::create(&csv_path) {
+                use std::io::Write;
+                writeln!(csv_file, "frame_idx,processing_time_ms").ok();
+                for (idx, t_ms) in result.frame_processing_times.iter().enumerate() {
+                    writeln!(csv_file, "{},{}", idx, t_ms).ok();
+                }
+            }
+        }
+    }
 }

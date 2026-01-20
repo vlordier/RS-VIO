@@ -23,10 +23,10 @@ fn main() {
         enable_statistics: true,         // File statistics
         enable_console_statistics: true, // Console statistics
         step_mode: false,
-        stats_output_path: None,
+        stats_output_path: args.stats_out.clone(),
     };
 
-    // Create and run EuRoC player
+    // Create and run TUM-VI player
     let player = TUMVIPlayer::new();
     match player.run(&player_config) {
         Ok(result) => {
@@ -45,14 +45,18 @@ fn main() {
 }
 
 #[derive(Parser, Debug)]
-#[command(name = "euroc_vio")]
-#[command(about = "EuRoC VIO/VO Dataset Player")]
+#[command(name = "tum_vi_vio")]
+#[command(about = "TUM-VI VIO/VO Dataset Player")]
 struct Args {
     /// Path to configuration file (YAML)
-    #[arg(help = "Path to configuration file (e.g., config/euroc_vio.yaml)")]
+    #[arg(help = "Path to configuration file (e.g., config/tum_vi.yaml)")]
     config_file: String,
 
-    /// Path to EuRoC dataset directory
-    #[arg(help = "Path to EuRoC dataset directory (e.g., /path/to/MH_01_easy)")]
+    /// Path to TUM-VI dataset directory
+    #[arg(help = "Path to dataset root (e.g., /path/to/TUM-VI/dataset-room1_512_16)")]
     dataset_path: String,
+
+    /// Optional path to write statistics; will also emit a CSV of per-frame timing
+    #[arg(long, help = "Optional path to write statistics; emits *_frames.csv too")]
+    stats_out: Option<String>,
 }

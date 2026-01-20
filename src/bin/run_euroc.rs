@@ -23,7 +23,7 @@ fn main() {
         enable_statistics: true,         // File statistics
         enable_console_statistics: true, // Console statistics
         step_mode: false,
-        stats_output_path: None,
+        stats_output_path: args.stats_out.clone(),
     };
     // Create and run EuRoC player
     let player = EurocPlayer::new();
@@ -54,4 +54,8 @@ struct Args {
     /// Path to EuRoC dataset directory
     #[arg(help = "Path to EuRoC dataset directory (e.g., /path/to/MH_01_easy)")]
     dataset_path: String,
+
+    /// Optional path to write statistics; will also emit a CSV of per-frame timing
+    #[arg(long, help = "Optional path to write statistics; emits *_frames.csv too")]
+    stats_out: Option<String>,
 }
