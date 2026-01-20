@@ -177,8 +177,8 @@ pub trait DatasetPlayer: Send + Sync {
 /// 5. Collecting statistics
 ///
 /// By extracting this pattern, we avoid code duplication across player implementations.
-pub fn execute<P: DatasetPlayer + ?Sized>(
-    player: &P,
+pub fn execute(
+    player: &dyn DatasetPlayer,
     config: &PlayerConfig,
     dataset_name: &str,
 ) -> Result<PlayerResult> {

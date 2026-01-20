@@ -1294,3 +1294,42 @@ pub fn create_viewer(
     viewer.initialize()?;
     Ok(Box::new(viewer))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn matrix_to_quaternion_identity_returns_unit_w() {
+        let rot = [
+            [1.0_f64, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0],
+        ];
+
+        let quat = matrix_to_quaternion(rot);
+        // Identity rotation should be zero vector with scalar 1
+        assert!((quat[0]).abs() < 1e-12);
+        assert!((quat[1]).abs() < 1e-12);
+        assert!((quat[2]).abs() < 1e-12);
+        assert!((quat[3] - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn image_to_jpeg_bytes_handles_valid_and_mismatched_sizes() {
+        let viewer = RerunViewer::new();
+
+        // 2x2 grayscale image with correct size
+        let valid_img = vec![0_u8, 255, 128, 64];
+        let jpeg = viewer.image_to_jpeg_bytes(&valid_img, 2, 2, "test/entity");
+        let bytes = jpeg.expect("expected JPEG bytes for valid image");
+        assert!(bytes.len() > 10, "JPEG output should have bytes");
+        assert_eq!(bytes[0], 0xFF);
+        assert_eq!(bytes[1], 0xD8);
+
+        // Mismatched size should return None and not panic
+        let bad_img = vec![0_u8; 3]; // expects 4 for 2x2
+        let jpeg_bad = viewer.image_to_jpeg_bytes(&bad_img, 2, 2, "test/entity");
+        assert!(jpeg_bad.is_none());
+    }
+}

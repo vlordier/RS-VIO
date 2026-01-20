@@ -23,6 +23,7 @@ env_logger = "0.11"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
 rand = "0.8"
+rand_distr = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 serde_json = "1.0"
@@ -30,8 +31,10 @@ toml = "0.8"
 anyhow = "1.0"
 thiserror = "1.0"
 rustfft = "6.2"
-rerun = "0.25"
-image = "0.25"
+rerun = { version = "0.25", optional = true }
+# Image crate with optional codec support (only png is required for datasets)
+image = { version = "0.25", default-features = false, features = ["png"] }
+
 imageproc = "0.25"
 nalgebra = "0.33.2"
 nalgebra034 = { package = "nalgebra", version = "0.34.1" } # TODO improve this, now this is dirty (needed for camera-intrinsic-model for now)
@@ -51,6 +54,9 @@ pollster = { version = "0.3", optional = true }
 
 
 [features]
+default = []
+# Feature flag for Rerun.io 3D visualization backend (adds ~30% IR bloat, off by default for lean builds)
+rerun-viewer = ["rerun"]
 # Feature flag for using f32 instead of f64 precision
 use_f32 = []
 # Feature flag for LightGlue ONNX-based verification
