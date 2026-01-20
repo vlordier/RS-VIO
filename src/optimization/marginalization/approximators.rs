@@ -334,13 +334,21 @@ impl PriorConstructor for StandardPriorConstructor {
         // Scale information matrix
         let info = schur_complement.clone() * config.prior_info_scale;
 
+        // Filter linearization points to only include kept parameters
+        let filtered_lin_points: HashMap<ParamId, DVector<f64>> = param_ids
+            .iter()
+            .filter_map(|id| {
+                linearization_points.get(id).map(|lp| (id.clone(), lp.clone()))
+            })
+            .collect();
+
         Some(MarginalizationPrior {
             param_ids: param_ids.to_vec(),
             residual_dim,
             residual: reduced_gradient.clone(),
             information: info,
             damping: config.damping,
-            linearization_points: linearization_points.clone(),
+            linearization_points: filtered_lin_points,
         })
     }
 

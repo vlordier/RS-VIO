@@ -21,5 +21,5 @@ pub use visual::{
 };
 pub use imu::ImuPriorFactor;
 pub use loop_closure::LoopClosurePoseFactor;
-pub use prior::PriorFactor;
+pub use prior::{JointPriorFactor, PriorFactor};
 pub use utils::skew_symmetric;

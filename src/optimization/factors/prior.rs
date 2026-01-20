@@ -120,6 +120,144 @@ impl Factor for PriorFactor {
     }
 }
 
+/// Joint prior factor for marginalization that handles multiple coupled parameters.
+///
+/// This factor encodes the marginalization prior from Schur complement reduction,
+/// which produces a joint information matrix coupling all kept parameters together.
+///
+/// Unlike `PriorFactor` which acts on a single parameter, this factor:
+/// - Takes multiple parameter blocks as inputs
+/// - Concatenates them in a specified order
+/// - Applies the full coupled information matrix
+///
+/// # Mathematical Formulation
+///
+/// Given parameter blocks `x_1, ..., x_n` and joint linearization point `x0`, information `Omega`:
+///
+/// ```text
+/// x_concat = [x_1; x_2; ...; x_n]  (concatenation)
+/// r = sqrt(Omega) * (x_concat - x0)
+/// Cost = 0.5 * r^T * Omega * r
+/// ```
+#[derive(Debug, Clone)]
+pub struct JointPriorFactor {
+    /// Linearization point for concatenated parameter vector
+    pub linearization_point: DVector<f64>,
+    /// Information matrix (inverse covariance) for all parameters jointly
+    pub information: DMatrix<f64>,
+    /// Prior weight (scales the prior strength)
+    pub prior_weight: f64,
+    /// Dimension of each parameter block (in order)
+    pub param_dims: Vec<usize>,
+}
+
+impl JointPriorFactor {
+    /// Create a new joint prior factor.
+    ///
+    /// # Arguments
+    /// * `linearization_point` - Joint linearization point (concatenated)
+    /// * `information` - Joint information matrix (must be square, matching concatenated dimension)
+    /// * `prior_weight` - Scaling factor for prior strength
+    /// * `param_dims` - Dimensions of each parameter block in order
+    pub fn new(
+        linearization_point: DVector<f64>,
+        information: DMatrix<f64>,
+        prior_weight: f64,
+        param_dims: Vec<usize>,
+    ) -> Self {
+        let total_dim: usize = param_dims.iter().sum();
+        assert_eq!(
+            linearization_point.len(),
+            total_dim,
+            "Linearization point dimension must match sum of parameter dimensions"
+        );
+        assert_eq!(
+            linearization_point.len(),
+            information.nrows(),
+            "Linearization point dimension must match information matrix"
+        );
+        assert_eq!(
+            information.nrows(),
+            information.ncols(),
+            "Information matrix must be square"
+        );
+
+        Self {
+            linearization_point,
+            information,
+            prior_weight,
+            param_dims,
+        }
+    }
+}
+
+impl Factor for JointPriorFactor {
+    fn linearize(
+        &self,
+        params: &[DVector<f64>],
+        compute_jacobian: bool,
+    ) -> (DVector<f64>, Option<DMatrix<f64>>) {
+        assert_eq!(
+            params.len(),
+            self.param_dims.len(),
+            "Number of parameters must match param_dims"
+        );
+
+        // Verify each parameter has the expected dimension
+        for (i, (param, &expected_dim)) in params.iter().zip(self.param_dims.iter()).enumerate() {
+            assert_eq!(
+                param.len(),
+                expected_dim,
+                "Parameter {} dimension mismatch: expected {}, got {}",
+                i,
+                expected_dim,
+                param.len()
+            );
+        }
+
+        // Concatenate all parameter vectors
+        let total_dim: usize = self.param_dims.iter().sum();
+        let mut x_concat = DVector::zeros(total_dim);
+        let mut offset = 0;
+        for param in params {
+            let dim = param.len();
+            x_concat.rows_mut(offset, dim).copy_from(param);
+            offset += dim;
+        }
+
+        // Compute residual: r = sqrt(Omega) * (x_concat - x0) * prior_weight
+        // For numerical stability, we use Cholesky decomposition if available
+        let delta = &x_concat - &self.linearization_point;
+        
+        // Try Cholesky decomposition for sqrt(Omega)
+        let residuals = if let Some(chol) = self.information.clone().cholesky() {
+            chol.l() * delta * self.prior_weight
+        } else {
+            // Fallback: use information matrix directly (less accurate but stable)
+            &self.information * delta * self.prior_weight
+        };
+
+        // Jacobian: Block diagonal structure, each block is sqrt(Omega_ii) * prior_weight
+        let jacobian_matrix = if compute_jacobian {
+            if let Some(chol) = self.information.clone().cholesky() {
+                let sqrt_omega = chol.l();
+                Some(&sqrt_omega * self.prior_weight)
+            } else {
+                // Fallback: use information matrix directly
+                Some(&self.information * self.prior_weight)
+            }
+        } else {
+            None
+        };
+
+        (residuals, jacobian_matrix)
+    }
+
+    fn get_dimension(&self) -> usize {
+        self.linearization_point.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -151,5 +289,46 @@ mod tests {
         assert!((residuals[0] - 1.5).abs() < 1e-12);
         assert!((residuals[1] + 3.0).abs() < 1e-12);
         assert!((residuals[2] - 0.75).abs() < 1e-12);
+    }
+
+    #[test]
+    fn joint_prior_factor_zero_residual_at_linearization_point() {
+        // Two parameters: 2D and 3D
+        let lin_point = DVector::from_vec(vec![1.0, 2.0, 3.0, 4.0, 5.0]);
+        let info = DMatrix::identity(5, 5);
+        let param_dims = vec![2, 3];
+        let factor = JointPriorFactor::new(lin_point.clone(), info, 1.0, param_dims);
+
+        let params = vec![
+            DVector::from_vec(vec![1.0, 2.0]),
+            DVector::from_vec(vec![3.0, 4.0, 5.0]),
+        ];
+        let (residuals, jac) = factor.linearize(&params, true);
+
+        assert!(residuals.iter().all(|v| v.abs() < 1e-12));
+        assert!(jac.is_some());
+    }
+
+    #[test]
+    fn joint_prior_factor_concatenates_parameters_correctly() {
+        // Two parameters with different values
+        let lin_point = DVector::from_vec(vec![0.0, 0.0, 0.0, 0.0]);
+        let info = DMatrix::identity(4, 4) * 2.0; // Scale for easier verification
+        let param_dims = vec![2, 2];
+        let factor = JointPriorFactor::new(lin_point, info, 1.0, param_dims);
+
+        let params = vec![
+            DVector::from_vec(vec![1.0, 2.0]),
+            DVector::from_vec(vec![3.0, 4.0]),
+        ];
+        let (residuals, _) = factor.linearize(&params, false);
+
+        // Residual should be sqrt(info) * [1,2,3,4] * weight
+        // With info = 2*I, sqrt(info) ≈ sqrt(2)*I
+        let expected_scale = 2.0_f64.sqrt();
+        assert!((residuals[0] - expected_scale * 1.0).abs() < 1e-10);
+        assert!((residuals[1] - expected_scale * 2.0).abs() < 1e-10);
+        assert!((residuals[2] - expected_scale * 3.0).abs() < 1e-10);
+        assert!((residuals[3] - expected_scale * 4.0).abs() < 1e-10);
     }
 }

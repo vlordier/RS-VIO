@@ -3,7 +3,7 @@ use crate::debug_log;
 use crate::estimator::Frame;
 use crate::imu::ImuMotionPrior;
 use crate::optimization::factors::{
-    BundleAdjustmentFactor, ImuPriorFactor, LoopClosurePoseFactor, PnPFactor,
+    BundleAdjustmentFactor, ImuPriorFactor, JointPriorFactor, LoopClosurePoseFactor, PnPFactor,
 };
 use crate::optimization::marginalization::{ParamBlock, ParamId};
 use crate::optimization::tight_coupling::{GravityModel, ImuPreintegration, InterKeyframeImuFactor};
@@ -515,7 +515,6 @@ impl SlidingWindow {
         }
     }
 
-    #[allow(unused_variables)]
     fn add_marginalization_prior_factor(&self, workspace: &mut OptimizationWorkspace) {
         if let Some(marg_prior) = self.marginalization_manager.get_prior() {
             debug_log!(
@@ -524,52 +523,80 @@ impl SlidingWindow {
                 marg_prior.residual_dim
             );
 
-            // TODO(CRITICAL): Marginalization prior application is currently disabled
-            // because the current implementation is incorrect.
-            // 
-            // PROBLEM: The prior information matrix couples ALL kept parameters together.
-            // The Schur complement gives us a joint information matrix over all kept params.
-            // However, the current code tries to add separate prior factors for each
-            // parameter with the full information matrix, which is incorrect.
-            //
-            // CORRECT SOLUTION: Implement a joint prior factor that takes all kept
-            // parameters as inputs and applies the coupled information matrix correctly.
-            // This requires:
-            // 1. Creating a multi-parameter prior factor
-            // 2. Concatenating all kept parameter vectors
-            // 3. Applying the full information matrix to the concatenated vector
-            //
-            // TEMPORARY WORKAROUND: Disable prior application to allow validation
-            // This means marginalization still happens (old states removed) but the
-            // information is not retained, which can cause drift.
-            
-            log::warn!("[SlidingWindow] Marginalization prior factor disabled (known bug #TODO)");
-            
-            // Original buggy code (commented out):
-            // for param_id in &marg_prior.param_ids {
-            //     let var_name = match param_id {
-            //         ParamId::KeyframePose(i) => format!("KF_{}", i),
-            //         ParamId::KeyframeVelocity(i) => format!("VEL_{}", i),
-            //         ParamId::Landmark(i) => format!("LM_{}", i),
-            //         _ => continue,
-            //     };
-            //
-            //     if workspace.initial_values.contains_key(&var_name) {
-            //         let lin_point = marg_prior
-            //             .linearization_points
-            //             .get(param_id)
-            //             .cloned()
-            //             .or_else(|| workspace.initial_values.get(&var_name).map(|(_, v)| v.clone()));
-            //
-            //         if let Some(lp) = lin_point {
-            //             let prior_factor =
-            //                 PriorFactor::new(lp, marg_prior.information.clone(), marg_prior.damping);
-            //             workspace
-            //                 .problem
-            //                 .add_residual_block(&[&var_name], Box::new(prior_factor), None);
-            //         }
-            //     }
-            // }
+            // Collect variable names and dimensions for all kept parameters
+            let mut var_names: Vec<String> = Vec::new();
+            let mut param_dims: Vec<usize> = Vec::new();
+            let mut linearization_points: Vec<DVector<f64>> = Vec::new();
+
+            for param_id in &marg_prior.param_ids {
+                let var_name = match param_id {
+                    ParamId::KeyframePose(i) => format!("KF_{}", i),
+                    ParamId::KeyframeVelocity(i) => format!("VEL_{}", i),
+                    ParamId::Landmark(i) => format!("LM_{}", i),
+                    _ => continue,
+                };
+
+                // Only include parameters that exist in the optimization problem
+                if let Some((_, param_val)) = workspace.initial_values.get(&var_name) {
+                    // Get linearization point for this parameter
+                    if let Some(lin_point) = marg_prior
+                        .linearization_points
+                        .get(param_id)
+                        .cloned()
+                    {
+                        var_names.push(var_name);
+                        param_dims.push(param_val.len());
+                        linearization_points.push(lin_point);
+                    }
+                }
+            }
+
+            // Only add prior if we have kept parameters
+            if !var_names.is_empty() {
+                // Concatenate linearization points
+                let total_dim: usize = param_dims.iter().sum();
+                
+                // Verify dimension matches Schur complement
+                assert_eq!(
+                    total_dim,
+                    marg_prior.information.nrows(),
+                    "Concatenated parameter dimension {} must match information matrix dimension {}",
+                    total_dim,
+                    marg_prior.information.nrows()
+                );
+                
+                let mut lin_point_concat = DVector::zeros(total_dim);
+                let mut offset = 0;
+                for lp in &linearization_points {
+                    let dim = lp.len();
+                    lin_point_concat.rows_mut(offset, dim).copy_from(lp);
+                    offset += dim;
+                }
+
+                // Create joint prior factor
+                let joint_prior = JointPriorFactor::new(
+                    lin_point_concat,
+                    marg_prior.information.clone(),
+                    marg_prior.damping,
+                    param_dims,
+                );
+
+                // Add as single residual block with all variables
+                let var_refs: Vec<&str> = var_names.iter().map(|s| s.as_str()).collect();
+                workspace.problem.add_residual_block(
+                    &var_refs.iter().map(|s| *s).collect::<Vec<_>>(),
+                    Box::new(joint_prior),
+                    None,
+                );
+
+                debug_log!(
+                    "[SlidingWindow] Added joint prior factor with {} variables (total dim: {})",
+                    var_names.len(),
+                    total_dim
+                );
+            } else {
+                debug_log!("[SlidingWindow] No kept parameters in optimization, skipping prior");
+            }
         }
     }
 

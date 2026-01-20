@@ -228,7 +228,8 @@ impl MarginalizationManager {
         assert_eq!(gradient.len(), total_params, "Gradient dimension mismatch");
 
         // Partition Hessian: H = [H_aa H_ab; H_ba H_bb]
-        // where a = marginalized, b = kept
+        // where a = kept (parameters to preserve), b = marginalized (parameters to eliminate)
+        // Schur complement S = H_aa - H_ab * H_bb^-1 * H_ba gives info matrix for 'a' after eliminating 'b'
         let (H_aa, H_ab, H_ba, H_bb) = self.partition_hessian(
             hessian,
             &keep_indices,
@@ -394,10 +395,12 @@ impl MarginalizationManager {
         let marg_elem_indices =
             self.expand_block_indices(marg_indices, param_blocks, keep_ids, marg_ids);
 
-        let H_aa = self.extract_dense_submatrix(H, &marg_elem_indices, &marg_elem_indices);
-        let H_ab = self.extract_dense_submatrix(H, &marg_elem_indices, &keep_elem_indices);
-        let H_ba = self.extract_dense_submatrix(H, &keep_elem_indices, &marg_elem_indices);
-        let H_bb = self.extract_dense_submatrix(H, &keep_elem_indices, &keep_elem_indices);
+        // H_aa = kept × kept, H_bb = marginalized × marginalized
+        // H_ab = kept × marginalized, H_ba = marginalized × kept
+        let H_aa = self.extract_dense_submatrix(H, &keep_elem_indices, &keep_elem_indices);
+        let H_ab = self.extract_dense_submatrix(H, &keep_elem_indices, &marg_elem_indices);
+        let H_ba = self.extract_dense_submatrix(H, &marg_elem_indices, &keep_elem_indices);
+        let H_bb = self.extract_dense_submatrix(H, &marg_elem_indices, &marg_elem_indices);
         (H_aa, H_ab, H_ba, H_bb)
     }
 
@@ -471,13 +474,14 @@ impl MarginalizationManager {
         let marg_elem_indices =
             self.expand_block_indices(marg_indices, param_blocks, keep_ids, marg_ids);
 
+        // b_a = gradient for kept params, b_b = gradient for marginalized params
         let b_a: DVector<f64> = DVector::from_iterator(
-            marg_elem_indices.len(),
-            marg_elem_indices.iter().map(|&i| b[i]),
-        );
-        let b_b: DVector<f64> = DVector::from_iterator(
             keep_elem_indices.len(),
             keep_elem_indices.iter().map(|&i| b[i]),
+        );
+        let b_b: DVector<f64> = DVector::from_iterator(
+            marg_elem_indices.len(),
+            marg_elem_indices.iter().map(|&i| b[i]),
         );
         (b_a, b_b)
     }
