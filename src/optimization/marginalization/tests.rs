@@ -654,7 +654,7 @@ mod tests {
         assert!(result.prior.is_some());
         let prior = result.prior.unwrap();
         assert_eq!(prior.param_ids.len(), 1);
-        assert_eq!(prior.param_ids[0], ParamId::KeyframePose(0));
+        assert_eq!(prior.param_ids[0], ParamId::KeyframePose(1)); // Prior is for KEPT parameter
         assert_eq!(prior.residual_dim, 7);
         assert!(result.info.schur_complement_time_ms >= 0.0);
         assert_eq!(result.info.states_marginalized, 1);
