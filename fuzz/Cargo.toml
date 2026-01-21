@@ -21,8 +21,10 @@ name = "math_utils_fuzz"
 path = "fuzz_targets/math_utils.rs"
 
 [profile.release]
-debug = 1  # Keep debug symbols for better crash reports
-overflow-checks = false  # Fuzzing doesn't need overflow checks
+debug = 1            # Keep debug symbols for better crash reports
+opt-level = 1        # Faster instrumentation turnaround
+overflow-checks = true
+panic = "abort"      # Better sanitizer reports
 
 [profile.dev]
 overflow-checks = true

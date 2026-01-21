@@ -1,0 +1,8 @@
+# Sanitizer defaults for cargo-fuzz (nightly toolchain required)
+# To override, run with: RUSTFLAGS="-Zsanitizer=undefined" cargo fuzz run <target>
+
+[build]
+rustflags = ["-Zsanitizer=address"]
+
+[profile.release]
+panic = "abort"
