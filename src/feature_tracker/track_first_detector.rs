@@ -15,7 +15,7 @@ use nalgebra as na;
 use std::collections::HashMap;
 
 /// Configuration for track-first detector
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct TrackFirstConfig {
     /// Minimum feature count to maintain
     pub min_features: usize,
@@ -159,7 +159,7 @@ impl TrackFirstDetector {
     }
 
     /// Determine if new features need to be detected
-    fn needs_new_features(&self) -> bool {
+    pub fn needs_new_features(&self) -> bool {
         // Check total feature count
         if self.tracked_features.len() < self.config.min_features {
             return true;

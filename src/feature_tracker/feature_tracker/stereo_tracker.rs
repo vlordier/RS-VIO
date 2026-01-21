@@ -12,6 +12,7 @@ use crate::feature_tracker::{
     frame_skip, gpu_accel, image_utilities,
     ransac_essential::{EssentialMatrixRansac, RansacConfig},
     subpixel_stereo::{StereoMatchResult, SubpixelStereoRefinement},
+    FrameStabilizer, StabilizerConfig, TrackFirstDetector, TrackFirstConfig,
 };
 use crate::vision::subpixel_disparity::PatchMatchingConfig;
 
@@ -60,6 +61,11 @@ pub struct StereoPatchTracker<const N: u32> {
     /// GPU accelerator for compute-intensive operations (initialized but not yet integrated)
     #[allow(dead_code)]
     gpu_accelerator: Option<Arc<gpu_accel::GpuAccelerator>>,
+    /// Frame stabilizer for multi-frame geometric super-resolution
+    frame_stabilizer_cam0: Option<FrameStabilizer>,
+    frame_stabilizer_cam1: Option<FrameStabilizer>,
+    /// Track-first detector for maintaining long feature tracks
+    track_first_detector: Option<TrackFirstDetector>,
 }
 
 impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
@@ -123,6 +129,9 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             last_frame_time: None,
             frame_count: 0,
             gpu_accelerator,
+            frame_stabilizer_cam0: None,
+            frame_stabilizer_cam1: None,
+            track_first_detector: None,
         }
     }
 
@@ -150,6 +159,33 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
     /// Set calibrated camera intrinsics for geometric gating and projection.
     pub fn set_camera_intrinsics(&mut self, fx: f32, fy: f32, cx: f32, cy: f32) {
         self.camera_matrix_hint = Some(na::Matrix3::new(fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0));
+    }
+
+    /// Enable frame stabilization with specified configuration
+    pub fn enable_frame_stabilization(&mut self, config: StabilizerConfig, fx: f32, fy: f32, cx: f32, cy: f32) {
+        if config.enabled {
+            self.frame_stabilizer_cam0 = Some(FrameStabilizer::new(config, fx, fy, cx, cy));
+            self.frame_stabilizer_cam1 = Some(FrameStabilizer::new(config, fx, fy, cx, cy));
+        } else {
+            self.frame_stabilizer_cam0 = None;
+            self.frame_stabilizer_cam1 = None;
+        }
+    }
+
+    /// Enable track-first detection strategy
+    pub fn enable_track_first_detection(&mut self, config: TrackFirstConfig, image_width: u32, image_height: u32) {
+        self.track_first_detector = Some(TrackFirstDetector::new(config, image_width, image_height));
+    }
+
+    /// Disable frame stabilization
+    pub fn disable_frame_stabilization(&mut self) {
+        self.frame_stabilizer_cam0 = None;
+        self.frame_stabilizer_cam1 = None;
+    }
+
+    /// Disable track-first detection
+    pub fn disable_track_first_detection(&mut self) {
+        self.track_first_detector = None;
     }
 
     /// Provide an IMU rotation hint (integrated gyro) to seed optical flow.
@@ -262,11 +298,49 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             return;
         }
 
+        // Apply frame stabilization if enabled
+        let processed_image0 = if let Some(ref mut stabilizer) = self.frame_stabilizer_cam0 {
+            // Get rotation from IMU hint or identity
+            let rotation = if let Some(omega) = self.imu_rotation_hint {
+                let angle = (omega[0] * omega[0] + omega[1] * omega[1] + omega[2] * omega[2]).sqrt();
+                if angle > 0.001 {
+                    let axis = na::Vector3::new(omega[0] / angle, omega[1] / angle, omega[2] / angle);
+                    na::Rotation3::from_axis_angle(&na::Unit::new_normalize(axis), angle)
+                } else {
+                    na::Rotation3::identity()
+                }
+            } else {
+                na::Rotation3::identity()
+            };
+            
+            stabilizer.process_frame(greyscale_image0, rotation, frame.timestamp_ns as f64)
+        } else {
+            greyscale_image0.clone()
+        };
+
+        let processed_image1 = if let Some(ref mut stabilizer) = self.frame_stabilizer_cam1 {
+            let rotation = if let Some(omega) = self.imu_rotation_hint {
+                let angle = (omega[0] * omega[0] + omega[1] * omega[1] + omega[2] * omega[2]).sqrt();
+                if angle > 0.001 {
+                    let axis = na::Vector3::new(omega[0] / angle, omega[1] / angle, omega[2] / angle);
+                    na::Rotation3::from_axis_angle(&na::Unit::new_normalize(axis), angle)
+                } else {
+                    na::Rotation3::identity()
+                }
+            } else {
+                na::Rotation3::identity()
+            };
+            
+            stabilizer.process_frame(greyscale_image1, rotation, frame.timestamp_ns as f64)
+        } else {
+            greyscale_image1.clone()
+        };
+
         // Build current image pyramids into preallocated buffers
-        let (w0, h0) = greyscale_image0.dimensions();
+        let (w0, h0) = processed_image0.dimensions();
         self.ensure_pyramids_allocated(w0, h0);
-        image_utilities::fill_pyramid(&mut self.current_image_pyramid0, greyscale_image0);
-        image_utilities::fill_pyramid(&mut self.current_image_pyramid1, greyscale_image1);
+        image_utilities::fill_pyramid(&mut self.current_image_pyramid0, &processed_image0);
+        image_utilities::fill_pyramid(&mut self.current_image_pyramid1, &processed_image1);
 
         // Track features if initialized
         if !self.previous_image_pyramid0.is_empty() {
@@ -310,12 +384,39 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             }
         }
 
-        // Add new points and perform stereo matching
-        let new_points0 = add_points(
-            &self.tracked_points_map_cam0,
-            greyscale_image0,
-            self.grid_size,
-        );
+        // Add new points using track-first strategy if enabled, otherwise use default detection
+        let new_points0 = if let Some(ref mut detector) = self.track_first_detector {
+            // Convert tracked points to format expected by track-first detector
+            let tracked_features: Vec<(usize, na::Vector2<f32>)> = self.tracked_points_map_cam0
+                .iter()
+                .map(|(id, affine)| {
+                    let mat = affine.matrix();
+                    (*id, na::Vector2::new(mat[(0, 2)], mat[(1, 2)]))
+                })
+                .collect();
+            
+            // Update with tracking residuals if available (for now, use None)
+            detector.update_tracks(&processed_image0, &tracked_features, None);
+            
+            // Get newly detected features by checking the detector's internal state
+            // For now, use default detection if track-first doesn't need new features
+            if detector.needs_new_features() {
+                add_points(
+                    &self.tracked_points_map_cam0,
+                    &processed_image0,
+                    self.grid_size,
+                )
+            } else {
+                Vec::new()
+            }
+        } else {
+            add_points(
+                &self.tracked_points_map_cam0,
+                &processed_image0,
+                self.grid_size,
+            )
+        };
+        
         let tmp_tracked_points0: HashMap<usize, _> = new_points0
             .iter()
             .enumerate()

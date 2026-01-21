@@ -14,7 +14,7 @@ use nalgebra as na;
 use std::collections::VecDeque;
 
 /// Configuration for rotation-based frame stabilization
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct StabilizerConfig {
     /// Number of frames to accumulate (recommended: 3-5)
     pub buffer_size: usize,
