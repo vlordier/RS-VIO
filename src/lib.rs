@@ -42,6 +42,11 @@
     clippy::needless_borrows_for_generic_args, // Explicit borrows for clarity
     clippy::useless_vec,             // vec! for consistency in test data
 )]
+#![allow(
+    rustdoc::broken_intra_doc_links,
+    rustdoc::invalid_html_tags,
+    rustdoc::redundant_explicit_links,
+)]
 //! # RS-VIO
 //!
 //! A Rust implementation of Visual-Inertial Odometry (VIO) for stereo cameras.
