@@ -1,0 +1,51 @@
+# VIO Pipeline Configuration - Hard Realtime
+# Optimized for minimal latency applications
+# Target: 60 FPS with strict timing guarantees
+
+platform = "HardRealtime"
+enable_imu = true
+enable_loop_closure = false  # Too expensive for realtime
+enable_bundle_adjustment = false  # Too expensive for realtime
+
+[performance]
+target_fps = 60.0
+max_latency_ms = 16.0
+max_cpu_usage = 0.7
+max_memory_mb = 128
+enable_gpu = false
+
+[fusion]
+strategy = "None"  # No fusion for minimal latency
+num_frames = 1
+
+[detection]
+backend = "Fast"
+tracking_strategy = "TrackFirst"
+min_quality = 0.02
+use_pyramid = true
+pyramid_levels = 2
+enforce_spatial_distribution = true
+grid_cell_size = 48
+
+[detection.track_first]
+min_features = 80
+max_features = 150
+grid_cell_size = 48
+min_features_per_cell = 1
+corner_quality_threshold = 0.02
+min_feature_distance = 15.0
+
+[matching]
+descriptor_type = "None"
+keyframes_only = true
+max_descriptor_distance = 50.0
+use_ratio_test = false
+ratio_test_threshold = 0.8
+
+[stereo]
+baseline = 0.11
+max_disparity = 64  # Smaller search range for speed
+subpixel_refinement = false
+cost_window_size = 3
+uniqueness_ratio = 0.15
+texture_threshold = 10.0

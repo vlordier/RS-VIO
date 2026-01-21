@@ -79,6 +79,7 @@ pub mod matching_strategy_config;
 pub mod parallel_tracking;
 pub mod patch;
 pub mod patch_simd;
+pub mod pipeline_config;
 pub mod ransac;
 pub mod ransac_essential;
 pub mod subpixel_stereo;
@@ -103,6 +104,11 @@ pub use matching_strategy::{
 pub use matching_strategy_config::MatchingStrategyConfig;
 pub use parallel_tracking::{
     build_pyramids_parallel, track_points_parallel, ParallelTrackingConfig, ParallelTrackingResult,
+};
+pub use pipeline_config::{
+    DepthAwareFusionParams, DetectionBackend, DetectionConfig, DescriptorType, FusionConfig,
+    FusionStrategy, MatchingConfig, PerformanceBudget, StereoConfig, TargetPlatform,
+    TrackingStrategy, VIOPipelineConfig,
 };
 pub use track_first_detector::{TrackFirstConfig, TrackFirstDetector, TrackedFeature};
 pub use patch::Pattern52;

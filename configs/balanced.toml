@@ -1,0 +1,57 @@
+# VIO Pipeline Configuration - Balanced (Default)
+# Balanced configuration for typical drone use
+# Target: 30 FPS with good quality/performance tradeoff
+
+platform = "Custom"
+enable_imu = true
+enable_loop_closure = true
+enable_bundle_adjustment = true
+
+[performance]
+target_fps = 30.0
+max_latency_ms = 33.0
+max_cpu_usage = 0.75
+max_memory_mb = 512
+enable_gpu = false
+
+[fusion]
+strategy = "RotationOnly"
+num_frames = 5
+
+[fusion.stabilizer]
+enabled = true
+buffer_size = 5
+accumulation_weight = 0.7
+min_rotation_threshold = 0.001
+
+[detection]
+backend = "ShiTomasi"
+tracking_strategy = "TrackFirst"
+min_quality = 0.01
+use_pyramid = true
+pyramid_levels = 3
+enforce_spatial_distribution = true
+grid_cell_size = 32
+
+[detection.track_first]
+min_features = 150
+max_features = 300
+grid_cell_size = 32
+min_features_per_cell = 2
+corner_quality_threshold = 0.01
+min_feature_distance = 10.0
+
+[matching]
+descriptor_type = "Orb"
+keyframes_only = true
+max_descriptor_distance = 50.0
+use_ratio_test = true
+ratio_test_threshold = 0.8
+
+[stereo]
+baseline = 0.11
+max_disparity = 128
+subpixel_refinement = true
+cost_window_size = 5
+uniqueness_ratio = 0.15
+texture_threshold = 10.0
