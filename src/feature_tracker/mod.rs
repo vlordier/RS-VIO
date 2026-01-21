@@ -71,6 +71,7 @@
 
 pub mod feature_tracker;
 pub mod frame_skip;
+pub mod frame_stabilizer;
 pub mod gpu_accel;
 pub mod image_utilities;
 pub mod matching_strategy;
@@ -81,9 +82,11 @@ pub mod patch_simd;
 pub mod ransac;
 pub mod ransac_essential;
 pub mod subpixel_stereo;
+pub mod track_first_detector;
 
 pub use feature_tracker::*;
 pub use frame_skip::AdaptiveFrameSkipper;
+pub use frame_stabilizer::{FrameStabilizer, StabilizerConfig};
 pub use gpu_accel::{GpuAccelerator, GpuBackend, GpuConfig, GpuDeviceInfo};
 #[cfg(feature = "matching-basic-ransac")]
 pub use matching_strategy::BasicRANSACStrategy;
@@ -101,6 +104,7 @@ pub use matching_strategy_config::MatchingStrategyConfig;
 pub use parallel_tracking::{
     build_pyramids_parallel, track_points_parallel, ParallelTrackingConfig, ParallelTrackingResult,
 };
+pub use track_first_detector::{TrackFirstConfig, TrackFirstDetector, TrackedFeature};
 pub use patch::Pattern52;
 pub use patch_simd::compute_residuals_simd;
 pub use ransac_essential::{EssentialMatrixRansac, RansacConfig};
