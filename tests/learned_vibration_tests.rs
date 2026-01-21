@@ -241,7 +241,7 @@ fn test_training_data_limits() {
         let sample = VibrationTrainingSample {
             inputs: VibrationInputs {
                 throttle: 0.5,
-                vibration_level: 0.2 + (i as Float * 0.001),
+                vibration_level: 0.2 + (Float::from(i) * 0.001),
                 time_since_keyframe: 0.5,
                 imu_rate: 200.0,
             },
@@ -291,7 +291,7 @@ fn test_different_imu_rates() {
 
     let rates = [100.0, 200.0, 400.0, 1000.0];
 
-    for &rate in &rates {
+    for (idx, &rate) in rates.iter().enumerate() {
         let inputs = VibrationInputs {
             throttle: 0.5,
             vibration_level: 0.3,
@@ -301,11 +301,18 @@ fn test_different_imu_rates() {
 
         let outputs = scheduler.predict(&inputs);
 
-        // Update interval should scale with rate
+        // Update interval should scale with rate (map by index to avoid casts)
+        let (high_vib, low_vib) = match idx {
+            0 => (5, 10),    // 100 Hz
+            1 => (10, 20),   // 200 Hz
+            2 => (20, 40),   // 400 Hz
+            3 => (50, 100),  // 1000 Hz
+            _ => (0, 0),
+        };
         let expected_interval = if inputs.vibration_level > 0.3 {
-            (rate * 0.05) as usize // 50ms at given rate
+            high_vib
         } else {
-            (rate * 0.1) as usize // 100ms at given rate
+            low_vib
         };
 
         assert_eq!(outputs.filter_update_interval, expected_interval);
@@ -453,9 +460,10 @@ fn test_training_sample_structure() {
         performance_score: 0.85,
     };
 
-    assert_eq!(sample.inputs.throttle, 0.6);
-    assert_eq!(sample.optimal_scale, 2.5);
-    assert_eq!(sample.performance_score, 0.85);
+    let eps = 1e-9;
+    assert!((sample.inputs.throttle - 0.6).abs() < eps);
+    assert!((sample.optimal_scale - 2.5).abs() < eps);
+    assert!((sample.performance_score - 0.85).abs() < eps);
 }
 
 /// Test scheduler statistics
@@ -466,7 +474,7 @@ fn test_scheduler_statistics() {
     // Initially empty
     let (count, avg_perf) = scheduler.training_stats();
     assert_eq!(count, 0);
-    assert_eq!(avg_perf, 0.0);
+    assert!(avg_perf.abs() < 1e-12);
 
     // Add samples
     scheduler.add_training_sample(VibrationTrainingSample {

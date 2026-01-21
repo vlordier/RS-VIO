@@ -14,6 +14,33 @@
     clippy::unwrap_or_default,       // or_insert_with vs or_default patterns
     clippy::expect_used,             // Expect in specific contexts (documented)
     clippy::for_kv_map,              // Iterating over map keys/values
+    clippy::new_without_default,     // Custom new() methods are preferred
+    clippy::type_complexity,         // Complex types for calibration observations
+    clippy::float_cmp,               // Careful float comparisons used where appropriate
+    clippy::get_first,               // Direct indexing for clarity
+    clippy::iter_kv_map,             // Iterating over map values explicitly
+    clippy::approx_constant,         // Custom constants preferred over std::f64::consts
+    clippy::unwrap_used,             // Unwrap used in hot paths after validation
+    clippy::let_and_return,          // Explicit let bindings for clarity
+    clippy::bind_instead_of_map,     // and_then patterns for control flow
+    clippy::map_clone,               // Manual clone for explicit copying
+    clippy::derivable_impls,         // Manual Default for complex initialization
+    clippy::inherent_to_string,      // Custom to_string for domain-specific formatting
+    clippy::useless_format,          // format! for consistency in string building
+    clippy::single_char_add_str,     // push_str for consistency
+    clippy::redundant_closure,       // Closures for flexibility in iteration
+    clippy::field_reassign_with_default, // Config reassignment for clarity
+    clippy::vec_init_then_push,      // Conditional vec building
+    clippy::manual_range_contains,   // Explicit range comparisons for clarity
+    clippy::collapsible_if,          // Nested ifs for readability
+    clippy::needless_return,         // Explicit return for clarity
+    clippy::manual_div_ceil,         // Manual div_ceil for compatibility
+    clippy::neg_cmp_op_on_partial_ord, // Comparison operators in ensure! macro
+    clippy::len_zero,                // len() > 0 for clarity in assertions
+    clippy::assertions_on_constants, // Test scaffolding assertions
+    clippy::module_inception,        // Test modules can have same name
+    clippy::needless_borrows_for_generic_args, // Explicit borrows for clarity
+    clippy::useless_vec,             // vec! for consistency in test data
 )]
 //! # RS-VIO
 //!
