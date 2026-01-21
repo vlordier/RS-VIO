@@ -10,14 +10,20 @@ use rs_vio::estimator::Estimator;
 
 /// Create realistic test image with features
 fn create_test_image(width: u32, height: u32) -> Vec<u8> {
-    let mut img = vec![128u8; (width * height) as usize];
+    let len = usize::try_from(u64::from(width) * u64::from(height)).unwrap_or(usize::MAX);
+
+    let mut img = vec![128u8; len];
 
     // Add gradient for texture
     for y in 0..height {
         for x in 0..width {
-            let idx = (y * width + x) as usize;
-            let grad_x = ((x as f64 / width as f64) * 50.0) as u8;
-            let grad_y = ((y as f64 / height as f64) * 30.0) as u8;
+            let idx_u64 = u64::from(y) * u64::from(width) + u64::from(x);
+            let idx = usize::try_from(idx_u64).unwrap_or(0);
+
+            let grad_x_u32 = x.saturating_mul(50) / width;
+            let grad_y_u32 = y.saturating_mul(30) / height;
+            let grad_x = u8::try_from(grad_x_u32).unwrap_or(u8::MAX);
+            let grad_y = u8::try_from(grad_y_u32).unwrap_or(u8::MAX);
             img[idx] = 100u8.saturating_add(grad_x).saturating_add(grad_y);
         }
     }
@@ -38,12 +44,15 @@ fn create_test_image(width: u32, height: u32) -> Vec<u8> {
     for &(cx, cy) in &blobs {
         for dy in -15i32..15 {
             for dx in -15i32..15 {
+                #[allow(clippy::cast_precision_loss)]
                 let dist_sq = (dx * dx + dy * dy) as f32;
-                let intensity = (200.0 * (-dist_sq / 150.0).exp()) as u8;
+                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                let intensity = (200.0f32 * (-dist_sq / 150.0f32).exp()).min(255.0) as u8;
 
-                let x = (cx as i32 + dx).max(0).min(width as i32 - 1) as u32;
-                let y = (cy as i32 + dy).max(0).min(height as i32 - 1) as u32;
-                let idx = (y * width + x) as usize;
+                let x = u32::try_from((cx + dx).clamp(0, width as i32 - 1)).unwrap_or(0);
+                let y = u32::try_from((cy + dy).clamp(0, height as i32 - 1)).unwrap_or(0);
+                let idx_u64 = u64::from(y) * u64::from(width) + u64::from(x);
+                let idx = usize::try_from(idx_u64).unwrap_or(0);
 
                 img[idx] = img[idx].saturating_add(intensity);
             }
@@ -53,20 +62,23 @@ fn create_test_image(width: u32, height: u32) -> Vec<u8> {
     img
 }
 
-/// Create stereo pair with disparity
-fn create_stereo_pair(width: u32, height: u32, disparity: f32) -> (Vec<u8>, Vec<u8>) {
+/// Create stereo pair with disparity (in pixels)
+fn create_stereo_pair(width: u32, height: u32, disparity: u32) -> (Vec<u8>, Vec<u8>) {
     let left = create_test_image(width, height);
-    let mut right = vec![128u8; (width * height) as usize];
+    let len = usize::try_from(u64::from(width) * u64::from(height)).unwrap_or(usize::MAX);
+    let mut right = vec![128u8; len];
 
-    // Shift left image by disparity to create right image
+    // Shift left image by integer disparity to create right image
     for y in 0..height {
         for x in 0..width {
             let x_left = x;
-            let x_right = (x as f32 - disparity).max(0.0) as u32;
+            let x_right = x.saturating_sub(disparity);
 
             if x_right < width {
-                let idx_right = (y * width + x_right) as usize;
-                let idx_left = (y * width + x_left) as usize;
+                let idx_right_u64 = u64::from(y) * u64::from(width) + u64::from(x_right);
+                let idx_left_u64 = u64::from(y) * u64::from(width) + u64::from(x_left);
+                let idx_right = usize::try_from(idx_right_u64).unwrap_or(0);
+                let idx_left = usize::try_from(idx_left_u64).unwrap_or(0);
                 right[idx_right] = left[idx_left];
             }
         }
@@ -81,7 +93,7 @@ fn create_imu_sequence(scenario: &str, count: usize) -> Vec<ImuData> {
     let dt = 0.005; // 200 Hz
 
     for i in 0..count {
-        let t = i as f64 * dt;
+        let t = f64::from(u32::try_from(i).unwrap_or(u32::MAX)) * dt;
 
         let (gyro, accel) = match scenario {
             "hover" => {
@@ -125,7 +137,7 @@ fn create_imu_sequence(scenario: &str, count: usize) -> Vec<ImuData> {
         };
 
         imu_data.push(ImuData {
-            timestamp: (i as i64) * 5_000_000, // 5ms intervals
+            timestamp: i64::try_from(i).unwrap_or(i64::MAX).saturating_mul(5_000_000), // 5ms intervals
             gyro,
             accel,
         });
@@ -163,8 +175,13 @@ impl BenchConfig {
 fn bench_fusion_configurations(c: &mut Criterion) {
     // Load base config
     let config_yaml = include_str!("../config/euroc_vio.yaml");
-    let mut base_config: Config =
-        serde_yaml::from_str(config_yaml).expect("Failed to parse config");
+    let mut base_config: Config = match serde_yaml::from_str(config_yaml) {
+        Ok(cfg) => cfg,
+        Err(err) => {
+            eprintln!("Failed to parse config: {err}");
+            return;
+        },
+    };
 
     let width = 640u32;
     let height = 480u32;
@@ -257,7 +274,7 @@ fn bench_fusion_configurations(c: &mut Criterion) {
 
     for config in configs {
         // Create stereo images
-        let (left_img, right_img) = create_stereo_pair(width, height, 8.0);
+        let (left_img, right_img) = create_stereo_pair(width, height, 8);
 
         // Create IMU data
         let imu_data = create_imu_sequence(config.scenario, 20); // 20 samples @ 200Hz = 0.1s
@@ -307,11 +324,13 @@ fn bench_imu_filtering_only(c: &mut Criterion) {
 
                 b.iter(|| {
                     for sample in imu {
+                        #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
                         let gyro = [
                             sample.gyro[0] as f32,
                             sample.gyro[1] as f32,
                             sample.gyro[2] as f32,
                         ];
+                        #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
                         let accel = [
                             sample.accel[0] as f32,
                             sample.accel[1] as f32,
@@ -339,7 +358,7 @@ fn bench_super_resolution_only(c: &mut Criterion) {
 
     let width = 640u32;
     let height = 480u32;
-    let (left_img, right_img) = create_stereo_pair(width, height, 8.0);
+    let (left_img, right_img) = create_stereo_pair(width, height, 8);
 
     // Different confidence levels
     let confidence_levels = [
@@ -357,7 +376,7 @@ fn bench_super_resolution_only(c: &mut Criterion) {
 
                 // Simulate 50 features
                 let left_coords: Vec<(f64, f64)> = (0..50)
-                    .map(|i| ((i * 12 + 50) as f64, (i * 8 + 50) as f64))
+                    .map(|i| (f64::from(i * 12 + 50), f64::from(i * 8 + 50)))
                     .collect();
                 let right_coords: Vec<(f64, f64)> =
                     left_coords.iter().map(|(x, y)| (x - 8.0, *y)).collect();
@@ -386,12 +405,17 @@ fn bench_super_resolution_only(c: &mut Criterion) {
 
 fn bench_complete_pipeline_comparison(c: &mut Criterion) {
     let config_yaml = include_str!("../config/euroc_vio.yaml");
-    let mut base_config: Config =
-        serde_yaml::from_str(config_yaml).expect("Failed to parse config");
+    let mut base_config: Config = match serde_yaml::from_str(config_yaml) {
+        Ok(cfg) => cfg,
+        Err(err) => {
+            eprintln!("Failed to parse config: {err}");
+            return;
+        },
+    };
 
     let width = 640u32;
     let height = 480u32;
-    let (left_img, right_img) = create_stereo_pair(width, height, 8.0);
+    let (left_img, right_img) = create_stereo_pair(width, height, 8);
     let imu_data = create_imu_sequence("gentle_motion", 20);
 
     let mut group = c.benchmark_group("complete_pipeline");

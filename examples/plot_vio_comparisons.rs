@@ -20,6 +20,11 @@ use rs_vio::vision::{
     generate_plot_script, DisparityComparison, RollingShutterComparison, TrackingComparison,
 };
 
+#[inline]
+fn to_f64_frame(frame: usize) -> f64 {
+    f64::from(u32::try_from(frame).unwrap_or(u32::MAX))
+}
+
 fn main() -> std::io::Result<()> {
     println!("=== VIO Optimization Comparison Demo ===\n");
 
@@ -32,13 +37,13 @@ fn main() -> std::io::Result<()> {
 
     // Simulate 100 frames
     for frame in 0..100 {
-        let ang_vel = (frame as f64 * 0.1).sin().abs() * 2.0; // Varying angular velocity
+        let ang_vel = (to_f64_frame(frame) * 0.1).sin().abs() * 2.0; // Varying angular velocity
 
         // Baseline: feature count drops with motion
-        let baseline_count = (100.0 - ang_vel * 15.0).max(50.0) as usize;
+        let baseline_count = clamp_count(100.0 - ang_vel * 15.0, 50, 120);
 
         // IMU-aided: much more stable
-        let imu_count = (110.0 - ang_vel * 5.0).max(85.0) as usize;
+        let imu_count = clamp_count(110.0 - ang_vel * 5.0, 85, 130);
 
         // Track lengths
         let baseline_len = 8.0 - ang_vel * 0.5;
@@ -84,7 +89,7 @@ fn main() -> std::io::Result<()> {
 
     for i in 0..200 {
         // True depth varies from 0.5m to 10m
-        let true_depth = 0.5 + (i as f64 / 200.0) * 9.5;
+        let true_depth = 0.5 + (to_f64_frame(i) / 200.0) * 9.5;
 
         // True disparity
         let true_disp = (baseline * focal) / true_depth;
@@ -135,7 +140,7 @@ fn main() -> std::io::Result<()> {
     for frame in 0..150 {
         // Angular velocity varies (simulates drone turns)
         let ang_vel = if frame > 50 && frame < 100 {
-            1.5 + (frame as f64 - 75.0).abs() * 0.02 // High rotation period
+            1.5 + (to_f64_frame(frame) - 75.0).abs() * 0.02 // High rotation period
         } else {
             0.2 + rand::random::<f64>() * 0.1
         };
@@ -146,7 +151,7 @@ fn main() -> std::io::Result<()> {
         // Rolling shutter correction keeps error low
         let rs_error = 0.5 + ang_vel * 0.3 + rand::random::<f64>() * 0.2;
 
-        let feature_count = (120.0 - ang_vel * 5.0).max(80.0) as usize;
+        let feature_count = clamp_count(120.0 - ang_vel * 5.0, 80, 150);
 
         rs_comp.add_frame(frame, ang_vel, gs_error, rs_error, feature_count);
     }
@@ -193,7 +198,7 @@ mod rand {
     use std::cell::Cell;
 
     thread_local! {
-        static SEED: Cell<u64> = Cell::new(12345);
+        static SEED: Cell<u64> = const { Cell::new(12345) };
     }
 
     pub fn random<T>() -> T
@@ -204,7 +209,31 @@ mod rand {
             let mut s = seed.get();
             s = s.wrapping_mul(1103515245).wrapping_add(12345);
             seed.set(s);
-            T::from((s / 65536 % 32768) as f64 / 32768.0)
+            let value = ((s >> 16) & 0x7FFF) as u16;
+            T::from(f64::from(value) / 32768.0)
         })
     }
+}
+
+#[allow(clippy::missing_const_for_fn)]
+fn clamp_count(value: f64, min: usize, max: usize) -> usize {
+    let min_f = to_f64_usize(min);
+    let max_f = to_f64_usize(max);
+    let clamped = value.clamp(min_f, max_f);
+    let rounded = clamped.round();
+    // Range is already bounded; conversion is safe.
+    #[allow(
+        clippy::cast_precision_loss,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        clippy::missing_const_for_fn
+    )]
+    {
+        rounded.max(min_f).min(max_f) as usize
+    }
+}
+
+#[inline]
+fn to_f64_usize(value: usize) -> f64 {
+    f64::from(u32::try_from(value).unwrap_or(u32::MAX))
 }

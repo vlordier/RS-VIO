@@ -7,6 +7,13 @@ use nalgebra as na;
 use rs_vio::feature_tracker::ransac::{MagsacPlusPlus, ProsacFundamental, RansacFundamental};
 use std::time::Instant;
 
+#[inline]
+fn to_f32_coord(index: usize, modulus: usize) -> f32 {
+    let reduced = index % modulus;
+    let as_u16 = u16::try_from(reduced).unwrap_or(u16::MAX);
+    f32::from(as_u16)
+}
+
 /// Generate synthetic correspondences with known outliers
 fn generate_test_data(
     num_inliers: usize,
@@ -17,8 +24,8 @@ fn generate_test_data(
 
     // Generate inliers with small noise
     for i in 0..num_inliers {
-        let x = (i as f32 * 10.0) % 640.0;
-        let y = (i as f32 * 5.0) % 480.0;
+        let x = to_f32_coord(i, 640);
+        let y = to_f32_coord(i, 480);
 
         // Add small Gaussian noise
         let noise_x1 = (rand::random::<f32>() - 0.5) * 2.0 * noise_std;
@@ -53,8 +60,8 @@ fn generate_prosac_test_data(
 
     // Generate inliers with small noise and high quality scores
     for i in 0..num_inliers {
-        let x = (i as f32 * 10.0) % 640.0;
-        let y = (i as f32 * 5.0) % 480.0;
+        let x = to_f32_coord(i, 640);
+        let y = to_f32_coord(i, 480);
 
         // Add small Gaussian noise
         let noise_x1 = (rand::random::<f32>() - 0.5) * 2.0 * noise_std;
@@ -175,5 +182,8 @@ fn run_performance_comparison() {
 
 #[test]
 fn performance_comparison() {
+    run_performance_comparison();
+}
+fn main() {
     run_performance_comparison();
 }

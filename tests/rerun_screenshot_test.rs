@@ -1,3 +1,5 @@
+#![cfg(feature = "rerun")]
+
 //! Integration test: capture a screenshot from Rerun viewer via CLI
 //! Skips gracefully if `rerun` CLI is not available.
 
@@ -34,7 +36,7 @@ fn rerun_cli_screenshot_smoke() -> Result<(), Box<dyn std::error::Error>> {
 
     // Invoke the viewer to take a screenshot and quit
     let status = Command::new("rerun")
-        .arg(rrd_path.to_str().unwrap())
+        .arg(&rrd_path)
         .arg("--screenshot-to")
         .arg(&png_path)
         .status()?;

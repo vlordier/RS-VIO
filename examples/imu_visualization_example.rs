@@ -9,6 +9,12 @@ use rs_vio::datasets::ImuData;
 use rs_vio::imu::ImuSignalAnalyzer;
 use rs_vio::viewers::Viewer;
 
+#[inline]
+#[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
+const fn to_f32(val: f64) -> f32 {
+    val as f32
+}
+
 fn main() {
     println!("IMU Visualization Example - See function documentation for usage");
 }
@@ -30,11 +36,15 @@ pub fn example_imu_visualization(
     for imu in imu_measurements {
         analyzer.process_measurement(imu);
         raw_accel.push([
-            imu.accel[0] as f32,
-            imu.accel[1] as f32,
-            imu.accel[2] as f32,
+            to_f32(imu.accel[0]),
+            to_f32(imu.accel[1]),
+            to_f32(imu.accel[2]),
         ]);
-        raw_gyro.push([imu.gyro[0] as f32, imu.gyro[1] as f32, imu.gyro[2] as f32]);
+        raw_gyro.push([
+            to_f32(imu.gyro[0]),
+            to_f32(imu.gyro[1]),
+            to_f32(imu.gyro[2]),
+        ]);
     }
 
     // Step 1: Log raw measurements (before processing)
@@ -49,14 +59,14 @@ pub fn example_imu_visualization(
 
     for imu in imu_measurements {
         let corrected_a = [
-            (imu.accel[0] - bias_accel.x) as f32,
-            (imu.accel[1] - bias_accel.y) as f32,
-            (imu.accel[2] - bias_accel.z) as f32,
+            to_f32(imu.accel[0] - bias_accel.x),
+            to_f32(imu.accel[1] - bias_accel.y),
+            to_f32(imu.accel[2] - bias_accel.z),
         ];
         let corrected_g = [
-            (imu.gyro[0] - bias_gyro.x) as f32,
-            (imu.gyro[1] - bias_gyro.y) as f32,
-            (imu.gyro[2] - bias_gyro.z) as f32,
+            to_f32(imu.gyro[0] - bias_gyro.x),
+            to_f32(imu.gyro[1] - bias_gyro.y),
+            to_f32(imu.gyro[2] - bias_gyro.z),
         ];
         processed_accel.push(corrected_a);
         processed_gyro.push(corrected_g);
@@ -75,24 +85,24 @@ pub fn example_imu_visualization(
 
     // Convert to f32 for visualization
     let gravity = [
-        harmonic_decomp.gravity.x as f32,
-        harmonic_decomp.gravity.y as f32,
-        harmonic_decomp.gravity.z as f32,
+        to_f32(harmonic_decomp.gravity.x),
+        to_f32(harmonic_decomp.gravity.y),
+        to_f32(harmonic_decomp.gravity.z),
     ];
     let bias_a = [
-        harmonic_decomp.accel_bias.x as f32,
-        harmonic_decomp.accel_bias.y as f32,
-        harmonic_decomp.accel_bias.z as f32,
+        to_f32(harmonic_decomp.accel_bias.x),
+        to_f32(harmonic_decomp.accel_bias.y),
+        to_f32(harmonic_decomp.accel_bias.z),
     ];
     let bias_g = [
-        harmonic_decomp.gyro_bias.x as f32,
-        harmonic_decomp.gyro_bias.y as f32,
-        harmonic_decomp.gyro_bias.z as f32,
+        to_f32(harmonic_decomp.gyro_bias.x),
+        to_f32(harmonic_decomp.gyro_bias.y),
+        to_f32(harmonic_decomp.gyro_bias.z),
     ];
     let harmonics: Vec<[f32; 3]> = harmonic_decomp
         .residual_harmonics
         .iter()
-        .map(|h| [h.x as f32, h.y as f32, h.z as f32])
+        .map(|h| [to_f32(h.x), to_f32(h.y), to_f32(h.z)])
         .collect();
 
     // Log harmonic decomposition
@@ -130,7 +140,7 @@ pub fn example_imu_visualization(
 
     // Adjust warnings based on motor state
     match harmonic_decomp.motor_state {
-            rs_vio::imu::MotorState::Off => {
+        rs_vio::imu::MotorState::Off => {
             if avg_snr < 20.0 {
                 log::warn!(
                     "[IMU] Low signal quality in stationary mode (SNR: {:.1} dB), check sensor calibration",
@@ -138,7 +148,7 @@ pub fn example_imu_visualization(
                 );
             }
         },
-            rs_vio::imu::MotorState::Running => {
+        rs_vio::imu::MotorState::Running => {
             if avg_snr < 10.0 {
                 log::warn!(
                     "[IMU] Very high vibration during flight (SNR: {:.1} dB), f₀={:.1} Hz - consider vibration damping",
@@ -152,7 +162,7 @@ pub fn example_imu_visualization(
                 );
             }
         },
-            rs_vio::imu::MotorState::Transitioning => {
+        rs_vio::imu::MotorState::Transitioning => {
             log::info!("[IMU] Motor state transitioning...");
         },
     }
@@ -173,7 +183,8 @@ pub fn example_estimator_integration(
     // After VIO processing, visualize IMU decomposition
     if !imu_data.is_empty() {
         // Update viewer timestamp for synchronization
-        viewer.set_frame(frame_idx as i64);
+        let frame_idx_i64 = i64::try_from(frame_idx).unwrap_or(i64::MAX);
+        viewer.set_frame(frame_idx_i64);
 
         // Visualize before/after IMU processing
         example_imu_visualization(viewer, imu_data, timestamp_ns);
@@ -200,14 +211,15 @@ pub fn analyze_sensor_health(imu_measurements: &[ImuData]) -> String {
     let (bias_a, bias_g) = analyzer.get_bias_estimates();
 
     // Analyze harmonics
-    let harmonic_rms: f32 = decomp
+    let harmonic_sum: f64 = decomp
         .residual_harmonics
         .iter()
-        .map(|h| {
-            (h.x as f32 * h.x as f32 + h.y as f32 * h.y as f32 + h.z as f32 * h.z as f32).sqrt()
-        })
-        .sum::<f32>()
-        / decomp.residual_harmonics.len().max(1) as f32;
+        .map(|h| (h.x * h.x + h.y * h.y + h.z * h.z).sqrt())
+        .sum();
+    let harmonic_denominator = u32::try_from(decomp.residual_harmonics.len().max(1))
+        .map(f64::from)
+        .unwrap_or(f64::MAX);
+    let harmonic_rms: f32 = to_f32(harmonic_sum / harmonic_denominator);
 
     let avg_snr = (decomp.quality.snr[0] + decomp.quality.snr[1] + decomp.quality.snr[2]) / 3.0;
 

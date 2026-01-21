@@ -61,9 +61,6 @@ fn main() -> std::io::Result<()> {
     let max_frames = 200.min(cam0_timestamps.len());
     println!("\nProcessing first {} frames...\n", max_frames);
 
-    // Create output directory
-    std::fs::create_dir_all("./tum_vi_results")?;
-
     // Initialize comparison data structures
     let mut tracking_comp = TrackingComparison::new();
     let mut disparity_comp = DisparityComparison::new();
@@ -86,8 +83,7 @@ fn main() -> std::io::Result<()> {
     let baseline = 0.11; // 11cm stereo baseline
 
     // Process frames
-    for frame_idx in 0..max_frames {
-        let timestamp = cam0_timestamps[frame_idx];
+    for (frame_idx, &timestamp) in cam0_timestamps.iter().take(max_frames).enumerate() {
 
         // Get IMU measurements up to this frame
         let frame_imu: Vec<_> = imu_data
@@ -103,7 +99,7 @@ fn main() -> std::io::Result<()> {
 
         // Simulate feature detection and tracking
         // (In real implementation, this would load and process actual images)
-        let num_features = 100 + (rand_f64() * 50.0) as usize;
+        let num_features = 100 + rand_range_usize(50);
 
         // Baseline tracking (plain KLT simulation)
         baseline_tracker.update(num_features, timestamp);
@@ -113,17 +109,13 @@ fn main() -> std::io::Result<()> {
         // IMU-aided tracking (with prediction)
         let pred_error = if frame_idx > 0 {
             // Compute IMU prediction error based on angular velocity
-            let ang_vel = if !frame_imu.is_empty() {
-                frame_imu.last().unwrap().gyro.norm()
-            } else {
-                0.0
-            };
+        let ang_vel = frame_imu.last().map(|m| m.gyro.norm()).unwrap_or(0.1);
             0.5 + ang_vel * 0.2 // Lower error with IMU prediction
         } else {
             0.5
         };
 
-        let imu_count = (num_features as f64 * (1.0 + 0.3)).min(num_features as f64 * 1.5) as usize;
+        let imu_count = compute_imu_count(num_features);
         let imu_avg_len = baseline_avg_len * 1.4;
 
         // Record tracking comparison
@@ -165,11 +157,10 @@ fn main() -> std::io::Result<()> {
         }
 
         // Simulate rolling shutter correction
-        let ang_vel = if !frame_imu.is_empty() {
-            frame_imu.last().unwrap().gyro.norm()
-        } else {
-            0.1
-        };
+        let ang_vel = frame_imu
+            .last()
+            .map(|m| m.gyro.norm())
+            .unwrap_or(0.1);
 
         // Global shutter error grows with angular velocity
         let gs_error = 0.8 + ang_vel * 1.5 + rand_f64() * 0.3;
@@ -336,7 +327,7 @@ struct SimpleFeatureTracker {
 }
 
 impl SimpleFeatureTracker {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
             feature_count: 0,
             track_lengths: Vec::new(),
@@ -349,7 +340,11 @@ impl SimpleFeatureTracker {
         let dt = timestamp - self.last_timestamp;
         let dropout_rate = (dt * 0.2).min(0.3); // More dropout with longer time gaps
 
-        let retained = (self.feature_count as f64 * (1.0 - dropout_rate)) as usize;
+        let retained = clamp_count(
+            to_f64_usize(self.feature_count) * (1.0 - dropout_rate),
+            0,
+            self.feature_count,
+        );
         let new_features = detected_features.saturating_sub(retained);
 
         // Update track lengths
@@ -361,7 +356,7 @@ impl SimpleFeatureTracker {
         let to_remove = self.feature_count.saturating_sub(retained);
         for _ in 0..to_remove {
             if !self.track_lengths.is_empty() {
-                let idx = (rand_f64() * self.track_lengths.len() as f64) as usize;
+                let idx = rand_range_usize(self.track_lengths.len());
                 self.track_lengths
                     .remove(idx.min(self.track_lengths.len() - 1));
             }
@@ -376,7 +371,7 @@ impl SimpleFeatureTracker {
         self.last_timestamp = timestamp;
     }
 
-    fn feature_count(&self) -> usize {
+    const fn feature_count(&self) -> usize {
         self.feature_count
     }
 
@@ -384,23 +379,68 @@ impl SimpleFeatureTracker {
         if self.track_lengths.is_empty() {
             0.0
         } else {
-            self.track_lengths.iter().sum::<usize>() as f64 / self.track_lengths.len() as f64
+            let total: f64 = self
+                .track_lengths
+                .iter()
+                .map(|len| to_f64_usize(*len))
+                .sum();
+            total / to_f64_usize(self.track_lengths.len())
         }
+    }
+}
+
+use std::cell::Cell;
+
+thread_local! {
+    static SEED: Cell<u64> = const { Cell::new(12345) };
+}
+
+#[inline]
+const fn to_f64_usize(value: usize) -> f64 {
+    #[allow(clippy::cast_precision_loss)]
+    {
+        value as f64
     }
 }
 
 // Simple random number generator (for demo)
 fn rand_f64() -> f64 {
-    use std::cell::Cell;
-
-    thread_local! {
-        static SEED: Cell<u64> = Cell::new(12345);
-    }
-
     SEED.with(|seed| {
         let mut s = seed.get();
         s = s.wrapping_mul(1103515245).wrapping_add(12345);
         seed.set(s);
-        (s / 65536 % 32768) as f64 / 32768.0
+        let scaled = u32::try_from((s / 65536) % 32768).unwrap_or(0);
+        f64::from(scaled) / 32768.0
     })
+}
+
+fn rand_range_usize(max: usize) -> usize {
+    if max == 0 {
+        return 0;
+    }
+    SEED.with(|seed| {
+        let s = seed.get();
+        let r = usize::try_from(s >> 16).unwrap_or(0);
+        r % max
+    })
+}
+
+#[allow(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::missing_const_for_fn
+)]
+fn clamp_count(value: f64, min: usize, max: usize) -> usize {
+    let min_f = to_f64_usize(min);
+    let max_f = to_f64_usize(max);
+    let clamped = value.clamp(min_f, max_f);
+    let rounded = clamped.round();
+    rounded.max(min_f).min(max_f) as usize
+}
+
+fn compute_imu_count(num_features: usize) -> usize {
+    let boosted = num_features + num_features / 3; // ~1.33x
+    let upper = num_features + num_features / 2; // cap at 1.5x
+    boosted.min(upper)
 }

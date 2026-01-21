@@ -441,7 +441,7 @@ pub struct VisualizationConfig {
     pub statistics_path: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DebugConfig {
     #[serde(default = "default_use_imu")]
     pub use_imu: bool,
@@ -453,6 +453,18 @@ pub struct DebugConfig {
     pub use_fallback_depth: bool,
     #[serde(default = "default_min_stereo_matches")]
     pub min_stereo_matches: usize,
+}
+
+impl Default for DebugConfig {
+    fn default() -> Self {
+        Self {
+            use_imu: default_use_imu(),
+            use_feature_tracking: default_use_feature_tracking(),
+            use_triangulation: default_use_triangulation(),
+            use_fallback_depth: default_use_fallback_depth(),
+            min_stereo_matches: default_min_stereo_matches(),
+        }
+    }
 }
 
 fn default_use_imu() -> bool {

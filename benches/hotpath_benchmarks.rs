@@ -9,7 +9,9 @@ fn create_test_keyframe_descriptors() -> (KeyframeDescriptor, KeyframeDescriptor
     let desc1 = KeyframeDescriptor {
         keyframe_id: 1,
         timestamp: 1000000,
-        descriptor: (0..256).map(|x| (x as Float * 0.01).sin()).collect(),
+        descriptor: (0..256)
+            .map(|x| (Float::from(x) * 0.01).sin())
+            .collect(),
         num_features: 100,
         pose: Isometry3::identity(),
     };
@@ -17,7 +19,9 @@ fn create_test_keyframe_descriptors() -> (KeyframeDescriptor, KeyframeDescriptor
     let desc2 = KeyframeDescriptor {
         keyframe_id: 2,
         timestamp: 2000000,
-        descriptor: (0..256).map(|x| (x as Float * 0.015).cos()).collect(),
+        descriptor: (0..256)
+            .map(|x| (Float::from(x) * 0.015).cos())
+            .collect(),
         num_features: 95,
         pose: Isometry3::new(Vector3::new(1.0, 0.5, 0.0), Vector3::zeros()),
     };
@@ -59,7 +63,9 @@ fn bench_orb_descriptor_matching(c: &mut Criterion) {
 fn bench_memory_allocation_patterns(c: &mut Criterion) {
     c.bench_function("vector_allocation_10k", |b| {
         b.iter(|| {
-            let vec: Vec<f64> = (0..10000).map(|x| x as f64 * 0.1).collect();
+            let vec: Vec<f64> = (0..10000)
+                .map(|x| f64::from(x) * 0.1)
+                .collect();
             black_box(vec);
         });
     });
@@ -75,7 +81,7 @@ fn bench_memory_allocation_patterns(c: &mut Criterion) {
         b.iter(|| {
             let mut map = BTreeMap::new();
             for i in 0..1000 {
-                map.insert(i, i as f64 * 0.1);
+                map.insert(i, f64::from(i) * 0.1);
             }
             black_box(map);
         });
@@ -83,7 +89,10 @@ fn bench_memory_allocation_patterns(c: &mut Criterion) {
 }
 
 fn bench_numerical_operations(c: &mut Criterion) {
-    let matrix = nalgebra::DMatrix::<f64>::from_fn(50, 50, |i, j| (i + j) as f64);
+    let matrix = nalgebra::DMatrix::<f64>::from_fn(50, 50, |i, j| {
+        let idx = u32::try_from(i + j).unwrap_or(u32::MAX);
+        f64::from(idx)
+    });
     let vector = nalgebra::DVector::<f64>::from_fn(50, |_, _| 0.0);
 
     c.bench_function("matrix_vector_multiplication", |b| {
@@ -114,7 +123,7 @@ fn bench_numerical_operations(c: &mut Criterion) {
         b.iter(|| {
             let mut result = 0.0;
             for i in 0..1000 {
-                let x = i as f64 * 0.001;
+                let x = f64::from(i) * 0.001;
                 result += x.sin() + x.cos() + x.tan();
             }
             black_box(result);

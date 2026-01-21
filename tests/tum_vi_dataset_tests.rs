@@ -13,6 +13,8 @@ use rs_vio::datasets::{ImageData, TUMVIPlayer};
 use rs_vio::feature_tracker::ransac::{MagsacPlusPlus, ProsacFundamental};
 use rs_vio::feature_tracker::PatchTracker;
 use rs_vio::imu::{ImuConfig, ImuPreintegrator, LearnedVibrationScheduler, VibrationInputs};
+#[cfg(feature = "gpu")]
+use rs_vio::feature_tracker::gpu_accel::{GpuAccelerator, GpuConfig};
 
 fn get_env_path(var: &str) -> Option<String> {
     std::env::var(var)
@@ -202,23 +204,17 @@ fn tumvi_prosac_robustness_with_real_data() {
 #[cfg(feature = "gpu")]
 #[test]
 fn tumvi_gpu_framework_robustness() {
-    // Test GPU framework availability and fallbacks
+    // Test GPU accelerator availability and fallbacks
     let gpu_config = GpuConfig::default();
+    let accelerator = GpuAccelerator::new(gpu_config.clone());
 
-    // Test robust estimator creation
-    let estimator = RobustEstimator::new_best_available(gpu_config).unwrap();
-
-    // Should work regardless of GPU availability (CPU fallback)
-    let matches = vec![
-        (na::Vector2::new(10.0, 20.0), na::Vector2::new(12.0, 22.0)),
-        (na::Vector2::new(30.0, 40.0), na::Vector2::new(32.0, 42.0)),
-    ];
-
-    let result = estimator.estimate_fundamental(&matches, 0.01, 0.99);
-    // Result may be None due to insufficient data, but should not panic
-    assert!(result.is_some() || result.is_none()); // Either is acceptable
-
-    println!("GPU framework test completed - CPU fallback working");
+    // Should report thread counts and optional device info without panicking
+    assert!(accelerator.num_threads() >= 1);
+    let _device = accelerator.device_info();
+    println!(
+        "GPU framework test completed - GPU enabled: {}",
+        accelerator.is_gpu_available()
+    );
 }
 
 #[test]
@@ -231,7 +227,7 @@ fn tumvi_learned_vibration_scheduling() {
     let _scheduler = LearnedVibrationScheduler::new();
 
     // Test with different vibration scenarios
-    let _test_cases = vec![
+    let _test_cases = [
         // Low vibration scenario
         VibrationInputs {
             throttle: 0.3,
