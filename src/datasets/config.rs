@@ -91,6 +91,7 @@ impl Config {
         Ok(config)
     }
 }
+
 fn default_processing_timeout_ms() -> u64 {
     100
 }
