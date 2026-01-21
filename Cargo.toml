@@ -54,7 +54,7 @@ pollster = { version = "0.3", optional = true }
 
 
 [features]
-default = []
+default = ["matching-basic-ransac"]
 # Feature flag for Rerun.io 3D visualization backend (adds ~30% IR bloat, off by default for lean builds)
 rerun-viewer = ["rerun"]
 # Feature flag for LightGlue ONNX-based verification
@@ -65,6 +65,15 @@ dhat-heap = []
 gpu = ["wgpu", "pollster"]
 # Feature flag to enable debug/trace logging in hot paths (default off)
 debug-logging = []
+# Stereo matching strategies - only one should be enabled per build
+# Basic RANSAC: 1000 iterations, standard 8-point algorithm (baseline, default)
+matching-basic-ransac = []
+# IMU-guided: Predictive matching with restricted search window (~8x faster stereo)
+matching-imu-guided = []
+# Temporal consistency: Frame-to-frame depth coherence (~100x faster than RANSAC)
+matching-temporal = []
+# Hybrid optical flow: Coarse OF + selective stereo (~30% faster)
+matching-hybrid-of = []
 
 [dev-dependencies]
 criterion = "0.5"
@@ -174,6 +183,7 @@ overflow-checks = true
 debug-assertions = true
 incremental = false
 
+
 [[bench]]
 name = "estimator"
 harness = true
@@ -213,6 +223,7 @@ harness = false
 [[bench]]
 name = "evaluation_metrics"
 harness = false
+
 [[bench]]
 name = "distance_speed_metrics"
 harness = false
@@ -226,9 +237,17 @@ name = "calibration_sensitivity"
 harness = false
 
 [[bench]]
+name = "robustness_benchmarks"
+harness = false
+
+[[bench]]
 name = "imu_tracking_fast_rotation"
 harness = false
 
 [[bench]]
 name = "rolling_shutter_extended"
+harness = false
+
+[[bench]]
+name = "strategy_comparison"
 harness = false

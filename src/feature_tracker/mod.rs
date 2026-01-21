@@ -73,6 +73,8 @@ pub mod feature_tracker;
 pub mod frame_skip;
 pub mod gpu_accel;
 pub mod image_utilities;
+pub mod matching_strategy;
+pub mod matching_strategy_config;
 pub mod parallel_tracking;
 pub mod patch;
 pub mod patch_simd;
@@ -83,6 +85,19 @@ pub mod subpixel_stereo;
 pub use feature_tracker::*;
 pub use frame_skip::AdaptiveFrameSkipper;
 pub use gpu_accel::{GpuAccelerator, GpuBackend, GpuConfig, GpuDeviceInfo};
+#[cfg(feature = "matching-basic-ransac")]
+pub use matching_strategy::BasicRANSACStrategy;
+#[cfg(feature = "matching-hybrid-of")]
+pub use matching_strategy::HybridOpticalFlowStrategy;
+#[cfg(feature = "matching-imu-guided")]
+pub use matching_strategy::IMUGuidedStrategy;
+#[cfg(feature = "matching-temporal")]
+pub use matching_strategy::TemporalConsistencyStrategy;
+pub use matching_strategy::{
+    BasicRANSACConfig, IMUState, MatchingStrategyResult, StereoMatchingStrategy, StrategyMetrics,
+    StrategyType,
+};
+pub use matching_strategy_config::MatchingStrategyConfig;
 pub use parallel_tracking::{
     build_pyramids_parallel, track_points_parallel, ParallelTrackingConfig, ParallelTrackingResult,
 };

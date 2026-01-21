@@ -1,5 +1,4 @@
 /// Stereo patch tracker implementation
-
 use image::{GrayImage, Luma};
 use nalgebra as na;
 use std::collections::{HashMap, HashSet};
@@ -35,7 +34,14 @@ pub struct StereoPatchTracker<const N: u32> {
     subpixel_iterations: usize,
     subpixel_threshold: f32,
     subpixel_refinement: SubpixelStereoRefinement,
+    #[allow(dead_code)]
     essential_ransac: EssentialMatrixRansac,
+    /// Pluggable stereo matching strategy (BasicRANSAC, IMUGuided, etc.)
+    #[allow(dead_code)]
+    matching_strategy: Box<dyn crate::feature_tracker::StereoMatchingStrategy>,
+    /// Previous frame's match results for temporal consistency
+    #[allow(dead_code)]
+    previous_match_results: Vec<StereoMatchResult>,
     imu_rotation_hint: Option<[f32; 3]>,
     imu_intrinsics_hint: Option<(f32, f32, f32, f32)>,
     camera_matrix_hint: Option<na::Matrix3<f32>>,
@@ -102,6 +108,11 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             subpixel_refinement: SubpixelStereoRefinement::new(PatchMatchingConfig::default())
                 .with_quality_gates(35.0, 0.02),
             essential_ransac: EssentialMatrixRansac::new(RansacConfig::default()),
+            // Initialize with default strategy (BasicRANSAC)
+            matching_strategy: Box::new(crate::feature_tracker::BasicRANSACStrategy::new(
+                crate::feature_tracker::BasicRANSACConfig::default(),
+            )),
+            previous_match_results: Vec::new(),
             imu_rotation_hint: None,
             imu_intrinsics_hint: None,
             camera_matrix_hint: None,
@@ -165,6 +176,41 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
 
         self.imu_rotation_hint = Some(omega);
         self.imu_intrinsics_hint = Some(intrinsics);
+    }
+
+    /// Set the stereo matching strategy at runtime
+    ///
+    /// Allows switching between different matching strategies without recompilation.
+    /// Useful for A/B testing or platform-specific optimization.
+    pub fn set_matching_strategy(
+        &mut self,
+        strategy: Box<dyn crate::feature_tracker::StereoMatchingStrategy>,
+    ) {
+        self.matching_strategy = strategy;
+    }
+
+    /// Load stereo matching strategy from configuration file
+    ///
+    /// # Arguments
+    /// * `path` - Path to YAML configuration file with strategy selection
+    ///
+    /// # Example
+    /// ```yaml
+    /// strategy: IMUGuided
+    /// params:
+    ///   search_margin_px: 8.0
+    ///   max_iterations: 500
+    /// ```
+    pub fn load_matching_strategy_config(&mut self, path: &str) -> Result<(), String> {
+        let config = crate::feature_tracker::MatchingStrategyConfig::from_file(path)
+            .map_err(|e| e.to_string())?;
+        self.matching_strategy = config.create_strategy()?;
+        Ok(())
+    }
+
+    /// Get the name of the currently active matching strategy
+    pub fn matching_strategy_name(&self) -> &'static str {
+        self.matching_strategy.name()
     }
 
     /// Process a stereo frame and update feature tracking
@@ -376,24 +422,20 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
                 .collect();
         }
 
-        // Geometric filtering with essential-matrix RANSAC
+        // Use selected stereo matching strategy for outlier rejection
         let camera_matrix = self.make_camera_matrix(w0, h0);
-        let ransac_inliers = if refined_matches.len() >= 8 {
-            let left_points: Vec<[f32; 2]> = refined_matches
-                .iter()
-                .map(|m| [m.left_pos.matrix().m13, m.left_pos.matrix().m23])
-                .collect();
-            let right_points: Vec<[f32; 2]> = refined_matches
-                .iter()
-                .map(|m| [m.right_pos.matrix().m13, m.right_pos.matrix().m23])
-                .collect();
 
-            let inliers =
-                self.essential_ransac
-                    .find_inliers(&left_points, &right_points, &camera_matrix);
-
-            if inliers.len() >= 4 {
-                Some(inliers)
+        // Prepare IMU state for strategy (if available)
+        let imu_state = if let Some(omega) = self.imu_rotation_hint {
+            if let Some((_fx, _fy, _cx, _cy)) = self.imu_intrinsics_hint {
+                // IMU state would come from fusion pipeline
+                // For now, use zero velocity as placeholder
+                // TODO: Connect to actual fusion/estimator velocity estimates
+                Some(crate::feature_tracker::IMUState {
+                    velocity: na::Vector3::zeros(),
+                    angular_velocity: na::Vector3::new(omega[0], omega[1], omega[2]),
+                    dt: 1.0 / 30.0, // Assume 30 FPS, should get from actual frame timing
+                })
             } else {
                 None
             }
@@ -401,17 +443,52 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             None
         };
 
-        let final_matches: Vec<StereoMatchResult> = refined_matches
-            .into_iter()
-            .enumerate()
-            .filter(|(idx, _)| {
-                ransac_inliers
-                    .as_ref()
-                    .map(|s| s.contains(idx))
-                    .unwrap_or(true)
-            })
-            .map(|(_, m)| m)
+        // Build previous depth map for temporal consistency strategy
+        let previous_depth: Vec<(usize, f32)> = self
+            .previous_match_results
+            .iter()
+            .map(|m| (m.id, m.disparity))
             .collect();
+
+        // Extract features in format expected by strategy
+        let features: Vec<(usize, f32, f32)> = refined_matches
+            .iter()
+            .map(|m| (m.id, m.left_pos.matrix().m13, m.left_pos.matrix().m23))
+            .collect();
+
+        // Call stereo matching strategy
+        let strategy_result = self.matching_strategy.match_stereo(
+            greyscale_image0.as_raw(),
+            greyscale_image1.as_raw(),
+            w0 as usize,
+            h0 as usize,
+            &features,
+            &camera_matrix,
+            imu_state.as_ref(),
+            if previous_depth.is_empty() {
+                None
+            } else {
+                Some(&previous_depth)
+            },
+        );
+
+        // Log strategy metrics
+        if should_log {
+            debug_log!(
+                "[FeatureTracker] Frame {}: Strategy='{}' inliers={}/{} time={:.3}ms",
+                self.frame_count,
+                self.matching_strategy.name(),
+                strategy_result.metrics.inliers_final,
+                strategy_result.metrics.candidates_initial,
+                strategy_result.metrics.time_total_ms
+            );
+        }
+
+        // Store results for next frame (temporal consistency)
+        self.previous_match_results = strategy_result.matches.clone();
+
+        // Use strategy-filtered matches directly
+        let final_matches = strategy_result.matches;
 
         let retained_ids: HashSet<usize> = final_matches.iter().map(|m| m.id).collect();
         self.tracked_points_map_cam0
