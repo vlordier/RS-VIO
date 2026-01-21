@@ -9,6 +9,7 @@ pub mod error;
 pub mod macros;
 pub mod math;
 pub mod perf;
+pub mod realtime_monitor;
 #[cfg(test)]
 pub mod testing;
 pub mod types;
@@ -17,5 +18,8 @@ pub mod validation;
 pub use config::{Clampable, ConfigBuilder, Mergeable, Validatable};
 pub use error::{ErrorCollector, OptionExt, ResultExt};
 pub use math::{clamp, normalize_angle, safe_sqrt};
+pub use realtime_monitor::{
+    FrameTimer, FrameTiming, GatingLevel, MonitorSummary, RealtimeMonitor, RealtimeMonitorConfig,
+};
 pub use types::{CameraId, Confidence, FeatureId, FrameId, Timestamp};
 pub use validation::{validate_matrix, validate_pose, validate_quaternion};

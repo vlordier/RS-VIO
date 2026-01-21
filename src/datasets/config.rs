@@ -453,6 +453,12 @@ pub struct DebugConfig {
     pub use_fallback_depth: bool,
     #[serde(default = "default_min_stereo_matches")]
     pub min_stereo_matches: usize,
+    /// Capture left image buffer on frame for fusion/debug consumers (off by default to avoid extra copy)
+    #[serde(default = "default_capture_left_image_for_fusion")]
+    pub capture_left_image_for_fusion: bool,
+    /// Fusion strategy: "none" (disabled), "rotation" (IMU-only), or "depth-aware" (default)
+    #[serde(default = "default_fusion_strategy")]
+    pub fusion_strategy: String,
 }
 
 impl Default for DebugConfig {
@@ -463,6 +469,8 @@ impl Default for DebugConfig {
             use_triangulation: default_use_triangulation(),
             use_fallback_depth: default_use_fallback_depth(),
             min_stereo_matches: default_min_stereo_matches(),
+            capture_left_image_for_fusion: default_capture_left_image_for_fusion(),
+            fusion_strategy: default_fusion_strategy(),
         }
     }
 }
@@ -482,6 +490,14 @@ fn default_use_fallback_depth() -> bool {
 fn default_min_stereo_matches() -> usize {
     2
 }
+fn default_capture_left_image_for_fusion() -> bool {
+    false
+}
+
+fn default_fusion_strategy() -> String {
+    "depth-aware".to_string()
+}
+
 
 impl Default for VisualizationConfig {
     fn default() -> Self {

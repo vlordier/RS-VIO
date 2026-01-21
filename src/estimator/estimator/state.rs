@@ -3,6 +3,7 @@ use crate::datasets::config::Config;
 use crate::datasets::CameraModelType;
 use crate::estimator::{FrameWorkspace, SlidingWindow};
 use crate::feature_tracker::StereoPatchTracker;
+use crate::fusion::FusionStrategyImpl;
 use crate::imu::{
     ExtrinsicCalibrator, HigherOrderFilter, ImuAidedKeyframeSelector, ImuBiasEstimator,
     ImuDenoiseFilter, ImuMotionPredictor, ImuPreintegrator, PreintegratedImu, VelocityEstimator,
@@ -86,4 +87,8 @@ pub struct Estimator {
     pub stereo_super_resolver: StereoSuperResolver,
     // Online intrinsics refiner for self-calibration
     pub intrinsics_refiner: Option<OnlineIntrinsicsRefiner>,
+    // Fusion buffer for multi-frame enhancement (circular, holds up to N frames)
+    pub fusion_frame_buffer: std::collections::VecDeque<crate::estimator::Frame>,
+    // Active fusion strategy instance (depth-aware fusion or rotation-only)
+    pub fusion_strategy: Option<Box<dyn FusionStrategyImpl>>,
 }

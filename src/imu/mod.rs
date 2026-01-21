@@ -151,7 +151,6 @@ impl Default for PreintegratedImu {
 }
 
 /// IMU preintegrator for visual-inertial odometry
-#[allow(dead_code)]
 pub struct ImuPreintegrator {
     config: ImuConfig,
     current: PreintegratedImu,
@@ -327,9 +326,9 @@ impl ImuPreintegrator {
 }
 
 /// Motion prediction using gyroscope
-#[allow(dead_code)]
 pub struct ImuMotionPredictor {
-    config: ImuConfig,
+    /// Configuration (reserved for future prediction tuning)
+    _config: ImuConfig,
     last_rotation: Option<na::UnitQuaternion<f64>>,
     last_timestamp: Option<i64>,
 }
@@ -338,7 +337,7 @@ impl ImuMotionPredictor {
     /// Create new motion predictor
     pub fn new(config: ImuConfig) -> Self {
         Self {
-            config,
+            _config: config,
             last_rotation: None,
             last_timestamp: None,
         }
@@ -357,7 +356,6 @@ impl ImuMotionPredictor {
     ///
     /// # Returns
     /// Predicted pixel displacement (du, dv)
-    #[allow(dead_code)]
     pub fn predict_feature_displacement(
         &self,
         imu_measurements: &[ImuData],
@@ -550,7 +548,6 @@ impl ImuBiasEstimator {
     /// # Arguments
     /// * `imu` - IMU measurement
     /// * `_assume_stationary` - If true, assume system is stationary (use for initialization)
-    #[allow(dead_code)]
     pub fn add_sample(&mut self, imu: &ImuData, _assume_stationary: bool) {
         let gyro = na::Vector3::new(imu.gyro[0], imu.gyro[1], imu.gyro[2]);
         let accel = na::Vector3::new(imu.accel[0], imu.accel[1], imu.accel[2]);

@@ -35,13 +35,11 @@ pub struct StereoPatchTracker<const N: u32> {
     subpixel_iterations: usize,
     subpixel_threshold: f32,
     subpixel_refinement: SubpixelStereoRefinement,
-    #[allow(dead_code)]
-    essential_ransac: EssentialMatrixRansac,
+    /// Essential matrix RANSAC (reserved for future geometric verification)
+    _essential_ransac: EssentialMatrixRansac,
     /// Pluggable stereo matching strategy (BasicRANSAC, IMUGuided, etc.)
-    #[allow(dead_code)]
     matching_strategy: Box<dyn crate::feature_tracker::StereoMatchingStrategy>,
     /// Previous frame's match results for temporal consistency
-    #[allow(dead_code)]
     previous_match_results: Vec<StereoMatchResult>,
     imu_rotation_hint: Option<[f32; 3]>,
     imu_intrinsics_hint: Option<(f32, f32, f32, f32)>,
@@ -58,9 +56,8 @@ pub struct StereoPatchTracker<const N: u32> {
     last_frame_time: Option<Instant>,
     /// Frame counter for sampled logging (log every N frames to reduce overhead)
     frame_count: u64,
-    /// GPU accelerator for compute-intensive operations (initialized but not yet integrated)
-    #[allow(dead_code)]
-    gpu_accelerator: Option<Arc<gpu_accel::GpuAccelerator>>,
+    /// GPU accelerator for compute-intensive operations (initialized, integration pending)
+    _gpu_accelerator: Option<Arc<gpu_accel::GpuAccelerator>>,
     /// Frame stabilizer for multi-frame geometric super-resolution
     frame_stabilizer_cam0: Option<FrameStabilizer>,
     frame_stabilizer_cam1: Option<FrameStabilizer>,
@@ -113,7 +110,7 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             subpixel_threshold: 0.0005,
             subpixel_refinement: SubpixelStereoRefinement::new(PatchMatchingConfig::default())
                 .with_quality_gates(35.0, 0.02),
-            essential_ransac: EssentialMatrixRansac::new(RansacConfig::default()),
+            _essential_ransac: EssentialMatrixRansac::new(RansacConfig::default()),
             // Initialize with default strategy (BasicRANSAC)
             matching_strategy: Box::new(crate::feature_tracker::BasicRANSACStrategy::new(
                 crate::feature_tracker::BasicRANSACConfig::default(),
@@ -128,7 +125,7 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             frame_skipper: frame_skip::AdaptiveFrameSkipper::new(30.0, 5, 2.0),
             last_frame_time: None,
             frame_count: 0,
-            gpu_accelerator,
+            _gpu_accelerator: gpu_accelerator,
             frame_stabilizer_cam0: None,
             frame_stabilizer_cam1: None,
             track_first_detector: None,

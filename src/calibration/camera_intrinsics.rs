@@ -153,6 +153,7 @@ impl CameraIntrinsicsEstimate {
 }
 
 /// Camera intrinsics calibrator using calibration target observations
+#[derive(Debug)]
 pub struct CameraIntrinsicsCalibrator {
     /// Target observations: (image_id, world_point, image_point)
     observations: Vec<(usize, Vector3<f64>, Vector2<f64>)>,

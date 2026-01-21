@@ -1,7 +1,9 @@
 pub mod acceptance_validator;
 pub mod camera_imu_extrinsics;
 pub mod camera_intrinsics;
+pub mod imu_calibration;
 pub mod imu_intrinsics;
+pub mod manual_workflow;
 pub mod online_intrinsics;
 pub mod online_time_offset;
 pub mod rolling_shutter;

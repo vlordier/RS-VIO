@@ -7,6 +7,8 @@ use crate::estimator::point_quality::PointQualityConfig;
 use crate::estimator::{FrameWorkspace, SlidingWindow, WorkspaceConfig};
 use crate::feature_tracker::StereoPatchTracker;
 use crate::fl;
+use crate::fusion::depth_aware_fusion::{DepthAwareFusion, DepthAwareFusionConfig};
+use crate::fusion::rotation_stabilizer::{RotationStabilizer, RotationStabilizerConfig};
 use crate::imu::{
     DenoiseConfig, ExtrinsicCalibrator, HigherOrderFilter, HigherOrderFilterConfig,
     ImuAidedKeyframeSelector, ImuBiasEstimator, ImuConfig, ImuDenoiseFilter, ImuMotionPredictor,
@@ -194,6 +196,17 @@ impl Estimator {
             stereo_super_resolver: StereoSuperResolver::new(StereoSuperResolutionConfig::default()),
             // Initialize online intrinsics refiner
             intrinsics_refiner,
+            // Initialize fusion buffer and strategy based on config
+            fusion_frame_buffer: std::collections::VecDeque::with_capacity(5),
+            fusion_strategy: match config.debug.fusion_strategy.to_lowercase().as_str() {
+                "none" => None,
+                "rotation" => Some(Box::new(RotationStabilizer::new(
+                    RotationStabilizerConfig::default(),
+                ))),
+                _ => Some(Box::new(DepthAwareFusion::new(
+                    DepthAwareFusionConfig::default(),
+                ))),
+            },
         }
     }
 }

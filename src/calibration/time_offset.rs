@@ -48,6 +48,7 @@ pub struct PreintegrationResult {
 }
 
 /// Joint time offset + rolling shutter estimator
+#[derive(Debug)]
 pub struct TimeOffsetEstimator {
     /// Current estimate of camera↔IMU time offset (seconds)
     pub time_offset_estimate: f64,

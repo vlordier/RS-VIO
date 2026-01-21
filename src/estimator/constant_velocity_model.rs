@@ -80,7 +80,6 @@ impl Default for ConstantVelocityConfig {
 
 /// State of constant velocity motion model
 #[derive(Debug, Clone, Copy)]
-#[allow(dead_code)]
 enum ModelState {
     /// Not initialized - waiting for first two frames
     Uninitialized,

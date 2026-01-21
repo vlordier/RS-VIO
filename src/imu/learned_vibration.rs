@@ -50,9 +50,8 @@ pub struct LearnedVibrationScheduler {
     weights: VibrationWeights,
     /// Maximum history length
     max_history: usize,
-    /// Learning rate for online adaptation
-    #[allow(dead_code)]
-    learning_rate: Float,
+    /// Learning rate for online adaptation (reserved for future online learning)
+    _learning_rate: Float,
 }
 
 /// Learned weights for vibration scheduling factors
@@ -60,9 +59,8 @@ pub struct LearnedVibrationScheduler {
 struct VibrationWeights {
     /// Weight for vibration level
     vibration_weight: Float,
-    /// Weight for trend (increasing/decreasing)
-    #[allow(dead_code)]
-    trend_weight: Float,
+    /// Weight for trend (increasing/decreasing) - reserved for future trend analysis
+    _trend_weight: Float,
     /// Weight for detected peaks
     peaks_weight: Float,
     /// Weight for throttle
@@ -75,7 +73,7 @@ impl Default for VibrationWeights {
     fn default() -> Self {
         Self {
             vibration_weight: 1.0,
-            trend_weight: 0.8,
+            _trend_weight: 0.8,
             peaks_weight: 0.6,
             throttle_weight: 0.4,
             time_weight: 0.3,
@@ -91,7 +89,7 @@ impl Default for LearnedVibrationScheduler {
             training_data: Vec::new(),
             weights: VibrationWeights::default(),
             max_history: 100,
-            learning_rate: 0.01,
+            _learning_rate: 0.01,
         }
     }
 }
@@ -249,10 +247,10 @@ impl LearnedVibrationScheduler {
             // Update weights based on error
             if error > 0.1 {
                 // Over-estimating - reduce vibration weight
-                self.weights.vibration_weight *= 1.0 - self.learning_rate;
+                self.weights.vibration_weight *= 1.0 - self._learning_rate;
             } else if error < -0.1 {
                 // Under-estimating - increase vibration weight
-                self.weights.vibration_weight *= 1.0 + self.learning_rate;
+                self.weights.vibration_weight *= 1.0 + self._learning_rate;
             }
         }
 

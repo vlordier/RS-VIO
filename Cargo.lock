@@ -1530,6 +1530,7 @@ dependencies = [
  "iana-time-zone",
  "js-sys",
  "num-traits",
+ "serde",
  "wasm-bindgen",
  "windows-link 0.2.1",
 ]
@@ -9720,6 +9721,7 @@ dependencies = [
  "anyhow",
  "apex-solver",
  "camera-intrinsic-model",
+ "chrono",
  "clap",
  "core_affinity",
  "criterion",
@@ -9744,11 +9746,13 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "sha2",
  "tempfile",
  "thiserror 1.0.69",
  "toml",
  "tracing",
  "tracing-subscriber",
+ "uuid",
  "wgpu 0.20.1",
 ]
 

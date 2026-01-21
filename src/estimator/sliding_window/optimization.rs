@@ -9,9 +9,8 @@ use crate::optimization::marginalization::{ParamBlock, ParamId};
 use crate::optimization::tight_coupling::{
     GravityModel, ImuPreintegration, InterKeyframeImuFactor,
 };
-use crate::vision::motion_aware_depth_optimization::{
-    MotionAwareDepthOptimizer, TriangulationConstraints,
-};
+#[cfg(test)]
+use crate::vision::{MotionAwareDepthOptimizer, TriangulationConstraints};
 use crate::{
     fl,
     types::{Float, Matrix3x3, Matrix4x4, Vector3},
@@ -788,22 +787,6 @@ impl SlidingWindow {
         Ok(true)
     }
 
-    /// Helper function to create skew-symmetric (cross-product) matrix from 3D vector.
-    #[allow(dead_code)]
-    fn skew_symmetric(v: &Vector3) -> Matrix3x3 {
-        na::Matrix3::<Float>::new(
-            fl!(0.0),
-            -v.z,
-            v.y,
-            v.z,
-            fl!(0.0),
-            -v.x,
-            -v.y,
-            v.x,
-            fl!(0.0),
-        )
-    }
-
     pub(crate) fn triangulate_stereo(
         left_obs: Vector3,
         right_obs: Vector3,
@@ -882,6 +865,8 @@ impl SlidingWindow {
         Some(p_W)
     }
 
+    /// Advanced triangulation with motion compensation (reserved for future use)
+    #[cfg(test)]
     #[allow(dead_code)]
     fn triangulate_stereo_motion_aware(
         left_obs: Vector3,

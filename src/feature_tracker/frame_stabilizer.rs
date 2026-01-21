@@ -44,9 +44,8 @@ struct StabilizedFrame {
     image: GrayImage,
     /// Rotation from reference frame (SO(3))
     rotation: na::Rotation3<f32>,
-    /// Timestamp for temporal ordering
-    #[allow(dead_code)]
-    timestamp: f64,
+    /// Timestamp for temporal ordering (reserved for future temporal weighting)
+    _timestamp: f64,
 }
 
 /// Rotation-only multi-frame stabilizer
@@ -98,7 +97,7 @@ impl FrameStabilizer {
         &mut self,
         image: &GrayImage,
         rotation: na::Rotation3<f32>,
-        timestamp: f64,
+        _timestamp: f64,
     ) -> GrayImage {
         if !self.config.enabled {
             return image.clone();
@@ -107,7 +106,7 @@ impl FrameStabilizer {
         let current = StabilizedFrame {
             image: image.clone(),
             rotation,
-            timestamp,
+            _timestamp,
         };
 
         // Initialize reference frame on first call

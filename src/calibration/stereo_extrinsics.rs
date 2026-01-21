@@ -76,6 +76,7 @@ impl StereoExtrinsicsEstimate {
 }
 
 /// Stereo extrinsics calibrator
+#[derive(Debug)]
 pub struct StereoExtrinsicsCalibrator {
     /// Matched point pairs: (left_pt, right_pt) in pixels
     matches: Vec<(Vector2<f64>, Vector2<f64>)>,

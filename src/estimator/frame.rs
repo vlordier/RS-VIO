@@ -39,6 +39,17 @@ pub struct Frame {
 
     /// Per-frame 2D features (right image).
     pub right_features: Vec<Feature>,
+
+    /// Optional left image buffer for fusion/quality metrics.
+    pub left_image_plane: Option<ImagePlane>,
+}
+
+/// Lightweight owned image plane (grayscale) with dimensions.
+#[derive(Debug, Clone)]
+pub struct ImagePlane {
+    pub data: Vec<u8>,
+    pub width: u32,
+    pub height: u32,
 }
 
 /// Builder for type-safe Frame construction.
@@ -146,6 +157,7 @@ impl FrameBuilder {
             is_keyframe: self.is_keyframe,
             left_features: Vec::new(),
             right_features: Vec::new(),
+            left_image_plane: None,
         })
     }
 }
@@ -171,6 +183,7 @@ impl Frame {
             is_keyframe: false,
             left_features: Vec::new(),
             right_features: Vec::new(),
+            left_image_plane: None,
         }
     }
 
@@ -195,12 +208,25 @@ impl Frame {
             is_keyframe: true,
             left_features: Vec::new(),
             right_features: Vec::new(),
+            left_image_plane: None,
         }
     }
 
     /// Immutable access to left-image features.
     pub fn left_features(&self) -> &Vec<Feature> {
         &self.left_features
+    }
+
+    /// Optional borrowed view of the left image plane.
+    pub fn left_image_plane(&self) -> Option<(&[u8], u32, u32)> {
+        self.left_image_plane
+            .as_ref()
+            .map(|plane| (plane.data.as_slice(), plane.width, plane.height))
+    }
+
+    /// Set/own the left image plane (cloned or transferred by caller).
+    pub fn set_left_image_plane(&mut self, data: Vec<u8>, width: u32, height: u32) {
+        self.left_image_plane = Some(ImagePlane { data, width, height });
     }
 
     /// Append a new feature to the left image.

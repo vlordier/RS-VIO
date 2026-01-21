@@ -1,0 +1,91 @@
+# RS-VIO Configuration with Fusion Disabled (Baseline)
+# This configuration disables all multi-frame fusion for baseline comparison.
+#
+# Fusion Strategy: None (fusion disabled)
+#   Standard feature tracking + stereo matching + triangulation without fusion post-processing.
+#   Useful for benchmarking or environments where fusion overhead is unacceptable.
+#
+# Recommended for: Baseline comparison, platforms with minimal compute headroom, or offline analysis
+
+# Camera Parameters (EuRoC dataset)
+camera:
+  image_width: 752
+  image_height: 480
+
+  # Left camera intrinsics
+  left_intrinsics: [458.654, 457.296, 367.215, 248.375]  # [fx, fy, cx, cy]
+  left_distortion: [-0.28340811, 0.07395907, 0.00019359, 1.76187114e-05]
+  left_model: "pinhole-radtan"
+
+  # Right camera intrinsics
+  right_intrinsics: [457.587, 456.134, 379.999, 255.238]
+  right_distortion: [-0.28368365, 0.07451284, -0.00010473, -3.55590700e-05]
+  right_model: "pinhole-radtan"
+
+  # Extrinsics (EuRoC dataset transforms)
+  T_B_Cl: [0.0148655429818, -0.999880929698, 0.00414029679422, -0.0216401454975,
+           0.999557249008, 0.0149672133247, 0.025715529948, -0.064676986768,
+           -0.0257744366974, 0.00375618835797, 0.999660727178, 0.00981073058949,
+           0.0, 0.0, 0.0, 1.0]
+
+  T_B_Cr: [0.0125552670891, -0.999755099723, 0.0182237714554, -0.0198435579556,
+           0.999598781151, 0.0130119051815, 0.0251588363115, 0.0453689425024,
+           -0.0253898008918, 0.0179005838253, 0.999517347078, 0.00786212447038,
+           0.0, 0.0, 0.0, 1.0]
+
+visualization:
+  enable_viewer: true
+  stream_name: "rs-vio-baseline"
+  startup_delay_ms: 500
+
+# Keyframe management
+keyframe_management:
+  keyframe_window_size: 10
+  translation_threshold: 0.2
+  rotation_threshold: 5.0
+  processing_timeout_ms: 50
+
+# Feature detection
+feature_detection:
+  grid_size: 30
+  max_features_per_grid: 200
+  optical_flow_max_iterations: 30
+  optical_flow_convergence_threshold: 0.005
+
+# Bundle adjustment
+optimization:
+  bundle_adjustment_max_iterations: 20
+  pnp_max_iterations: 10
+  imu_prior_enable: true
+  imu_prior_weight_pos: 0.5
+  imu_prior_weight_rot: 1.0
+  imu_prior_huber_delta: 1.0
+
+# Marginalization
+marginalization:
+  enabled: true
+  max_keyframes: 10
+  num_marginalize_per_step: 1
+  min_landmark_observations: 3
+  landmark_age_limit: 50
+  use_fej: true
+  damping: 1e-7
+  prior_info_scale: 0.9
+  hessian_approximator: "GaussNewton"
+  gradient_computer: "Standard"
+  prior_constructor: "Standard"
+
+# Debug & Fusion Configuration
+# ==============================================================================
+debug:
+  use_imu: true
+  use_feature_tracking: true
+  use_triangulation: true
+  use_fallback_depth: false
+  min_stereo_matches: 2
+  
+  # No image capture needed (fusion disabled)
+  capture_left_image_for_fusion: false
+
+  # Disable fusion entirely for baseline comparison
+  fusion_strategy: "none"

@@ -13,7 +13,6 @@ use std::collections::{HashMap, VecDeque};
 /// Maintains a fixed-size window of keyframes and manages the optimization
 /// of poses and 3D points across these frames.
 #[derive(Debug)]
-#[allow(dead_code)]
 pub struct SlidingWindow {
     /// Maximum number of keyframes in the sliding window.
     pub(crate) max_frames: usize,
@@ -37,11 +36,11 @@ pub struct SlidingWindow {
     /// Loop-closure constraints linking keyframes inside the window
     pub(crate) loop_closure_constraints: Vec<LoopClosureConstraint>,
 
-    /// Aggressive keyframe culler for intelligent frame removal
-    pub(crate) keyframe_culler: Option<AggressiveKeyframeCuller>,
+    /// Aggressive keyframe culler for intelligent frame removal (reserved for future culling)
+    pub(crate) _keyframe_culler: Option<AggressiveKeyframeCuller>,
 
-    /// Point quality scorer for filtering map points
-    pub(crate) point_scorer: Option<PointQualityScorer>,
+    /// Point quality scorer for filtering map points (reserved for quality-based filtering)
+    pub(crate) _point_scorer: Option<PointQualityScorer>,
 
     /// IMU preintegrations between consecutive keyframes
     /// Key: from_keyframe_idx, Value: ImuPreintegration to next keyframe
@@ -66,8 +65,8 @@ impl SlidingWindow {
         const DEFAULT_MAX_MAP_POINTS: usize = 2000;
 
         let marg_manager = MarginalizationManager::new(marg_config);
-        let keyframe_culler = culling_config.map(AggressiveKeyframeCuller::new);
-        let point_scorer = quality_config.map(PointQualityScorer::new);
+        let _keyframe_culler = culling_config.map(AggressiveKeyframeCuller::new);
+        let _point_scorer = quality_config.map(PointQualityScorer::new);
 
         Self {
             max_frames,
@@ -77,8 +76,8 @@ impl SlidingWindow {
             map_point_observations: HashMap::with_capacity(DEFAULT_MAX_MAP_POINTS),
             marginalization_manager: marg_manager,
             loop_closure_constraints: Vec::new(),
-            keyframe_culler,
-            point_scorer,
+            _keyframe_culler,
+            _point_scorer,
             imu_preintegrations: Vec::new(),
         }
     }

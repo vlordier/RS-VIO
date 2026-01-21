@@ -514,6 +514,50 @@ impl Estimator {
             }
         }
 
+        // Optionally capture the left image for fusion consumers; default is off to avoid extra copies.
+        if self.config.debug.capture_left_image_for_fusion {
+            let left_image_copy = left_img.as_raw().clone();
+            current_frame.set_left_image_plane(left_image_copy, img_w, img_h);
+        }
+
+        // Optional: Apply multi-frame fusion to enhance feature confidence
+        // Buffer frames and call fusion strategy if available
+        if let Some(fusion_strat) = self.fusion_strategy.as_mut() {
+            // Add current frame to buffer
+            self.fusion_frame_buffer.push_back(current_frame.clone());
+            
+            // Keep buffer within capacity (default 5 frames)
+            if self.fusion_frame_buffer.len() > 5 {
+                self.fusion_frame_buffer.pop_front();
+            }
+            
+            // Apply fusion when we have at least 2 frames
+            if self.fusion_frame_buffer.len() >= 2 {
+                let frames_vec: Vec<crate::estimator::Frame> = 
+                    self.fusion_frame_buffer.iter().cloned().collect();
+                
+                if let Ok(fused) = fusion_strat.fuse(&frames_vec) {
+                    // Apply per-feature confidence from fusion to current frame
+                    let feature_count = current_frame.left_features.len();
+                    if fused.feature_confidence.len() >= feature_count {
+                        for (feat, conf) in current_frame.left_features.iter_mut()
+                            .zip(fused.feature_confidence.iter())
+                        {
+                            // Blend fusion confidence with existing tracking confidence
+                            feat.quality.confidence = ((feat.quality.confidence as crate::types::Float + conf) / 2.0) as f32;
+                        }
+                        if should_log {
+                            debug_log!(
+                                "[Estimator] Fusion: enhanced {} features, SNR improvement: {:?}dB",
+                                feature_count,
+                                fused.metrics.snr_improvement_db
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
         // Return image buffers to workspace for reuse
         let left_buf_back = left_img.into_raw();
         let right_buf_back = right_img.into_raw();

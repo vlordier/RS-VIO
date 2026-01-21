@@ -69,11 +69,13 @@
 
 #![allow(clippy::module_inception)]
 
+pub mod feature_distributor;
 pub mod feature_tracker;
 pub mod frame_skip;
 pub mod frame_stabilizer;
 pub mod gpu_accel;
 pub mod image_utilities;
+pub mod lightglue_matcher;
 pub mod matching_strategy;
 pub mod matching_strategy_config;
 pub mod parallel_tracking;
@@ -83,12 +85,17 @@ pub mod pipeline_config;
 pub mod ransac;
 pub mod ransac_essential;
 pub mod subpixel_stereo;
+pub mod superpoint_descriptor;
 pub mod track_first_detector;
 
 pub use feature_tracker::*;
+pub use feature_distributor::{
+    CellStatus, DistributionConfig, DistributionStats, FeatureDistributor,
+};
 pub use frame_skip::AdaptiveFrameSkipper;
 pub use frame_stabilizer::{FrameStabilizer, StabilizerConfig};
 pub use gpu_accel::{GpuAccelerator, GpuBackend, GpuConfig, GpuDeviceInfo};
+pub use lightglue_matcher::{FeatureMatch, LightGlueMatcher, LightGlueConfig};
 #[cfg(feature = "matching-basic-ransac")]
 pub use matching_strategy::BasicRANSACStrategy;
 #[cfg(feature = "matching-hybrid-of")]
@@ -114,4 +121,7 @@ pub use pipeline_config::{
 };
 pub use ransac_essential::{EssentialMatrixRansac, RansacConfig};
 pub use subpixel_stereo::{StereoMatchResult, SubpixelStereoRefinement};
+pub use superpoint_descriptor::{
+    KeypointDescriptor, SuperPointConfig, SuperPointDescriptor,
+};
 pub use track_first_detector::{TrackFirstConfig, TrackFirstDetector, TrackedFeature};

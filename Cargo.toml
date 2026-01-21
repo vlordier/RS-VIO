@@ -28,6 +28,9 @@ serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 serde_json = "1.0"
 toml = "0.8"
+uuid = { version = "1.11", features = ["v4", "serde"] }
+sha2 = "0.10"
+chrono = { version = "0.4", features = ["serde"] }
 anyhow = "1.0"
 thiserror = "1.0"
 rustfft = "6.2"

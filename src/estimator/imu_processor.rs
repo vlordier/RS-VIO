@@ -33,16 +33,16 @@ pub struct ImuProcessor {
     preintegrator: ImuPreintegrator,
     motion_predictor: ImuMotionPredictor,
     velocity_estimator: VelocityEstimator,
-    #[allow(dead_code)]
-    bias_estimator: ImuBiasEstimator,
+    /// Bias estimator - reserved for online bias calibration
+    _bias_estimator: ImuBiasEstimator,
     keyframe_selector: ImuAidedKeyframeSelector,
 
     // State
     current_preintegration: Option<PreintegratedImu>,
     last_timestamp: Option<i64>,
     stats: ImuStatistics,
-    #[allow(dead_code)]
-    current_velocity: Vector3,
+    /// Current velocity - reserved for velocity-based predictions
+    _current_velocity: Vector3,
     current_rotation: na::UnitQuaternion<f64>,
     is_initialized: bool,
 }
@@ -53,19 +53,19 @@ impl ImuProcessor {
         preintegrator: ImuPreintegrator,
         motion_predictor: ImuMotionPredictor,
         velocity_estimator: VelocityEstimator,
-        bias_estimator: ImuBiasEstimator,
+        _bias_estimator: ImuBiasEstimator,
         keyframe_selector: ImuAidedKeyframeSelector,
     ) -> Self {
         Self {
             preintegrator,
             motion_predictor,
             velocity_estimator,
-            bias_estimator,
+            _bias_estimator,
             keyframe_selector,
             current_preintegration: None,
             last_timestamp: None,
             stats: ImuStatistics::default(),
-            current_velocity: Vector3::zeros(),
+            _current_velocity: Vector3::zeros(),
             current_rotation: na::UnitQuaternion::identity(),
             is_initialized: false,
         }
