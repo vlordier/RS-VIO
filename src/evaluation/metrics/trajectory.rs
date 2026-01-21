@@ -1,7 +1,6 @@
 /// Trajectory analysis metrics
 ///
 /// Analyzes accuracy across combined distance and speed scenarios.
-
 use super::distance::DistanceBinnedMetrics;
 use super::speed::SpeedBinnedMetrics;
 use super::types::BinMetrics;

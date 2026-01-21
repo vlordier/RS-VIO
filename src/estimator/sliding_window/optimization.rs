@@ -6,7 +6,9 @@ use crate::optimization::factors::{
     BundleAdjustmentFactor, ImuPriorFactor, JointPriorFactor, LoopClosurePoseFactor, PnPFactor,
 };
 use crate::optimization::marginalization::{ParamBlock, ParamId};
-use crate::optimization::tight_coupling::{GravityModel, ImuPreintegration, InterKeyframeImuFactor};
+use crate::optimization::tight_coupling::{
+    GravityModel, ImuPreintegration, InterKeyframeImuFactor,
+};
 use crate::vision::motion_aware_depth_optimization::{
     MotionAwareDepthOptimizer, TriangulationConstraints,
 };
@@ -326,7 +328,9 @@ impl SlidingWindow {
                         &var_names,
                         Box::new(factor),
                         Some(Box::new(huber_loss)
-                            as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>),
+                            as Box<
+                                dyn apex_solver::core::loss_functions::LossFunction + Send,
+                            >),
                     );
                 }
             }
@@ -428,18 +432,19 @@ impl SlidingWindow {
                 InterKeyframeImuFactor::new(preintegration.dt, preintegration.clone(), gravity);
 
             let imu_huber_delta = 2.0;
-            let imu_loss = match HuberLoss::new(imu_huber_delta) {
-                Ok(l) => Some(Box::new(l)
-                    as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>),
-                Err(e) => {
-                    log::warn!(
-                        "[SlidingWindow] Invalid IMU Huber delta ({}): {}",
-                        imu_huber_delta,
-                        e
-                    );
-                    None
-                },
-            };
+            let imu_loss =
+                match HuberLoss::new(imu_huber_delta) {
+                    Ok(l) => Some(Box::new(l)
+                        as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>),
+                    Err(e) => {
+                        log::warn!(
+                            "[SlidingWindow] Invalid IMU Huber delta ({}): {}",
+                            imu_huber_delta,
+                            e
+                        );
+                        None
+                    },
+                };
 
             workspace.problem.add_residual_block(
                 &[&kf_i_var, &vel_i_var, &kf_j_var, &vel_j_var],
@@ -488,11 +493,7 @@ impl SlidingWindow {
                         Ok(l) => Some(Box::new(l)
                             as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>),
                         Err(e) => {
-                            log::warn!(
-                                "[SlidingWindow] Invalid Huber delta ({}): {}",
-                                delta,
-                                e
-                            );
+                            log::warn!("[SlidingWindow] Invalid Huber delta ({}): {}", delta, e);
                             None
                         },
                     }
@@ -511,7 +512,9 @@ impl SlidingWindow {
                 last_index, w_pos, w_rot, imu_huber_delta
             );
         } else {
-            log::warn!("[SlidingWindow] IMU prior predicted pose inversion failed; skipping IMU residual");
+            log::warn!(
+                "[SlidingWindow] IMU prior predicted pose inversion failed; skipping IMU residual"
+            );
         }
     }
 
@@ -527,7 +530,7 @@ impl SlidingWindow {
             // and compute their positions in both the prior and workspace
             let mut param_mapping: Vec<(String, usize)> = Vec::new(); // (var_name, dim)
             let mut prior_param_indices: Vec<usize> = Vec::new(); // indices in marg_prior.param_ids
-            
+
             for (param_idx, param_id) in marg_prior.param_ids.iter().enumerate() {
                 let var_name = match param_id {
                     ParamId::KeyframePose(i) => format!("KF_{}", i),
@@ -554,7 +557,7 @@ impl SlidingWindow {
                     }
                     orig_offsets.push(offset);
                 }
-                
+
                 // Extract rows and columns from information matrix for existing params
                 let mut info_rows = Vec::new();
                 let mut info_cols = Vec::new();
@@ -566,7 +569,7 @@ impl SlidingWindow {
                         info_cols.push(i);
                     }
                 }
-                
+
                 // Build reduced information matrix
                 let total_dim = info_rows.len();
                 let mut info_reduced = DMatrix::zeros(total_dim, total_dim);
@@ -575,13 +578,13 @@ impl SlidingWindow {
                         info_reduced[(new_i, new_j)] = marg_prior.information[(old_i, old_j)];
                     }
                 }
-                
+
                 // Extract residual for existing parameters
                 let mut residual_reduced = DVector::zeros(total_dim);
                 for (new_i, &old_i) in info_rows.iter().enumerate() {
                     residual_reduced[new_i] = marg_prior.residual[old_i];
                 }
-                
+
                 // Collect linearization points in order of existing parameters
                 let mut lin_point_concat = DVector::zeros(total_dim);
                 let mut offset = 0;
@@ -593,7 +596,7 @@ impl SlidingWindow {
                         offset += dim;
                     }
                 }
-                
+
                 // Collect dimension info and variable names
                 let var_names: Vec<String> = param_mapping.iter().map(|x| x.0.clone()).collect();
                 let param_dims: Vec<usize> = param_mapping.iter().map(|x| x.1).collect();
@@ -649,7 +652,9 @@ impl SlidingWindow {
         }
 
         if problem.num_residual_blocks() == 0 {
-            return Err(std::io::Error::other("Optimization problem has no residuals"));
+            return Err(std::io::Error::other(
+                "Optimization problem has no residuals",
+            ));
         }
 
         Ok(true)
@@ -944,10 +949,8 @@ impl SlidingWindow {
         let estimated_landmarks = self.map_points.len().max(100);
         let estimated_keyframes = self.keyframes.len();
 
-        let mut workspace = self.build_optimization_workspace(
-            estimated_landmarks,
-            estimated_keyframes,
-        )?;
+        let mut workspace =
+            self.build_optimization_workspace(estimated_landmarks, estimated_keyframes)?;
 
         self.count_landmark_observations(&mut workspace);
         self.add_keyframe_states_and_visual_factors(&mut workspace)?;
@@ -1027,9 +1030,7 @@ impl SlidingWindow {
         self.optimize_with_imu(None, None, None)
     }
 
-    pub(crate) fn build_param_blocks_for_marginalization(
-        &self,
-    ) -> HashMap<ParamId, ParamBlock> {
+    pub(crate) fn build_param_blocks_for_marginalization(&self) -> HashMap<ParamId, ParamBlock> {
         let mut param_blocks = HashMap::new();
 
         for (i, frame) in self.keyframes.iter().enumerate() {

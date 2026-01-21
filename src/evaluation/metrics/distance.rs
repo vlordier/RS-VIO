@@ -1,7 +1,6 @@
 /// Distance-aware accuracy metrics
 ///
 /// Bin metrics by distance from camera (near, mid, far, very far fields).
-
 use super::types::BinMetrics;
 
 /// Accuracy metrics binned by distance

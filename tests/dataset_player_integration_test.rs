@@ -1,6 +1,6 @@
 // Integration tests for dataset players
 
-use rs_vio::datasets::{PlayerConfig, ImageData, ImuData};
+use rs_vio::datasets::{ImageData, ImuData, PlayerConfig};
 
 #[test]
 fn test_player_config_creation() {
@@ -12,7 +12,7 @@ fn test_player_config_creation() {
         step_mode: false,
         stats_output_path: Some("/test/stats.csv".to_string()),
     };
-    
+
     assert_eq!(config.config_path, "/test/config.yaml");
     assert_eq!(config.dataset_path, "/test/euroc/MH_01_easy");
     assert!(config.enable_statistics);
@@ -31,7 +31,7 @@ fn test_player_config_minimal() {
         step_mode: true,
         stats_output_path: None,
     };
-    
+
     assert!(config.step_mode);
     assert!(config.stats_output_path.is_none());
 }
@@ -42,7 +42,7 @@ fn test_image_data_creation() {
         timestamp: 1234567890,
         filename: "cam0/data/000001.png".to_string(),
     };
-    
+
     assert_eq!(img.timestamp, 1234567890);
     assert!(img.filename.contains("cam0"));
 }
@@ -54,10 +54,11 @@ fn test_imu_data_creation() {
         gyro: [0.1, 0.2, 0.3],
         accel: [9.8, 0.1, 0.0],
     };
-    
+
     assert_eq!(imu.timestamp, 1234567890);
-    assert_eq!(imu.gyro[0], 0.1);
-    assert_eq!(imu.accel[0], 9.8);
+    let eps = 1e-9;
+    assert!((imu.gyro[0] - 0.1).abs() < eps);
+    assert!((imu.accel[0] - 9.8).abs() < eps);
 }
 
 #[test]
@@ -67,11 +68,20 @@ fn test_imu_data_clone() {
         gyro: [1.0, 2.0, 3.0],
         accel: [4.0, 5.0, 6.0],
     };
-    
+
     let imu2 = imu1.clone();
     assert_eq!(imu1.timestamp, imu2.timestamp);
-    assert_eq!(imu1.gyro, imu2.gyro);
-    assert_eq!(imu1.accel, imu2.accel);
+    let eps = 1e-9;
+    assert!(imu1
+        .gyro
+        .iter()
+        .zip(imu2.gyro.iter())
+        .all(|(a, b)| (*a - *b).abs() < eps));
+    assert!(imu1
+        .accel
+        .iter()
+        .zip(imu2.accel.iter())
+        .all(|(a, b)| (*a - *b).abs() < eps));
 }
 
 #[test]
@@ -80,7 +90,7 @@ fn test_image_data_clone() {
         timestamp: 5000,
         filename: "test.png".to_string(),
     };
-    
+
     let img2 = img1.clone();
     assert_eq!(img1.timestamp, img2.timestamp);
     assert_eq!(img1.filename, img2.filename);

@@ -1,7 +1,7 @@
 //! Concrete implementations of Hessian, Gradient, and Prior constructors
 
-use nalgebra as na;
 use na::{DMatrix, DVector};
+use nalgebra as na;
 use std::collections::HashMap;
 
 use super::config::{MarginalizationConfig, ParamId};
@@ -338,7 +338,9 @@ impl PriorConstructor for StandardPriorConstructor {
         let filtered_lin_points: HashMap<ParamId, DVector<f64>> = param_ids
             .iter()
             .filter_map(|id| {
-                linearization_points.get(id).map(|lp| (id.clone(), lp.clone()))
+                linearization_points
+                    .get(id)
+                    .map(|lp| (id.clone(), lp.clone()))
             })
             .collect();
 

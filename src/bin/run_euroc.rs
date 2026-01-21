@@ -56,6 +56,9 @@ struct Args {
     dataset_path: String,
 
     /// Optional path to write statistics; will also emit a CSV of per-frame timing
-    #[arg(long, help = "Optional path to write statistics; emits *_frames.csv too")]
+    #[arg(
+        long,
+        help = "Optional path to write statistics; emits *_frames.csv too"
+    )]
     stats_out: Option<String>,
 }

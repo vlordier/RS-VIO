@@ -8,14 +8,14 @@ use crate::estimator::{FrameWorkspace, SlidingWindow, WorkspaceConfig};
 use crate::feature_tracker::StereoPatchTracker;
 use crate::fl;
 use crate::imu::{
-    DenoiseConfig, ExtrinsicCalibrator, ImuAidedKeyframeSelector, ImuBiasEstimator,
-    ImuConfig, ImuDenoiseFilter, ImuMotionPredictor, ImuPreintegrator, VelocityEstimator,
-    HigherOrderFilter, HigherOrderFilterConfig,
+    DenoiseConfig, ExtrinsicCalibrator, HigherOrderFilter, HigherOrderFilterConfig,
+    ImuAidedKeyframeSelector, ImuBiasEstimator, ImuConfig, ImuDenoiseFilter, ImuMotionPredictor,
+    ImuPreintegrator, VelocityEstimator,
 };
 use crate::optimization::loop_closure::{LoopClosureConfig, LoopClosureDetector};
 use crate::types::Float;
 use crate::viewers::Viewer;
-use crate::vision::{StereoSuperResolver, StereoSuperResolutionConfig};
+use crate::vision::{StereoSuperResolutionConfig, StereoSuperResolver};
 use nalgebra as na;
 use std::io::Write;
 use std::time::Duration;

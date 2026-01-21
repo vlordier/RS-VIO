@@ -18,7 +18,8 @@ fn test_vibration_filter_creation() {
     };
 
     let filter = VibrationNotchFilter::new(config.sampling_rate, config.fft_size);
-    assert_eq!(filter.config().sampling_rate, 200.0);
+    let eps = 1e-12;
+    assert!((filter.config().sampling_rate - 200.0).abs() < eps);
     assert_eq!(filter.config().fft_size, 512);
 }
 
@@ -56,8 +57,8 @@ fn test_vibration_filter_edge_cases() {
 
     for _ in 0..100 {
         let filtered = filter.process_measurement(&zero_imu);
-        assert_eq!(filtered.gyro, [0.0; 3]);
-        assert_eq!(filtered.accel, [0.0; 3]);
+        assert!(filtered.gyro.iter().all(|g| g.abs() < 1e-12));
+        assert!(filtered.accel.iter().all(|a| a.abs() < 1e-12));
     }
 
     // Test with extreme noise
@@ -191,10 +192,10 @@ fn test_vibration_filter_performance() {
 /// Test vibration filter with different sampling rates
 #[test]
 fn test_vibration_filter_different_rates() {
-    let rates = [100.0, 200.0, 400.0, 1000.0];
+    let rates: [u32; 4] = [100, 200, 400, 1000];
 
     for &rate in &rates {
-        let mut filter = VibrationNotchFilter::new(rate, 256);
+        let mut filter = VibrationNotchFilter::new(f64::from(rate), 256);
         let imu_data = generate_test_imu_data_at_rate(100, 0.1, rate);
 
         for imu in imu_data {
@@ -204,21 +205,21 @@ fn test_vibration_filter_different_rates() {
         }
 
         // Check that frequency ranges are adjusted for sampling rate
-        let nyquist = rate / 2.0;
+        let nyquist = f64::from(rate) / 2.0;
         assert!(filter.config().max_freq <= nyquist);
     }
 }
 
 // Helper functions for test data generation
 
-fn generate_test_imu_data(num_samples: usize, vibration_amplitude: f64) -> Vec<ImuData> {
+fn generate_test_imu_data(num_samples: u32, vibration_amplitude: f64) -> Vec<ImuData> {
     (0..num_samples)
         .map(|i| {
-            let t = i as f64 * 0.005; // 200Hz sampling
+            let t = f64::from(i) * 0.005; // 200Hz sampling
             let vibration = vibration_amplitude * (t * 50.0 * 2.0 * std::f64::consts::PI).sin();
 
             ImuData {
-                timestamp: (i as i64) * 5000, // 5ms intervals
+                timestamp: i64::from(i) * 5000, // 5ms intervals
                 gyro: [vibration, vibration * 0.5, vibration * 0.3],
                 accel: [vibration * 10.0, vibration * 5.0, 9.81 + vibration * 2.0],
             }
@@ -227,18 +228,19 @@ fn generate_test_imu_data(num_samples: usize, vibration_amplitude: f64) -> Vec<I
 }
 
 fn generate_test_imu_data_at_rate(
-    num_samples: usize,
+    num_samples: u32,
     vibration_amplitude: f64,
-    rate: f64,
+    rate_hz: u32,
 ) -> Vec<ImuData> {
-    let dt = 1.0 / rate;
+    let dt = 1.0 / f64::from(rate_hz);
+    let period_ns_i64: i64 = 1_000_000_000i64 / i64::from(rate_hz);
     (0..num_samples)
         .map(|i| {
-            let t = i as f64 * dt;
+            let t = f64::from(i) * dt;
             let vibration = vibration_amplitude * (t * 50.0 * 2.0 * std::f64::consts::PI).sin();
 
             ImuData {
-                timestamp: (i as i64) * (dt * 1e9) as i64,
+                timestamp: i64::from(i) * period_ns_i64,
                 gyro: [vibration, vibration * 0.5, vibration * 0.3],
                 accel: [vibration * 10.0, vibration * 5.0, 9.81 + vibration * 2.0],
             }
@@ -247,7 +249,7 @@ fn generate_test_imu_data_at_rate(
 }
 
 fn generate_multitone_imu_data(
-    num_samples: usize,
+    num_samples: u32,
     frequencies: &[f64],
     amplitudes: &[f64],
 ) -> Vec<ImuData> {
@@ -255,7 +257,7 @@ fn generate_multitone_imu_data(
 
     (0..num_samples)
         .map(|i| {
-            let t = i as f64 * 0.005; // 200Hz sampling
+            let t = f64::from(i) * 0.005; // 200Hz sampling
             let mut vibration = 0.0;
 
             for (&freq, &amp) in frequencies.iter().zip(amplitudes.iter()) {
@@ -263,7 +265,7 @@ fn generate_multitone_imu_data(
             }
 
             ImuData {
-                timestamp: (i as i64) * 5000,
+                timestamp: i64::from(i) * 5000,
                 gyro: [vibration, vibration * 0.5, vibration * 0.3],
                 accel: [vibration * 10.0, vibration * 5.0, 9.81 + vibration * 2.0],
             }
@@ -280,9 +282,10 @@ fn test_vibration_peak_structure() {
         snr: 15.0,
     };
 
-    assert_eq!(peak.frequency, 100.0);
-    assert_eq!(peak.magnitude, 2.5);
-    assert_eq!(peak.snr, 15.0);
+    let eps = 1e-12;
+    assert!((peak.frequency - 100.0).abs() < eps);
+    assert!((peak.magnitude - 2.5).abs() < eps);
+    assert!((peak.snr - 15.0).abs() < eps);
 }
 
 /// Test vibration filter configuration validation

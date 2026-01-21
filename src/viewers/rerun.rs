@@ -1301,11 +1301,7 @@ mod tests {
 
     #[test]
     fn matrix_to_quaternion_identity_returns_unit_w() {
-        let rot = [
-            [1.0_f64, 0.0, 0.0],
-            [0.0, 1.0, 0.0],
-            [0.0, 0.0, 1.0],
-        ];
+        let rot = [[1.0_f64, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
 
         let quat = matrix_to_quaternion(rot);
         // Identity rotation should be zero vector with scalar 1

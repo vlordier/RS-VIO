@@ -9,7 +9,7 @@ use rs_vio::datasets::ImuData;
 fn test_rolling_shutter_compensator_creation() {
     let compensator = RollingShutterCompensator::new(0.02, 480); // 20ms readout, 480 rows
 
-    assert_eq!(compensator.config().readout_time, 0.02);
+    assert!((compensator.config().readout_time - 0.02).abs() < 1e-12);
     assert_eq!(compensator.config().image_height, 480);
     assert!(compensator.config().top_to_bottom);
 }
@@ -24,7 +24,7 @@ fn test_compensator_creation_variations() {
     let slow_compensator = RollingShutterCompensator::new(0.1, 1080); // 4K height
 
     // Both should work
-    assert_eq!(fast_compensator.config().readout_time, 0.001);
+    assert!((fast_compensator.config().readout_time - 0.001).abs() < 1e-12);
     assert_eq!(slow_compensator.config().image_height, 1080);
 }
 
@@ -132,11 +132,11 @@ fn test_rolling_shutter_extreme_imu() {
 /// Test compensation with different image sizes
 #[test]
 fn test_rolling_shutter_different_sizes() {
-    let sizes = [240, 480, 720, 1080];
+    let sizes: [u32; 4] = [240, 480, 720, 1080];
 
     for &height in &sizes {
-        let compensator = RollingShutterCompensator::new(0.02, height);
-        let features = vec![(100.0, height as f64 / 2.0)]; // Middle row
+        let compensator = RollingShutterCompensator::new(0.02, height as usize);
+        let features = vec![(100.0, f64::from(height) / 2.0)]; // Middle row
         let imu_data = generate_test_imu_data(5);
 
         let compensated = compensator.compensate_features(
@@ -150,7 +150,7 @@ fn test_rolling_shutter_different_sizes() {
         let (_, v) = compensated[0];
         assert!(v.is_finite());
         assert!(v >= 0.0);
-        assert!(v < height as f64);
+        assert!(v < f64::from(height));
     }
 }
 
@@ -268,7 +268,7 @@ fn test_compensation_identity_transform() {
 fn test_rolling_shutter_performance() {
     let compensator = RollingShutterCompensator::new(0.02, 480);
     let features = (0..100)
-        .map(|i| (i as f64 * 6.4, i as f64 * 4.8))
+        .map(|i| (f64::from(i) * 6.4, f64::from(i) * 4.8))
         .collect::<Vec<_>>();
     let imu_data = generate_test_imu_data(100);
 
@@ -287,11 +287,11 @@ fn test_rolling_shutter_performance() {
 }
 
 // Helper function for test IMU data
-fn generate_test_imu_data(num_samples: usize) -> Vec<ImuData> {
+fn generate_test_imu_data(num_samples: u32) -> Vec<ImuData> {
     (0..num_samples)
         .map(|i| ImuData {
-            timestamp: 1000000000 + (i as i64) * 5000000, // 5ms intervals
-            gyro: [0.1 * (i as f64 * 0.1).sin(), 0.05, 0.02], // Some rotation
+            timestamp: 1_000_000_000 + i64::from(i) * 5_000_000, // 5ms intervals
+            gyro: [0.1 * (f64::from(i) * 0.1).sin(), 0.05, 0.02], // Some rotation
             accel: [0.0, 0.0, 9.81],                      // Gravity only
         })
         .collect()

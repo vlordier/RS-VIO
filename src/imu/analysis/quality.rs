@@ -4,8 +4,7 @@
 //! and SNR with motor-state-aware noise floor estimation.
 
 use super::config::{
-    MotorState, SignalQuality, MOTOR_RUNNING_NOISE_MULTIPLIER,
-    MOTOR_TRANSITIONING_NOISE_MULTIPLIER,
+    MotorState, SignalQuality, MOTOR_RUNNING_NOISE_MULTIPLIER, MOTOR_TRANSITIONING_NOISE_MULTIPLIER,
 };
 use crate::types::Vector3;
 use std::collections::VecDeque;
@@ -93,8 +92,7 @@ mod tests {
             accel_history.push_back(Vector3::new(0.0, 0.0, -9.81));
         }
 
-        let quality =
-            compute_signal_quality(&accel_history, MotorState::Off, 0.0, 0.01);
+        let quality = compute_signal_quality(&accel_history, MotorState::Off, 0.0, 0.01);
 
         // Check RMS is close to gravity magnitude
         assert!(

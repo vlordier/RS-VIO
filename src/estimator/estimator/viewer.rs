@@ -1,8 +1,8 @@
 use super::state::Estimator;
-use crate::types::Matrix4x4;
-use crate::estimator::Frame;
-use image::GrayImage;
 use crate::debug_log;
+use crate::estimator::Frame;
+use crate::types::Matrix4x4;
+use image::GrayImage;
 use std::io::Write;
 
 impl Estimator {

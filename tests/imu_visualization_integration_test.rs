@@ -11,7 +11,7 @@ fn test_imu_signal_analyzer_basic_workflow() {
     // Generate synthetic IMU data (stationary + gravity)
     let imu_data: Vec<ImuData> = (0..100)
         .map(|i| ImuData {
-            timestamp: (i * 10_000_000) as i64, // 100 Hz
+            timestamp: i64::from(i) * 10_000_000, // 100 Hz
             accel: [0.01, -0.02, -9.81],        // Small noise + gravity
             gyro: [0.001, -0.001, 0.0005],      // Small drift
         })
@@ -73,7 +73,7 @@ fn test_imu_signal_quality_computation() {
     // High-quality synthetic data (low noise)
     let clean_data: Vec<ImuData> = (0..50)
         .map(|i| ImuData {
-            timestamp: (i * 10_000_000) as i64,
+            timestamp: i64::from(i) * 10_000_000,
             accel: [0.0, 0.0, -9.81], // Perfect stationary
             gyro: [0.0, 0.0, 0.0],
         })
@@ -110,7 +110,7 @@ fn test_bias_estimation_convergence() {
     let bias = [0.15, -0.08, 0.03]; // Known bias
     let data: Vec<ImuData> = (0..200)
         .map(|i| ImuData {
-            timestamp: (i * 5_000_000) as i64,
+            timestamp: i64::from(i) * 5_000_000,
             accel: [bias[0], bias[1], -9.81 + bias[2]],
             gyro: [0.01, -0.02, 0.005],
         })
@@ -152,10 +152,10 @@ fn test_harmonic_extraction() {
     // Add sinusoidal variation (simulated vibration)
     let data: Vec<ImuData> = (0..100)
         .map(|i| {
-            let t = i as f64 * 0.01; // Time in seconds
+            let t = f64::from(i) * 0.01; // Time in seconds
             let vibration = 0.05 * (2.0 * std::f64::consts::PI * 10.0 * t).sin(); // 10 Hz vibration
             ImuData {
-                timestamp: (i * 10_000_000) as i64,
+                timestamp: i64::from(i) * 10_000_000,
                 accel: [vibration, 0.0, -9.81],
                 gyro: [0.0, 0.0, 0.0],
             }
@@ -200,7 +200,7 @@ fn test_window_size_impact() {
 
     let data: Vec<ImuData> = (0..250)
         .map(|i| ImuData {
-            timestamp: (i * 5_000_000) as i64,
+            timestamp: i64::from(i) * 5_000_000,
             accel: [0.01, -0.01, -9.81],
             gyro: [0.001, 0.0, -0.001],
         })
@@ -243,7 +243,7 @@ fn test_noise_floor_adaptation() {
     // Just verify it doesn't crash and stays reasonable
     let data: Vec<ImuData> = (0..50)
         .map(|i| ImuData {
-            timestamp: (i * 10_000_000) as i64,
+            timestamp: i64::from(i) * 10_000_000,
             accel: [0.0, 0.0, -9.81],
             gyro: [0.0, 0.0, 0.0],
         })

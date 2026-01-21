@@ -99,7 +99,7 @@ impl CameraId {
 
     /// Left camera (camera 0).
     pub const LEFT: Self = Self(0);
-    
+
     /// Right camera (camera 1).
     pub const RIGHT: Self = Self(1);
 }
@@ -193,10 +193,10 @@ pub struct Confidence(f64);
 impl Confidence {
     /// Minimum confidence value (0.0).
     pub const MIN: Self = Self(0.0);
-    
+
     /// Maximum confidence value (1.0).
     pub const MAX: Self = Self(1.0);
-    
+
     /// Medium confidence (0.5).
     pub const MEDIUM: Self = Self(0.5);
 
@@ -268,7 +268,7 @@ mod tests {
         assert_eq!(frame.value(), 42);
         assert_eq!(frame.next().value(), 43);
         assert_eq!(frame.prev().unwrap().value(), 41);
-        
+
         let frame0 = FrameId::new(0);
         assert_eq!(frame0.prev(), None);
     }
@@ -290,7 +290,7 @@ mod tests {
     fn test_timestamp() {
         let ts1 = Timestamp::from_secs(1.5);
         let ts2 = Timestamp::from_secs(2.0);
-        
+
         assert_eq!(ts1.as_secs(), 1.5);
         assert_eq!(ts2.duration_since(&ts1), Duration::from_secs_f64(0.5));
     }
@@ -301,10 +301,10 @@ mod tests {
         assert!(c1.is_high());
         assert!(c1.is_medium());
         assert!(!c1.is_low());
-        
+
         let c2 = Confidence::new(1.5); // Clamped to 1.0
         assert_eq!(c2.value(), 1.0);
-        
+
         let c3 = Confidence::new(-0.5); // Clamped to 0.0
         assert_eq!(c3.value(), 0.0);
     }

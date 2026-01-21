@@ -1,7 +1,7 @@
 //! Trait definitions for marginalization strategies
 
-use nalgebra as na;
 use na::{DMatrix, DVector};
+use nalgebra as na;
 use std::collections::HashMap;
 use std::fmt::Debug;
 

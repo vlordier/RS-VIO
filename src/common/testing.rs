@@ -3,9 +3,7 @@
 //! This module provides reusable test fixtures, assertions, and helpers
 //! to reduce duplication across test modules and improve test maintainability.
 
-#![cfg(test)]
-
-use crate::types::{Matrix4x4, Float};
+use crate::types::{Float, Matrix4x4};
 use nalgebra as na;
 
 /// Creates a test pose matrix with a simple rotation and translation.
@@ -30,20 +28,20 @@ pub fn create_test_pose(
     yaw: Float,
 ) -> Matrix4x4 {
     let mut T = Matrix4x4::identity();
-    
+
     let q = na::UnitQuaternion::from_euler_angles(roll, pitch, yaw);
     let R = q.to_rotation_matrix().into_inner();
-    
+
     for i in 0..3 {
         for j in 0..3 {
             T[(i, j)] = R[(i, j)];
         }
     }
-    
+
     T[(0, 3)] = tx;
     T[(1, 3)] = ty;
     T[(2, 3)] = tz;
-    
+
     T
 }
 
@@ -57,9 +55,9 @@ pub fn identity_pose() -> Matrix4x4 {
 /// Uses a fixed seed for reproducibility.
 pub fn random_pose(seed: u64) -> Matrix4x4 {
     use rand::{rngs::StdRng, Rng, SeedableRng};
-    
+
     let mut rng = StdRng::seed_from_u64(seed);
-    
+
     create_test_pose(
         rng.gen_range(-10.0..10.0),
         rng.gen_range(-10.0..10.0),
@@ -117,7 +115,7 @@ macro_rules! assert_matrix_eq {
         let b_mat = &$b;
         assert_eq!(a_mat.nrows(), b_mat.nrows(), "Matrix row count mismatch");
         assert_eq!(a_mat.ncols(), b_mat.ncols(), "Matrix column count mismatch");
-        
+
         for i in 0..a_mat.nrows() {
             for j in 0..a_mat.ncols() {
                 assert!(
@@ -144,17 +142,8 @@ macro_rules! assert_matrix_eq {
 /// # Returns
 ///
 /// A 3x3 camera matrix
-pub fn create_test_camera_matrix(
-    fx: Float,
-    fy: Float,
-    cx: Float,
-    cy: Float,
-) -> na::Matrix3<Float> {
-    na::Matrix3::new(
-        fx, 0.0, cx,
-        0.0, fy, cy,
-        0.0, 0.0, 1.0,
-    )
+pub fn create_test_camera_matrix(fx: Float, fy: Float, cx: Float, cy: Float) -> na::Matrix3<Float> {
+    na::Matrix3::new(fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0)
 }
 
 /// Generates synthetic feature matches for testing.
@@ -177,24 +166,24 @@ pub fn generate_test_correspondences(
 ) -> (Vec<na::Vector2<Float>>, Vec<na::Vector2<Float>>) {
     use rand::{rngs::StdRng, Rng, SeedableRng};
     use rand_distr::{Distribution, Normal};
-    
+
     let mut rng = StdRng::seed_from_u64(seed);
     let normal = Normal::new(0.0, noise_stddev as f64).unwrap();
-    
+
     let mut left = Vec::with_capacity(count);
     let mut right = Vec::with_capacity(count);
-    
+
     for _ in 0..count {
         let x = rng.gen_range(0.0..640.0);
         let y = rng.gen_range(0.0..480.0);
-        
+
         let noise_x = normal.sample(&mut rng) as Float;
         let noise_y = normal.sample(&mut rng) as Float;
-        
+
         left.push(na::Vector2::new(x, y));
         right.push(na::Vector2::new(x + noise_x, y + noise_y));
     }
-    
+
     (left, right)
 }
 
@@ -205,12 +194,12 @@ mod tests {
     #[test]
     fn test_create_test_pose() {
         let T = create_test_pose(1.0, 2.0, 3.0, 0.1, 0.2, 0.3);
-        
+
         // Check translation
         assert_float_eq!(T[(0, 3)], 1.0, 1e-6);
         assert_float_eq!(T[(1, 3)], 2.0, 1e-6);
         assert_float_eq!(T[(2, 3)], 3.0, 1e-6);
-        
+
         // Check bottom row
         assert_float_eq!(T[(3, 0)], 0.0, 1e-6);
         assert_float_eq!(T[(3, 1)], 0.0, 1e-6);
@@ -246,7 +235,7 @@ mod tests {
         let (left, right) = generate_test_correspondences(10, 0.5, 42);
         assert_eq!(left.len(), 10);
         assert_eq!(right.len(), 10);
-        
+
         // Deterministic with same seed
         let (left2, _right2) = generate_test_correspondences(10, 0.5, 42);
         for i in 0..10 {

@@ -401,8 +401,9 @@ impl Estimator {
             // Compute IMU confidence metric from denoise and higher-order filters
             let denoise_weight = self.denoise_filter.weight_scale;
             let f0_confidence = self.higher_order_filter.f0_confidence;
-            let imu_confidence =
-                ((denoise_weight as crate::types::Float) * (f0_confidence as crate::types::Float)).clamp(0.0, 1.0);
+            let imu_confidence = ((denoise_weight as crate::types::Float)
+                * (f0_confidence as crate::types::Float))
+                .clamp(0.0, 1.0);
 
             // Estimate motion state from acceleration magnitude
             let accel_magnitude = if let Some(accel) = processed_accel.as_ref() {
@@ -429,7 +430,11 @@ impl Estimator {
             let current_accel = if let Some(accel) = processed_accel.as_ref() {
                 if !accel.is_empty() {
                     let last = accel[accel.len() - 1];
-                    [last[0] as crate::types::Float, last[1] as crate::types::Float, last[2] as crate::types::Float]
+                    [
+                        last[0] as crate::types::Float,
+                        last[1] as crate::types::Float,
+                        last[2] as crate::types::Float,
+                    ]
                 } else {
                     [0.0 as crate::types::Float, 0.0, 0.0]
                 }
@@ -441,13 +446,23 @@ impl Estimator {
             let left_coords: Vec<(crate::types::Float, crate::types::Float)> = current_frame
                 .left_features
                 .iter()
-                .map(|f| (f.pixel_coord[0] as crate::types::Float, f.pixel_coord[1] as crate::types::Float))
+                .map(|f| {
+                    (
+                        f.pixel_coord[0] as crate::types::Float,
+                        f.pixel_coord[1] as crate::types::Float,
+                    )
+                })
                 .collect();
 
             let right_coords: Vec<(crate::types::Float, crate::types::Float)> = current_frame
                 .right_features
                 .iter()
-                .map(|f| (f.pixel_coord[0] as crate::types::Float, f.pixel_coord[1] as crate::types::Float))
+                .map(|f| {
+                    (
+                        f.pixel_coord[0] as crate::types::Float,
+                        f.pixel_coord[1] as crate::types::Float,
+                    )
+                })
                 .collect();
 
             let feature_ids: Vec<usize> = current_frame
@@ -566,7 +581,11 @@ impl Estimator {
                     let t_rel = T_rel.fixed_view::<3, 1>(0, 3).into_owned();
                     let R_rel = T_rel.fixed_view::<3, 3>(0, 0).into_owned();
                     let rotmat = na::Rotation3::from_matrix_unchecked(R_rel);
-                    let euler: (crate::types::Float, crate::types::Float, crate::types::Float) = rotmat.euler_angles();
+                    let euler: (
+                        crate::types::Float,
+                        crate::types::Float,
+                        crate::types::Float,
+                    ) = rotmat.euler_angles();
                     let rotation_norm = (euler.0.abs() + euler.1.abs() + euler.2.abs()).abs();
 
                     // Keyframe if either visual or IMU criteria met

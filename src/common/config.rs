@@ -114,10 +114,22 @@ pub fn clamp_with_warning<T: PartialOrd + Copy + std::fmt::Display>(
     name: &str,
 ) -> T {
     if value < min {
-        log::warn!("{} value {} below minimum {}, clamping to {}", name, value, min, min);
+        log::warn!(
+            "{} value {} below minimum {}, clamping to {}",
+            name,
+            value,
+            min,
+            min
+        );
         min
     } else if value > max {
-        log::warn!("{} value {} above maximum {}, clamping to {}", name, value, max, max);
+        log::warn!(
+            "{} value {} above maximum {}, clamping to {}",
+            name,
+            value,
+            max,
+            max
+        );
         max
     } else {
         value
@@ -189,7 +201,9 @@ mod tests {
     impl Clampable for TestConfig {
         fn clamp(&mut self) {
             self.threshold = clamp_with_warning(self.threshold, 0.01, 1.0, "threshold");
-            self.count = clamp_with_warning(self.count, 1, 1000, "count").min(1000).max(1);
+            self.count = clamp_with_warning(self.count, 1, 1000, "count")
+                .min(1000)
+                .max(1);
         }
     }
 

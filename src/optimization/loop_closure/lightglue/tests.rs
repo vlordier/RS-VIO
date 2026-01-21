@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use super::super::{config::LightGlueConfig, downloader::LightGlueModelDownloader};
+    use super::super::config::LightGlueConfig;
 
     #[cfg(feature = "lightglue")]
     use super::super::feature_extraction::descriptors_to_f32;
@@ -59,7 +59,7 @@ mod tests {
                 );
                 return;
             }
-            let session = result.unwrap();
+            let _session = result.unwrap();
 
             println!("✅ Session created successfully");
         } else {
@@ -98,7 +98,14 @@ mod tests {
         let empty_kpts = Array2::<f32>::zeros((0, 2));
         let empty_desc = Array2::<f32>::zeros((0, 256));
 
-        let result = run_inference(&mut session, 0.5, &empty_kpts, &empty_kpts, &empty_desc, &empty_desc);
+        let result = run_inference(
+            &mut session,
+            0.5,
+            &empty_kpts,
+            &empty_kpts,
+            &empty_desc,
+            &empty_desc,
+        );
         assert!(result.is_ok(), "Should handle empty inputs gracefully");
 
         // Test 2: Single feature
@@ -149,7 +156,14 @@ mod tests {
             }
         }
 
-        let result = run_inference(&mut session, 0.5, &kpts, &kpts, &desc_similar, &desc_different);
+        let result = run_inference(
+            &mut session,
+            0.5,
+            &kpts,
+            &kpts,
+            &desc_similar,
+            &desc_different,
+        );
         assert!(result.is_ok(), "Should handle very different descriptors");
     }
 
@@ -228,11 +242,11 @@ mod tests {
             match download_result {
                 Ok(status) if status.success() => {
                     println!("✅ Model downloaded successfully");
-                }
+                },
                 _ => {
                     println!("⚠️  Model download failed - skipping validation test");
                     return;
-                }
+                },
             }
         }
 
@@ -376,7 +390,14 @@ mod tests {
             }
         }
 
-        let result = run_inference(&mut session, 0.1, &keypoints0, &keypoints1, &descriptors0, &descriptors1);
+        let result = run_inference(
+            &mut session,
+            0.1,
+            &keypoints0,
+            &keypoints1,
+            &descriptors0,
+            &descriptors1,
+        );
         assert!(result.is_ok(), "Should handle sequential frame scenario");
 
         // Scenario 2: Loop closure
@@ -523,8 +544,26 @@ mod tests {
         let keypoints_zero = Array2::<f32>::from_shape_vec(
             (10, 2),
             vec![
-                0.0, 0.0, -10.0, -5.0, 1000.0, 800.0, -100.0, 50.0, 640.0, -100.0, 320.0, 240.0,
-                f32::MAX, f32::MIN, 0.0, 100.0, 200.0, 0.0, -1.0, -1.0,
+                0.0,
+                0.0,
+                -10.0,
+                -5.0,
+                1000.0,
+                800.0,
+                -100.0,
+                50.0,
+                640.0,
+                -100.0,
+                320.0,
+                240.0,
+                f32::MAX,
+                f32::MIN,
+                0.0,
+                100.0,
+                200.0,
+                0.0,
+                -1.0,
+                -1.0,
             ],
         )
         .unwrap();

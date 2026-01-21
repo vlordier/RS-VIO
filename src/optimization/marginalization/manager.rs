@@ -1,15 +1,17 @@
 //! Main marginalization manager with trait-based composition
 
-use nalgebra as na;
 use na::{linalg::LU, linalg::SVD, DMatrix, DVector};
+use nalgebra as na;
 use std::collections::{HashMap, HashSet};
 
 use super::approximators::{
-    DiagonalApproximator, ExactHessianApproximator, GaussNewtonApproximator,
-    LevenbergMarquardtApproximator, IdentityApproximator, RegularizedPriorConstructor,
-    StandardGradientComputer, StandardPriorConstructor, ZeroGradientComputer,
+    DiagonalApproximator, ExactHessianApproximator, GaussNewtonApproximator, IdentityApproximator,
+    LevenbergMarquardtApproximator, RegularizedPriorConstructor, StandardGradientComputer,
+    StandardPriorConstructor, ZeroGradientComputer,
 };
-use super::config::{MarginalizationConfig, MarginalizationInfo, MarginalizationResult, ParamBlock, ParamId};
+use super::config::{
+    MarginalizationConfig, MarginalizationInfo, MarginalizationResult, ParamBlock, ParamId,
+};
 use super::prior::{FejCache, MarginalizationPrior, MarginalizationStats};
 use super::traits::{GradientComputer, HessianApproximator, PriorConstructor};
 

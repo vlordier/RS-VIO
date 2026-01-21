@@ -3,14 +3,14 @@
 //! Combines all analysis components into a single analyzer struct that processes
 //! IMU measurements and produces harmonic decompositions.
 
-use super::config::{
-    MotorState, SignalQuality, HarmonicDecomposition, DEFAULT_MOTOR_THRESHOLD,
-    DEFAULT_NOISE_FLOOR, MIN_SAMPLES_FOR_DETECTION,
-};
-use super::quality;
-use super::motor_detection;
 use super::bias;
+use super::config::{
+    HarmonicDecomposition, MotorState, SignalQuality, DEFAULT_MOTOR_THRESHOLD, DEFAULT_NOISE_FLOOR,
+    MIN_SAMPLES_FOR_DETECTION,
+};
 use super::harmonic;
+use super::motor_detection;
+use super::quality;
 use super::spectral;
 
 use crate::datasets::ImuData;
@@ -105,7 +105,8 @@ impl ImuSignalAnalyzer {
     pub fn decompose_harmonics(&mut self) -> HarmonicDecomposition {
         let quality = self._compute_signal_quality();
         let residuals = self._compute_residuals();
-        let (fundamental, residual_harmonics) = harmonic::extract_harmonics(&residuals, self.motor_state);
+        let (fundamental, residual_harmonics) =
+            harmonic::extract_harmonics(&residuals, self.motor_state);
 
         HarmonicDecomposition {
             gravity: self.gravity_estimate,
@@ -136,8 +137,10 @@ impl ImuSignalAnalyzer {
         );
 
         if matches!(self.motor_state, MotorState::Running) {
-            self.fundamental_freq_hz =
-                spectral::estimate_fundamental_frequency(&self.accel_history, &self.timestamp_history);
+            self.fundamental_freq_hz = spectral::estimate_fundamental_frequency(
+                &self.accel_history,
+                &self.timestamp_history,
+            );
         } else if self.motor_state == MotorState::Off {
             self.fundamental_freq_hz = 0.0;
         }

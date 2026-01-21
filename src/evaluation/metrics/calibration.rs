@@ -1,8 +1,9 @@
 /// Calibration-aware performance metrics
 ///
 /// Tracks how calibration quality affects tracking accuracy across distance/speed bins.
-
-use super::accuracy::{compute_residual_stats, compute_track_survival, TrackSurvivalStats, WeightedResidualStats};
+use super::accuracy::{
+    compute_residual_stats, compute_track_survival, TrackSurvivalStats, WeightedResidualStats,
+};
 use super::distance::DistanceBinnedImprovement;
 use super::speed::SpeedBinnedImprovement;
 

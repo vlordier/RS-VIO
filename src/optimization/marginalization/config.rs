@@ -1,7 +1,7 @@
 //! Configuration types for marginalization
 
-use nalgebra as na;
 use na::DVector;
+use nalgebra as na;
 use serde::{Deserialize, Serialize};
 
 /// Result of marginalization operation

@@ -1,7 +1,6 @@
 /// Speed/velocity-aware accuracy metrics
 ///
 /// Bin metrics by motion speed (static, slow, normal, fast, very fast).
-
 use super::types::BinMetrics;
 
 /// Accuracy metrics binned by speed

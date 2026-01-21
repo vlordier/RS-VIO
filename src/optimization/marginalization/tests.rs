@@ -7,8 +7,8 @@
     clippy::field_reassign_with_default
 )]
 mod tests {
-    use std::collections::HashMap;
     use nalgebra as na;
+    use std::collections::HashMap;
 
     use crate::optimization::marginalization::{
         approximators::*,
@@ -350,8 +350,11 @@ mod tests {
     fn test_exact_hessian_approximator() {
         let approximator = ExactHessianApproximator;
         let residuals = na::DVector::from_vec(vec![1.0, 2.0]);
-        let jacobians: Vec<na::DMatrix<f64>> =
-            vec![na::DMatrix::from_vec(2, 3, vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0])];
+        let jacobians: Vec<na::DMatrix<f64>> = vec![na::DMatrix::from_vec(
+            2,
+            3,
+            vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+        )];
         let hessian = approximator.compute_hessian(&residuals, 3, Some(&jacobians));
 
         assert_eq!(hessian.nrows(), 3);
@@ -390,8 +393,11 @@ mod tests {
     fn test_lm_approximator_with_jacobians() {
         let lm = LevenbergMarquardtApproximator::default();
         let residuals = na::DVector::from_vec(vec![1.0, 2.0]);
-        let jacobians: Vec<na::DMatrix<f64>> =
-            vec![na::DMatrix::from_vec(2, 3, vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0])];
+        let jacobians: Vec<na::DMatrix<f64>> = vec![na::DMatrix::from_vec(
+            2,
+            3,
+            vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+        )];
         let hessian = lm.compute_hessian(&residuals, 3, Some(&jacobians));
 
         assert_eq!(hessian.nrows(), 3);
@@ -407,10 +413,8 @@ mod tests {
 
     #[test]
     fn test_lm_approximator_adaptive_damping() {
-        let lm = LevenbergMarquardtApproximator::new(
-            Box::new(GaussNewtonApproximator::default()),
-            2.0,
-        );
+        let lm =
+            LevenbergMarquardtApproximator::new(Box::new(GaussNewtonApproximator::default()), 2.0);
         let residuals = na::DVector::from_vec(vec![1.0, 2.0, 3.0]);
         let hessian = lm.compute_hessian(&residuals, 4, None);
 
@@ -1170,8 +1174,9 @@ mod tests {
 
     #[test]
     fn test_hessian_approximator_clone() {
-        let approximator: Box<dyn crate::optimization::marginalization::traits::HessianApproximator> =
-            Box::new(GaussNewtonApproximator::new(1e-5));
+        let approximator: Box<
+            dyn crate::optimization::marginalization::traits::HessianApproximator,
+        > = Box::new(GaussNewtonApproximator::new(1e-5));
         let cloned = approximator.clone_box();
         assert_eq!(cloned.name(), "GaussNewton");
 
@@ -1268,7 +1273,8 @@ mod tests {
         let cond_val = cond.unwrap();
         assert!(cond_val > 0.0, "Condition number should be positive");
 
-        let ill_conditioned = na::DMatrix::from_diagonal(&na::DVector::from_vec(vec![1e6, 1.0, 1e-6]));
+        let ill_conditioned =
+            na::DMatrix::from_diagonal(&na::DVector::from_vec(vec![1e6, 1.0, 1e-6]));
         let cond_ill = manager.estimate_condition_number(&ill_conditioned);
         assert!(cond_ill.is_some());
         let cond_ill_val = cond_ill.unwrap();

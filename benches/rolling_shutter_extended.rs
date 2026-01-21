@@ -20,7 +20,7 @@ struct RSScenario {
 
 impl RSScenario {
     /// Create a scenario
-    fn new(motion_type: &'static str, angular_vel: f64, linear_vel: f64, distance: f64) -> Self {
+    const fn new(motion_type: &'static str, angular_vel: f64, linear_vel: f64, distance: f64) -> Self {
         Self {
             _frame_height: 480,
             readout_time_ms: 33.0, // Full frame readout for 30Hz camera
@@ -89,7 +89,7 @@ impl RSScenario {
     }
 
     /// Compute CPU time for rotation-only model (milliseconds per frame)
-    fn cpu_time_rotation_only(&self) -> f64 {
+    const fn cpu_time_rotation_only(&self) -> f64 {
         // Rotation-only RS:
         // - Compute per-row capture time: O(H) where H = frame height
         // - Integrate rotation to each row: O(H)
@@ -99,7 +99,7 @@ impl RSScenario {
     }
 
     /// Compute CPU time for full RS model (milliseconds per frame)
-    fn cpu_time_full_rs(&self) -> f64 {
+    const fn cpu_time_full_rs(&self) -> f64 {
         // Full RS correction:
         // - Per-row pose estimation: O(H) for time, O(H) for rotation + translation
         // - IMU integration for full 6-DOF: O(H)
@@ -117,12 +117,10 @@ impl RSScenario {
         // Use full RS if:
         // 1. Significant error reduction (> 0.3 px) OR
         // 2. Low computational cost ratio (< 2×)
-        if error_diff > 0.3 && cpu_ratio < 2.0 {
+        if error_diff > 0.5 || (error_diff > 0.3 && cpu_ratio < 2.0) {
             "full_rs"
-        } else if error_diff > 0.5 {
-            "full_rs" // Always use full RS for large error reduction
         } else {
-            "rotation_only" // Default to rotation-only (simpler, faster)
+            "rotation_only"
         }
     }
 }
@@ -138,12 +136,11 @@ fn bench_rs_rotation_only_accuracy(c: &mut Criterion) {
         let scenario = RSScenario::new("rotation_only", angular_vel, 0.0, 2.0);
 
         group.bench_with_input(
-            BenchmarkId::new("angular_vel", format!("{}°/s", angular_vel as i32)),
+            BenchmarkId::new("angular_vel", format!("{:.0}°/s", angular_vel)),
             &angular_vel,
             |b, _| {
                 b.iter(|| {
-                    let error = black_box(scenario.reprojection_error_rotation_only());
-                    error
+                    black_box(scenario.reprojection_error_rotation_only())
                 });
             },
         );
@@ -162,12 +159,11 @@ fn bench_rs_full_accuracy(c: &mut Criterion) {
         let scenario = RSScenario::new("translation_heavy", angular_vel, 0.5, 2.0);
 
         group.bench_with_input(
-            BenchmarkId::new("with_translation", format!("{}°/s", angular_vel as i32)),
+            BenchmarkId::new("with_translation", format!("{:.0}°/s", angular_vel)),
             &angular_vel,
             |b, _| {
                 b.iter(|| {
-                    let error = black_box(scenario.reprojection_error_full_rs());
-                    error
+                    black_box(scenario.reprojection_error_full_rs())
                 });
             },
         );
@@ -211,7 +207,7 @@ fn bench_rs_cpu_cost(c: &mut Criterion) {
     let mut group = c.benchmark_group("rs_cpu_cost");
 
     // Test at different frame heights (impacts per-row computations)
-    let frame_heights = vec![240, 480, 720]; // QVGA, VGA, 720p
+    let frame_heights: Vec<u32> = vec![240, 480, 720]; // QVGA, VGA, 720p
 
     for &height in &frame_heights {
         group.bench_with_input(
@@ -220,7 +216,7 @@ fn bench_rs_cpu_cost(c: &mut Criterion) {
             |b, _| {
                 b.iter(|| {
                     // Simulate rotation-only cost scaling with frame height
-                    let cost = (height as f64 / 480.0) * 0.5; // Linear scaling
+                    let cost = (f64::from(height) / 480.0) * 0.5; // Linear scaling
                     black_box(cost)
                 });
             },
@@ -232,7 +228,7 @@ fn bench_rs_cpu_cost(c: &mut Criterion) {
             |b, _| {
                 b.iter(|| {
                     // Full RS scales similarly but with larger constant
-                    let cost = (height as f64 / 480.0) * 1.5;
+                    let cost = (f64::from(height) / 480.0) * 1.5;
                     black_box(cost)
                 });
             },

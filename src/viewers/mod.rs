@@ -30,7 +30,6 @@
 pub mod screenshot_helper;
 pub mod viewer;
 
-
 pub use rerun::{create_viewer, RerunViewer};
 pub use screenshot_helper::{
     ScreenshotBatch, ScreenshotId, ScreenshotMetadata, ScreenshotResult, ViewScreenshotRequest,

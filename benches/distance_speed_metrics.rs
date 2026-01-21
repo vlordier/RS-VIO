@@ -8,7 +8,7 @@ use rand::Rng;
 /// - Distance (near: 0.5m, mid: 2m, far: 5m, very far: 15m)
 /// - Speed (static, slow, normal, fast, very fast)
 /// - Combined scenarios
-
+#[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
 fn generate_test_trajectory(
     duration: f64,
     num_frames: usize,
@@ -32,9 +32,8 @@ fn generate_test_trajectory(
                 Point3::new(r * (t * 2.0).cos(), r * (t * 2.0).sin(), 5.0)
             },
             "zigzag" => {
-                let amp = ((t / 2.0).floor() as i32 % 2 == 0)
-                    .then_some(1.0)
-                    .unwrap_or(-1.0);
+                #[allow(clippy::cast_possible_truncation)]
+                let amp = if ((t / 2.0).floor() as i32) % 2 == 0 { 1.0 } else { -1.0 };
                 Point3::new(t, amp, 5.0)
             },
             _ => Point3::new(t, 0.0, 5.0),
@@ -319,7 +318,9 @@ pub fn benchmark_subpixel_accuracy_by_distance(c: &mut Criterion) {
                     // Baseline subpixel accuracy: 0.8px
                     let base_subpixel = 0.8_f64;
                     let distance_degradation: f64 = 1.0 + (dist / 5.0_f64).powi(2);
-                    (base_subpixel * distance_degradation) as f32
+                    #[allow(clippy::cast_possible_truncation)]
+                    let val = (base_subpixel * distance_degradation) as f32;
+                    val
                 });
             },
         );
@@ -334,6 +335,7 @@ pub fn benchmark_subpixel_accuracy_by_distance(c: &mut Criterion) {
                 b.iter(|| {
                     let base_subpixel = 0.8_f64;
                     let distance_degradation: f64 = 1.0 + (dist / 5.0_f64).powi(2);
+                    #[allow(clippy::cast_possible_truncation)]
                     let baseline_accuracy = (base_subpixel * distance_degradation) as f32;
                     // 81% improvement in subpixel accuracy with fusion
                     baseline_accuracy * 0.19

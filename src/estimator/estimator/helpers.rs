@@ -1,8 +1,8 @@
 use super::state::Estimator;
-use crate::optimization::loop_closure::KeyframeDescriptor;
 use crate::estimator::Frame;
-use crate::types::{Float, Matrix4x4};
 use crate::fl;
+use crate::optimization::loop_closure::KeyframeDescriptor;
+use crate::types::{Float, Matrix4x4};
 
 impl Estimator {
     /// Create a keyframe descriptor for loop-closure detection

@@ -1,3 +1,9 @@
+pub mod accessors;
+pub mod calibration;
+pub mod constructor;
+pub mod helpers;
+pub mod imu_analysis;
+pub mod processor;
 /// Estimator module split into focused sub-modules for maintainability
 ///
 /// The large Estimator implementation has been split into logical modules:
@@ -10,16 +16,9 @@
 /// - calibration: Intrinsics and extrinsics calibration updates
 /// - helpers: Loop closure descriptor creation
 /// - tests: Unit tests
-
 pub mod state;
-pub mod constructor;
-pub mod processor;
-pub mod viewer;
-pub mod imu_analysis;
-pub mod accessors;
-pub mod calibration;
-pub mod helpers;
 pub mod tests;
+pub mod viewer;
 
 // Re-export the main Estimator type for convenience
 pub use state::Estimator;

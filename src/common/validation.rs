@@ -3,7 +3,7 @@
 //! Provides functions to validate poses, rotations, and other geometric
 //! quantities to ensure numerical stability and correctness.
 
-use crate::types::{Matrix4x4, Float};
+use crate::types::{Float, Matrix4x4};
 use nalgebra as na;
 
 /// Validates that a quaternion is properly normalized.
@@ -16,10 +16,7 @@ use nalgebra as na;
 /// # Returns
 ///
 /// Ok(()) if valid, Err with description if invalid.
-pub fn validate_quaternion(
-    q: &na::UnitQuaternion<Float>,
-    tolerance: Float,
-) -> Result<(), String> {
+pub fn validate_quaternion(q: &na::UnitQuaternion<Float>, tolerance: Float) -> Result<(), String> {
     let norm = q.quaternion().norm();
     if (norm - 1.0).abs() > tolerance {
         return Err(format!(
@@ -42,14 +39,11 @@ pub fn validate_quaternion(
 /// # Returns
 ///
 /// Ok(()) if valid, Err with description if invalid.
-pub fn validate_rotation_matrix(
-    R: &na::Matrix3<Float>,
-    tolerance: Float,
-) -> Result<(), String> {
+pub fn validate_rotation_matrix(R: &na::Matrix3<Float>, tolerance: Float) -> Result<(), String> {
     // Check orthonormality: R^T * R should be identity
     let rtx_r = R.transpose() * R;
     let identity = na::Matrix3::<Float>::identity();
-    
+
     for i in 0..3 {
         for j in 0..3 {
             let expected = identity[(i, j)];
@@ -93,7 +87,7 @@ pub fn validate_pose(T: &Matrix4x4, tolerance: Float) -> Result<(), String> {
     // Extract rotation part
     let R = T.fixed_view::<3, 3>(0, 0);
     let R_matrix = R.into_owned();
-    
+
     // Validate rotation
     validate_rotation_matrix(&R_matrix, tolerance)?;
 
@@ -102,11 +96,12 @@ pub fn validate_pose(T: &Matrix4x4, tolerance: Float) -> Result<(), String> {
         if T[(3, i)].abs() > tolerance {
             return Err(format!(
                 "Pose matrix bottom row invalid: T[3,{}] = {}, expected 0",
-                i, T[(3, i)]
+                i,
+                T[(3, i)]
             ));
         }
     }
-    
+
     if (T[(3, 3)] - 1.0).abs() > tolerance {
         return Err(format!(
             "Pose matrix bottom-right element = {}, expected 1.0",
@@ -174,7 +169,12 @@ where
             if (cov[(i, j)] - cov[(j, i)]).abs() > tolerance {
                 return Err(format!(
                     "Covariance matrix not symmetric: cov[{},{}] = {}, cov[{},{}] = {}",
-                    i, j, cov[(i, j)], j, i, cov[(j, i)]
+                    i,
+                    j,
+                    cov[(i, j)],
+                    j,
+                    i,
+                    cov[(j, i)]
                 ));
             }
         }
@@ -210,17 +210,17 @@ mod tests {
         let mut T = Matrix4x4::identity();
         let q = na::UnitQuaternion::from_euler_angles(0.1, 0.2, 0.3);
         let R = q.to_rotation_matrix().into_inner();
-        
+
         for i in 0..3 {
             for j in 0..3 {
                 T[(i, j)] = R[(i, j)];
             }
         }
-        
+
         T[(0, 3)] = 1.0;
         T[(1, 3)] = 2.0;
         T[(2, 3)] = 3.0;
-        
+
         assert!(validate_pose(&T, 1e-6).is_ok());
     }
 
@@ -228,7 +228,7 @@ mod tests {
     fn test_validate_matrix() {
         let m = na::Matrix3::<Float>::identity();
         assert!(validate_matrix(&m, "test").is_ok());
-        
+
         let mut m_nan = na::Matrix3::<Float>::identity();
         m_nan[(0, 0)] = Float::NAN;
         assert!(validate_matrix(&m_nan, "test").is_err());
@@ -238,7 +238,7 @@ mod tests {
     fn test_validate_covariance() {
         let cov = na::Matrix3::<Float>::identity();
         assert!(validate_covariance(&cov, 1e-6).is_ok());
-        
+
         let mut asymmetric = na::Matrix3::<Float>::identity();
         asymmetric[(0, 1)] = 1.0;
         asymmetric[(1, 0)] = 2.0;

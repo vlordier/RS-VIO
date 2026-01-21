@@ -5,9 +5,9 @@
 
 #[cfg(test)]
 mod tests {
+    use crate::datasets::ImuData;
     use crate::imu::analysis::analyzer::ImuSignalAnalyzer;
     use crate::imu::analysis::config::MotorState;
-    use crate::datasets::ImuData;
 
     #[test]
     fn test_motor_state_hysteresis() {

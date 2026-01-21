@@ -1,7 +1,7 @@
 //! Prior and cache types for marginalization
 
-use nalgebra as na;
 use na::DVector;
+use nalgebra as na;
 use std::collections::HashMap;
 
 use super::config::ParamId;

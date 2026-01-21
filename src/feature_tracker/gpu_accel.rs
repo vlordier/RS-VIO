@@ -234,6 +234,9 @@ pub struct GpuAccelerator {
 impl GpuAccelerator {
     /// Create new accelerator (try GPU, fall back to CPU)
     pub fn new(config: GpuConfig) -> Self {
+        #[cfg(feature = "gpu")]
+        let mut device_info = None;
+        #[cfg(not(feature = "gpu"))]
         let device_info = None;
         let mut context = None;
 

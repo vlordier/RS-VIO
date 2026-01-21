@@ -121,7 +121,11 @@ proptest! {
         prop_assert!(outputs.confidence >= 0.0);
         prop_assert!(outputs.confidence <= 1.0);
         prop_assert!(outputs.filter_update_interval > 0);
-        prop_assert!(outputs.filter_update_interval <= (imu_rate * 0.2) as usize);
+        if let Ok(iv) = u32::try_from(outputs.filter_update_interval) {
+            prop_assert!(f64::from(iv) <= imu_rate * 0.2);
+        } else {
+            prop_assert!(false, "filter_update_interval overflowed u32");
+        }
     }
 
     #[test]

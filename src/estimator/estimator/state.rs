@@ -1,17 +1,16 @@
 use crate::calibration::online_intrinsics::OnlineIntrinsicsRefiner;
+use crate::datasets::config::Config;
 use crate::datasets::CameraModelType;
-use crate::estimator::{SlidingWindow, FrameWorkspace};
+use crate::estimator::{FrameWorkspace, SlidingWindow};
 use crate::feature_tracker::StereoPatchTracker;
 use crate::imu::{
-    ExtrinsicCalibrator, ImuAidedKeyframeSelector, ImuBiasEstimator,
-    ImuMotionPredictor, ImuPreintegrator, PreintegratedImu, VelocityEstimator,
-    ImuDenoiseFilter, HigherOrderFilter,
+    ExtrinsicCalibrator, HigherOrderFilter, ImuAidedKeyframeSelector, ImuBiasEstimator,
+    ImuDenoiseFilter, ImuMotionPredictor, ImuPreintegrator, PreintegratedImu, VelocityEstimator,
 };
 use crate::optimization::loop_closure::LoopClosureDetector;
 use crate::types::{Float, Matrix4x4};
 use crate::viewers::Viewer;
 use crate::vision::StereoSuperResolver;
-use crate::datasets::config::Config;
 use nalgebra as na;
 use std::time::Duration;
 

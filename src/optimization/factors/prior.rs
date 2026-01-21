@@ -228,7 +228,7 @@ impl Factor for JointPriorFactor {
         // Compute residual: r = sqrt(Omega) * (x_concat - x0) * prior_weight
         // For numerical stability, we use Cholesky decomposition if available
         let delta = &x_concat - &self.linearization_point;
-        
+
         // Try Cholesky decomposition for sqrt(Omega)
         let residuals = if let Some(chol) = self.information.clone().cholesky() {
             chol.l() * delta * self.prior_weight

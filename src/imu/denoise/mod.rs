@@ -1,7 +1,6 @@
 /// Real-time IMU denoising filter for VIO systems
 /// Handles camera frame rates (30-60 fps) vs IMU sampling (200 Hz)
 /// Incorporates notch filtering for identified resonances (0.06 Hz, 1.46 Hz)
-
 mod biquad;
 mod config;
 mod filter;

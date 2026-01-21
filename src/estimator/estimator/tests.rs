@@ -75,7 +75,9 @@ optimization:
             1.0, 0.0, 0.0, 0.1, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
         ]);
 
-        let frame = crate::estimator::Frame::from_stereo_images(1000000000, 0, left_cam, right_cam, t_b_cl, t_b_cr);
+        let frame = crate::estimator::Frame::from_stereo_images(
+            1000000000, 0, left_cam, right_cam, t_b_cl, t_b_cr,
+        );
 
         assert_eq!(frame.frame_id, 0);
         assert_eq!(frame.timestamp_ns, 1000000000);

@@ -9,7 +9,6 @@
 /// - IMU-aided feature tracking
 /// - Sub-pixel disparity refinement
 /// - Multi-frame bundle adjustment
-
 #[cfg(test)]
 mod vio_integration_tests {
     use nalgebra::{Matrix3, Vector3};
@@ -132,11 +131,11 @@ mod vio_integration_tests {
         assert!(improvement > 30.0);
 
         // Convergence iterations scale with search area
-        let iterations_without = (search_area_without / 10.0) as i32;
-        let iterations_with = (search_area_with / 10.0) as i32;
+        let iterations_without = search_area_without / 10.0;
+        let iterations_with = search_area_with / 10.0;
 
         // Should need 3-5x fewer iterations
-        assert!(iterations_with < iterations_without / 3);
+        assert!(iterations_with < iterations_without / 3.0);
     }
 
     #[test]
@@ -159,7 +158,7 @@ mod vio_integration_tests {
         // At 90°/s rotation, per-row rotation = 90°/s * readout_time
         let rotation_rate_deg_per_s = 90.0;
         let rotation_rate_rad_per_s = rotation_rate_deg_per_s * std::f64::consts::PI / 180.0;
-        let per_row_rotation_rad = rotation_rate_rad_per_s * t_bottom / frame_height_px as f64;
+        let per_row_rotation_rad = rotation_rate_rad_per_s * t_bottom / f64::from(frame_height_px);
 
         // Per-row rotation should be small but measurable
         assert!(per_row_rotation_rad > 1e-6);
@@ -187,7 +186,7 @@ mod vio_integration_tests {
     #[test]
     fn test_feature_track_survival_with_imu() {
         // Without IMU-aiding: features drop more frequently
-        let frames_without_imu = vec![
+        let frames_without_imu = [
             (0, true),  // Frame 0: tracking
             (1, true),  // Frame 1: tracking
             (2, true),  // Frame 2: tracking
@@ -195,7 +194,7 @@ mod vio_integration_tests {
         ];
 
         // With IMU-aiding: same features last much longer
-        let frames_with_imu = vec![
+        let frames_with_imu = [
             (0, true),
             (1, true),
             (2, true),
@@ -214,7 +213,7 @@ mod vio_integration_tests {
         let survival_with = frames_with_imu.iter().filter(|(_, alive)| *alive).count();
 
         // IMU-aided should have >2× longer survival (8 frames vs 4 frames)
-        assert!(survival_with as f64 >= survival_without as f64 * 2.0);
+        assert!(survival_with >= survival_without * 2);
     }
 
     #[test]
@@ -287,8 +286,8 @@ mod vio_integration_tests {
         let _subpixel_refinement_accuracy = 0.1; // px
 
         // 3. Stereo matching with IMU-aided initialization
-        let stereo_match_success_rate = 0.92; // 92% of features matched
-        let matched_features = (num_features as f64 * stereo_match_success_rate) as i32;
+        let stereo_match_success_rate = 92; // percent
+        let matched_features = (num_features * stereo_match_success_rate + 50) / 100;
         assert!(matched_features > 100);
 
         // 4. IMU preintegration and prediction
@@ -304,8 +303,8 @@ mod vio_integration_tests {
         assert!(ba_reprojection_error < 1.0);
 
         // 7. Outlier rejection
-        let outlier_rate = 0.05; // 5% outliers rejected
-        let inliers = (matched_features as f64 * (1.0 - outlier_rate)) as i32;
+        let outlier_percent = 5; // 5% outliers rejected
+        let inliers = (matched_features * (100 - outlier_percent) + 50) / 100;
         assert!(inliers > 80);
 
         // Final state: should have good geometric consistency
@@ -321,17 +320,18 @@ mod vio_integration_tests {
         let num_frames = 5;
         let mut poses = vec![];
 
-        for frame in 0..num_frames {
-            let t = frame as f64 * 0.033; // 30Hz
+        let mut t = 0.0; // seconds
+        for _ in 0..num_frames {
 
             // Simulated drone motion: circular path
-            let rotation_rad = t * 0.5; // 0.5 rad/s
-            let radius_m = 1.0;
+            let rotation_rad: f64 = t * 0.5; // 0.5 rad/s
+            let radius_m: f64 = 1.0;
             let x = radius_m * rotation_rad.cos();
             let y = radius_m * rotation_rad.sin();
             let z = -0.5; // Slowly descending
 
             poses.push((x, y, z));
+            t += 0.033; // 30Hz step
         }
 
         // Check trajectory is smooth
@@ -339,10 +339,10 @@ mod vio_integration_tests {
             let (x_prev, y_prev, z_prev) = poses[i - 1];
             let (x_curr, y_curr, z_curr) = poses[i];
 
-            let dist = ((x_curr as f64 - x_prev as f64).powi(2)
-                + (y_curr as f64 - y_prev as f64).powi(2)
-                + (z_curr as f64 - z_prev as f64).powi(2))
-            .sqrt();
+            let dx = x_curr - x_prev;
+            let dy = y_curr - y_prev;
+            let dz = z_curr - z_prev;
+            let dist: f64 = (dx * dx + dy * dy + dz * dz).sqrt();
 
             // Distance between frames should be reasonable (~0.05m at 1m/s)
             assert!(dist < 0.1);

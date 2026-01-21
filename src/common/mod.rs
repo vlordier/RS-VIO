@@ -9,10 +9,10 @@ pub mod error;
 pub mod macros;
 pub mod math;
 pub mod perf;
-pub mod types;
-pub mod validation;
 #[cfg(test)]
 pub mod testing;
+pub mod types;
+pub mod validation;
 
 pub use config::{Clampable, ConfigBuilder, Mergeable, Validatable};
 pub use error::{ErrorCollector, OptionExt, ResultExt};

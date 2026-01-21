@@ -82,9 +82,9 @@ mod tests;
 
 // Re-export public types
 pub use approximators::{
-    DiagonalApproximator, ExactHessianApproximator, GaussNewtonApproximator,
-    IdentityApproximator, LevenbergMarquardtApproximator, RegularizedPriorConstructor,
-    StandardGradientComputer, StandardPriorConstructor, ZeroGradientComputer,
+    DiagonalApproximator, ExactHessianApproximator, GaussNewtonApproximator, IdentityApproximator,
+    LevenbergMarquardtApproximator, RegularizedPriorConstructor, StandardGradientComputer,
+    StandardPriorConstructor, ZeroGradientComputer,
 };
 pub use config::{
     MarginalizationConfig, MarginalizationInfo, MarginalizationResult, ParamBlock, ParamId,

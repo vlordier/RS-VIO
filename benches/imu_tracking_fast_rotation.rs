@@ -15,7 +15,7 @@ fn fast_rotation_scenario(angular_velocity: f64) -> (Vec<f64>, Vec<f64>, Vec<f64
 
     // Generate rotating pose trajectory
     for frame in 0..3 {
-        let _t = frame as f64 * dt;
+        let _t = f64::from(frame) * dt;
 
         // Simulate ×3 rotation angle at this time
         let _angle = angular_velocity * _t;
@@ -23,14 +23,14 @@ fn fast_rotation_scenario(angular_velocity: f64) -> (Vec<f64>, Vec<f64>, Vec<f64
         // BASELINE (Plain KLT): Large search region, slow convergence
         // Without prior, must search ±20px in each direction (400px² search area)
         let baseline_iterations = 15; // Needs more iterations
-        let baseline_time = baseline_iterations as f64 * 0.5; // ~7.5ms per frame
+        let baseline_time = f64::from(baseline_iterations) * 0.5; // ~7.5ms per frame
         baseline_times.push(baseline_time);
 
         // IMU-AIDED (Initialized KLT): Narrow search region, fast convergence
         // With prediction, search only ±3px around predicted position (36px² search area)
         // ~11× smaller search area → fewer iterations needed
         let imu_iterations = 4; // Only 4 iterations needed
-        let imu_time = imu_iterations as f64 * 0.5; // ~2ms per frame
+        let imu_time = f64::from(imu_iterations) * 0.5; // ~2ms per frame
         imu_aided_times.push(imu_time);
 
         // IMU prediction accuracy at this angular velocity
@@ -47,9 +47,12 @@ fn compute_tracking_metrics(
     imu_times: &[f64],
     pred_errors: &[f64],
 ) -> (f64, f64, f64, f64) {
-    let baseline_total = baseline_times.iter().sum::<f64>() / baseline_times.len() as f64;
-    let imu_total = imu_times.iter().sum::<f64>() / imu_times.len() as f64;
-    let pred_error_avg = pred_errors.iter().sum::<f64>() / pred_errors.len() as f64;
+    let denom_b = u32::try_from(baseline_times.len()).unwrap_or(1);
+    let denom_i = u32::try_from(imu_times.len()).unwrap_or(1);
+    let denom_p = u32::try_from(pred_errors.len()).unwrap_or(1);
+    let baseline_total = baseline_times.iter().sum::<f64>() / f64::from(denom_b);
+    let imu_total = imu_times.iter().sum::<f64>() / f64::from(denom_i);
+    let pred_error_avg = pred_errors.iter().sum::<f64>() / f64::from(denom_p);
     let speedup = baseline_total / imu_total;
 
     (baseline_total, imu_total, pred_error_avg, speedup)
@@ -166,7 +169,7 @@ fn bench_tracking_survival_rates(c: &mut Criterion) {
             }
 
             // IMU-aided should have better survival
-            assert!(imu_tracks >= baseline_tracks + 1);
+            assert!(imu_tracks > baseline_tracks);
             (baseline_tracks, imu_tracks)
         });
     });

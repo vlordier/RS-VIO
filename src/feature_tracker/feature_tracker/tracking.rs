@@ -1,5 +1,4 @@
 /// Core optical flow tracking algorithms
-
 use image::GrayImage;
 use imageproc::corners::Corner;
 use nalgebra as na;

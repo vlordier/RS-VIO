@@ -1,10 +1,10 @@
 //! Stub for Rerun viewer - used when rerun-viewer feature is disabled
 //! Maintains API compatibility while eliminating ~30% IR bloat
 
+use super::Viewer;
 use crate::datasets::config::VisualizationConfig;
 use crate::types::Matrix4x4;
 use crate::Result;
-use super::Viewer;
 
 pub struct RerunViewer;
 
@@ -33,7 +33,15 @@ impl Viewer for RerunViewer {
     fn log_image_raw(&mut self, _: &[u8], _: u32, _: u32, _: &str) {}
     fn log_image_equalized(&mut self, _: &[u8], _: u32, _: u32, _: &str) {}
     fn log_image_with_features(&mut self, _: &[u8], _: u32, _: u32, _: &[[f32; 2]], _: &str) {}
-    fn log_image_with_features_colored(&mut self, _: &[u8], _: u32, _: u32, _: &[(usize, [f32; 2])], _: &str) {}
+    fn log_image_with_features_colored(
+        &mut self,
+        _: &[u8],
+        _: u32,
+        _: u32,
+        _: &[(usize, [f32; 2])],
+        _: &str,
+    ) {
+    }
     fn log_points(&mut self, _: &[[f32; 3]], _: &str) {}
     fn log_points_colored(&mut self, _: &[(usize, [f32; 3])], _: &str) {}
     fn set_frame(&mut self, _: i64) {}
@@ -44,4 +52,3 @@ impl Viewer for RerunViewer {
 pub fn create_viewer(config: &VisualizationConfig) -> Result<Box<dyn Viewer>> {
     Ok(Box::new(RerunViewer::new_with_config(config)))
 }
-

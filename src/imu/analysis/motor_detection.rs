@@ -114,6 +114,10 @@ mod tests {
 
         let rms = compute_vibration_rms(&accel_history);
         // RMS of varying signal should be non-zero
-        assert!(rms > 0.0, "RMS should be non-zero for varying signal: {}", rms);
+        assert!(
+            rms > 0.0,
+            "RMS should be non-zero for varying signal: {}",
+            rms
+        );
     }
 }

@@ -181,11 +181,7 @@ impl ErrorCollector {
         if self.errors.is_empty() {
             Ok(ok_value)
         } else {
-            Err(format!(
-                "{}: {}",
-                self.context,
-                self.errors.join("; ")
-            ))
+            Err(format!("{}: {}", self.context, self.errors.join("; ")))
         }
     }
 
@@ -203,19 +199,16 @@ mod tests {
     fn test_result_with_context() {
         let result: Result<i32, &str> = Err("original error");
         let with_ctx = result.with_context("additional context");
-        
+
         assert!(with_ctx.is_err());
-        assert_eq!(
-            with_ctx.unwrap_err(),
-            "additional context: original error"
-        );
+        assert_eq!(with_ctx.unwrap_err(), "additional context: original error");
     }
 
     #[test]
     fn test_result_with_context_lazy() {
         let result: Result<i32, &str> = Err("error");
         let with_ctx = result.with_context_lazy(|| format!("context {}", 42));
-        
+
         assert_eq!(with_ctx.unwrap_err(), "context 42: error");
     }
 
@@ -223,7 +216,7 @@ mod tests {
     fn test_option_ok_or_context() {
         let opt: Option<i32> = None;
         let result = opt.ok_or_context("value missing");
-        
+
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "value missing");
     }
@@ -232,7 +225,7 @@ mod tests {
     fn test_option_ok_or_context_lazy() {
         let opt: Option<i32> = None;
         let result = opt.ok_or_context_lazy(|| format!("missing {}", "value"));
-        
+
         assert_eq!(result.unwrap_err(), "missing value");
     }
 
@@ -264,10 +257,10 @@ mod tests {
         collector.push_if(true, "Error 1");
         collector.push_if(false, "Should not appear");
         collector.push("Error 2");
-        
+
         assert!(collector.has_errors());
         assert_eq!(collector.errors().len(), 2);
-        
+
         let result = collector.into_result(());
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "Validation: Error 1; Error 2");

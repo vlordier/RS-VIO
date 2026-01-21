@@ -1,5 +1,5 @@
-mod window;
 mod optimization;
+mod window;
 
 #[cfg(test)]
 mod tests;

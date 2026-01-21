@@ -3,9 +3,7 @@
 //! Extracts harmonic components (f0, 2f0, 3f0, ...) from residual IMU signals
 //! with adaptive extraction coefficients based on motor state.
 
-use super::config::{
-    MotorState, HARMONIC_COEFF_RUNNING, HARMONIC_COEFF_TRANSITIONING,
-};
+use super::config::{MotorState, HARMONIC_COEFF_RUNNING, HARMONIC_COEFF_TRANSITIONING};
 use crate::types::Vector3;
 
 /// Extract harmonics based on motor state
@@ -75,8 +73,7 @@ mod tests {
             Vector3::new(1.1, 0.4, 0.3),
         ];
 
-        let (fundamental, residual_harmonics) =
-            extract_harmonics(&residuals, MotorState::Running);
+        let (fundamental, residual_harmonics) = extract_harmonics(&residuals, MotorState::Running);
 
         // Should extract fundamental component
         assert!(fundamental.norm() > 0.0);
@@ -90,10 +87,7 @@ mod tests {
 
     #[test]
     fn test_compute_mean() {
-        let samples = vec![
-            Vector3::new(1.0, 2.0, 3.0),
-            Vector3::new(3.0, 4.0, 5.0),
-        ];
+        let samples = vec![Vector3::new(1.0, 2.0, 3.0), Vector3::new(3.0, 4.0, 5.0)];
 
         let mean = compute_mean(&samples);
         assert!((mean.x - 2.0).abs() < 1e-6);

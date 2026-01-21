@@ -1,5 +1,4 @@
 /// Feature tracker module - split from monolithic file for better organization
-
 mod mono_tracker;
 mod stereo_tracker;
 mod tracking;

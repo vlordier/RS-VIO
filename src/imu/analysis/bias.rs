@@ -3,7 +3,10 @@
 //! Estimates accelerometer and gyroscope bias with adaptive filtering
 //! based on motor state. Also estimates gravity direction from accelerometer.
 
-use super::config::{MotorState, MIN_GRAVITY_FOR_ESTIMATION, GRAVITY_MAG, BIAS_FILTER_COEFF_MOTORS_RUNNING, BIAS_UPDATE_RATE_MOTORS_RUNNING};
+use super::config::{
+    MotorState, BIAS_FILTER_COEFF_MOTORS_RUNNING, BIAS_UPDATE_RATE_MOTORS_RUNNING, GRAVITY_MAG,
+    MIN_GRAVITY_FOR_ESTIMATION,
+};
 use crate::types::Vector3;
 
 /// Update gravity direction estimate from accelerometer mean
@@ -123,7 +126,12 @@ mod tests {
 
         // Slower update when motors running
         let initial_bias = accel_bias;
-        update_accel_bias_estimate(&mut accel_bias, &bias_candidate, &gravity, MotorState::Running);
+        update_accel_bias_estimate(
+            &mut accel_bias,
+            &bias_candidate,
+            &gravity,
+            MotorState::Running,
+        );
         let change = (accel_bias - initial_bias).norm();
         assert!(change < (bias_candidate - initial_bias).norm());
     }

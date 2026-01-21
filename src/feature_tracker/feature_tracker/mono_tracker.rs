@@ -1,5 +1,4 @@
 /// Monocular patch tracker implementation
-
 use image::GrayImage;
 use nalgebra as na;
 use std::collections::HashMap;

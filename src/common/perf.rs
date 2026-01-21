@@ -163,7 +163,7 @@ pub mod collection_ops {
     {
         let mut true_items = Vec::with_capacity(items.len() / 2);
         let mut false_items = Vec::with_capacity(items.len() / 2);
-        
+
         for item in items {
             if predicate(&item) {
                 true_items.push(item);
@@ -171,7 +171,7 @@ pub mod collection_ops {
                 false_items.push(item);
             }
         }
-        
+
         true_items.shrink_to_fit();
         false_items.shrink_to_fit();
         (true_items, false_items)
@@ -182,7 +182,7 @@ pub mod collection_ops {
 pub mod hints {
     // Note: These optimizations are disabled because the codebase uses #![deny(unsafe_code)].
     // They would require unsafe blocks for std::hint::unreachable_unchecked().
-    
+
     /// Branch prediction hint (currently no-op).
     #[inline(always)]
     pub fn likely(b: bool) -> bool {
@@ -198,8 +198,8 @@ pub mod hints {
 
 #[cfg(test)]
 mod tests {
-    use super::vec_ops;
     use super::collection_ops;
+    use super::vec_ops;
 
     #[test]
     fn test_dot_product() {

@@ -21,12 +21,10 @@ pub fn run_inference(
     let desc0_shape = vec![descriptors0.nrows() as i64, descriptors0.ncols() as i64];
     let desc1_shape = vec![descriptors1.nrows() as i64, descriptors1.ncols() as i64];
 
-    let kpts0 =
-        Value::from_array((kpts0_shape, keypoints0.clone().into_raw_vec_and_offset().0))
-            .map_err(|e| format!("Failed to create keypoints0 tensor: {}", e))?;
-    let kpts1 =
-        Value::from_array((kpts1_shape, keypoints1.clone().into_raw_vec_and_offset().0))
-            .map_err(|e| format!("Failed to create keypoints1 tensor: {}", e))?;
+    let kpts0 = Value::from_array((kpts0_shape, keypoints0.clone().into_raw_vec_and_offset().0))
+        .map_err(|e| format!("Failed to create keypoints0 tensor: {}", e))?;
+    let kpts1 = Value::from_array((kpts1_shape, keypoints1.clone().into_raw_vec_and_offset().0))
+        .map_err(|e| format!("Failed to create keypoints1 tensor: {}", e))?;
     let desc0 = Value::from_array((
         desc0_shape,
         descriptors0.clone().into_raw_vec_and_offset().0,

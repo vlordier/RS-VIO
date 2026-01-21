@@ -61,11 +61,8 @@ impl BinMetrics {
         let sum: f32 = samples.iter().sum();
         self.mean = sum / samples.len() as f32;
 
-        let variance: f32 = samples
-            .iter()
-            .map(|v| (v - self.mean).powi(2))
-            .sum::<f32>()
-            / samples.len() as f32;
+        let variance: f32 =
+            samples.iter().map(|v| (v - self.mean).powi(2)).sum::<f32>() / samples.len() as f32;
         self.std = variance.sqrt();
 
         self.min = samples

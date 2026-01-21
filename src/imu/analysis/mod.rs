@@ -29,15 +29,15 @@
 //! 4. **Harmonic Decomposition** (f0 extraction + higher harmonics when motors running)
 //! 5. **Quality Assessment** (SNR, vibration with motor-aware thresholds)
 
+pub mod analyzer;
+pub mod bias;
 pub mod config;
-pub mod quality;
-pub mod spectral;
 pub mod harmonic;
 pub mod motor_detection;
-pub mod bias;
-pub mod analyzer;
+pub mod quality;
+pub mod spectral;
 mod tests;
 
 // Re-export public API
-pub use config::{MotorState, SignalQuality, HarmonicDecomposition};
 pub use analyzer::ImuSignalAnalyzer;
+pub use config::{HarmonicDecomposition, MotorState, SignalQuality};

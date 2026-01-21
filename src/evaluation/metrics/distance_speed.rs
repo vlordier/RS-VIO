@@ -1,7 +1,6 @@
 /// Distance-speed combined analysis
 ///
 /// Analyzer for measuring accuracy effects of distance and speed independently and together.
-
 use super::distance::DistanceBinnedMetrics;
 use super::speed::SpeedBinnedMetrics;
 use super::trajectory::DistanceSpeedAnalysis;

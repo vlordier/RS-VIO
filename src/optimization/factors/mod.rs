@@ -6,20 +6,20 @@
 //! - Loop closure factors for global consistency
 //! - Prior factors for marginalization
 
-mod visual;
 mod imu;
 mod loop_closure;
 mod prior;
 mod utils;
+mod visual;
 
 #[cfg(test)]
 mod tests;
 
-pub use visual::{
-    BundleAdjustmentFactor, BundleAdjustmentFactorTranslationOnly, PinholeProjectionFactor,
-    PnPFactor,
-};
 pub use imu::ImuPriorFactor;
 pub use loop_closure::LoopClosurePoseFactor;
 pub use prior::{JointPriorFactor, PriorFactor};
 pub use utils::skew_symmetric;
+pub use visual::{
+    BundleAdjustmentFactor, BundleAdjustmentFactorTranslationOnly, PinholeProjectionFactor,
+    PnPFactor,
+};

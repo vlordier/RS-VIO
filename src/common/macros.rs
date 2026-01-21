@@ -69,7 +69,11 @@ macro_rules! fast_min {
     ($a:expr, $b:expr) => {{
         let a = $a;
         let b = $b;
-        if a < b { a } else { b }
+        if a < b {
+            a
+        } else {
+            b
+        }
     }};
 }
 
@@ -78,7 +82,11 @@ macro_rules! fast_max {
     ($a:expr, $b:expr) => {{
         let a = $a;
         let b = $b;
-        if a > b { a } else { b }
+        if a > b {
+            a
+        } else {
+            b
+        }
     }};
 }
 
@@ -86,7 +94,7 @@ macro_rules! fast_max {
 #[macro_export]
 macro_rules! color_const {
     ($name:ident = rgb($r:expr, $g:expr, $b:expr)) => {
-        pub const $name: rerun::components::Color = 
+        pub const $name: rerun::components::Color =
             rerun::components::Color::from_rgb($r, $g, $b);
     };
     ($($name:ident = rgb($r:expr, $g:expr, $b:expr);)*) => {

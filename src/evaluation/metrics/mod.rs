@@ -8,7 +8,6 @@
 /// - `trajectory`: Combined distance-speed analysis
 /// - `calibration`: Calibration-aware performance metrics
 /// - `distance_speed`: Unified distance-speed analyzer
-
 pub mod accuracy;
 pub mod calibration;
 pub mod distance;

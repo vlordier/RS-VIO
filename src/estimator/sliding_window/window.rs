@@ -180,7 +180,7 @@ impl SlidingWindow {
                     .retain(|c| c.keyframe_id_1 != removed_id && c.keyframe_id_2 != removed_id);
             }
         }
-        
+
         self.keyframes.push_back(frame);
         debug_log!(
             "[SlidingWindow] Added keyframe, window size: {}/{}",

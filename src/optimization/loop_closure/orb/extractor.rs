@@ -99,14 +99,8 @@ impl OrbExtractor {
                                 // Valid FAST corner
                                 let orientation =
                                     compute_orientation(image, x, y, width as usize, &self.config);
-                                let descriptor = extract_brief(
-                                    image,
-                                    x,
-                                    y,
-                                    width as usize,
-                                    orientation,
-                                    None,
-                                );
+                                let descriptor =
+                                    extract_brief(image, x, y, width as usize, orientation, None);
 
                                 let feature = OrbFeature {
                                     position: Vector2::new(x as f64, y as f64),
@@ -289,14 +283,8 @@ impl OrbExtractor {
                                 // Valid FAST corner
                                 let orientation =
                                     compute_orientation(image, x, y, width as usize, &self.config);
-                                let descriptor = extract_brief(
-                                    image,
-                                    x,
-                                    y,
-                                    width as usize,
-                                    orientation,
-                                    pool,
-                                );
+                                let descriptor =
+                                    extract_brief(image, x, y, width as usize, orientation, pool);
 
                                 let feature = OrbFeature {
                                     position: Vector2::new(x as f64, y as f64),

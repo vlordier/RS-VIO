@@ -132,7 +132,14 @@ fn evaluate_calibration_error(
                 tracking_loss_rate: 0.03 * error_magnitude * 100.0,
             }
         },
-        _ => panic!("Unknown parameter type: {}", parameter_type),
+        _ => CalibrationSensitivity {
+            parameter_name: "Unknown",
+            nominal_value: 0.0,
+            error_percentage: error_magnitude * 100.0,
+            reprojection_error_increase: 0.0,
+            depth_error_increase: 0.0,
+            tracking_loss_rate: 0.0,
+        },
     }
 }
 
@@ -237,7 +244,12 @@ fn bench_sensitivity_ranking(c: &mut Criterion) {
             }
 
             // Sort by total impact (reprojection + tracking)
-            sensitivities.sort_by(|a, b| (b.1 + b.2).partial_cmp(&(a.1 + a.2)).unwrap());
+            use std::cmp::Ordering;
+            sensitivities.sort_by(|a, b| {
+                (b.1 + b.2)
+                    .partial_cmp(&(a.1 + a.2))
+                    .unwrap_or(Ordering::Equal)
+            });
 
             sensitivities
         });
@@ -267,10 +279,7 @@ fn bench_combined_calibration_error(c: &mut Criterion) {
             let scale_error = evaluate_calibration_error(0.01, "imu_scale_factor");
 
             // IMU errors interact strongly with motion speed
-            let combined_tracking_loss =
-                (time_error.tracking_loss_rate + scale_error.tracking_loss_rate).min(0.5);
-
-            combined_tracking_loss
+            (time_error.tracking_loss_rate + scale_error.tracking_loss_rate).min(0.5)
         });
     });
 }
@@ -282,7 +291,7 @@ fn bench_calibration_acceptance_thresholds(c: &mut Criterion) {
         b.iter(|| {
             // Find error level where reprojection error exceeds 0.5px threshold
             let threshold_px = 0.5;
-            for error in (1..100).map(|i| i as f64 / 10000.0) {
+            for error in (1..100).map(|i| f64::from(i) / 10000.0) {
                 let sensitivity = evaluate_calibration_error(error, "focal_length");
                 if sensitivity.reprojection_error_increase > threshold_px {
                     return error; // This is our acceptance boundary
@@ -296,7 +305,7 @@ fn bench_calibration_acceptance_thresholds(c: &mut Criterion) {
         b.iter(|| {
             // Time offset is critical: >2% tracking loss is bad
             let threshold_tracking_loss = 0.02;
-            for error in (1..100).map(|i| i as f64 / 100000.0) {
+            for error in (1..100).map(|i| f64::from(i) / 100000.0) {
                 let sensitivity = evaluate_calibration_error(error, "time_offset");
                 if sensitivity.tracking_loss_rate > threshold_tracking_loss {
                     return error * 1000.0; // Convert to ms for clarity

@@ -1,6 +1,5 @@
 //! Test suite for ORB feature extraction
 
-#![cfg(test)]
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -66,11 +65,7 @@ fn create_test_image(width: usize, height: usize) -> Vec<u8> {
     ];
 
     for (corner_idx, &(cx, cy)) in corner_positions.iter().enumerate() {
-        if cx < width.saturating_sub(20)
-            && cy < height.saturating_sub(20)
-            && cx >= 20
-            && cy >= 20
-        {
+        if cx < width.saturating_sub(20) && cy < height.saturating_sub(20) && cx >= 20 && cy >= 20 {
             // Set center pixel with variation per corner
             let base_intensity = 180 + (corner_idx % 4) as u8 * 15;
             image[cy * width + cx] = base_intensity;
@@ -95,9 +90,8 @@ fn create_test_image(width: usize, height: usize) -> Vec<u8> {
                         if x < width && y < height {
                             // Create gradient based on angle and corner index
                             let angle_factor = ((dx as f64).atan2(dy as f64) * 10.0) as i32;
-                            let intensity = (120 + (corner_idx as i32 * 7) + angle_factor)
-                                .clamp(60, 240)
-                                as u8;
+                            let intensity =
+                                (120 + (corner_idx as i32 * 7) + angle_factor).clamp(60, 240) as u8;
                             image[y * width + x] = intensity;
                         }
                     }
