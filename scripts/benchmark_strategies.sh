@@ -124,7 +124,7 @@ check_datasets() {
     fi
 
     if [ ${#DATASETS[@]} -eq 0 ]; then
-        log_error "No datasets found. Install with: make setup-datasets"
+        log_error "No datasets found. Install with: just setup-datasets"
         exit 1
     fi
 

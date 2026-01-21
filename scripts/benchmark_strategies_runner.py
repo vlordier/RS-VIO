@@ -90,7 +90,7 @@ def find_available_datasets() -> Dict[str, Path]:
     if not datasets:
         log_error("No datasets found!")
         log_error(f"Expected location: {DATASET_BASE}")
-        log_error("Download with: make setup-datasets")
+        log_error("Download with: just setup-datasets")
         sys.exit(1)
     
     return datasets
@@ -418,7 +418,7 @@ Examples:
         print("Next steps:")
         print(f"  1. Review results: cat {runner.csv_file}")
         print(f"  2. Detailed analysis: python3 scripts/analyze_benchmark_results.py")
-        print(f"  3. Deploy optimal: make deploy-optimal")
+        print(f"  3. Deploy optimal: just deploy-optimal")
     else:
         log_error("Benchmarking failed")
         sys.exit(1)

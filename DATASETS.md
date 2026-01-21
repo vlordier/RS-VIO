@@ -6,12 +6,12 @@ This guide explains how to download and set up the datasets supported by RS-VIO.
 
 ```bash
 # Auto-downloads TUM-VI (if mirror is available)
-make download-datasets
+just download-datasets
 
 # Manually place EuRoC and 4Seasons data, then run
-make run-euroc
-make run-tum
-make run-4seasons
+just run-euroc
+just run-tum
+just run-4seasons
 ```
 
 ## EuRoC MAV Dataset
@@ -51,7 +51,7 @@ Expected output:
 ### Auto-Download
 
 ```bash
-make download-datasets
+just download-datasets
 ```
 
 This will download and extract the TUM RGB-D walking sequence to `/tmp/rs-vio-samples/tum_vi/`.

@@ -180,7 +180,7 @@ def create_report() -> bool:
     print(f"Unit tests: {Colors.GREEN}60+ passing{Colors.RESET}")
     print()
     print("Ready for real dataset validation:")
-    print(f"  {Colors.CYAN}make setup-datasets{Colors.RESET}  # Download EuRoC, TUM-VI, 4Seasons")
+    print(f"  {Colors.CYAN}just setup-datasets{Colors.RESET}  # Download EuRoC, TUM-VI, 4Seasons")
     print(f"  {Colors.CYAN}python3 scripts/benchmark_strategies_runner.py --all{Colors.RESET}")
     print()
     

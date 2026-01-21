@@ -92,12 +92,10 @@ python3 scripts/benchmark_strategies_runner.py --strategies BasicRANSAC,IMUGuide
 /tmp/rs-vio-samples/tum_vi/
 /tmp/rs-vio-samples/4seasons/recording_*/
 ```
-
 **Download Instructions:**
 ```bash
-make setup-datasets  # Automatic EuRoC, TUM-VI setup
+just setup-datasets  # Automatic EuRoC, TUM-VI setup
 ```
-
 ### Expected Timeline
 
 | Phase | Task | Time | Status |
@@ -276,7 +274,7 @@ timestamp,strategy,dataset,elapsed_seconds,frames_processed,avg_processing_ms,fp
 
 ##Next Immediate Steps
 
-1. **Download datasets:** `make setup-datasets`
+1. **Download datasets:** `just setup-datasets`
 2. **Run benchmarks:** `python3 scripts/benchmark_strategies_runner.py --all`
 3. **Analyze results:** Review CSV output
 4. **Select optimal:** Choose best strategy per platform
@@ -287,7 +285,7 @@ timestamp,strategy,dataset,elapsed_seconds,frames_processed,avg_processing_ms,fp
 ## Questions & Support
 
 - Strategy not compiling? Check feature flags in Cargo.toml
-- Dataset not found? Run `make setup-datasets`
+- Dataset not found? Run `just setup-datasets`
 - Benchmark slow? Try `--fast` option for quick test
 - Results analysis? See benchmark_results/*.csv files
 

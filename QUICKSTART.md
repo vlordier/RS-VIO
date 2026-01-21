@@ -24,7 +24,7 @@ ls /tmp/rs-vio-samples/euroc/MH_01_easy/mav0/
 ### TUM-VI Dataset
 ```bash
 # Option A: Auto-download (if mirror available)
-make download-datasets
+just download-datasets
 
 # Option B: Manual download
 # 1. Download rgbd-dataset_freiburg3_walking_xyz.tgz
@@ -61,14 +61,14 @@ cargo run --release --bin run_tum config/tum_vi.yaml /tmp/rs-vio-samples/tum_vi
 cargo run --release --bin run_4seasons config/4seasons.yaml /tmp/rs-vio-samples/4seasons/recording_2021-01-07_13-03-56
 ```
 
-## Using Make Targets
+## Using just Targets
 
 Once datasets are in place:
 
 ```bash
-make run-euroc
-make run-tum
-make run-4seasons
+just run-euroc
+just run-tum
+just run-4seasons
 ```
 
 ## Expected Output
