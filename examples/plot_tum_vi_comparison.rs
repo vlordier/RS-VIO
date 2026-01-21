@@ -84,7 +84,6 @@ fn main() -> std::io::Result<()> {
 
     // Process frames
     for (frame_idx, &timestamp) in cam0_timestamps.iter().take(max_frames).enumerate() {
-
         // Get IMU measurements up to this frame
         let frame_imu: Vec<_> = imu_data
             .iter()
@@ -109,7 +108,7 @@ fn main() -> std::io::Result<()> {
         // IMU-aided tracking (with prediction)
         let pred_error = if frame_idx > 0 {
             // Compute IMU prediction error based on angular velocity
-        let ang_vel = frame_imu.last().map(|m| m.gyro.norm()).unwrap_or(0.1);
+            let ang_vel = frame_imu.last().map(|m| m.gyro.norm()).unwrap_or(0.1);
             0.5 + ang_vel * 0.2 // Lower error with IMU prediction
         } else {
             0.5
@@ -157,10 +156,7 @@ fn main() -> std::io::Result<()> {
         }
 
         // Simulate rolling shutter correction
-        let ang_vel = frame_imu
-            .last()
-            .map(|m| m.gyro.norm())
-            .unwrap_or(0.1);
+        let ang_vel = frame_imu.last().map(|m| m.gyro.norm()).unwrap_or(0.1);
 
         // Global shutter error grows with angular velocity
         let gs_error = 0.8 + ang_vel * 1.5 + rand_f64() * 0.3;

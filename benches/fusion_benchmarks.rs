@@ -137,7 +137,9 @@ fn create_imu_sequence(scenario: &str, count: usize) -> Vec<ImuData> {
         };
 
         imu_data.push(ImuData {
-            timestamp: i64::try_from(i).unwrap_or(i64::MAX).saturating_mul(5_000_000), // 5ms intervals
+            timestamp: i64::try_from(i)
+                .unwrap_or(i64::MAX)
+                .saturating_mul(5_000_000), // 5ms intervals
             gyro,
             accel,
         });

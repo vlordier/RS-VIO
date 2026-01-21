@@ -20,7 +20,12 @@ struct RSScenario {
 
 impl RSScenario {
     /// Create a scenario
-    const fn new(motion_type: &'static str, angular_vel: f64, linear_vel: f64, distance: f64) -> Self {
+    const fn new(
+        motion_type: &'static str,
+        angular_vel: f64,
+        linear_vel: f64,
+        distance: f64,
+    ) -> Self {
         Self {
             _frame_height: 480,
             readout_time_ms: 33.0, // Full frame readout for 30Hz camera
@@ -139,9 +144,7 @@ fn bench_rs_rotation_only_accuracy(c: &mut Criterion) {
             BenchmarkId::new("angular_vel", format!("{:.0}°/s", angular_vel)),
             &angular_vel,
             |b, _| {
-                b.iter(|| {
-                    black_box(scenario.reprojection_error_rotation_only())
-                });
+                b.iter(|| black_box(scenario.reprojection_error_rotation_only()));
             },
         );
     }
@@ -162,9 +165,7 @@ fn bench_rs_full_accuracy(c: &mut Criterion) {
             BenchmarkId::new("with_translation", format!("{:.0}°/s", angular_vel)),
             &angular_vel,
             |b, _| {
-                b.iter(|| {
-                    black_box(scenario.reprojection_error_full_rs())
-                });
+                b.iter(|| black_box(scenario.reprojection_error_full_rs()));
             },
         );
     }

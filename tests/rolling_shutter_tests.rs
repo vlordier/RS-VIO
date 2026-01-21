@@ -292,7 +292,7 @@ fn generate_test_imu_data(num_samples: u32) -> Vec<ImuData> {
         .map(|i| ImuData {
             timestamp: 1_000_000_000 + i64::from(i) * 5_000_000, // 5ms intervals
             gyro: [0.1 * (f64::from(i) * 0.1).sin(), 0.05, 0.02], // Some rotation
-            accel: [0.0, 0.0, 9.81],                      // Gravity only
+            accel: [0.0, 0.0, 9.81],                             // Gravity only
         })
         .collect()
 }

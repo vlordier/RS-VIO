@@ -36,7 +36,7 @@ fn create_test_features(count: usize) -> Vec<(usize, f32, f32)> {
 /// Create synthetic previous depth estimates
 fn create_previous_depth(feature_count: usize) -> Vec<(usize, f32)> {
     (0..feature_count)
-    .map(|i| (i, 3.0 + (to_f32_u16(i) * 0.01).sin() * 0.5))
+        .map(|i| (i, 3.0 + (to_f32_u16(i) * 0.01).sin() * 0.5))
         .collect()
 }
 

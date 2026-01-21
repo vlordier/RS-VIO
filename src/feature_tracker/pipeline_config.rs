@@ -99,7 +99,7 @@ impl Default for PerformanceBudget {
     fn default() -> Self {
         Self {
             target_fps: 30.0,
-            max_latency_ms: 33.0,  // ~30 FPS
+            max_latency_ms: 33.0, // ~30 FPS
             max_cpu_usage: 0.8,
             max_memory_mb: 512,
             enable_gpu: false,
@@ -238,7 +238,7 @@ pub struct StereoConfig {
 impl Default for StereoConfig {
     fn default() -> Self {
         Self {
-            baseline: 0.11,  // Typical stereo rig
+            baseline: 0.11, // Typical stereo rig
             max_disparity: 128,
             subpixel_refinement: true,
             cost_window_size: 5,
@@ -291,7 +291,7 @@ impl VIOPipelineConfig {
             },
             fusion: FusionConfig {
                 strategy: FusionStrategy::RotationOnly,
-                num_frames: 3,  // Fewer frames for memory
+                num_frames: 3, // Fewer frames for memory
                 stabilizer: Some(StabilizerConfig {
                     enabled: true,
                     buffer_size: 3,
@@ -313,7 +313,7 @@ impl VIOPipelineConfig {
                 }),
                 min_quality: 0.01,
                 use_pyramid: true,
-                pyramid_levels: 2,  // Fewer levels for speed
+                pyramid_levels: 2, // Fewer levels for speed
                 enforce_spatial_distribution: true,
                 grid_cell_size: 32,
             },
@@ -343,7 +343,7 @@ impl VIOPipelineConfig {
                 enable_gpu: true,
             },
             fusion: FusionConfig {
-                strategy: FusionStrategy::Adaptive,  // Can afford more
+                strategy: FusionStrategy::Adaptive, // Can afford more
                 num_frames: 5,
                 stabilizer: Some(StabilizerConfig {
                     enabled: true,
@@ -354,7 +354,7 @@ impl VIOPipelineConfig {
                 depth_aware_params: Some(DepthAwareFusionParams::default()),
             },
             detection: DetectionConfig {
-                backend: DetectionBackend::ShiTomasi,  // Keep CPU for tracking
+                backend: DetectionBackend::ShiTomasi, // Keep CPU for tracking
                 tracking_strategy: TrackingStrategy::TrackFirst,
                 track_first: Some(TrackFirstConfig {
                     min_features: 150,
@@ -364,7 +364,7 @@ impl VIOPipelineConfig {
                     corner_quality_threshold: 0.01,
                     min_feature_distance: 10.0,
                 }),
-                min_quality: 0.005,  // Can afford better quality
+                min_quality: 0.005, // Can afford better quality
                 use_pyramid: true,
                 pyramid_levels: 3,
                 enforce_spatial_distribution: true,
@@ -373,7 +373,7 @@ impl VIOPipelineConfig {
             matching: MatchingConfig {
                 descriptor_type: DescriptorType::SuperPoint,
                 keyframes_only: true,
-                max_descriptor_distance: 0.7,  // Normalized for learned
+                max_descriptor_distance: 0.7, // Normalized for learned
                 use_ratio_test: true,
                 ratio_test_threshold: 0.9,
             },
@@ -396,20 +396,20 @@ impl VIOPipelineConfig {
                 enable_gpu: false,
             },
             fusion: FusionConfig {
-                strategy: FusionStrategy::None,  // Too expensive
+                strategy: FusionStrategy::None, // Too expensive
                 num_frames: 1,
                 stabilizer: None,
                 depth_aware_params: None,
             },
             detection: DetectionConfig {
-                backend: DetectionBackend::Fast,  // Fastest detector
+                backend: DetectionBackend::Fast, // Fastest detector
                 tracking_strategy: TrackingStrategy::TrackFirst,
                 track_first: Some(TrackFirstConfig {
                     min_features: 80,
                     max_features: 150,
-                    grid_cell_size: 48,  // Larger cells = fewer features
+                    grid_cell_size: 48, // Larger cells = fewer features
                     min_features_per_cell: 1,
-                    corner_quality_threshold: 0.02,  // Lower quality ok
+                    corner_quality_threshold: 0.02, // Lower quality ok
                     min_feature_distance: 15.0,
                 }),
                 min_quality: 0.02,
@@ -419,21 +419,21 @@ impl VIOPipelineConfig {
                 grid_cell_size: 48,
             },
             matching: MatchingConfig {
-                descriptor_type: DescriptorType::None,  // No matching
+                descriptor_type: DescriptorType::None, // No matching
                 keyframes_only: true,
                 max_descriptor_distance: 50.0,
                 use_ratio_test: false,
                 ratio_test_threshold: 0.8,
             },
             stereo: StereoConfig {
-                max_disparity: 64,  // Smaller search range
+                max_disparity: 64, // Smaller search range
                 subpixel_refinement: false,
                 cost_window_size: 3,
                 ..Default::default()
             },
             enable_imu: true,
-            enable_loop_closure: false,  // Too expensive
-            enable_bundle_adjustment: false,  // Too expensive
+            enable_loop_closure: false,      // Too expensive
+            enable_bundle_adjustment: false, // Too expensive
         }
     }
 
@@ -476,28 +476,33 @@ impl VIOPipelineConfig {
             match self.detection.backend {
                 DetectionBackend::SuperPoint | DetectionBackend::Disk => {
                     return Err("SuperPoint/DISK require GPU enabled".to_string());
-                }
-                _ => {}
+                },
+                _ => {},
             }
             match self.matching.descriptor_type {
                 DescriptorType::SuperPoint | DescriptorType::LightGlue => {
                     return Err("SuperPoint/LightGlue descriptors require GPU".to_string());
-                }
-                _ => {}
+                },
+                _ => {},
             }
         }
 
         // Check fusion consistency
-        if self.fusion.strategy == FusionStrategy::RotationOnly && self.fusion.stabilizer.is_none() {
+        if self.fusion.strategy == FusionStrategy::RotationOnly && self.fusion.stabilizer.is_none()
+        {
             return Err("Rotation-only fusion requires stabilizer config".to_string());
         }
 
-        if self.fusion.strategy == FusionStrategy::DepthAware && self.fusion.depth_aware_params.is_none() {
+        if self.fusion.strategy == FusionStrategy::DepthAware
+            && self.fusion.depth_aware_params.is_none()
+        {
             return Err("Depth-aware fusion requires depth params".to_string());
         }
 
         // Check tracking consistency
-        if self.detection.tracking_strategy == TrackingStrategy::TrackFirst && self.detection.track_first.is_none() {
+        if self.detection.tracking_strategy == TrackingStrategy::TrackFirst
+            && self.detection.track_first.is_none()
+        {
             return Err("Track-first strategy requires track_first config".to_string());
         }
 
@@ -547,8 +552,7 @@ impl VIOPipelineConfig {
 
     /// Save configuration to TOML file
     pub fn save_toml(&self, path: &std::path::Path) -> std::io::Result<()> {
-        let toml_string = toml::to_string_pretty(self)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let toml_string = toml::to_string_pretty(self).map_err(std::io::Error::other)?;
         std::fs::write(path, toml_string)
     }
 

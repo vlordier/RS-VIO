@@ -10,11 +10,11 @@ use rs_vio::datasets::config::Config;
 use rs_vio::datasets::config::FeatureDetectionConfig;
 use rs_vio::datasets::player_trait::DatasetPlayer;
 use rs_vio::datasets::{ImageData, TUMVIPlayer};
+#[cfg(feature = "gpu")]
+use rs_vio::feature_tracker::gpu_accel::{GpuAccelerator, GpuConfig};
 use rs_vio::feature_tracker::ransac::{MagsacPlusPlus, ProsacFundamental};
 use rs_vio::feature_tracker::PatchTracker;
 use rs_vio::imu::{ImuConfig, ImuPreintegrator, LearnedVibrationScheduler, VibrationInputs};
-#[cfg(feature = "gpu")]
-use rs_vio::feature_tracker::gpu_accel::{GpuAccelerator, GpuConfig};
 
 fn get_env_path(var: &str) -> Option<String> {
     std::env::var(var)

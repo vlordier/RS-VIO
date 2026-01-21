@@ -105,13 +105,13 @@ pub use matching_strategy_config::MatchingStrategyConfig;
 pub use parallel_tracking::{
     build_pyramids_parallel, track_points_parallel, ParallelTrackingConfig, ParallelTrackingResult,
 };
+pub use patch::Pattern52;
+pub use patch_simd::compute_residuals_simd;
 pub use pipeline_config::{
-    DepthAwareFusionParams, DetectionBackend, DetectionConfig, DescriptorType, FusionConfig,
+    DepthAwareFusionParams, DescriptorType, DetectionBackend, DetectionConfig, FusionConfig,
     FusionStrategy, MatchingConfig, PerformanceBudget, StereoConfig, TargetPlatform,
     TrackingStrategy, VIOPipelineConfig,
 };
-pub use track_first_detector::{TrackFirstConfig, TrackFirstDetector, TrackedFeature};
-pub use patch::Pattern52;
-pub use patch_simd::compute_residuals_simd;
 pub use ransac_essential::{EssentialMatrixRansac, RansacConfig};
 pub use subpixel_stereo::{StereoMatchResult, SubpixelStereoRefinement};
+pub use track_first_detector::{TrackFirstConfig, TrackFirstDetector, TrackedFeature};

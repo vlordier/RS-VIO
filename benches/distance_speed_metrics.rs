@@ -33,7 +33,11 @@ fn generate_test_trajectory(
             },
             "zigzag" => {
                 #[allow(clippy::cast_possible_truncation)]
-                let amp = if ((t / 2.0).floor() as i32) % 2 == 0 { 1.0 } else { -1.0 };
+                let amp = if ((t / 2.0).floor() as i32) % 2 == 0 {
+                    1.0
+                } else {
+                    -1.0
+                };
                 Point3::new(t, amp, 5.0)
             },
             _ => Point3::new(t, 0.0, 5.0),

@@ -1,4 +1,9 @@
-#![allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::needless_range_loop, clippy::single_range_in_vec_init)]
+#![allow(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::needless_range_loop,
+    clippy::single_range_in_vec_init
+)]
 /// Comprehensive evaluation benchmark
 /// Tests all 4 configurations with synthetic trajectories and metrics
 use criterion::{black_box, criterion_group, criterion_main, Criterion};

@@ -156,8 +156,7 @@ impl FrameStabilizer {
         let r_rel = reference.rotation.inverse() * current.rotation;
 
         // Create output image
-        let mut warped =
-            ImageBuffer::<Luma<f32>, Vec<f32>>::from_pixel(width, height, Luma([0.0]));
+        let mut warped = ImageBuffer::<Luma<f32>, Vec<f32>>::from_pixel(width, height, Luma([0.0]));
 
         // For each pixel in reference frame, find corresponding pixel in current
         for y in 0..height {

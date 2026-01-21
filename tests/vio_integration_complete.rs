@@ -322,7 +322,6 @@ mod vio_integration_tests {
 
         let mut t = 0.0; // seconds
         for _ in 0..num_frames {
-
             // Simulated drone motion: circular path
             let rotation_rad: f64 = t * 0.5; // 0.5 rad/s
             let radius_m: f64 = 1.0;

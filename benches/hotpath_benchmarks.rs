@@ -9,9 +9,7 @@ fn create_test_keyframe_descriptors() -> (KeyframeDescriptor, KeyframeDescriptor
     let desc1 = KeyframeDescriptor {
         keyframe_id: 1,
         timestamp: 1000000,
-        descriptor: (0..256)
-            .map(|x| (Float::from(x) * 0.01).sin())
-            .collect(),
+        descriptor: (0..256).map(|x| (Float::from(x) * 0.01).sin()).collect(),
         num_features: 100,
         pose: Isometry3::identity(),
     };
@@ -19,9 +17,7 @@ fn create_test_keyframe_descriptors() -> (KeyframeDescriptor, KeyframeDescriptor
     let desc2 = KeyframeDescriptor {
         keyframe_id: 2,
         timestamp: 2000000,
-        descriptor: (0..256)
-            .map(|x| (Float::from(x) * 0.015).cos())
-            .collect(),
+        descriptor: (0..256).map(|x| (Float::from(x) * 0.015).cos()).collect(),
         num_features: 95,
         pose: Isometry3::new(Vector3::new(1.0, 0.5, 0.0), Vector3::zeros()),
     };
@@ -63,9 +59,7 @@ fn bench_orb_descriptor_matching(c: &mut Criterion) {
 fn bench_memory_allocation_patterns(c: &mut Criterion) {
     c.bench_function("vector_allocation_10k", |b| {
         b.iter(|| {
-            let vec: Vec<f64> = (0..10000)
-                .map(|x| f64::from(x) * 0.1)
-                .collect();
+            let vec: Vec<f64> = (0..10000).map(|x| f64::from(x) * 0.1).collect();
             black_box(vec);
         });
     });

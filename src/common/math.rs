@@ -39,17 +39,17 @@ pub fn clamp<T: PartialOrd>(value: T, min: T, max: T) -> T {
 /// use rs_vio::common::math::normalize_angle;
 /// use std::f64::consts::PI;
 ///
-/// assert!((normalize_angle(0.0) - 0.0).abs() < 1e-10);
-/// assert!((normalize_angle(3.0 * PI) - (-PI)).abs() < 1e-10);
+/// assert!((normalize_angle(0.0) - 0.0).abs() < 1e-9);
+/// assert!((normalize_angle(3.0 * PI) - PI).abs() < 1e-9);
 /// ```
 #[inline]
 pub fn normalize_angle(angle: Float) -> Float {
-    let two_pi = 2.0 * std::f32::consts::PI as Float;
+    let two_pi = 2.0 * std::f64::consts::PI;
     let mut normalized = angle % two_pi;
 
-    if normalized > std::f32::consts::PI as Float {
+    if normalized > std::f64::consts::PI {
         normalized -= two_pi;
-    } else if normalized < -(std::f32::consts::PI as Float) {
+    } else if normalized < -std::f64::consts::PI {
         normalized += two_pi;
     }
 
@@ -182,7 +182,7 @@ mod tests {
 
     #[test]
     fn test_normalize_angle() {
-        use std::f32::consts::PI;
+        use std::f64::consts::PI;
 
         assert!((normalize_angle(0.0) - 0.0).abs() < 1e-6);
         assert!((normalize_angle(PI as Float) - PI as Float).abs() < 1e-6);

@@ -110,13 +110,8 @@ impl TrackFirstDetector {
         for feature in self.tracked_features.values_mut() {
             let x = feature.position.x as u32;
             let y = feature.position.y as u32;
-            feature.gradient_magnitude = Self::get_gradient_at_static(
-                &gradients,
-                x,
-                y,
-                self.image_width,
-                self.image_height,
-            );
+            feature.gradient_magnitude =
+                Self::get_gradient_at_static(&gradients, x, y, self.image_width, self.image_height);
         }
 
         // Check if we need to detect new features
@@ -218,7 +213,8 @@ impl TrackFirstDetector {
                 let grad_mag = self.get_gradient_at(gradients, x, y);
 
                 // Check if this is better than current best and far from existing features
-                if grad_mag > best_response && grad_mag > self.config.corner_quality_threshold as f32
+                if grad_mag > best_response
+                    && grad_mag > self.config.corner_quality_threshold as f32
                 {
                     let pos = na::Vector2::new(x as f32, y as f32);
                     if self.is_far_from_existing_features(&pos) {
@@ -270,10 +266,10 @@ impl TrackFirstDetector {
 
     /// Get grid dimensions
     fn grid_dimensions(&self) -> (u32, u32) {
-        let grid_width = (self.image_width + self.config.grid_cell_size - 1)
-            / self.config.grid_cell_size;
-        let grid_height = (self.image_height + self.config.grid_cell_size - 1)
-            / self.config.grid_cell_size;
+        let grid_width =
+            (self.image_width + self.config.grid_cell_size - 1) / self.config.grid_cell_size;
+        let grid_height =
+            (self.image_height + self.config.grid_cell_size - 1) / self.config.grid_cell_size;
         (grid_width, grid_height)
     }
 
@@ -286,19 +282,19 @@ impl TrackFirstDetector {
         for y in 1..(height - 1) {
             for x in 1..(width - 1) {
                 // Sobel kernels
-                let gx = (-1.0 * image.get_pixel(x - 1, y - 1).0[0] as f32)
-                    + (-2.0 * image.get_pixel(x - 1, y).0[0] as f32)
-                    + (-1.0 * image.get_pixel(x - 1, y + 1).0[0] as f32)
-                    + (1.0 * image.get_pixel(x + 1, y - 1).0[0] as f32)
+                let gx = -(image.get_pixel(x - 1, y - 1).0[0] as f32)
+                    + -(2.0 * image.get_pixel(x - 1, y).0[0] as f32)
+                    + -(image.get_pixel(x - 1, y + 1).0[0] as f32)
+                    + (image.get_pixel(x + 1, y - 1).0[0] as f32)
                     + (2.0 * image.get_pixel(x + 1, y).0[0] as f32)
-                    + (1.0 * image.get_pixel(x + 1, y + 1).0[0] as f32);
+                    + (image.get_pixel(x + 1, y + 1).0[0] as f32);
 
-                let gy = (-1.0 * image.get_pixel(x - 1, y - 1).0[0] as f32)
-                    + (-2.0 * image.get_pixel(x, y - 1).0[0] as f32)
-                    + (-1.0 * image.get_pixel(x + 1, y - 1).0[0] as f32)
-                    + (1.0 * image.get_pixel(x - 1, y + 1).0[0] as f32)
+                let gy = -(image.get_pixel(x - 1, y - 1).0[0] as f32)
+                    + -(2.0 * image.get_pixel(x, y - 1).0[0] as f32)
+                    + -(image.get_pixel(x + 1, y - 1).0[0] as f32)
+                    + (image.get_pixel(x - 1, y + 1).0[0] as f32)
                     + (2.0 * image.get_pixel(x, y + 1).0[0] as f32)
-                    + (1.0 * image.get_pixel(x + 1, y + 1).0[0] as f32);
+                    + (image.get_pixel(x + 1, y + 1).0[0] as f32);
 
                 let magnitude = (gx * gx + gy * gy).sqrt();
                 gradients[(y * width + x) as usize] = magnitude;

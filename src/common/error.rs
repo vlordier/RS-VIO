@@ -17,7 +17,7 @@ pub trait ResultExt<T, E> {
     /// ```
     /// use rs_vio::common::error::ResultExt;
     ///
-    /// fn read_config() -> Result<String, std::io::Error> {
+    /// fn read_config() -> Result<String, String> {
     ///     std::fs::read_to_string("config.yaml")
     ///         .with_context("Failed to read configuration file")
     /// }
@@ -140,9 +140,12 @@ macro_rules! ensure {
 /// use rs_vio::common::error::ErrorCollector;
 ///
 /// let mut errors = ErrorCollector::new("Configuration validation failed");
+/// let value = -1.0;
+/// let count = 0;
 /// errors.push_if(value < 0.0, "Value must be non-negative");
 /// errors.push_if(count == 0, "Count must be positive");
-/// errors.into_result(())
+/// let result: Result<(), String> = errors.into_result(());
+/// assert!(result.is_err());
 /// ```
 #[derive(Default)]
 pub struct ErrorCollector {

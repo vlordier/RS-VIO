@@ -12,8 +12,8 @@ fn test_imu_signal_analyzer_basic_workflow() {
     let imu_data: Vec<ImuData> = (0..100)
         .map(|i| ImuData {
             timestamp: i64::from(i) * 10_000_000, // 100 Hz
-            accel: [0.01, -0.02, -9.81],        // Small noise + gravity
-            gyro: [0.001, -0.001, 0.0005],      // Small drift
+            accel: [0.01, -0.02, -9.81],          // Small noise + gravity
+            gyro: [0.001, -0.001, 0.0005],        // Small drift
         })
         .collect();
 

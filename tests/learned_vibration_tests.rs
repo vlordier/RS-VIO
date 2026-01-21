@@ -303,10 +303,10 @@ fn test_different_imu_rates() {
 
         // Update interval should scale with rate (map by index to avoid casts)
         let (high_vib, low_vib) = match idx {
-            0 => (5, 10),    // 100 Hz
-            1 => (10, 20),   // 200 Hz
-            2 => (20, 40),   // 400 Hz
-            3 => (50, 100),  // 1000 Hz
+            0 => (5, 10),   // 100 Hz
+            1 => (10, 20),  // 200 Hz
+            2 => (20, 40),  // 400 Hz
+            3 => (50, 100), // 1000 Hz
             _ => (0, 0),
         };
         let expected_interval = if inputs.vibration_level > 0.3 {
