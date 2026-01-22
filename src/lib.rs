@@ -116,7 +116,12 @@ pub enum ErrorCategory {
 ///
 /// Categorizes errors to enable appropriate retry and recovery strategies
 /// in distributed systems and embedded platforms.
+///
+/// # Non-Exhaustive
+/// This enum is marked as non-exhaustive to allow adding new error variants
+/// in future versions without breaking downstream code that matches on all variants.
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum VIOError {
     #[error("Configuration error: {0}")]
     Config(String),
@@ -188,6 +193,18 @@ impl VIOError {
 }
 
 /// Result type for RS-VIO operations, defaulting to VIOError.
+///
+/// # Must Use Policy
+/// All operations that return `Result<T>` MUST handle the result explicitly.
+/// Ignoring results can lead to silent failures or undefined behavior.
+/// Use one of:
+/// - `result?` - Propagate error in Result-returning context
+/// - `result.expect("message")` - Panic with message on error
+/// - `result.unwrap_or_default()` - Use default value on error
+/// - `result.ok()` - Convert to `Option<T>`, ignoring error
+/// - `if result.is_ok() { ... }` - Conditional handling
+///
+/// Never use `let _ = ...;` to ignore a Result.
 pub type Result<T> = std::result::Result<T, VIOError>;
 
 /// Initialize colored logging for RS-VIO.

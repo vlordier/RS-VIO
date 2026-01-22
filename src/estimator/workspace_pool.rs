@@ -225,17 +225,29 @@ pub struct PooledFrameWorkspace<'a> {
 
 impl<'a> PooledFrameWorkspace<'a> {
     /// Get mutable reference to workspace
+    /// 
+    /// # Panics
+    /// Panics if workspace is None. This should never happen because:
+    /// 1. Workspace is guaranteed to be Some at construction
+    /// 2. It's only cleared in Drop, which consumes self
+    /// 3. Therefore, this method always succeeds for borrowed self
     #[inline]
-    #[allow(clippy::unwrap_used)] // Workspace is guaranteed Some by construction
     pub fn get_mut(&mut self) -> &mut FrameWorkspace {
-        self.workspace.as_mut().unwrap()
+        self.workspace.as_mut()
+            .expect("Workspace is guaranteed Some during PooledFrameWorkspace lifetime")
     }
 
     /// Get reference to workspace
+    ///
+    /// # Panics
+    /// Panics if workspace is None. This should never happen because:
+    /// 1. Workspace is guaranteed to be Some at construction
+    /// 2. It's only cleared in Drop, which consumes self
+    /// 3. Therefore, this method always succeeds for borrowed self
     #[inline]
-    #[allow(clippy::unwrap_used)] // Workspace is guaranteed Some by construction
     pub fn get(&self) -> &FrameWorkspace {
-        self.workspace.as_ref().unwrap()
+        self.workspace.as_ref()
+            .expect("Workspace is guaranteed Some during PooledFrameWorkspace lifetime")
     }
 }
 

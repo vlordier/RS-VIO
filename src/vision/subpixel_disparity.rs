@@ -167,16 +167,37 @@ impl SubPixelDisparityRefiner {
         let mut iterations = 0;
 
         for level in (0..self.config.max_pyramid_levels).rev() {
-            let (w, h) = left_pyr.get_dims(level).unwrap();
+            let (w, h) = match left_pyr.get_dims(level) {
+                Some(dims) => dims,
+                None => {
+                    log::error!("Pyramid level {} out of bounds", level);
+                    break;
+                }
+            };
             let scale = 2_f64.powi(level as i32);
             let level_x = (x as f64 / scale) as u32;
             let level_y = (y as f64 / scale) as u32;
             let level_disparity = disparity / scale;
 
             // Gauss-Newton refinement at this level
+            let left_level = match left_pyr.get_level(level) {
+                Some(img) => img,
+                None => {
+                    log::error!("Failed to get left pyramid level {}", level);
+                    break;
+                }
+            };
+            let right_level = match right_pyr.get_level(level) {
+                Some(img) => img,
+                None => {
+                    log::error!("Failed to get right pyramid level {}", level);
+                    break;
+                }
+            };
+
             let (refined_disp, iter_count, converged) = self.gauss_newton_refinement(
-                left_pyr.get_level(level).unwrap(),
-                right_pyr.get_level(level).unwrap(),
+                left_level,
+                right_level,
                 w,
                 h,
                 level_x,
@@ -434,15 +455,15 @@ mod tests {
         let pyramid = ImagePyramid::build(&image, width, height, 3);
         assert_eq!(pyramid.num_levels(), 3);
 
-        let (w0, h0) = pyramid.get_dims(0).unwrap();
+        let (w0, h0) = pyramid.get_dims(0).expect("Level 0 should exist");
         assert_eq!(w0, 8);
         assert_eq!(h0, 8);
 
-        let (w1, h1) = pyramid.get_dims(1).unwrap();
+        let (w1, h1) = pyramid.get_dims(1).expect("Level 1 should exist");
         assert_eq!(w1, 4);
         assert_eq!(h1, 4);
 
-        let (w2, h2) = pyramid.get_dims(2).unwrap();
+        let (w2, h2) = pyramid.get_dims(2).expect("Level 2 should exist");
         assert_eq!(w2, 2);
         assert_eq!(h2, 2);
     }
