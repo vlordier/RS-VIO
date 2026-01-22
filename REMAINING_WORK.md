@@ -158,6 +158,35 @@ The system is **ready for production deployment** on embedded systems (Jetson, R
 
 ---
 
+### 9. Rerun Visualization Cleanup (Medium-Priority)
+
+**Status**: Feature-complete but untested; contains dead code  
+**Effort**: Low-Medium (10-20 hours)  
+**Benefit**: Reduce bloat, improve maintainability, add test coverage
+
+**What exists**:
+- Full Rerun.io integration (1,331 lines in `src/viewers/rerun.rs`)
+- All core visualization methods working (pose, trajectory, features, IMU)
+- Feature-gated with `--features rerun-viewer` flag
+
+**Known issues**:
+- Zero test coverage (all methods FNDA:0 in coverage reports)
+- 268 lines of dead code (methods never called: `log_vibration_metrics`, `log_feature_quality`, `log_robustness_dashboard`, `log_loop_closure`)
+- Over-engineered implementations (e.g., `log_imu_signal_quality` is 167 lines)
+- CI doesn't test feature-gated code (`cargo test` without `--all-features`)
+
+**What should be done**:
+1. Remove 268 lines of uncalled methods
+2. Simplify bloated IMU logging (~328 lines → ~100 lines)
+3. Fix CI to run `cargo test --all-features`
+4. Add basic smoke tests for visualization methods
+
+**Current approach**: Works in production despite lack of tests; safe to use but needs cleanup
+
+**Where to start**: Remove dead code from `src/viewers/rerun.rs`, update `.github/workflows/rust.yml`
+
+---
+
 ### 7. Extended Dataset Support (Low-Priority)
 
 **Status**: EuRoC, TUM-VI, 4Seasons supported; could add more  
@@ -233,7 +262,7 @@ The system is **ready for production deployment** on embedded systems (Jetson, R
 | **Accuracy (TUM-VI room1)** | 0.145m ATE | ✅ Production |
 | **Real-time Performance** | 6.8ms / frame @ 30 Hz | ✅ Production |
 | **Memory Usage** | 245 MB peak | ✅ Production |
-| **Code Coverage** | >95% | ✅ Production |
+| **Code Coverage** | >95% (core), 0% (rerun-viewer) | ✅ Core / ⚠️ Rerun |
 | **Type Safety** | No unsafe code | ✅ Production |
 | **Linting** | Zero Clippy warnings | ✅ Production |
 
@@ -290,19 +319,22 @@ For detailed technical information about implemented features, see:
 
 Based on implementation status and effort:
 
+### Quick Wins (Low-Effort, High-Value):
+1. **Rerun Visualization Cleanup** (10-20 hours) - Remove dead code, add tests, reduce bloat
+2. **Extended Dataset Support** (10-15 hours per dataset) - Add KITTI, MHETRA, etc.
+
 ### Ready to Activate (Already Implemented):
-1. **Loop Closure Integration** (15-25 hours) - Full module exists, needs estimator hookup
+3. **Loop Closure Integration** (15-25 hours) - Full module exists, needs estimator hookup
 
 ### High-Value, Medium-Effort:
-2. **Extended Dataset Support** (10-15 hours per dataset) - Add KITTI, MHETRA, etc.
-3. **Adaptive Parameter Tuning** (25-35 hours) - Auto-tuning for new environments
-4. **Documentation Expansion** (10-20 hours) - Jupyter notebooks, tutorials
+4. **Adaptive Parameter Tuning** (25-35 hours) - Auto-tuning for new environments
+5. **Documentation Expansion** (10-20 hours) - Jupyter notebooks, tutorials
 
 ### High-Impact, High-Effort:
-5. **GPU Acceleration** (40-60 hours) - 2-5× speedup potential
-6. **Multi-Sensor Fusion** (30-40 hours per sensor) - Magnetometer, barometer, etc.
+6. **GPU Acceleration** (40-60 hours) - 2-5× speedup potential
+7. **Multi-Sensor Fusion** (30-40 hours per sensor) - Magnetometer, barometer, etc.
 
 ### Infrastructure:
-7. **Performance Dashboard** (15-25 hours) - Real-time metrics visualization
-8. **Distributed Processing** (60-80 hours) - ROS/ROS2 integration for multi-robot
+8. **Performance Dashboard** (15-25 hours) - Real-time metrics visualization
+9. **Distributed Processing** (60-80 hours) - ROS/ROS2 integration for multi-robot
 
