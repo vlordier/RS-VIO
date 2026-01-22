@@ -533,8 +533,8 @@ impl Estimator {
         // Optional: Apply multi-frame fusion to enhance feature confidence
         // Buffer frames and call fusion strategy if available
         if let Some(fusion_strat) = self.fusion_strategy.as_mut() {
-            // Add current frame to buffer
-            self.fusion_frame_buffer.push_back(current_frame.clone());
+            // Add current frame to buffer (Arc-wrapped to avoid expensive clones)
+            self.fusion_frame_buffer.push_back(std::sync::Arc::new(current_frame.clone()));
             
             // Keep buffer within capacity (default 5 frames)
             if self.fusion_frame_buffer.len() > 5 {
@@ -543,8 +543,9 @@ impl Estimator {
             
             // Apply fusion when we have at least 2 frames
             if self.fusion_frame_buffer.len() >= 2 {
-                let frames_vec: Vec<crate::estimator::Frame> = 
-                    self.fusion_frame_buffer.iter().cloned().collect();
+                let frames_vec: Vec<_> = self.fusion_frame_buffer.iter()
+                    .map(|arc_frame| (**arc_frame).clone())
+                    .collect();
                 
                 if let Ok(fused) = fusion_strat.fuse(&frames_vec) {
                     // Apply per-feature confidence from fusion to current frame

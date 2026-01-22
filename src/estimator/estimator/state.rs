@@ -34,6 +34,7 @@ pub struct Estimator {
     pub spectrum_log_writer: std::sync::Mutex<Option<std::fs::File>>,
     pub stereo_super_resolver: StereoSuperResolver,
     pub intrinsics_refiner: Option<OnlineIntrinsicsRefiner>,
-    pub fusion_frame_buffer: std::collections::VecDeque<crate::estimator::Frame>,
+    /// Frame buffer for fusion (Arc-wrapped to avoid expensive clones)
+    pub fusion_frame_buffer: std::collections::VecDeque<std::sync::Arc<crate::estimator::Frame>>,
     pub fusion_strategy: Option<Box<dyn FusionStrategyImpl>>,
 }
