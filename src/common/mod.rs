@@ -4,6 +4,7 @@
 //! DRY principles and maintainability.
 
 pub mod arena;
+pub mod arena_integration;
 pub mod config;
 pub mod error;
 #[macro_use]
@@ -18,6 +19,7 @@ pub mod types;
 pub mod validation;
 
 pub use arena::{DescriptorArena, FeatureTrackingArena, ImuDataArena};
+pub use arena_integration::{DescriptorContext, FeatureTrackingContext, ImuContext};
 pub use config::{Clampable, ConfigBuilder, Mergeable, Validatable};
 pub use error::{ErrorCollector, OptionExt, ResultExt};
 pub use math::{clamp, normalize_angle, safe_sqrt};

@@ -45,7 +45,7 @@ impl Estimator {
             _ => crate::datasets::create_camera_models_from_config(&config),
         };
 
-        let feature_config = config.feature_detection.clone();
+        let feature_config = &config.feature_detection;
 
         // Compute the transformation from left to right (T_C1_C0) as in compute_stereo.
         // Cast f64 config values to Float for f32/f64 compatibility
