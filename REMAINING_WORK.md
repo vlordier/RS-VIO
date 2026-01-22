@@ -266,6 +266,26 @@ The system is **ready for production deployment** on embedded systems (Jetson, R
 
 ---
 
+## Remaining Optional TODOs (4 Total)
+
+All 4 remaining TODO comments are for **optional ONNX/neural network feature matchers** that have working fallback implementations. None block production deployment.
+
+### TODO 1-2: LightGlue Neural Matcher (src/feature_tracker/lightglue_matcher.rs:115)
+**Status**: Working fallback with nearest-neighbor matching  
+**Future Enhancement**: Implement ONNX cross-attention matching  
+**Current Impact**: Simple NN matching works well; neural version would improve quality  
+**Effort**: 15-20 hours (ONNX runtime + model loading)
+
+### TODO 3-4: SuperPoint Descriptor Extraction (src/feature_tracker/superpoint_descriptor.rs:92, 138, 155)
+**Status**: Working fallback with standard descriptors  
+**Future Enhancement**: Implement ONNX model inference  
+**Current Impact**: CPU descriptor extraction adequate; neural version would be faster  
+**Effort**: 15-20 hours (ONNX model loading + inference)
+
+**Summary**: Both feature matchers have production-ready fallback implementations. These TODOs represent future optimizations for users with GPU access who want neural network-based feature matching. The system works perfectly well without them.
+
+---
+
 ## Quality Metrics (Current Status)
 
 | Metric | Status |
@@ -331,22 +351,24 @@ For detailed technical information about implemented features, see:
 
 Based on implementation status and effort:
 
+### ✅ Fully Integrated (Production-Ready):
+1. ✅ **Loop Closure Integration** (COMPLETED - detection + constraints + visualization all active)
+2. ✅ **Rerun Visualization Cleanup** (COMPLETED - removed 419 lines, added tests)
+3. ✅ **Configuration Validation** (COMPLETED - startup validation + auto-clamping)
+4. ✅ **Velocity Hint Integration** (COMPLETED - fusion estimates to feature tracker)
+
 ### Quick Wins (Low-Effort, High-Value):
-1. **Extended Dataset Support** (10-15 hours per dataset) - Add KITTI, MHETRA, etc.
-2. **Documentation Expansion** (10-20 hours) - Jupyter notebooks, tutorials
+1. **Extended Dataset Support** (10-15 hours per dataset) - Add KITTI, other EuRoC sequences, etc.
+2. **Documentation Expansion** (10-20 hours) - Jupyter notebooks, tutorials, case studies
 
-### Fully Integrated (Production-Ready):
-3. ✅ **Loop Closure Integration** (COMPLETED - detection + constraints + visualization all active)
-4. ✅ **Rerun Visualization Cleanup** (COMPLETED - removed 419 lines, added tests)
-
-### High-Value, Medium-Effort:
+### Medium Effort, Medium-Value:
 3. **Adaptive Parameter Tuning** (25-35 hours) - Auto-tuning for new environments
+4. **Performance Dashboard** (15-25 hours) - Real-time metrics visualization
 
 ### High-Impact, High-Effort:
-4. **GPU Acceleration** (40-60 hours) - 2-5× speedup potential
-5. **Multi-Sensor Fusion** (30-40 hours per sensor) - Magnetometer, barometer, etc.
+5. **GPU Acceleration** (40-60 hours) - 2-5× speedup potential on GPU platforms
+6. **Multi-Sensor Fusion** (30-40 hours per sensor) - Magnetometer, barometer, LiDAR, etc.
 
-### Infrastructure:
-6. **Performance Dashboard** (15-25 hours) - Real-time metrics visualization
-7. **Distributed Processing** (60-80 hours) - ROS/ROS2 integration for multi-robot
+### Infrastructure (Future):
+7. **Distributed Processing** (60-80 hours) - ROS/ROS2 integration for multi-robot systems
 
