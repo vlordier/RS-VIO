@@ -60,8 +60,8 @@ pub struct FeatureDistributor {
     image_height: u32,
     /// Statistics
     total_features: u32,
-    /// Frame tracking (for change detection)
-    #[allow(dead_code)]
+    /// Frame tracking for temporal change detection (reserved for future enhancement)
+    #[allow(dead_code)] // Will be used for adaptive grid resizing based on scene dynamics
     last_update_frame: u32,
 }
 

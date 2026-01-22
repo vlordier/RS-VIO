@@ -76,8 +76,10 @@ impl RotationStabilizer {
         }
     }
 
-    /// Integrate IMU gyro data to estimate rotation
-    /// TODO: Integrate this into fuse() method for production use
+    /// Integrate IMU gyro data to estimate rotation (test helper)
+    /// 
+    /// NOTE: This is a simplified implementation for testing. Production integration
+    /// would use proper SO(3) exponential map. Kept for future fusion enhancements.
     #[cfg(test)]
     #[allow(dead_code)]
     fn integrate_gyro_rotation(&self, imu_data: &[ImuData]) -> FusionResult<Matrix3x3> {
@@ -122,8 +124,10 @@ impl RotationStabilizer {
         }
     }
 
-    /// Warp frame to reference using rotation
-    /// TODO: Integrate this into fuse() method for production use
+    /// Warp frame to reference using rotation (test helper)
+    /// 
+    /// NOTE: Simplified bilinear resampling for testing. Production would use
+    /// OpenCV remap or SIMD-accelerated implementation. Kept for future enhancements.
     #[cfg(test)]
     #[allow(dead_code)]
     fn warp_frame_rotation(

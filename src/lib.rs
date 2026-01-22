@@ -273,7 +273,10 @@ pub mod math;
 pub mod multi_drone;
 pub mod optimization;
 pub mod platform;
+
+#[cfg(feature = "swarm")]
 pub mod swarm;
+
 pub mod traits;
 pub mod types;
 pub mod validation;

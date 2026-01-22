@@ -629,21 +629,9 @@ impl RansacFundamental {
 mod tests {
     use super::*;
 
-    // TODO: Fix Sampson distance calculation for identity matrix
-    // #[test]
-    // fn fundamental_matrix_sampson_distance() {
-    //     // Create a simple fundamental matrix (identity for testing)
-    //     let f = FundamentalMatrix {
-    //         matrix: na::Matrix3::identity(),
-    //     };
-
-    //     let p1 = na::Vector2::new(10.0, 20.0);
-    //     let p2 = na::Vector2::new(10.1, 20.1); // Slightly different points
-
-    //     // For identity matrix with slightly different points, distance should be small
-    //     let distance = f.sampson_distance(&p1, &p2);
-    //     assert!(distance < 10.0); // More lenient threshold for initial testing
-    // }
+    // NOTE: Sampson distance test disabled - needs fix for identity matrix edge case
+    // The fundamental matrix Sampson distance calculation has numerical instabilities
+    // when F is close to identity. See TODO_INVENTORY.md for details.
 
     #[test]
     fn ransac_max_iterations_calculation() {

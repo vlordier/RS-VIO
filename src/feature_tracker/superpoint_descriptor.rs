@@ -88,8 +88,8 @@ pub struct SuperPointDescriptor {
     config: SuperPointConfig,
     /// Model path (ONNX format)
     model_path: Option<String>,
-    /// Input image size expected by model
-    #[allow(dead_code)]
+    /// Input image size expected by model (reserved for ONNX integration)
+    #[allow(dead_code)] // TODO: Will be used when ONNX model loading is implemented
     input_size: (u32, u32),
     /// Extracted keypoints and descriptors
     keypoints: Vec<KeypointDescriptor>,

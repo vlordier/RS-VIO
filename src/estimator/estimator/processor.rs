@@ -300,15 +300,8 @@ impl Estimator {
                         self.imu_processor.extrinsic_calibrator
                             .add_measurement(&T_W_B_copy, R_W_B);
 
-                        // Run calibration periodically
-                        if self.imu_processor.stats.total_measurements % 100 == 0 {
-                            // Temporarily disabled due to NaN issues
-                            // let error = self.imu_processor.extrinsic_calibrator.calibrate_iteration();
-                            // log::debug!(
-                            //     "[Estimator] IMU extrinsic calibration error: {:.6} rad",
-                            //     error
-                            // );
-                        }
+                        // NOTE: Periodic calibration disabled due to NaN instabilities in edge cases
+                        // Can be re-enabled once calibrator is stabilized for all motion profiles
                     }
                 }
             } else if should_log {
