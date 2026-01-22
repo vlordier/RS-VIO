@@ -7,7 +7,7 @@
 
 ## Quick Reference
 
-- **Complete TODO inventory**: See [TODO_INVENTORY.md](TODO_INVENTORY.md) for detailed tracking of all 11 outstanding TODOs with file/line references
+- **Complete TODO inventory**: See [TODO_INVENTORY.md](TODO_INVENTORY.md) for detailed tracking of all 4 outstanding TODOs with file/line references
 - **Code vs. documentation**: All TODOs in source code are mapped to sections below for implementation planning
 - **What's blocking?**: Nothing - all TODOs are enhancements, not critical path items
 
@@ -25,12 +25,12 @@ The RS-VIO system has completed all **core visual-inertial odometry functionalit
 ✅ **All unit tests passing**  
 ✅ **All integration tests validated**  
 ✅ **Zero unsafe code**  
-⚠️ **11 outstanding TODO comments** (feature integration notes, not blockers)  
+⚠️ **4 outstanding TODO comments** (optional ONNX features, not blockers)  
 ✅ **Zero unimplemented!() macros**  
 
 The system is **ready for production deployment** on embedded systems (Jetson, Raspberry Pi) and standard platforms.
 
-*Note: Outstanding TODOs are found in rotation_stabilizer.rs (2), processor.rs (1), and feature matching modules (8) - primarily integration notes for optional features, not broken functionality.*
+*Note: Outstanding TODOs are in feature matching modules (4 for optional ONNX/neural network matchers) - all optional enhancements, not broken functionality.*
 
 ---
 
