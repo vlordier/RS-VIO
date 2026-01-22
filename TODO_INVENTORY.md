@@ -232,22 +232,20 @@ This document provides a complete inventory of all TODO/FIXME comments in the co
 
 #### TODO 5: Strategy Runtime Injection
 
-**File**: `src/bin/run_euroc_strategies.rs`  
-**Category**: Feature improvement  
+**Status**: ✅ **REMOVED** (2026-01-22)
 
-```rust
-// TODO: Inject strategy into player for runtime switching
-```
+The incomplete `run_euroc_strategies.rs` binary has been removed.
 
-**What it is**: Suggested improvement for easier testing of different VIO configurations
+**Reason for removal**:
+- Binary was undocumented and not mentioned in any guides
+- Had unfinished TODO about injecting strategies into player  
+- Created a StereoMatchingStrategy but never passed it to the player
+- Only used the strategy for logging its name
 
-**What needs to be done**:
-1. Add command-line arguments for strategy selection
-2. Implement dynamic strategy loading
-3. Test with different configurations
-4. Document for users
-
-**Reference**: [REMAINING_WORK.md - Section 4: Adaptive Parameter Tuning](REMAINING_WORK.md#4-adaptive-parameter-tuning-low-priority)
+**Current approach**:
+- Strategy selection available as feature gates in the library (`matching-basic-ransac`, `matching-imu-guided`, etc.)
+- Main `run_euroc.rs` binary provides full dataset player functionality
+- Proper strategy selection for production use is documented in CONFIGURATION_GUIDE.md
 
 **Effort**: 5-8 hours  
 **Priority**: Very Low (manual recompilation works currently)
@@ -364,8 +362,8 @@ This document provides a complete inventory of all TODO/FIXME comments in the co
    - Integrate estimator feedback
 
 ### Phase 4: Developer Convenience (<10 hours, Nice-to-Have)
-1. **Runtime Strategy Injection** (run_euroc_strategies.rs)
-2. **Dataset Code Cleanup** (datasets/mod.rs)
+1. ~~**Runtime Strategy Injection** (run_euroc_strategies.rs)~~ ✅ **REMOVED**
+2. **Dataset Code Cleanup** (datasets/mod.rs) - Optional refactoring for elegance
 
 ---
 
