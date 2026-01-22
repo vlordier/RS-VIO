@@ -3,6 +3,7 @@
 //! This module contains reusable components, traits, and helpers that promote
 //! DRY principles and maintainability.
 
+pub mod arena;
 pub mod config;
 pub mod error;
 #[macro_use]
@@ -16,6 +17,7 @@ pub mod testing;
 pub mod types;
 pub mod validation;
 
+pub use arena::{DescriptorArena, FeatureTrackingArena, ImuDataArena};
 pub use config::{Clampable, ConfigBuilder, Mergeable, Validatable};
 pub use error::{ErrorCollector, OptionExt, ResultExt};
 pub use math::{clamp, normalize_angle, safe_sqrt};
@@ -24,3 +26,4 @@ pub use realtime_monitor::{
 };
 pub use types::{CameraId, Confidence, FeatureId, FrameId, Timestamp};
 pub use validation::{validate_matrix, validate_pose, validate_quaternion};
+
