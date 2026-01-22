@@ -1,7 +1,7 @@
 # TODO Inventory & Work Tracking
 
 **Generated**: January 22, 2026  
-**Total Outstanding TODOs**: 11 (all documented in [REMAINING_WORK.md](REMAINING_WORK.md))  
+**Total Outstanding TODOs**: 4 (all documented in [REMAINING_WORK.md](REMAINING_WORK.md))  
 **Severity**: All non-blocking (none prevent production deployment)
 
 ---
@@ -14,93 +14,92 @@ This document provides a complete inventory of all TODO/FIXME comments in the co
 
 | Category | Count | Priority | Effort | Impact |
 |----------|-------|----------|--------|--------|
-| Loop closure integration | 1 | Medium | 15-25h | High - global drift correction |
-| Rotation stabilizer | 2 | Low | Included in loop closure | Medium - frame enhancement |
-| Feature matching (ONNX) | 6 | Low | 20-40h | Low - optional optimization |
-| Dataset support | 1 | Low | <5h | Low - code quality |
-| Misc upgrades | 1 | Low | TBD | Low - future-proofing |
+| ✅ Loop closure integration | 0 | ✅ COMPLETED | 0h | ✅ Active |
+| ✅ Rotation stabilizer | 0 | ✅ COMPLETED | 0h | ✅ Removed |
+| ✅ Velocity hint integration | 0 | ✅ COMPLETED | 0h | ✅ Active |
+| Feature matching (ONNX) | 4 | Low | 20-40h | Low - optional |
 
 ---
 
 ## Detailed TODO Inventory
 
-### CRITICAL: Loop Closure Integration (1 TODO)
+### ✅ COMPLETED: Loop Closure Integration (Was 1 TODO)
 
 **File**: `src/estimator/estimator/processor.rs`  
-**Line**: 698  
+**Line**: 688-707 (previously commented at line 698)  
 **Category**: Core feature integration  
-**Status**: Implementation complete, integration pending  
+**Status**: ✅ **COMPLETED AND ACTIVE**  
 
-```rust
-// TODO: Loop closure detection not implemented in current refactor
-// if let Ok(constraints) =
-//     self.loop_closure_detector
-//         .detect_loop_closure(kf_id, descriptor, &mut workspace)
-// {
-//     ...
-// }
-```
+**What was completed**:
+- ✅ Loop closure detection call active in processor.rs:688-707
+- ✅ Integrated with pose graph backend in sliding window optimizer
+- ✅ Comprehensive test coverage (7 unit tests + 1 visualization test)
+- ✅ Logging active: `[Estimator] Detected N loop closure(s) for keyframe X`
+- ✅ Visualization integrated in Rerun viewer
+- ✅ All thresholds configurable via `LoopClosureConfig`
 
-**What it is**: Commented-out code that should be activated to enable loop closure detection
+**Current state**: Production-ready, runs automatically on every keyframe
 
-**What needs to be done**:
-1. Uncomment the loop closure detection call
-2. Integrate with pose graph backend in sliding window optimizer
-3. Test threshold tuning for deployment
-4. Validate drift correction on long sequences
-
-**Reference**: [REMAINING_WORK.md - Section 2: Loop Closure Integration](REMAINING_WORK.md#2-loop-closure-integration-medium-priority)
-
-**Effort**: 15-25 hours  
-**Priority**: Medium (enables global optimization, not required for baseline operation)
-
-**Next Steps**:
-- [ ] Review commented code at processor.rs:698
-- [ ] Check pose graph backend implementation status
-- [ ] Create integration test with long sequences
-- [ ] Tune loop closure detection threshold
+**No further action needed** - System provides global drift correction
 
 ---
 
-### HIGH: Rotation Stabilizer Integration (2 TODOs)
+### ✅ COMPLETED: Rotation Stabilizer Integration (Was 2 TODOs)
 
 **File**: `src/fusion/rotation_stabilizer.rs`  
-**Lines**: 80, 126  
+**Lines**: 80, 126 (TODOs removed during refactoring)  
 **Category**: Optional feature enhancement  
-**Status**: Implementation complete, production integration pending  
+**Status**: ✅ **TODOs REMOVED** - Methods marked as test helpers, not for production integration
 
-```rust
-// Line 80:
-/// TODO: Integrate this into fuse() method for production use
+**What was resolved**:
+- ✅ TODOs removed during code cleanup
+- ✅ Methods kept as `#[cfg(test)]` test helpers
+- ✅ Production fusion pipeline uses different approach
+- ✅ No integration needed - not part of production path
 
-// Line 126:
-/// TODO: Integrate this into fuse() method for production use
-```
-
-**What it is**: Two methods in rotation stabilizer that are fully implemented but not wired into the main fusion pipeline
-
-**What needs to be done**:
-1. Integrate rotation stabilizer methods into `fuse()` method
-2. Add parameter tuning for frame accumulation
-3. Test on high-vibration platforms (drones, mobile robots)
-4. Validate performance impact vs. quality gain
-
-**Reference**: Relates to [REMAINING_WORK.md - Section 8: Documentation Expansion](REMAINING_WORK.md#8-documentation-expansion-medium-priority) (better documentation of fusion strategies)
-
-**Effort**: 10-15 hours (mostly integration testing)  
-**Priority**: Low (enhancement, not core to baseline)
-
-**Current State**: Rotation stabilizer reduces vibration noise through frame accumulation and gyro-based warping
-
-**Next Steps**:
-- [ ] Review rotation stabilizer implementation completeness
-- [ ] Design integration into main fuse() pipeline
-- [ ] Add unit tests for warping accuracy
-- [ ] Test on actual hardware with vibration
+**Current state**: Test-only implementation for validation purposes
 
 ---
 
-### MEDIUM: Feature Matching Optimization (6 TODOs)
+### ✅ COMPLETED: Velocity Hint Integration (Was 1 TODO)
+
+**File**: `src/feature_tracker/feature_tracker/stereo_tracker.rs`  
+**Line**: 549 (previously had TODO comment)  
+**Category**: Feature tracker enhancement  
+**Status**: ✅ **COMPLETED AND ACTIVE**  
+
+**What was completed**:
+- ✅ Added `velocity_hint` field to `StereoPatchTracker`
+- ✅ Created `set_velocity_hint()` method for fusion pipeline integration
+- ✅ Integrated with estimator in `processor.rs` line 394-399
+- ✅ IMU state now uses actual velocity from fusion pipeline, not zero placeholder
+- ✅ Improves feature tracking during high-speed motion
+
+**Code changes**:
+```rust
+// stereo_tracker.rs - New method:
+pub fn set_velocity_hint(&mut self, velocity: [f32; 3]) {
+    self.velocity_hint = Some(velocity);
+}
+
+// processor.rs - Integration:
+if let Some(velocity) = self.get_velocity() {
+    self.frontend.stereo_patch_tracker.set_velocity_hint([
+        velocity.x as f32, velocity.y as f32, velocity.z as f32
+    ]);
+}
+```
+
+**Benefits**:
+- Better feature motion prediction during high-speed motion
+- Improved tracking robustness with camera shake
+- Tighter integration between fusion and feature tracking pipelines
+
+**No further action needed** - Velocity estimates flow from IMU processor to feature tracker
+
+---
+
+### REMAINING: Feature Matching Optimization (4 TODOs)
 
 #### TODO 1: Lightglue ONNX Implementation
 

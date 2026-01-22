@@ -385,6 +385,15 @@ impl Estimator {
             if self.config.debug.use_imu {
                 self.frontend.stereo_patch_tracker
                     .set_imu_rotation_hint(imu, (fx, fy, cx, cy));
+                    
+                // Provide velocity estimate for improved feature tracking
+                if let Some(velocity) = self.get_velocity() {
+                    self.frontend.stereo_patch_tracker.set_velocity_hint([
+                        velocity.x as f32,
+                        velocity.y as f32,
+                        velocity.z as f32,
+                    ]);
+                }
             }
         }
 

@@ -43,6 +43,7 @@ pub struct StereoPatchTracker<const N: u32> {
     previous_match_results: Vec<StereoMatchResult>,
     imu_rotation_hint: Option<[f32; 3]>,
     imu_intrinsics_hint: Option<(f32, f32, f32, f32)>,
+    velocity_hint: Option<[f32; 3]>,
     camera_matrix_hint: Option<na::Matrix3<f32>>,
     /// Features that were lost and may be re-tracked
     lost_features: HashMap<usize, (na::Affine2<f32>, na::Affine2<f32>, u32)>, // (left_pos, right_pos, frames_lost)
@@ -118,6 +119,7 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             previous_match_results: Vec::new(),
             imu_rotation_hint: None,
             imu_intrinsics_hint: None,
+            velocity_hint: None,
             camera_matrix_hint: None,
             lost_features: HashMap::new(),
             max_lost_frames: 5, // Keep lost features for 5 frames
@@ -222,6 +224,17 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
 
         self.imu_rotation_hint = Some(omega);
         self.imu_intrinsics_hint = Some(intrinsics);
+    }
+
+    /// Provide velocity hint from fusion/estimator for improved feature tracking
+    ///
+    /// Velocity estimate helps predict feature motion and improve tracking robustness,
+    /// especially during high-speed motion or camera shake.
+    ///
+    /// # Arguments
+    /// * `velocity` - Estimated velocity in world frame [m/s] from fusion pipeline
+    pub fn set_velocity_hint(&mut self, velocity: [f32; 3]) {
+        self.velocity_hint = Some(velocity);
     }
 
     /// Set the stereo matching strategy at runtime
@@ -544,11 +557,15 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
         // Prepare IMU state for strategy (if available)
         let imu_state = if let Some(omega) = self.imu_rotation_hint {
             if let Some((_fx, _fy, _cx, _cy)) = self.imu_intrinsics_hint {
-                // IMU state would come from fusion pipeline
-                // For now, use zero velocity as placeholder
-                // TODO: Connect to actual fusion/estimator velocity estimates
+                // Use velocity from fusion pipeline if available, otherwise zero
+                let velocity = if let Some(v) = self.velocity_hint {
+                    na::Vector3::new(v[0], v[1], v[2])
+                } else {
+                    na::Vector3::zeros()
+                };
+                
                 Some(crate::feature_tracker::IMUState {
-                    velocity: na::Vector3::zeros(),
+                    velocity,
                     angular_velocity: na::Vector3::new(omega[0], omega[1], omega[2]),
                     dt: 1.0 / 30.0, // Assume 30 FPS, should get from actual frame timing
                 })
