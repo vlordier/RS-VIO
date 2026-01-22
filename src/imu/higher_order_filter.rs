@@ -463,12 +463,12 @@ mod tests {
                 9.81 + 0.2 * (2.0 * std::f32::consts::PI * 0.8 * t).sin(),
             ];
 
-            let output = filter.process_accel(accel);
+            let _output = filter.process_accel(accel);
 
             // All outputs should be finite
-            assert_finite!(output.jerk_magnitude, "Jerk should be finite");
-            assert_finite!(output.snap_magnitude, "Snap should be finite");
-            assert_finite!(output.f0_confidence, "f0_confidence should be finite");
+            assert_finite!(_output.jerk_magnitude, "Jerk should be finite");
+            assert_finite!(_output.snap_magnitude, "Snap should be finite");
+            assert_finite!(_output.f0_confidence, "f0_confidence should be finite");
         }
 
         // Should have reasonable peak magnitudes
@@ -538,10 +538,10 @@ mod tests {
                 0.5 * (2.0 * std::f32::consts::PI * 0.5 * t).sin(), // 0.5 Hz on Z
             ];
 
-            let output = filter.process_accel(accel);
+            let _output = filter.process_accel(accel);
 
             // Each axis should be processed independently
-            assert_all_finite!(output.jerk, "jerk components must be finite");
+            assert_all_finite!(_output.jerk, "jerk components must be finite");
         }
     }
 

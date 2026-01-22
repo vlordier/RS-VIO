@@ -46,6 +46,8 @@ rayon = "1.10"  # Parallel iteration for multi-core feature tracking
 core_affinity = "0.8"  # Thread pinning support (used on Raspberry Pi)
 lazy_static = "1.4"  # For global workspace pool singleton
 typed-arena = "2.0"  # Arena allocator for zero-copy feature tracking
+tokio = { version = "1.35", features = ["full"] }  # Async runtime for concurrent processing
+futures = "0.3"  # Async utilities and combinators
 # Note: Using git dependency for apex-solver to access Schur complement methods
 # Consider pinning to a specific commit when stable release is available
 apex-solver = { git = "https://github.com/amin-abouee/apex-solver", branch = "main" }
