@@ -111,8 +111,8 @@ impl PoolSlot {
 pub struct WorkspacePool {
     /// Fixed-size array of workspace slots
     slots: Vec<PoolSlot>,
-    /// Configuration for creating new workspaces
-    config: WorkspaceConfig,
+    /// Shared configuration (Arc avoids cloning on each workspace creation)
+    config: std::sync::Arc<WorkspaceConfig>,
     /// Maximum pool size
     max_pool_size: usize,
     /// Fallback mutex-protected overflow storage
@@ -122,11 +122,12 @@ pub struct WorkspacePool {
 impl WorkspacePool {
     /// Create new lock-free workspace pool
     pub fn new(config: WorkspaceConfig, initial_size: usize, max_size: usize) -> Self {
+        let config = std::sync::Arc::new(config);
         let mut slots = Vec::with_capacity(max_size);
 
         // Pre-allocate initial workspaces in lock-free slots
         for _ in 0..initial_size {
-            slots.push(PoolSlot::new(FrameWorkspace::new(config.clone())));
+            slots.push(PoolSlot::new(FrameWorkspace::new((*config).clone())));
         }
 
         // Fill remaining slots with empty markers
@@ -165,8 +166,8 @@ impl WorkspacePool {
             None
         };
 
-        // Last resort: allocate new workspace
-        let workspace = workspace.unwrap_or_else(|| FrameWorkspace::new(self.config.clone()));
+        // Last resort: allocate new workspace using Arc reference
+        let workspace = workspace.unwrap_or_else(|| FrameWorkspace::new((*self.config).clone()));
 
         PooledFrameWorkspace {
             workspace: Some(workspace),
@@ -297,8 +298,8 @@ impl ResourcePool for WorkspacePool {
             }
         }
 
-        // Allocate new
-        FrameWorkspace::new(self.config.clone())
+        // Allocate new workspace using Arc reference
+        FrameWorkspace::new((*self.config).clone())
     }
 
     fn try_acquire(&self) -> Option<Self::Resource> {
