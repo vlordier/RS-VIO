@@ -1,5 +1,6 @@
 use crate::traits::{StateTransform, StateView};
 use crate::types::{Float, Matrix4x4, Vector3};
+use crate::ok_or_log;
 
 #[derive(Debug, Clone)]
 pub struct State {
@@ -58,7 +59,11 @@ impl StateTransform for State {
     }
 
     fn inverse(&self) -> Self {
-        let T_W_B_inv = self.T_W_B.try_inverse().unwrap_or(Matrix4x4::identity());
+        let T_W_B_inv = ok_or_log!(
+            self.T_W_B.try_inverse(),
+            Matrix4x4::identity(),
+            "[State] T_W_B inversion failed, using identity"
+        );
         Self {
             T_W_B: T_W_B_inv,
             T_B_Cl: self.T_B_Cl,

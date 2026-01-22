@@ -3,7 +3,7 @@
 //! Implements coordinated exploration using frontier detection and
 //! utility-based task allocation for efficient coverage.
 
-use crate::multi_drone::boids::Vector3;
+use crate::types::{Float, Vector3};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
@@ -15,10 +15,10 @@ pub enum CellState {
     Occupied,
 }
 
-/// 3D occupancy grid for mapping
+/// 3D occupancy grid for mapping with efficient frontier tracking
 pub struct OccupancyGrid {
     /// Grid resolution (meters per cell)
-    pub resolution: f32,
+    pub resolution: Float,
     /// Grid origin (minimum corner)
     pub origin: Vector3,
     /// Grid dimensions (cells)
@@ -27,11 +27,15 @@ pub struct OccupancyGrid {
     pub size_z: usize,
     /// Cell states (flattened 3D array)
     cells: Vec<CellState>,
+    /// Frontier candidate cells (cells that became free recently)
+    frontier_candidates: HashSet<(usize, usize, usize)>,
+    /// Dirty flag for incremental frontier detection
+    frontiers_dirty: bool,
 }
 
 impl OccupancyGrid {
-    /// Create new occupancy grid
-    pub fn new(origin: Vector3, resolution: f32, size_x: usize, size_y: usize, size_z: usize) -> Self {
+    /// Create new occupancy grid with efficient frontier tracking
+    pub fn new(origin: Vector3, resolution: Float, size_x: usize, size_y: usize, size_z: usize) -> Self {
         let total_cells = size_x * size_y * size_z;
         Self {
             resolution,
@@ -40,6 +44,8 @@ impl OccupancyGrid {
             size_y,
             size_z,
             cells: vec![CellState::Unknown; total_cells],
+            frontier_candidates: HashSet::new(),
+            frontiers_dirty: false,
         }
     }
 
@@ -63,9 +69,9 @@ impl OccupancyGrid {
     /// Convert grid index to world coordinates (cell center)
     pub fn grid_to_world(&self, x: usize, y: usize, z: usize) -> Vector3 {
         Vector3::new(
-            self.origin.x + (x as f32 + 0.5) * self.resolution,
-            self.origin.y + (y as f32 + 0.5) * self.resolution,
-            self.origin.z + (z as f32 + 0.5) * self.resolution,
+            self.origin.x + (x as Float + 0.5) * self.resolution,
+            self.origin.y + (y as Float + 0.5) * self.resolution,
+            self.origin.z + (z as Float + 0.5) * self.resolution,
         )
     }
 
@@ -78,13 +84,63 @@ impl OccupancyGrid {
         self.cells[idx]
     }
 
-    /// Set cell state
+    /// Set cell state and update frontier candidates
     pub fn set_cell(&mut self, x: usize, y: usize, z: usize, state: CellState) {
         if x >= self.size_x || y >= self.size_y || z >= self.size_z {
             return;
         }
+
         let idx = x + y * self.size_x + z * self.size_x * self.size_y;
+        let old_state = self.cells[idx];
+
+        // Only update if state changed
+        if old_state == state {
+            return;
+        }
+
         self.cells[idx] = state;
+        self.frontiers_dirty = true;
+
+        // If cell became free, it's a potential frontier
+        if state == CellState::Free {
+            self.frontier_candidates.insert((x, y, z));
+
+            // Also add neighbors as potential frontiers (they might now border unknown)
+            self.add_neighbor_candidates(x, y, z);
+        }
+
+        // If cell became occupied or was free, remove from candidates
+        if old_state == CellState::Free || state == CellState::Occupied {
+            self.frontier_candidates.remove(&(x, y, z));
+
+            // Update neighbors (they might no longer be frontiers)
+            self.add_neighbor_candidates(x, y, z);
+        }
+    }
+
+    /// Add neighbors of a cell to frontier candidates
+    fn add_neighbor_candidates(&mut self, x: usize, y: usize, z: usize) {
+        let neighbors: [(isize, isize, isize); 6] = [
+            (x as isize - 1, y as isize, z as isize),
+            (x as isize + 1, y as isize, z as isize),
+            (x as isize, y as isize - 1, z as isize),
+            (x as isize, y as isize + 1, z as isize),
+            (x as isize, y as isize, z as isize - 1),
+            (x as isize, y as isize, z as isize + 1),
+        ];
+
+        for (nx, ny, nz) in neighbors {
+            if nx >= 0 && ny >= 0 && nz >= 0
+                && (nx as usize) < self.size_x
+                && (ny as usize) < self.size_y
+                && (nz as usize) < self.size_z
+            {
+                let state = self.get_cell(nx as usize, ny as usize, nz as usize);
+                if state == CellState::Free {
+                    self.frontier_candidates.insert((nx as usize, ny as usize, nz as usize));
+                }
+            }
+        }
     }
 
     /// Mark point as free
@@ -107,19 +163,23 @@ impl OccupancyGrid {
             return false;
         }
 
-        // Check 6-connected neighbors
-        let neighbors = [
-            (x.wrapping_sub(1), y, z),
-            (x + 1, y, z),
-            (x, y.wrapping_sub(1), z),
-            (x, y + 1, z),
-            (x, y, z.wrapping_sub(1)),
-            (x, y, z + 1),
+        // Check 6-connected neighbors with proper bounds checking
+        let neighbors: [(isize, isize, isize); 6] = [
+            (x as isize - 1, y as isize, z as isize),
+            (x as isize + 1, y as isize, z as isize),
+            (x as isize, y as isize - 1, z as isize),
+            (x as isize, y as isize + 1, z as isize),
+            (x as isize, y as isize, z as isize - 1),
+            (x as isize, y as isize, z as isize + 1),
         ];
 
         for (nx, ny, nz) in neighbors {
-            if nx < self.size_x && ny < self.size_y && nz < self.size_z {
-                if self.get_cell(nx, ny, nz) == CellState::Unknown {
+            if nx >= 0 && ny >= 0 && nz >= 0
+                && (nx as usize) < self.size_x
+                && (ny as usize) < self.size_y
+                && (nz as usize) < self.size_z
+            {
+                if self.get_cell(nx as usize, ny as usize, nz as usize) == CellState::Unknown {
                     return true;
                 }
             }
@@ -139,7 +199,7 @@ pub struct Frontier {
     /// Number of cells in frontier
     pub size: usize,
     /// Estimated information gain
-    pub information_gain: f32,
+    pub information_gain: Float,
 }
 
 impl Frontier {
@@ -148,22 +208,22 @@ impl Frontier {
             id,
             centroid,
             size,
-            information_gain: size as f32, // Simple estimate
+            information_gain: size as Float, // Simple estimate
         }
     }
 }
 
 /// Configuration for exploration strategy
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone,Serialize, Deserialize)]
 pub struct ExplorationConfig {
     /// Minimum frontier size (cells)
     pub min_frontier_size: usize,
     /// Weight for information gain in utility
-    pub information_gain_weight: f32,
+    pub information_gain_weight: Float,
     /// Weight for distance in utility
-    pub distance_weight: f32,
+    pub distance_weight: Float,
     /// Maximum exploration range
-    pub max_range: f32,
+    pub max_range: Float,
 }
 
 impl Default for ExplorationConfig {
@@ -183,7 +243,7 @@ pub struct ExplorationTask {
     pub drone_id: usize,
     pub frontier_id: usize,
     pub target_position: Vector3,
-    pub utility: f32,
+    pub utility: Float,
 }
 
 /// Frontier-based exploration manager
@@ -221,46 +281,55 @@ impl ExplorationManager {
         }
     }
 
-    /// Detect frontiers in the occupancy grid
+    /// Detect frontiers in the occupancy grid (optimized incremental version)
     pub fn detect_frontiers(&mut self) {
+        // Skip if grid hasn't changed
+        if !self.grid.frontiers_dirty {
+            return;
+        }
+
         self.frontiers.clear();
         let mut visited = HashSet::new();
 
-        for z in 0..self.grid.size_z {
-            for y in 0..self.grid.size_y {
-                for x in 0..self.grid.size_x {
-                    if visited.contains(&(x, y, z)) {
-                        continue;
+        // Only check frontier candidates instead of all cells (O(candidates) vs O(n³))
+        let candidates: Vec<(usize, usize, usize)> = self.grid.frontier_candidates.iter().copied().collect();
+
+        for (x, y, z) in candidates {
+            if visited.contains(&(x, y, z)) {
+                continue;
+            }
+
+            if self.grid.is_frontier(x, y, z) {
+                // Cluster frontier cells
+                let cluster = self.cluster_frontier(x, y, z, &mut visited);
+
+                if cluster.len() >= self.config.min_frontier_size {
+                    // Compute centroid
+                    let mut sum_x = 0.0;
+                    let mut sum_y = 0.0;
+                    let mut sum_z = 0.0;
+
+                    for (cx, cy, cz) in &cluster {
+                        let pos = self.grid.grid_to_world(*cx, *cy, *cz);
+                        sum_x += pos.x;
+                        sum_y += pos.y;
+                        sum_z += pos.z;
                     }
 
-                    if self.grid.is_frontier(x, y, z) {
-                        // Cluster frontier cells
-                        let cluster = self.cluster_frontier(x, y, z, &mut visited);
-                        
-                        if cluster.len() >= self.config.min_frontier_size {
-                            // Compute centroid
-                            let mut sum_x = 0.0;
-                            let mut sum_y = 0.0;
-                            let mut sum_z = 0.0;
+                    let n = cluster.len() as Float;
+                    let centroid = Vector3::new(sum_x / n, sum_y / n, sum_z / n);
 
-                            for (cx, cy, cz) in &cluster {
-                                let pos = self.grid.grid_to_world(*cx, *cy, *cz);
-                                sum_x += pos.x;
-                                sum_y += pos.y;
-                                sum_z += pos.z;
-                            }
-
-                            let n = cluster.len() as f32;
-                            let centroid = Vector3::new(sum_x / n, sum_y / n, sum_z / n);
-
-                            let frontier = Frontier::new(self.next_frontier_id, centroid, cluster.len());
-                            self.next_frontier_id += 1;
-                            self.frontiers.push(frontier);
-                        }
-                    }
+                    let frontier = Frontier::new(self.next_frontier_id, centroid, cluster.len());
+                    self.next_frontier_id += 1;
+                    self.frontiers.push(frontier);
                 }
+            } else {
+                // Not a frontier anymore, remove from candidates
+                self.grid.frontier_candidates.remove(&(x, y, z));
             }
         }
+
+        self.grid.frontiers_dirty = false;
     }
 
     /// Cluster connected frontier cells using flood fill
@@ -286,23 +355,24 @@ impl ExplorationManager {
             visited.insert((x, y, z));
             cluster.push((x, y, z));
 
-            // Add neighbors
-            let neighbors = [
-                (x.wrapping_sub(1), y, z),
-                (x + 1, y, z),
-                (x, y.wrapping_sub(1), z),
-                (x, y + 1, z),
-                (x, y, z.wrapping_sub(1)),
-                (x, y, z + 1),
+            // Add neighbors with proper bounds checking
+            let neighbors: [(isize, isize, isize); 6] = [
+                (x as isize - 1, y as isize, z as isize),
+                (x as isize + 1, y as isize, z as isize),
+                (x as isize, y as isize - 1, z as isize),
+                (x as isize, y as isize + 1, z as isize),
+                (x as isize, y as isize, z as isize - 1),
+                (x as isize, y as isize, z as isize + 1),
             ];
 
             for (nx, ny, nz) in neighbors {
-                if nx < self.grid.size_x 
-                    && ny < self.grid.size_y 
-                    && nz < self.grid.size_z
-                    && !visited.contains(&(nx, ny, nz))
+                if nx >= 0 && ny >= 0 && nz >= 0
+                    && (nx as usize) < self.grid.size_x
+                    && (ny as usize) < self.grid.size_y
+                    && (nz as usize) < self.grid.size_z
+                    && !visited.contains(&(nx as usize, ny as usize, nz as usize))
                 {
-                    stack.push((nx, ny, nz));
+                    stack.push((nx as usize, ny as usize, nz as usize));
                 }
             }
         }
@@ -311,8 +381,8 @@ impl ExplorationManager {
     }
 
     /// Compute utility of a frontier for a drone
-    pub fn compute_utility(&self, drone_position: &Vector3, frontier: &Frontier) -> f32 {
-        let distance = drone_position.distance_to(&frontier.centroid);
+    pub fn compute_utility(&self, drone_position: &Vector3, frontier: &Frontier) -> Float {
+        let distance = (drone_position - frontier.centroid).norm();
         
         if distance > self.config.max_range {
             return 0.0;
@@ -388,7 +458,7 @@ mod tests {
 
     #[test]
     fn test_occupancy_grid_creation() {
-        let grid = OccupancyGrid::new(Vector3::zero(), 0.1, 10, 10, 10);
+        let grid = OccupancyGrid::new(Vector3::zeros(), 0.1, 10, 10, 10);
         assert_eq!(grid.size_x, 10);
         assert_eq!(grid.size_y, 10);
         assert_eq!(grid.size_z, 10);
@@ -396,14 +466,14 @@ mod tests {
 
     #[test]
     fn test_world_to_grid() {
-        let grid = OccupancyGrid::new(Vector3::zero(), 1.0, 10, 10, 10);
+        let grid = OccupancyGrid::new(Vector3::zeros(), 1.0, 10, 10, 10);
         let idx = grid.world_to_grid(&Vector3::new(5.5, 5.5, 5.5));
         assert_eq!(idx, Some((5, 5, 5)));
     }
 
     #[test]
     fn test_grid_to_world() {
-        let grid = OccupancyGrid::new(Vector3::zero(), 1.0, 10, 10, 10);
+        let grid = OccupancyGrid::new(Vector3::zeros(), 1.0, 10, 10, 10);
         let pos = grid.grid_to_world(5, 5, 5);
         assert!((pos.x - 5.5).abs() < 0.001);
         assert!((pos.y - 5.5).abs() < 0.001);
@@ -412,7 +482,7 @@ mod tests {
 
     #[test]
     fn test_cell_state() {
-        let mut grid = OccupancyGrid::new(Vector3::zero(), 1.0, 10, 10, 10);
+        let mut grid = OccupancyGrid::new(Vector3::zeros(), 1.0, 10, 10, 10);
         assert_eq!(grid.get_cell(5, 5, 5), CellState::Unknown);
         
         grid.set_cell(5, 5, 5, CellState::Free);
@@ -424,7 +494,7 @@ mod tests {
 
     #[test]
     fn test_mark_free_occupied() {
-        let mut grid = OccupancyGrid::new(Vector3::zero(), 1.0, 10, 10, 10);
+        let mut grid = OccupancyGrid::new(Vector3::zeros(), 1.0, 10, 10, 10);
         
         grid.mark_free(&Vector3::new(5.5, 5.5, 5.5));
         assert_eq!(grid.get_cell(5, 5, 5), CellState::Free);
@@ -435,7 +505,7 @@ mod tests {
 
     #[test]
     fn test_is_frontier() {
-        let mut grid = OccupancyGrid::new(Vector3::zero(), 1.0, 10, 10, 10);
+        let mut grid = OccupancyGrid::new(Vector3::zeros(), 1.0, 10, 10, 10);
         
         // Free cell with unknown neighbors is frontier
         grid.set_cell(5, 5, 5, CellState::Free);
@@ -472,14 +542,14 @@ mod tests {
 
     #[test]
     fn test_exploration_manager_creation() {
-        let grid = OccupancyGrid::new(Vector3::zero(), 1.0, 10, 10, 10);
+        let grid = OccupancyGrid::new(Vector3::zeros(), 1.0, 10, 10, 10);
         let manager = ExplorationManager::new(ExplorationConfig::default(), grid);
         assert_eq!(manager.num_frontiers(), 0);
     }
 
     #[test]
     fn test_update_grid() {
-        let grid = OccupancyGrid::new(Vector3::zero(), 1.0, 10, 10, 10);
+        let grid = OccupancyGrid::new(Vector3::zeros(), 1.0, 10, 10, 10);
         let mut manager = ExplorationManager::new(ExplorationConfig::default(), grid);
         
         let free = vec![Vector3::new(1.5, 1.5, 1.5)];
@@ -493,7 +563,7 @@ mod tests {
 
     #[test]
     fn test_compute_utility() {
-        let grid = OccupancyGrid::new(Vector3::zero(), 1.0, 10, 10, 10);
+        let grid = OccupancyGrid::new(Vector3::zeros(), 1.0, 10, 10, 10);
         let manager = ExplorationManager::new(ExplorationConfig::default(), grid);
         
         let drone_pos = Vector3::new(0.0, 0.0, 0.0);
@@ -505,7 +575,7 @@ mod tests {
 
     #[test]
     fn test_allocate_tasks() {
-        let grid = OccupancyGrid::new(Vector3::zero(), 1.0, 10, 10, 10);
+        let grid = OccupancyGrid::new(Vector3::zeros(), 1.0, 10, 10, 10);
         let mut manager = ExplorationManager::new(ExplorationConfig::default(), grid);
         
         // Manually add a frontier

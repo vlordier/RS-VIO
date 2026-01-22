@@ -99,7 +99,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Identify regions needing new detections
     let detection_regions = distributor.get_detection_regions();
     println!("\n  Detection needed in {} regions", detection_regions.len());
-    if detection_regions.len() > 0 {
+    if !detection_regions.is_empty() {
         println!("  Top 5 detection priority regions:");
         for (i, (cx, cy)) in detection_regions.iter().take(5).enumerate() {
             let threshold = distributor.get_adaptive_quality_threshold(*cx, *cy);
@@ -110,7 +110,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Identify overcrowded regions
     let overcrowded = distributor.get_overcrowded_regions();
-    if overcrowded.len() > 0 {
+    if !overcrowded.is_empty() {
         println!("\n  {} regions are overcrowded (pruning candidates)", overcrowded.len());
     }
 

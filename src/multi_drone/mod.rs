@@ -5,7 +5,7 @@ pub mod distributed_optimization;
 pub mod exploration;
 pub mod map_merging;
 
-pub use boids::{Boid, BoidsConfig, BoidsSwarm, Vector3};
+pub use boids::{Boid, BoidsConfig, BoidsSwarm};
 pub use distributed_optimization::{
     Constraint, DistributedOptimizationConfig, DistributedOptimizer, LocalPoseGraph, Pose,
 };

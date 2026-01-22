@@ -23,7 +23,8 @@
 /// - Patch-Based SR methods (A+, SelfExSR)
 /// - Deep SR: SRCNN, EDSR, RCAN
 use crate::types::Float;
-use nalgebra as na;
+use crate::unwrap_or_log;
+use nalgebra034 as na;
 use std::collections::VecDeque;
 
 /// Configuration for temporal super resolution
@@ -191,8 +192,13 @@ impl TemporalSuperResolution {
             self.reference_timestamp = Some(timestamp);
         }
 
-        // Clean old frames
-        let _time_window = (timestamp - self.reference_timestamp.unwrap_or(timestamp)) as f64 / 1e9;
+        // Clean old frames (log if reference timestamp was missing)
+        let reference_timestamp = unwrap_or_log!(
+            self.reference_timestamp,
+            timestamp,
+            "Missing reference_timestamp; defaulting to current timestamp"
+        );
+        let _time_window = (timestamp - reference_timestamp) as f64 / 1e9;
         while let Some(oldest) = self.frames.front() {
             let oldest_age = (timestamp - oldest.timestamp) as f64 / 1e9;
             if oldest_age > self.config.max_time_window {

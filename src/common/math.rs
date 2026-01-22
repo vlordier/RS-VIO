@@ -169,6 +169,90 @@ pub fn is_outlier_mad(value: Float, values: &[Float], threshold: Float) -> bool 
     false
 }
 
+/// Safe division with epsilon protection
+///
+/// Returns `numerator / max(denominator, epsilon)` to avoid division by zero.
+/// If denominator is very small, returns a default value instead.
+///
+/// # Arguments
+///
+/// * `numerator` - The numerator
+/// * `denominator` - The denominator
+/// * `epsilon` - Minimum value for denominator (default: 1e-10)
+/// * `default` - Value to return if denominator is too small
+///
+/// # Example
+///
+/// ```
+/// use rs_vio::common::math::safe_div;
+///
+/// assert_eq!(safe_div(10.0, 2.0, 1e-10, 0.0), 5.0);
+/// assert_eq!(safe_div(10.0, 0.0, 1e-10, 0.0), 0.0);
+/// ```
+#[inline]
+pub fn safe_div(numerator: Float, denominator: Float, epsilon: Float, default: Float) -> Float {
+    if denominator.abs() < epsilon {
+        default
+    } else {
+        numerator / denominator
+    }
+}
+
+/// Normalized vector with safety check for zero-length vectors
+///
+/// Returns the normalized vector, or a default vector if the input is too small.
+///
+/// # Arguments
+///
+/// * `v` - Input vector as [x, y, z]
+/// * `epsilon` - Minimum magnitude threshold
+/// * `default` - Default vector to return if magnitude < epsilon
+pub fn safe_normalize(v: [Float; 3], epsilon: Float, default: [Float; 3]) -> [Float; 3] {
+    let mag_sq = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
+
+    if mag_sq < epsilon * epsilon {
+        default
+    } else {
+        let mag = mag_sq.sqrt();
+        [v[0] / mag, v[1] / mag, v[2] / mag]
+    }
+}
+
+/// Safe inverse with stability check
+///
+/// Returns `1.0 / value` if value is above epsilon, otherwise returns default.
+///
+/// # Example
+///
+/// ```
+/// use rs_vio::common::math::safe_inverse;
+///
+/// assert_eq!(safe_inverse(2.0, 1e-10, 0.0), 0.5);
+/// assert_eq!(safe_inverse(0.0, 1e-10, 0.0), 0.0);
+/// ```
+#[inline]
+pub fn safe_inverse(value: Float, epsilon: Float, default: Float) -> Float {
+    if value.abs() < epsilon {
+        default
+    } else {
+        1.0 / value
+    }
+}
+
+/// Clamp a value to ensure it stays in a numerically stable range
+///
+/// Useful for preventing floating point operations from producing extreme values.
+#[inline]
+pub fn clamp_stable(value: Float, min: Float, max: Float) -> Float {
+    if value.is_nan() {
+        (min + max) / 2.0
+    } else if value.is_infinite() {
+        if value > 0.0 { max } else { min }
+    } else {
+        clamp(value, min, max)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -224,5 +308,41 @@ mod tests {
         let values = vec![1.0, 2.0, 3.0, 4.0, 5.0];
         assert!(!is_outlier_mad(3.0, &values, 3.0));
         assert!(is_outlier_mad(100.0, &values, 3.0));
+    }
+
+    #[test]
+    fn test_safe_div() {
+        assert_eq!(safe_div(10.0, 2.0, 1e-10, 0.0), 5.0);
+        assert_eq!(safe_div(10.0, 0.0, 1e-10, 0.0), 0.0);
+        assert_eq!(safe_div(10.0, 1e-11, 1e-10, 0.0), 0.0);
+        assert_eq!(safe_div(10.0, 1e-11, 1e-10, 99.0), 99.0);
+    }
+
+    #[test]
+    fn test_safe_normalize() {
+        let v = [3.0, 4.0, 0.0];
+        let norm = safe_normalize(v, 1e-10, [1.0, 0.0, 0.0]);
+        assert!((norm[0] - 0.6).abs() < 1e-6);
+        assert!((norm[1] - 0.8).abs() < 1e-6);
+
+        let zero = [0.0, 0.0, 0.0];
+        let default = [1.0, 0.0, 0.0];
+        let result = safe_normalize(zero, 1e-10, default);
+        assert_eq!(result, default);
+    }
+
+    #[test]
+    fn test_safe_inverse() {
+        assert_eq!(safe_inverse(2.0, 1e-10, 0.0), 0.5);
+        assert_eq!(safe_inverse(0.0, 1e-10, 0.0), 0.0);
+        assert_eq!(safe_inverse(1e-11, 1e-10, 99.0), 99.0);
+    }
+
+    #[test]
+    fn test_clamp_stable() {
+        assert_eq!(clamp_stable(5.0, 0.0, 10.0), 5.0);
+        assert_eq!(clamp_stable(f64::NAN, 0.0, 10.0), 5.0);
+        assert_eq!(clamp_stable(f64::INFINITY, 0.0, 10.0), 10.0);
+        assert_eq!(clamp_stable(f64::NEG_INFINITY, 0.0, 10.0), 0.0);
     }
 }

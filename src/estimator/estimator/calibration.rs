@@ -21,7 +21,7 @@ impl Estimator {
     /// Called periodically to apply calibrated IMU-to-camera extrinsics.
     /// The calibrator accumulates pose measurements and refines T_BC.
     pub fn update_extrinsics_from_calibrator(&mut self) {
-        let measurement_count = self.extrinsic_calibrator.measurement_count();
+        let measurement_count = self.imu_processor.extrinsic_calibrator.measurement_count();
 
         // Only apply after collecting enough measurements
         if measurement_count < 100 {
@@ -30,23 +30,23 @@ impl Estimator {
 
         // Run calibration periodically (every 100 measurements after initial collection)
         if measurement_count % 100 == 0 {
-            let _error = self.extrinsic_calibrator.calibrate_iteration();
+            let _error = self.imu_processor.extrinsic_calibrator.calibrate_iteration();
             debug_log!(
                 "[Estimator] IMU extrinsic calibration iteration {}, error: {:.6} rad",
-                self.extrinsic_calibrator.iterations(),
+                self.imu_processor.extrinsic_calibrator.iterations(),
                 _error
             );
         }
 
         // Apply calibrated extrinsics periodically
-        if self.extrinsic_calibrator.iterations() > 0 && measurement_count % 500 == 0 {
-            let calibrated_T_BC = self.extrinsic_calibrator.get_extrinsics();
+        if self.imu_processor.extrinsic_calibrator.iterations() > 0 && measurement_count % 500 == 0 {
+            let calibrated_T_BC = self.imu_processor.extrinsic_calibrator.get_extrinsics();
 
             // Update the stored extrinsics
             self.T_B_Cl = calibrated_T_BC;
 
             // Also update in all frame states if window has frames
-            for frame in self.sliding_window.keyframes_mut() {
+            for frame in self.backend.sliding_window.keyframes_mut() {
                 frame.state.T_B_Cl = calibrated_T_BC;
             }
 

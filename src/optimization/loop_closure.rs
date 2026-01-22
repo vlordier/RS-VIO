@@ -47,13 +47,16 @@ pub mod orb_matcher;
 pub mod pnp_ransac;
 pub mod vocabulary;
 
-use crate::{types::Float, Result};
+use crate::{fl, types::Float, Result, clamp_or};
 use nalgebra as na;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 pub use orb::{OrbConfig, OrbExtractor, OrbFeature};
 pub use orb_matcher::OrbMatcher;
+
+#[cfg(feature = "gpu")]
+use pollster::block_on;
 
 /// Match statistics returned by a descriptor matcher
 #[derive(Debug, Clone)]
@@ -146,6 +149,7 @@ pub fn verify_relative_pose(
 
 /// Configuration for loop closure detection
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct LoopClosureConfig {
     /// Minimum number of frames since last keyframe to consider for loop closure
     pub min_frame_gap: usize,
@@ -199,6 +203,84 @@ impl Default for LoopClosureConfig {
             rotation_sigma: 0.05,
             max_keyframe_database_size: 5000,
             descriptor_type: "simple".to_string(),
+        }
+    }
+}
+
+impl LoopClosureConfig {
+    /// Clamp parameters to safe ranges and ensure logical ordering.
+    pub fn validate_and_clamp(&mut self) {
+        self.min_frame_gap = clamp_or!(
+            self.min_frame_gap,
+            1,
+            i32::MAX,
+            1,
+            "min_frame_gap must be > 0, setting to 1"
+        );
+
+        if let Some(gap) = self.min_time_gap_ns {
+            if gap <= 0 {
+                log::warn!("min_time_gap_ns must be positive, disabling time gating");
+                self.min_time_gap_ns = None;
+            }
+        }
+
+        self.num_candidates = clamp_or!(
+            self.num_candidates,
+            1,
+            u16::MAX,
+            1,
+            "num_candidates cannot be 0, setting to 1"
+        );
+
+        self.min_matches_for_candidate = clamp_or!(
+            self.min_matches_for_candidate,
+            1,
+            u16::MAX,
+            1,
+            "min_matches_for_candidate cannot be 0, setting to 1"
+        );
+
+        self.descriptor_distance_threshold =
+            self.descriptor_distance_threshold.clamp(fl!(0.0), fl!(1.0));
+        self.inlier_ratio_threshold = self.inlier_ratio_threshold.clamp(fl!(0.0), fl!(1.0));
+
+        self.min_inliers = clamp_or!(
+            self.min_inliers,
+            1,
+            u16::MAX,
+            1,
+            "min_inliers cannot be 0, setting to 1"
+        );
+
+        self.constraint_covariance_scale = clamp_or!(
+            self.constraint_covariance_scale,
+            fl!(1e-6),
+            fl!(100.0),
+            fl!(1.0),
+            "constraint_covariance_scale must be > 0, setting to 1.0"
+        );
+
+        self.translation_sigma = clamp_or!(
+            self.translation_sigma,
+            fl!(1e-6),
+            fl!(10.0),
+            fl!(0.25),
+            "translation_sigma must be > 0, setting to 0.25"
+        );
+
+        if self.rotation_sigma <= fl!(0.0) {
+            log::warn!("rotation_sigma must be > 0, setting to 0.05");
+            self.rotation_sigma = fl!(0.05);
+        }
+
+        if self.max_keyframe_database_size < 2 {
+            log::warn!("max_keyframe_database_size too small, setting to 50");
+            self.max_keyframe_database_size = 50;
+        }
+
+        if self.descriptor_type.trim().is_empty() {
+            self.descriptor_type = "simple".to_string();
         }
     }
 }
@@ -310,11 +392,12 @@ impl KeyframeDatabase {
     pub fn search_candidates(
         &self,
         query: &KeyframeDescriptor,
+        matcher: &dyn DescriptorMatcher,
     ) -> Vec<(u64, KeyframeDescriptor, MatchMetrics)> {
         let mut candidates = Vec::new();
 
         for (id, keyframe) in &self.keyframes {
-            let metrics = compute_match_metrics(query, keyframe);
+            let metrics = matcher.match_keyframes(query, keyframe);
 
             if metrics.similarity >= self.config.descriptor_distance_threshold {
                 candidates.push((*id, keyframe.clone(), metrics));
@@ -349,6 +432,7 @@ impl KeyframeDatabase {
 pub struct LoopClosureDetector {
     config: LoopClosureConfig,
     database: KeyframeDatabase,
+    matcher: Box<dyn DescriptorMatcher>,
     last_detection_keyframe_id: Option<u64>,
     last_detection_timestamp: Option<i64>,
 }
@@ -356,9 +440,16 @@ pub struct LoopClosureDetector {
 impl LoopClosureDetector {
     /// Create new loop closure detector
     pub fn new(config: LoopClosureConfig) -> Self {
+        let matcher: Box<dyn DescriptorMatcher> = if config.descriptor_type == "orb" {
+            Box::new(OrbMatcher::default())
+        } else {
+            Box::new(CosineMatcher)
+        };
+
         Self {
             config: config.clone(),
             database: KeyframeDatabase::new(config),
+            matcher,
             last_detection_keyframe_id: None,
             last_detection_timestamp: None,
         }
@@ -378,7 +469,7 @@ impl LoopClosureDetector {
         }
 
         // Search for candidates
-        let candidates = self.database.search_candidates(&descriptor);
+        let candidates = self.database.search_candidates(&descriptor, self.matcher.as_ref());
         let mut valid_closures = Vec::new();
 
         // Verify each candidate
@@ -554,7 +645,7 @@ mod tests {
 
         // Query with similar descriptor (similar to frame 0)
         let query = create_test_descriptor(100, 0.0);
-        let candidates = db.search_candidates(&query);
+        let candidates = db.search_candidates(&query, &CosineMatcher);
 
         // Should find candidates (frame 0 should be top)
         assert!(candidates.len() > 0);
@@ -647,7 +738,7 @@ mod tests {
             ..create_test_descriptor(100, 0.0)
         };
 
-        let candidates = db.search_candidates(&query);
+        let candidates = db.search_candidates(&query, &CosineMatcher);
         assert!(!candidates.is_empty());
         assert_eq!(candidates[0].0, 42);
     }

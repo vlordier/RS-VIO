@@ -4,6 +4,8 @@
 //! Primarily used for determining embedded vs desktop environments to optimize
 //! memory allocation strategies and thread management.
 
+use crate::ok_or_log;
+
 /// Platform type detection
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PlatformType {
@@ -116,9 +118,11 @@ pub fn has_gpu() -> bool {
 /// Get number of available CPU cores for parallel processing.
 #[inline]
 pub fn num_cores() -> usize {
-    std::thread::available_parallelism()
-        .map(|n| n.get())
-        .unwrap_or(1)
+    ok_or_log!(
+        std::thread::available_parallelism().map(|n| n.get()),
+        1,
+        "Failed to detect available_parallelism; defaulting to 1 core"
+    )
 }
 
 /// Get recommended thread count for parallel operations.

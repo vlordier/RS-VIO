@@ -101,7 +101,21 @@
 
 use thiserror::Error;
 
+/// Error category for retry logic in distributed systems.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ErrorCategory {
+    /// Error is transient and can be safely retried (e.g., "frame queue full")
+    Transient,
+    /// Error is permanent and should not be retried (e.g., "invalid intrinsics")
+    Permanent,
+    /// Error is degraded state that can continue (e.g., "low feature count")
+    Degraded,
+}
+
 /// Custom error type for RS-VIO operations.
+///
+/// Categorizes errors to enable appropriate retry and recovery strategies
+/// in distributed systems and embedded platforms.
 #[derive(Error, Debug)]
 pub enum VIOError {
     #[error("Configuration error: {0}")]
@@ -120,6 +134,57 @@ pub enum VIOError {
     Io(#[from] std::io::Error),
     #[error("Anyhow error: {0}")]
     Anyhow(#[from] anyhow::Error),
+    
+    // === New error categories for swarm operations ===
+    #[error("Transient error (can retry): {0}")]
+    Transient(String),
+    #[error("Permanent error (do not retry): {0}")]
+    Permanent(String),
+    #[error("Degraded state (continue with caution): {0}")]
+    Degraded(String),
+    
+    // === Network/distributed errors ===
+    #[error("Message version incompatible: {0}")]
+    VersionIncompatible(String),
+    #[error("Network partition detected: {0}")]
+    NetworkPartition(String),
+    #[error("Consensus failed: {0}")]
+    ConsensusFailed(String),
+}
+
+impl VIOError {
+    /// Categorize this error for retry logic.
+    pub fn category(&self) -> ErrorCategory {
+        match self {
+            VIOError::Transient(_) => ErrorCategory::Transient,
+            VIOError::Permanent(_) => ErrorCategory::Permanent,
+            VIOError::Degraded(_) => ErrorCategory::Degraded,
+            VIOError::Config(_) | VIOError::Parse(_) | VIOError::VersionIncompatible(_) => {
+                ErrorCategory::Permanent
+            }
+            VIOError::Image(_) | VIOError::Io(_) => ErrorCategory::Transient,
+            VIOError::Optimization(_) | VIOError::Solver(_) => ErrorCategory::Degraded,
+            VIOError::Viewer(_) => ErrorCategory::Transient,
+            VIOError::Anyhow(_) => ErrorCategory::Permanent,
+            VIOError::NetworkPartition(_) => ErrorCategory::Transient,
+            VIOError::ConsensusFailed(_) => ErrorCategory::Transient,
+        }
+    }
+
+    /// Check if this error should trigger a retry.
+    pub fn is_retryable(&self) -> bool {
+        matches!(self.category(), ErrorCategory::Transient)
+    }
+
+    /// Check if this error indicates a permanent failure.
+    pub fn is_permanent(&self) -> bool {
+        matches!(self.category(), ErrorCategory::Permanent)
+    }
+
+    /// Check if the system can continue in degraded mode.
+    pub fn is_degradable(&self) -> bool {
+        matches!(self.category(), ErrorCategory::Degraded)
+    }
 }
 
 /// Result type for RS-VIO operations, defaulting to VIOError.
@@ -204,11 +269,11 @@ pub mod feature_tracker;
 pub mod fusion;
 pub mod imu;
 pub mod logging;
-pub mod loop_closure;
 pub mod math;
 pub mod multi_drone;
 pub mod optimization;
 pub mod platform;
+pub mod swarm;
 pub mod traits;
 pub mod types;
 pub mod validation;
@@ -222,3 +287,4 @@ pub use datasets::fourseasons_player::FourSeasonsPlayer;
 pub use datasets::tum_vi_player::TUMVIPlayer;
 pub use datasets::{PlayerConfig, PlayerResult};
 pub use optimization::marginalization::MarginalizationPrior;
+pub use swarm::{DroneId, HealthStatus, HealthState, SwarmMessage, SwarmState, TelemetryFrame, VIOEvent};

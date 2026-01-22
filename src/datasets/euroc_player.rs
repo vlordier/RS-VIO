@@ -4,7 +4,7 @@ use crate::datasets::{
 };
 use crate::debug_log;
 use crate::estimator::Estimator;
-use crate::{Result, VIOError};
+use crate::{Result, VIOError, ok_or_log};
 use image::ImageReader;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -148,17 +148,52 @@ impl DatasetPlayer for EurocPlayer {
             }
 
             // Parse timestamp (nanoseconds)
-            let timestamp: i64 = parts[0].trim().parse().unwrap_or(0);
+            let timestamp: i64 = ok_or_log!(
+                parts[0].trim().parse(),
+                0,
+                "Failed to parse EuRoC IMU timestamp on line {}",
+                line_num + 1
+            );
 
             // Parse gyroscope (rad/s)
-            let gyro_x: f64 = parts[1].trim().parse().unwrap_or(0.0);
-            let gyro_y: f64 = parts[2].trim().parse().unwrap_or(0.0);
-            let gyro_z: f64 = parts[3].trim().parse().unwrap_or(0.0);
+            let gyro_x: f64 = ok_or_log!(
+                parts[1].trim().parse(),
+                0.0,
+                "Failed to parse EuRoC gyro_x on line {}",
+                line_num + 1
+            );
+            let gyro_y: f64 = ok_or_log!(
+                parts[2].trim().parse(),
+                0.0,
+                "Failed to parse EuRoC gyro_y on line {}",
+                line_num + 1
+            );
+            let gyro_z: f64 = ok_or_log!(
+                parts[3].trim().parse(),
+                0.0,
+                "Failed to parse EuRoC gyro_z on line {}",
+                line_num + 1
+            );
 
             // Parse accelerometer (m/s^2)
-            let accel_x: f64 = parts[4].trim().parse().unwrap_or(0.0);
-            let accel_y: f64 = parts[5].trim().parse().unwrap_or(0.0);
-            let accel_z: f64 = parts[6].trim().parse().unwrap_or(0.0);
+            let accel_x: f64 = ok_or_log!(
+                parts[4].trim().parse(),
+                0.0,
+                "Failed to parse EuRoC accel_x on line {}",
+                line_num + 1
+            );
+            let accel_y: f64 = ok_or_log!(
+                parts[5].trim().parse(),
+                0.0,
+                "Failed to parse EuRoC accel_y on line {}",
+                line_num + 1
+            );
+            let accel_z: f64 = ok_or_log!(
+                parts[6].trim().parse(),
+                0.0,
+                "Failed to parse EuRoC accel_z on line {}",
+                line_num + 1
+            );
 
             imu_data_vec.push(ImuData {
                 timestamp,
@@ -191,7 +226,10 @@ impl DatasetPlayer for EurocPlayer {
                     .cloned()
                     .collect()
             })
-            .unwrap_or_default()
+            .unwrap_or_else(|e| {
+                log::warn!("EuRoC IMU cache poisoned while fetching between frames: {}", e);
+                Vec::new()
+            })
     }
 
     fn process_single_frame(

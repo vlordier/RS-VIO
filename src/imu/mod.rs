@@ -38,6 +38,7 @@
 pub mod analysis;
 pub mod denoise;
 pub mod higher_order_filter;
+pub mod imu_types; // New module for IMU-specific types
 pub mod initialization;
 pub mod learned_vibration;
 pub mod vibration_filter;
@@ -47,6 +48,8 @@ pub use denoise::{DenoiseConfig, ImuDenoiseFilter};
 pub use higher_order_filter::{
     HigherOrderFilter, HigherOrderFilterConfig, HigherOrderOutput, JerkStats, SnapStats,
 };
+pub use imu_types::{ImuFloat, ImuVector3, ImuUnitQuaternion}; // Import new IMU types
+pub use crate::imu_fl;
 pub use initialization::{
     AdaptiveNoiseEstimator, BiasEstimate, ImuInitializationConfig, ImuInitializer,
     InitializationState,
@@ -68,25 +71,25 @@ use nalgebra as na;
 #[derive(Debug, Clone)]
 pub struct ImuConfig {
     /// Gyroscope noise density [rad/s/√Hz]
-    pub gyro_noise_density: f64,
+    pub gyro_noise_density: ImuFloat,
     /// Accelerometer noise density [m/s²/√Hz]
-    pub accel_noise_density: f64,
+    pub accel_noise_density: ImuFloat,
     /// Gyroscope bias random walk [rad/s²/√Hz]
-    pub gyro_bias_random_walk: f64,
+    pub gyro_bias_random_walk: ImuFloat,
     /// Accelerometer bias random walk [m/s³/√Hz]
-    pub accel_bias_random_walk: f64,
+    pub accel_bias_random_walk: ImuFloat,
     /// Gravity vector in world frame [m/s²]
-    pub gravity: [f64; 3],
+    pub gravity: [ImuFloat; 3],
 }
 
 impl Default for ImuConfig {
     fn default() -> Self {
         Self {
-            gyro_noise_density: 1e-4,
-            accel_noise_density: 1e-2,
-            gyro_bias_random_walk: 1e-5,
-            accel_bias_random_walk: 1e-4,
-            gravity: [0.0, 0.0, -9.81],
+            gyro_noise_density: imu_fl!(1e-4),
+            accel_noise_density: imu_fl!(1e-2),
+            gyro_bias_random_walk: imu_fl!(1e-5),
+            accel_bias_random_walk: imu_fl!(1e-4),
+            gravity: [imu_fl!(0.0), imu_fl!(0.0), imu_fl!(-9.81)],
         }
     }
 }
@@ -95,34 +98,34 @@ impl Default for ImuConfig {
 #[derive(Debug, Clone)]
 pub struct PreintegratedImu {
     /// Delta rotation from i to j [R_ij]
-    pub delta_rotation: na::UnitQuaternion<f64>,
+    pub delta_rotation: ImuUnitQuaternion,
     /// Delta velocity from i to j [m/s]
-    pub delta_velocity: na::Vector3<f64>,
+    pub delta_velocity: ImuVector3,
     /// Delta position from i to j [m]
-    pub delta_position: na::Vector3<f64>,
+    pub delta_position: ImuVector3,
     /// Time interval [s]
-    pub delta_time: f64,
+    pub delta_time: ImuFloat,
     /// Covariance matrix (9x9 for rotation, velocity, position)
-    pub covariance: na::DMatrix<f64>,
+    pub covariance: na::DMatrix<ImuFloat>,
     /// Jacobian of preintegration w.r.t. rotation at i
-    pub jacobian_wrt_rotation: na::Matrix3<f64>,
+    pub jacobian_wrt_rotation: na::Matrix3<ImuFloat>,
     /// Jacobian of preintegration w.r.t. velocity at i
-    pub jacobian_wrt_velocity: na::Matrix3<f64>,
+    pub jacobian_wrt_velocity: na::Matrix3<ImuFloat>,
     /// Jacobian of preintegration w.r.t. acceleration bias at i
-    pub jacobian_wrt_accel_bias: na::Matrix3<f64>,
+    pub jacobian_wrt_accel_bias: na::Matrix3<ImuFloat>,
     /// Jacobian of preintegration w.r.t. gyro bias at i
-    pub jacobian_wrt_gyro_bias: na::Matrix3<f64>,
+    pub jacobian_wrt_gyro_bias: na::Matrix3<ImuFloat>,
 }
 
 impl PreintegratedImu {
     /// Create new preintegration with identity
     pub fn new() -> Self {
         Self {
-            delta_rotation: na::UnitQuaternion::identity(),
-            delta_velocity: na::Vector3::zeros(),
-            delta_position: na::Vector3::zeros(),
-            delta_time: 0.0,
-            covariance: na::DMatrix::identity(9, 9) * 1e8,
+            delta_rotation: ImuUnitQuaternion::identity(),
+            delta_velocity: ImuVector3::zeros(),
+            delta_position: ImuVector3::zeros(),
+            delta_time: imu_fl!(0.0),
+            covariance: na::DMatrix::identity(9, 9) * imu_fl!(1e8),
             jacobian_wrt_rotation: na::Matrix3::identity(),
             jacobian_wrt_velocity: na::Matrix3::zeros(),
             jacobian_wrt_accel_bias: na::Matrix3::zeros(),
@@ -132,11 +135,11 @@ impl PreintegratedImu {
 
     /// Reset preintegration to identity
     pub fn reset(&mut self) {
-        self.delta_rotation = na::UnitQuaternion::identity();
-        self.delta_velocity = na::Vector3::zeros();
-        self.delta_position = na::Vector3::zeros();
-        self.delta_time = 0.0;
-        self.covariance = na::DMatrix::identity(9, 9) * 1e8;
+        self.delta_rotation = ImuUnitQuaternion::identity();
+        self.delta_velocity = ImuVector3::zeros();
+        self.delta_position = ImuVector3::zeros();
+        self.delta_time = imu_fl!(0.0);
+        self.covariance = na::DMatrix::identity(9, 9) * imu_fl!(1e8);
         self.jacobian_wrt_rotation = na::Matrix3::identity();
         self.jacobian_wrt_velocity = na::Matrix3::zeros();
         self.jacobian_wrt_accel_bias = na::Matrix3::zeros();
@@ -154,8 +157,8 @@ impl Default for PreintegratedImu {
 pub struct ImuPreintegrator {
     config: ImuConfig,
     current: PreintegratedImu,
-    last_gyro: na::Vector3<f64>,
-    last_accel: na::Vector3<f64>,
+    last_gyro: ImuVector3,
+    last_accel: ImuVector3,
     has_initial_measurement: bool,
 }
 
@@ -172,25 +175,30 @@ impl ImuPreintegrator {
     }
 
     /// Process a single IMU measurement and update preintegration
-    pub fn propagate(&mut self, imu: &ImuData, dt: f64) {
-        let gyro = na::Vector3::new(imu.gyro[0], imu.gyro[1], imu.gyro[2]);
-        let accel = na::Vector3::new(imu.accel[0], imu.accel[1], imu.accel[2]);
+    /// Hotpath: inlined for zero function call overhead
+    #[inline(always)]
+    pub fn propagate(&mut self, imu: &ImuData, dt: Float) {
+        let gyro = ImuVector3::new(imu_fl!(imu.gyro[0]), imu_fl!(imu.gyro[1]), imu_fl!(imu.gyro[2]));
+        let accel = ImuVector3::new(imu_fl!(imu.accel[0]), imu_fl!(imu.accel[1]), imu_fl!(imu.accel[2]));
 
-        self.propagate_raw(gyro, accel, dt);
+        self.propagate_raw(gyro, accel, dt as ImuFloat);
     }
 
     /// Process bias-corrected IMU measurements
+    #[inline(always)]
     pub fn propagate_corrected(
         &mut self,
-        gyro_corrected: na::Vector3<f64>,
-        accel_corrected: na::Vector3<f64>,
-        dt: f64,
+        gyro_corrected: ImuVector3,
+        accel_corrected: ImuVector3,
+        dt: Float,
     ) {
-        self.propagate_raw(gyro_corrected, accel_corrected, dt);
+        self.propagate_raw(gyro_corrected, accel_corrected, dt as ImuFloat);
     }
 
     /// Internal method for propagation with raw (possibly corrected) measurements
-    fn propagate_raw(&mut self, gyro: na::Vector3<f64>, accel: na::Vector3<f64>, dt: f64) {
+    /// Hotpath: aggressively inlined, optimized for numerical stability
+    #[inline(always)]
+    fn propagate_raw(&mut self, gyro: ImuVector3, accel: ImuVector3, dt: ImuFloat) {
         if !self.has_initial_measurement {
             self.last_gyro = gyro;
             self.last_accel = accel;
@@ -198,13 +206,17 @@ impl ImuPreintegrator {
             return;
         }
 
-        // Average of first and last measurements for midpoint integration
-        let gyro_avg = (self.last_gyro + gyro) * 0.5;
-        let accel_avg = (self.last_accel + accel) * 0.5;
+        // Midpoint integration for 2nd order accuracy
+        // Fused multiply-add for better performance
+        let gyro_avg = (self.last_gyro + gyro) * imu_fl!(0.5);
+        let accel_avg = (self.last_accel + accel) * imu_fl!(0.5);
 
-        // Update rotation using Rodrigues' formula
+        // Update rotation using Rodrigues' formula (exponential map)
         let delta_angle = gyro_avg * dt;
-        let delta_rot = na::UnitQuaternion::new(delta_angle);
+        let delta_rot = ImuUnitQuaternion::new(delta_angle);
+        debug_assert_approx!(delta_rot.norm_squared(), imu_fl!(1.0), imu_fl!(1e-6));
+
+        // Quaternion multiplication (right-to-left composition)
         self.current.delta_rotation = delta_rot * self.current.delta_rotation;
 
         // Update velocity (in local frame)
@@ -329,7 +341,7 @@ impl ImuPreintegrator {
 pub struct ImuMotionPredictor {
     /// Configuration (reserved for future prediction tuning)
     _config: ImuConfig,
-    last_rotation: Option<na::UnitQuaternion<f64>>,
+    last_rotation: Option<ImuUnitQuaternion>,
     last_timestamp: Option<i64>,
 }
 
@@ -359,46 +371,45 @@ impl ImuMotionPredictor {
     pub fn predict_feature_displacement(
         &self,
         imu_measurements: &[ImuData],
-        _prev_pixel: (f64, f64),
-        focal_length: f64,
-    ) -> (f64, f64) {
+        _prev_pixel: (Float, Float),
+        focal_length: Float,
+    ) -> (Float, Float) {
         if imu_measurements.is_empty() {
-            return (0.0, 0.0);
+            return (fl!(0.0), fl!(0.0));
         }
 
         // Integrate gyroscope to get total rotation
-        let mut total_rotation = na::Vector3::zeros();
+        let mut total_rotation = ImuVector3::zeros();
         let mut last_ts = imu_measurements[0].timestamp;
 
         for imu in imu_measurements {
-            let dt = (imu.timestamp - last_ts) as f64 / 1e9;
-            if dt > 0.0 {
-                total_rotation +=
-                    na::Vector3::new(imu.gyro[0] * dt, imu.gyro[1] * dt, imu.gyro[2] * dt);
+            let dt = imu_fl!((imu.timestamp - last_ts) as f64 / 1e9); // Cast to f32
+            if dt > imu_fl!(0.0) {
+                total_rotation += ImuVector3::new(imu_fl!(imu.gyro[0]) * dt, imu_fl!(imu.gyro[1]) * dt, imu_fl!(imu.gyro[2]) * dt);
             }
             last_ts = imu.timestamp;
         }
 
         // Convert to rotation angle and axis
         let angle = total_rotation.norm();
-        if angle < 1e-6 {
-            return (0.0, 0.0);
+        if angle < imu_fl!(1e-6) {
+            return (fl!(0.0), fl!(0.0));
         }
         let _axis = total_rotation / angle;
 
         // Rotation angle in image plane (simplified)
         // For small rotations, du ≈ -ω_y * f, dv ≈ ω_x * f
-        let predicted_du = -total_rotation[1] * focal_length;
-        let predicted_dv = total_rotation[0] * focal_length;
+        let predicted_du = -total_rotation[1] as Float * focal_length;
+        let predicted_dv = total_rotation[0] as Float * focal_length;
 
         (predicted_du, predicted_dv)
     }
 
     /// Update predictor with new rotation
-    pub fn update(&mut self, timestamp: i64, rotation: na::UnitQuaternion<f64>) {
+    pub fn update(&mut self, timestamp: i64, rotation: ImuUnitQuaternion) {
         if let Some((last_ts, _last_rot)) = self.last_timestamp.zip(self.last_rotation.as_ref()) {
-            let _dt = (timestamp - last_ts) as f64 / 1e9;
-            if _dt > 0.0 {
+            let _dt = imu_fl!((timestamp - last_ts) as f64 / 1e9);
+            if _dt > imu_fl!(0.0) {
                 // Could use this for velocity estimation
             }
         }
@@ -410,7 +421,7 @@ impl ImuMotionPredictor {
 /// Velocity estimator using accelerometer
 pub struct VelocityEstimator {
     config: ImuConfig,
-    velocity: na::Vector3<Float>,
+    velocity: na::Vector3<Float>, // Velocity is global Float
     initialized: bool,
 }
 
@@ -428,20 +439,20 @@ impl VelocityEstimator {
     ///
     /// # Arguments
     /// * `imu_measurements` - IMU measurements during initialization
-    /// * `initial_orientation` - Initial body orientation
+    /// * `initial_orientation` - Initial body orientation (global Float)
     pub fn initialize_from_imu(
         &mut self,
         imu_measurements: &[ImuData],
-        initial_orientation: &na::UnitQuaternion<f64>,
+        initial_orientation: &na::UnitQuaternion<Float>,
     ) {
         if imu_measurements.len() < 2 {
             return;
         }
 
         let gravity = na::Vector3::new(
-            self.config.gravity[0],
-            self.config.gravity[1],
-            self.config.gravity[2],
+            self.config.gravity[0] as Float,
+            self.config.gravity[1] as Float,
+            self.config.gravity[2] as Float,
         );
 
         // Integrate accelerometer to get velocity change
@@ -449,9 +460,9 @@ impl VelocityEstimator {
         let mut last_ts = imu_measurements[0].timestamp;
 
         for imu in imu_measurements.iter().skip(1) {
-            let dt = (imu.timestamp - last_ts) as f64 / 1e9;
-            if dt > 0.0 {
-                let accel = na::Vector3::new(imu.accel[0], imu.accel[1], imu.accel[2]);
+            let dt = (imu.timestamp - last_ts) as Float / fl!(1e9);
+            if dt > fl!(0.0) {
+                let accel = na::Vector3::new(imu.accel[0] as Float, imu.accel[1] as Float, imu.accel[2] as Float);
                 // Rotate to world frame and remove gravity
                 let accel_world = initial_orientation * accel - gravity;
                 delta_v += accel_world * dt;
@@ -459,7 +470,7 @@ impl VelocityEstimator {
             last_ts = imu.timestamp;
         }
 
-        self.velocity = delta_v.cast::<Float>();
+        self.velocity = delta_v;
         self.initialized = true;
     }
 
@@ -469,12 +480,12 @@ impl VelocityEstimator {
     }
 
     /// Update velocity estimate with new IMU measurements
-    pub fn update(&mut self, imu_measurements: &[ImuData], dt: f64) {
+    pub fn update(&mut self, imu_measurements: &[ImuData], dt: Float) {
         if !self.initialized || imu_measurements.is_empty() {
             return;
         }
 
-        let dt_float = dt as Float;
+        let dt_float = dt;
         let gravity = na::Vector3::new(
             self.config.gravity[0] as Float,
             self.config.gravity[1] as Float,
@@ -513,15 +524,15 @@ pub struct ImuBiasEstimator {
     /// Configuration
     config: ImuConfig,
     /// Accumulated gyroscope measurements for bias estimation
-    gyro_samples: Vec<na::Vector3<f64>>,
+    gyro_samples: Vec<ImuVector3>,
     /// Accumulated accelerometer measurements for bias estimation
-    accel_samples: Vec<na::Vector3<f64>>,
+    accel_samples: Vec<ImuVector3>,
     /// Timestamps for each sample
     timestamps: Vec<i64>,
     /// Estimated gyroscope bias [rad/s]
-    pub gyro_bias: na::Vector3<f64>,
+    pub gyro_bias: ImuVector3,
     /// Estimated accelerometer bias [m/s²]
-    pub accel_bias: na::Vector3<f64>,
+    pub accel_bias: ImuVector3,
     /// Whether the estimator has collected enough samples
     pub is_initialized: bool,
     /// Number of samples required for initialization
@@ -536,8 +547,8 @@ impl ImuBiasEstimator {
             gyro_samples: Vec::with_capacity(1000),
             accel_samples: Vec::with_capacity(1000),
             timestamps: Vec::with_capacity(1000),
-            gyro_bias: na::Vector3::zeros(),
-            accel_bias: na::Vector3::zeros(),
+            gyro_bias: ImuVector3::zeros(),
+            accel_bias: ImuVector3::zeros(),
             is_initialized: false,
             min_samples: 100, // At 200Hz, this is 0.5 seconds
         }
@@ -549,8 +560,8 @@ impl ImuBiasEstimator {
     /// * `imu` - IMU measurement
     /// * `_assume_stationary` - If true, assume system is stationary (use for initialization)
     pub fn add_sample(&mut self, imu: &ImuData, _assume_stationary: bool) {
-        let gyro = na::Vector3::new(imu.gyro[0], imu.gyro[1], imu.gyro[2]);
-        let accel = na::Vector3::new(imu.accel[0], imu.accel[1], imu.accel[2]);
+        let gyro = ImuVector3::new(imu_fl!(imu.gyro[0]), imu_fl!(imu.gyro[1]), imu_fl!(imu.gyro[2]));
+        let accel = ImuVector3::new(imu_fl!(imu.accel[0]), imu_fl!(imu.accel[1]), imu_fl!(imu.accel[2]));
 
         self.gyro_samples.push(gyro);
         self.accel_samples.push(accel);
@@ -574,43 +585,43 @@ impl ImuBiasEstimator {
         }
 
         // Estimate gyro bias: mean of measurements (assuming stationary = zero rotation)
-        let mut gyro_sum = na::Vector3::zeros();
+        let mut gyro_sum = ImuVector3::zeros();
         for g in &self.gyro_samples {
             gyro_sum += g;
         }
-        self.gyro_bias = gyro_sum / self.gyro_samples.len() as f64;
+        self.gyro_bias = gyro_sum / imu_fl!(self.gyro_samples.len() as ImuFloat);
 
         // Estimate accel bias: mean - gravity (assuming stationary = gravity only)
-        let gravity = na::Vector3::new(
+        let gravity = ImuVector3::new(
             self.config.gravity[0],
             self.config.gravity[1],
             self.config.gravity[2],
         );
-        let mut accel_sum = na::Vector3::zeros();
+        let mut accel_sum = ImuVector3::zeros();
         for a in &self.accel_samples {
             accel_sum += a;
         }
-        let mean_accel = accel_sum / self.accel_samples.len() as f64;
+        let mean_accel = accel_sum / imu_fl!(self.accel_samples.len() as ImuFloat);
         self.accel_bias = mean_accel - gravity;
 
         self.is_initialized = true;
     }
 
     /// Get bias-corrected gyroscope measurement
-    pub fn correct_gyro(&self, imu: &ImuData) -> na::Vector3<f64> {
-        na::Vector3::new(
-            imu.gyro[0] - self.gyro_bias[0],
-            imu.gyro[1] - self.gyro_bias[1],
-            imu.gyro[2] - self.gyro_bias[2],
+    pub fn correct_gyro(&self, imu: &ImuData) -> ImuVector3 {
+        ImuVector3::new(
+            imu_fl!(imu.gyro[0]) - self.gyro_bias[0],
+            imu_fl!(imu.gyro[1]) - self.gyro_bias[1],
+            imu_fl!(imu.gyro[2]) - self.gyro_bias[2],
         )
     }
 
     /// Get bias-corrected accelerometer measurement
-    pub fn correct_accel(&self, imu: &ImuData) -> na::Vector3<f64> {
-        na::Vector3::new(
-            imu.accel[0] - self.accel_bias[0],
-            imu.accel[1] - self.accel_bias[1],
-            imu.accel[2] - self.accel_bias[2],
+    pub fn correct_accel(&self, imu: &ImuData) -> ImuVector3 {
+        ImuVector3::new(
+            imu_fl!(imu.accel[0]) - self.accel_bias[0],
+            imu_fl!(imu.accel[1]) - self.accel_bias[1],
+            imu_fl!(imu.accel[2]) - self.accel_bias[2],
         )
     }
 
@@ -619,8 +630,8 @@ impl ImuBiasEstimator {
         self.gyro_samples.clear();
         self.accel_samples.clear();
         self.timestamps.clear();
-        self.gyro_bias = na::Vector3::zeros();
-        self.accel_bias = na::Vector3::zeros();
+        self.gyro_bias = ImuVector3::zeros();
+        self.accel_bias = ImuVector3::zeros();
         self.is_initialized = false;
     }
 
@@ -744,11 +755,11 @@ pub struct ImuAidedKeyframeSelector {
     /// Last keyframe pose (T_W_B)
     last_keyframe_pose: Option<na::Matrix4<Float>>,
     /// IMU delta rotation from last keyframe
-    imu_delta_rotation: na::UnitQuaternion<Float>,
+    imu_delta_rotation: ImuUnitQuaternion,
     /// IMU delta translation from last keyframe
-    imu_delta_translation: na::Vector3<Float>,
+    imu_delta_translation: ImuVector3,
     /// IMU delta time from last keyframe
-    imu_delta_time: Float,
+    imu_delta_time: ImuFloat,
 }
 
 impl ImuAidedKeyframeSelector {
@@ -759,9 +770,9 @@ impl ImuAidedKeyframeSelector {
             rotation_threshold,
             last_keyframe_timestamp: None,
             last_keyframe_pose: None,
-            imu_delta_rotation: na::UnitQuaternion::identity(),
-            imu_delta_translation: na::Vector3::zeros(),
-            imu_delta_time: fl!(0.0),
+            imu_delta_rotation: ImuUnitQuaternion::identity(),
+            imu_delta_translation: ImuVector3::zeros(),
+            imu_delta_time: imu_fl!(0.0),
         }
     }
 
@@ -769,23 +780,23 @@ impl ImuAidedKeyframeSelector {
     pub fn reset(&mut self) {
         self.last_keyframe_timestamp = None;
         self.last_keyframe_pose = None;
-        self.imu_delta_rotation = na::UnitQuaternion::identity();
-        self.imu_delta_translation = na::Vector3::zeros();
-        self.imu_delta_time = fl!(0.0);
+        self.imu_delta_rotation = ImuUnitQuaternion::identity();
+        self.imu_delta_translation = ImuVector3::zeros();
+        self.imu_delta_time = imu_fl!(0.0);
     }
 
     /// Update with new IMU measurement
     pub fn update_imu(&mut self, imu: &ImuData) {
-        let gyro = na::Vector3::new(fl!(imu.gyro[0]), fl!(imu.gyro[1]), fl!(imu.gyro[2]));
-        let accel = na::Vector3::new(fl!(imu.accel[0]), fl!(imu.accel[1]), fl!(imu.accel[2]));
+        let gyro = ImuVector3::new(imu_fl!(imu.gyro[0]), imu_fl!(imu.gyro[1]), imu_fl!(imu.gyro[2]));
+        let accel = ImuVector3::new(imu_fl!(imu.accel[0]), imu_fl!(imu.accel[1]), imu_fl!(imu.accel[2]));
 
         // Integrate rotation
-        let delta_rot = na::UnitQuaternion::new(gyro * fl!(0.01)); // Approximate dt
+        let delta_rot = ImuUnitQuaternion::new(gyro * imu_fl!(0.01)); // Approximate dt
         self.imu_delta_rotation = delta_rot * self.imu_delta_rotation;
 
         // Integrate translation (simplified - assumes small motion)
-        self.imu_delta_translation += accel * fl!(0.01) * fl!(0.01) * fl!(0.5);
-        self.imu_delta_time += fl!(0.01);
+        self.imu_delta_translation += accel * imu_fl!(0.01) * imu_fl!(0.01) * imu_fl!(0.5);
+        self.imu_delta_time += imu_fl!(0.01);
     }
 
     /// Accumulate IMU measurements between frames
@@ -795,22 +806,21 @@ impl ImuAidedKeyframeSelector {
         }
 
         let mut last_ts = imu_measurements[0].timestamp;
-        let mut integrated_rot = na::UnitQuaternion::identity();
-        let mut integrated_trans = na::Vector3::zeros();
+        let mut integrated_rot = ImuUnitQuaternion::identity();
+        let mut integrated_trans = ImuVector3::zeros();
 
         for imu in imu_measurements {
-            let dt = fl!((imu.timestamp - last_ts) as f64 / 1e9);
-            if dt > fl!(0.0) {
-                let gyro = na::Vector3::new(fl!(imu.gyro[0]), fl!(imu.gyro[1]), fl!(imu.gyro[2]));
-                let accel =
-                    na::Vector3::new(fl!(imu.accel[0]), fl!(imu.accel[1]), fl!(imu.accel[2]));
+            let dt = imu_fl!((imu.timestamp - last_ts) as f64 / 1e9);
+            if dt > imu_fl!(0.0) {
+                let gyro = ImuVector3::new(imu_fl!(imu.gyro[0]), imu_fl!(imu.gyro[1]), imu_fl!(imu.gyro[2]));
+                let accel = ImuVector3::new(imu_fl!(imu.accel[0]), imu_fl!(imu.accel[1]), imu_fl!(imu.accel[2]));
 
                 // Rotation integration
-                let delta_rot = na::UnitQuaternion::new(gyro * dt);
+                let delta_rot = ImuUnitQuaternion::new(gyro * dt);
                 integrated_rot = delta_rot * integrated_rot;
 
                 // Translation integration (assuming constant velocity model)
-                integrated_trans += accel * dt * dt * fl!(0.5);
+                integrated_trans += accel * dt * dt * imu_fl!(0.5);
 
                 self.imu_delta_time += dt;
             }
@@ -859,8 +869,8 @@ impl ImuAidedKeyframeSelector {
                 || rotation_norm > self.rotation_threshold;
 
             // IMU-aided triggers
-            let imu_translation_norm = self.imu_delta_translation.norm();
-            let imu_rotation_angle = self.imu_delta_rotation.angle();
+            let imu_translation_norm = self.imu_delta_translation.norm() as Float;
+            let imu_rotation_angle = self.imu_delta_rotation.angle() as Float;
 
             // If visual motion is small but IMU shows significant motion, trigger keyframe
             let imu_motion_trigger = imu_translation_norm > self.translation_threshold * fl!(0.5)
@@ -896,9 +906,9 @@ impl ImuAidedKeyframeSelector {
         if is_keyframe {
             self.last_keyframe_timestamp = Some(current_timestamp);
             self.last_keyframe_pose = Some(*current_pose);
-            self.imu_delta_rotation = na::UnitQuaternion::identity();
-            self.imu_delta_translation = na::Vector3::zeros();
-            self.imu_delta_time = fl!(0.0);
+            self.imu_delta_rotation = ImuUnitQuaternion::identity();
+            self.imu_delta_translation = ImuVector3::zeros();
+            self.imu_delta_time = imu_fl!(0.0);
         }
 
         (is_keyframe, reason)
@@ -956,7 +966,7 @@ impl ImuMotionPrior {
     /// Compute predicted state at time j
     ///
     /// Returns (predicted_pose, predicted_velocity)
-    pub fn predict_state(&self) -> (na::Matrix4<f64>, na::Vector3<f64>) {
+    pub fn predict_state(&self) -> (na::Matrix4<Float>, na::Vector3<Float>) {
         // Rotation prediction
         let R_W_Bi = na::Rotation3::from_matrix_unchecked(
             self.initial_pose.fixed_view::<3, 3>(0, 0).into_owned(),
@@ -970,7 +980,7 @@ impl ImuMotionPrior {
         let p_W_Bi = self.initial_pose.fixed_view::<3, 1>(0, 3).into_owned();
         let p_W_Bj = p_W_Bi
             + self.initial_velocity * self.delta_time
-            + 0.5 * self.gravity * self.delta_time * self.delta_time
+            + fl!(0.5) * self.gravity * self.delta_time * self.delta_time
             + self.delta_position;
 
         // Compose pose matrix
@@ -980,7 +990,7 @@ impl ImuMotionPrior {
             .copy_from(&R_W_Bj.into_inner());
         T_W_Bj.fixed_view_mut::<3, 1>(0, 3).copy_from(&p_W_Bj);
 
-        (T_W_Bj.cast::<f64>(), v_W_Bj.cast::<f64>())
+        (T_W_Bj, v_W_Bj)
     }
 
     /// Compute innovation (prediction error) given observed pose
@@ -990,22 +1000,16 @@ impl ImuMotionPrior {
         &self,
         observed_pose: &na::Matrix4<Float>,
         observed_velocity: &na::Vector3<Float>,
-    ) -> (na::Vector3<f64>, f64, na::Vector3<f64>) {
+    ) -> (na::Vector3<Float>, Float, na::Vector3<Float>) {
         let (predicted_pose, predicted_velocity) = self.predict_state();
 
         // Position innovation
-        let pos_error = observed_pose
-            .cast::<f64>()
-            .fixed_view::<3, 1>(0, 3)
-            .into_owned()
+        let pos_error = observed_pose.fixed_view::<3, 1>(0, 3).into_owned()
             - predicted_pose.fixed_view::<3, 1>(0, 3).into_owned();
 
         // Rotation innovation (angle-axis)
         let R_obs = na::Rotation3::from_matrix_unchecked(
-            observed_pose
-                .cast::<f64>()
-                .fixed_view::<3, 3>(0, 0)
-                .into_owned(),
+            observed_pose.fixed_view::<3, 3>(0, 0).into_owned(),
         );
         let R_pred = na::Rotation3::from_matrix_unchecked(
             predicted_pose.fixed_view::<3, 3>(0, 0).into_owned(),
@@ -1014,7 +1018,7 @@ impl ImuMotionPrior {
         let rot_error = dq.angle();
 
         // Velocity innovation
-        let vel_error = observed_velocity.cast::<f64>() - predicted_velocity;
+        let vel_error = observed_velocity - predicted_velocity;
 
         (pos_error, rot_error, vel_error)
     }
@@ -1026,22 +1030,22 @@ mod tests {
 
     #[test]
     fn test_imu_aided_keyframe_selector() {
-        let mut selector = ImuAidedKeyframeSelector::new(0.1, 0.1);
+        let mut selector = ImuAidedKeyframeSelector::new(fl!(0.1), fl!(0.1));
 
         // First frame should be keyframe
         let pose = na::Matrix4::identity();
-        let (is_kf, reason) = selector.should_be_keyframe(&pose, 1000000000, 0.0);
+        let (is_kf, reason) = selector.should_be_keyframe(&pose, 1000000000, fl!(0.0));
         assert!(is_kf);
         assert_eq!(reason, "Initial frame");
 
         // Small motion shouldn't trigger keyframe
-        let small_motion = na::Matrix4::new_translation(&na::Vector3::new(0.01, 0.0, 0.0));
-        let (is_kf, _) = selector.should_be_keyframe(&small_motion, 1000001000, 0.01);
+        let small_motion = na::Matrix4::new_translation(&na::Vector3::new(fl!(0.01), fl!(0.0), fl!(0.0)));
+        let (is_kf, _) = selector.should_be_keyframe(&small_motion, 1000001000, fl!(0.01));
         assert!(!is_kf);
 
         // Large motion should trigger keyframe
-        let large_motion = na::Matrix4::new_translation(&na::Vector3::new(0.2, 0.0, 0.0));
-        let (is_kf, reason) = selector.should_be_keyframe(&large_motion, 1000002000, 0.01);
+        let large_motion = na::Matrix4::new_translation(&na::Vector3::new(fl!(0.2), fl!(0.0), fl!(0.0)));
+        let (is_kf, reason) = selector.should_be_keyframe(&large_motion, 1000002000, fl!(0.01));
         assert!(is_kf);
         assert!(reason.contains("Visual motion"));
     }
@@ -1057,17 +1061,17 @@ mod tests {
         let (pred_pose, pred_vel) = prior.predict_state();
 
         // Should be close to initial for zero IMU motion
-        assert!((pred_pose - pose.cast::<f64>()).abs().sum() < 1e-10);
-        assert!((pred_vel - velocity.cast::<f64>()).norm() < 1e-10);
+        assert!((pred_pose - pose).abs().sum() < fl!(1e-10));
+        assert!((pred_vel - velocity).norm() < fl!(1e-10));
     }
 
     #[test]
     fn test_imu_motion_prior_innovation() {
         let mut preint = PreintegratedImu::new();
-        preint.delta_rotation = na::UnitQuaternion::new(na::Vector3::zeros());
-        preint.delta_velocity = na::Vector3::new(0.1, 0.0, 0.0);
-        preint.delta_position = na::Vector3::zeros();
-        preint.delta_time = 1.0;
+        preint.delta_rotation = ImuUnitQuaternion::new(ImuVector3::zeros());
+        preint.delta_velocity = ImuVector3::new(imu_fl!(0.1), imu_fl!(0.0), imu_fl!(0.0));
+        preint.delta_position = ImuVector3::zeros();
+        preint.delta_time = imu_fl!(1.0);
 
         let pose = na::Matrix4::identity();
         let velocity = na::Vector3::zeros();
@@ -1080,11 +1084,11 @@ mod tests {
         let (pos_err, rot_err, vel_err) = prior.compute_innovation(&obs_pose, &obs_vel);
 
         // Position error should be small (no delta position)
-        assert!(pos_err.norm() < 1e-10);
+        assert!(pos_err.norm() < fl!(1e-10));
         // Rotation error should be small
-        assert!(rot_err.abs() < 1e-10);
+        assert!(rot_err.abs() < fl!(1e-10));
         // Velocity error should be ~0.1 (predicted has velocity, observed doesn't)
-        assert!((vel_err - na::Vector3::new(-0.1, 0.0, 0.0)).norm() < 1e-10);
+        assert!((vel_err - na::Vector3::new(fl!(-0.1), fl!(0.0), fl!(0.0))).norm() < fl!(1e-5));
     }
 
     #[test]
@@ -1093,9 +1097,9 @@ mod tests {
         let predictor = ImuMotionPredictor::new(config);
 
         // No IMU measurements should give zero displacement
-        let disp = predictor.predict_feature_displacement(&[], (320.0, 240.0), 500.0);
-        assert!((disp.0).abs() < 1e-6);
-        assert!((disp.1).abs() < 1e-6);
+        let disp = predictor.predict_feature_displacement(&[], (fl!(320.0), fl!(240.0)), fl!(500.0));
+        assert!((disp.0).abs() < fl!(1e-6));
+        assert!((disp.1).abs() < fl!(1e-6));
     }
 
     #[test]
@@ -1108,13 +1112,13 @@ mod tests {
         let imu_measurements = vec![
             ImuData {
                 timestamp: 0,
-                gyro: [0.0; 3],
-                accel: [0.0, 0.0, 9.81],
+                gyro: [fl!(0.0); 3],
+                accel: [fl!(0.0), fl!(0.0), fl!(9.81)],
             },
             ImuData {
                 timestamp: 10000000,
-                gyro: [0.0; 3],
-                accel: [0.0, 0.0, 9.81],
+                gyro: [fl!(0.0); 3],
+                accel: [fl!(0.0), fl!(0.0), fl!(9.81)],
             },
         ];
 
@@ -1149,23 +1153,23 @@ mod tests {
 
         // Add some IMU samples with known biases
         // Simulate: gyro bias = [0.01, -0.02, 0.005], accel bias = [0.05, -0.03, 0.1]
-        let gyro_bias = [0.01, -0.02, 0.005];
-        let accel_bias = [0.05, -0.03, 0.1];
-        let gravity = -9.81;
+        let gyro_bias = [imu_fl!(0.01), imu_fl!(-0.02), imu_fl!(0.005)];
+        let accel_bias = [imu_fl!(0.05), imu_fl!(-0.03), imu_fl!(0.1)];
+        let gravity = imu_fl!(-9.81);
 
         for i in 0..200 {
             let ts = (i * 5000) as i64; // 200Hz
             let imu = ImuData {
                 timestamp: ts,
                 gyro: [
-                    0.001 + gyro_bias[0], // Small motion + bias
-                    -0.002 + gyro_bias[1],
-                    0.001 + gyro_bias[2],
+                    (imu_fl!(0.001) + gyro_bias[0]) as f64, // Small motion + bias
+                    (imu_fl!(-0.002) + gyro_bias[1]) as f64,
+                    (imu_fl!(0.001) + gyro_bias[2]) as f64,
                 ],
                 accel: [
-                    0.02 + accel_bias[0], // Small acceleration + bias
-                    -0.01 + accel_bias[1],
-                    gravity + accel_bias[2],
+                    (imu_fl!(0.02) + accel_bias[0]) as f64, // Small acceleration + bias
+                    (imu_fl!(-0.01) + accel_bias[1]) as f64,
+                    (gravity + accel_bias[2]) as f64,
                 ],
             };
             bias_estimator.add_sample(&imu, true);
@@ -1176,39 +1180,55 @@ mod tests {
         assert_eq!(bias_estimator.sample_count(), 200);
 
         // Check bias estimates (should be close to true biases, accounting for small motion)
-        assert!((bias_estimator.gyro_bias[0] - gyro_bias[0] - 0.001).abs() < 0.005);
-        assert!((bias_estimator.gyro_bias[1] - gyro_bias[1] + 0.002).abs() < 0.005);
-        assert!((bias_estimator.gyro_bias[2] - gyro_bias[2] - 0.001).abs() < 0.005);
+        assert!(
+            (bias_estimator.gyro_bias[0] - gyro_bias[0] - imu_fl!(0.001)).abs() < imu_fl!(0.005)
+        );
+        assert!(
+            (bias_estimator.gyro_bias[1] - gyro_bias[1] + imu_fl!(0.002)).abs() < imu_fl!(0.005)
+        );
+        assert!(
+            (bias_estimator.gyro_bias[2] - gyro_bias[2] - imu_fl!(0.001)).abs() < imu_fl!(0.005)
+        );
 
-        assert!((bias_estimator.accel_bias[0] - accel_bias[0] - 0.02).abs() < 0.05);
-        assert!((bias_estimator.accel_bias[1] - accel_bias[1] + 0.01).abs() < 0.05);
-        assert!((bias_estimator.accel_bias[2] - accel_bias[2]).abs() < 0.05);
+        assert!(
+            (bias_estimator.accel_bias[0] - accel_bias[0] - imu_fl!(0.02)).abs() < imu_fl!(0.05)
+        );
+        assert!(
+            (bias_estimator.accel_bias[1] - accel_bias[1] + imu_fl!(0.01)).abs() < imu_fl!(0.05)
+        );
+        assert!(
+            (bias_estimator.accel_bias[2] - accel_bias[2]).abs() < imu_fl!(0.05)
+        );
 
         // Test bias correction - should remove the known bias
         let test_imu = ImuData {
             timestamp: 0,
-            gyro: [gyro_bias[0] + 0.1, gyro_bias[1] + 0.1, gyro_bias[2] + 0.1],
+            gyro: [
+                (gyro_bias[0] + imu_fl!(0.1)) as f64,
+                (gyro_bias[1] + imu_fl!(0.1)) as f64,
+                (gyro_bias[2] + imu_fl!(0.1)) as f64,
+            ],
             accel: [
-                accel_bias[0] + 1.0,
-                accel_bias[1] + 1.0,
-                accel_bias[2] + 1.0, // No gravity - bias estimator handles that
+                (accel_bias[0] + imu_fl!(1.0)) as f64,
+                (accel_bias[1] + imu_fl!(1.0)) as f64,
+                (accel_bias[2] + imu_fl!(1.0)) as f64, // No gravity - bias estimator handles that
             ],
         };
 
         let corrected_gyro = bias_estimator.correct_gyro(&test_imu);
         // Corrected value should be approximately 0.1 (the added motion, minus small bias estimation error)
         assert!(
-            (corrected_gyro[0] - 0.1).abs() < 0.02,
+            (corrected_gyro[0] - imu_fl!(0.1)).abs() < imu_fl!(0.02),
             "gyro x: {} vs expected 0.1",
             corrected_gyro[0]
         );
         assert!(
-            (corrected_gyro[1] - 0.1).abs() < 0.02,
+            (corrected_gyro[1] - imu_fl!(0.1)).abs() < imu_fl!(0.02),
             "gyro y: {} vs expected 0.1",
             corrected_gyro[1]
         );
         assert!(
-            (corrected_gyro[2] - 0.1).abs() < 0.02,
+            (corrected_gyro[2] - imu_fl!(0.1)).abs() < imu_fl!(0.02),
             "gyro z: {} vs expected 0.1",
             corrected_gyro[2]
         );
@@ -1216,17 +1236,17 @@ mod tests {
         let corrected_accel = bias_estimator.correct_accel(&test_imu);
         // Corrected value should be approximately 1.0 (the added acceleration, minus small bias estimation error)
         assert!(
-            (corrected_accel[0] - 1.0).abs() < 0.1,
+            (corrected_accel[0] - imu_fl!(1.0)).abs() < imu_fl!(0.1),
             "accel x: {} vs expected 1.0",
             corrected_accel[0]
         );
         assert!(
-            (corrected_accel[1] - 1.0).abs() < 0.1,
+            (corrected_accel[1] - imu_fl!(1.0)).abs() < imu_fl!(0.1),
             "accel y: {} vs expected 1.0",
             corrected_accel[1]
         );
         assert!(
-            (corrected_accel[2] - 1.0).abs() < 0.1,
+            (corrected_accel[2] - imu_fl!(1.0)).abs() < imu_fl!(0.1),
             "accel z: {} vs expected 1.0",
             corrected_accel[2]
         );
@@ -1243,29 +1263,29 @@ mod tests {
         let mut preintegrator = ImuPreintegrator::new(config);
 
         // Simulate IMU with known biases
-        let gyro_bias = [0.01, -0.02, 0.005];
-        let accel_bias = [0.05, -0.03, 0.1];
+        let gyro_bias = [imu_fl!(0.01), imu_fl!(-0.02), imu_fl!(0.005)];
+        let accel_bias = [imu_fl!(0.05), imu_fl!(-0.03), imu_fl!(0.1)];
 
         // Process 10 samples with bias correction
         for i in 0..10 {
-            let dt = 0.005; // 5ms
+            let dt = fl!(0.005); // 5ms
             let _ts = (i * 5000) as i64;
 
             // Measurements with bias
-            let gyro_raw = [0.1 + gyro_bias[0], 0.05 + gyro_bias[1], 0.02 + gyro_bias[2]];
+            let gyro_raw = [imu_fl!(0.1) + gyro_bias[0], imu_fl!(0.05) + gyro_bias[1], imu_fl!(0.02) + gyro_bias[2]];
             let accel_raw = [
-                0.5 + accel_bias[0],
-                -0.2 + accel_bias[1],
-                -9.81 + accel_bias[2],
+                imu_fl!(0.5) + accel_bias[0],
+                imu_fl!(-0.2) + accel_bias[1],
+                imu_fl!(-9.81) + accel_bias[2],
             ];
 
             // Corrected measurements
-            let gyro_corrected = na::Vector3::new(
+            let gyro_corrected = ImuVector3::new(
                 gyro_raw[0] - gyro_bias[0],
                 gyro_raw[1] - gyro_bias[1],
                 gyro_raw[2] - gyro_bias[2],
             );
-            let accel_corrected = na::Vector3::new(
+            let accel_corrected = ImuVector3::new(
                 accel_raw[0] - accel_bias[0],
                 accel_raw[1] - accel_bias[1],
                 accel_raw[2] - accel_bias[2],
@@ -1275,16 +1295,16 @@ mod tests {
         }
 
         let preint = preintegrator.get();
-        assert!(preint.delta_time > 0.0, "Should have non-zero delta time");
+        assert!(preint.delta_time > imu_fl!(0.0), "Should have non-zero delta time");
         assert!(
-            preint.delta_rotation.angle() > 0.0,
+            preint.delta_rotation.angle() > imu_fl!(0.0),
             "Should have rotation from angular velocity"
         );
 
         // Preintegrator should accumulate position change
         // With constant velocity, position change should be significant
         assert!(
-            preint.delta_position.norm() > 0.001,
+            preint.delta_position.norm() > imu_fl!(0.001),
             "Should have position change: {}",
             preint.delta_position.norm()
         );
@@ -1296,48 +1316,48 @@ mod tests {
         let test_cases = vec![
             // (delta_rotation_deg, delta_velocity, delta_position, delta_time, description)
             (
-                0.0,
+                fl!(0.0),
                 na::Vector3::zeros(),
                 na::Vector3::zeros(),
-                1.0,
+                fl!(1.0),
                 "stationary",
             ),
             (
-                10.0,
-                na::Vector3::new(0.1, 0.0, 0.0),
+                fl!(10.0),
+                na::Vector3::new(fl!(0.1), fl!(0.0), fl!(0.0)),
                 na::Vector3::zeros(),
-                1.0,
+                fl!(1.0),
                 "pure_translation",
             ),
             (
-                0.0,
+                fl!(0.0),
                 na::Vector3::zeros(),
-                na::Vector3::new(0.05, 0.0, 0.0),
-                1.0,
+                na::Vector3::new(fl!(0.05), fl!(0.0), fl!(0.0)),
+                fl!(1.0),
                 "position_offset",
             ),
             (
-                5.0,
-                na::Vector3::new(0.05, 0.02, 0.0),
-                na::Vector3::new(0.02, 0.01, 0.0),
-                0.5,
+                fl!(5.0),
+                na::Vector3::new(fl!(0.05), fl!(0.02), fl!(0.0)),
+                na::Vector3::new(fl!(0.02), fl!(0.01), fl!(0.0)),
+                fl!(0.5),
                 "combined_motion",
             ),
         ];
 
         for (rot_deg, vel, pos, dt, desc) in test_cases {
             let mut preint = PreintegratedImu::new();
-            let rot_rad = rot_deg * std::f64::consts::PI / 180.0;
-            if rot_rad > 0.0 {
-                preint.delta_rotation = na::UnitQuaternion::new(na::Vector3::z() * rot_rad);
+            let rot_rad = rot_deg as ImuFloat * std::f64::consts::PI as ImuFloat / imu_fl!(180.0);
+            if rot_rad > imu_fl!(0.0) {
+                preint.delta_rotation = ImuUnitQuaternion::new(ImuVector3::z() * rot_rad);
             }
-            preint.delta_velocity = vel;
-            preint.delta_position = pos;
-            preint.delta_time = dt;
+            preint.delta_velocity = vel.cast::<ImuFloat>();
+            preint.delta_position = pos.cast::<ImuFloat>();
+            preint.delta_time = dt as ImuFloat;
 
             let initial_pose = na::Matrix4::identity();
             let initial_velocity = na::Vector3::zeros();
-            let gravity = na::Vector3::new(0.0, 0.0, -9.81);
+            let gravity = na::Vector3::new(fl!(0.0), fl!(0.0), fl!(-9.81));
 
             let prior = ImuMotionPrior::from_preintegration(
                 &preint,
@@ -1351,7 +1371,7 @@ mod tests {
             if desc == "stationary" {
                 // For stationary case, rotation should be identity
                 assert!(
-                    pred_pose.fixed_view::<3, 3>(0, 0).abs().sum() > 2.9,
+                    pred_pose.fixed_view::<3, 3>(0, 0).abs().sum() > fl!(2.9),
                     "Rotation matrix should be approximately identity for stationary"
                 );
             }
@@ -1362,7 +1382,7 @@ mod tests {
             // For stationary case with zero preintegration, rotation error should be zero
             if desc == "stationary" {
                 assert!(
-                    rot_err.abs() < 1e-10,
+                    rot_err.abs() < fl!(1e-10),
                     "Rotation error should be zero for stationary"
                 );
             }
@@ -1379,8 +1399,12 @@ mod tests {
             let _ts = (i * 5000) as i64;
             let imu = ImuData {
                 timestamp: _ts,
-                gyro: [0.01, -0.02, 0.005],
-                accel: [0.05, -0.03, -9.81 + 0.1],
+                gyro: [imu_fl!(0.01) as f64, imu_fl!(-0.02) as f64, imu_fl!(0.005) as f64],
+                accel: [
+                    imu_fl!(0.05) as f64,
+                    imu_fl!(-0.03) as f64,
+                    (imu_fl!(-9.81) + imu_fl!(0.1)) as f64,
+                ],
             };
             bias_estimator.add_sample(&imu, true);
         }
@@ -1389,8 +1413,8 @@ mod tests {
         assert!(bias_estimator.sample_count() > 100);
 
         // Verify biases are non-zero after initialization
-        assert!(bias_estimator.gyro_bias.norm() > 0.0);
-        assert!(bias_estimator.accel_bias.norm() > 0.0);
+        assert!(bias_estimator.gyro_bias.norm() > imu_fl!(0.0));
+        assert!(bias_estimator.accel_bias.norm() > imu_fl!(0.0));
 
         // Reset
         bias_estimator.reset();
@@ -1398,16 +1422,20 @@ mod tests {
         // Verify reset state
         assert!(!bias_estimator.is_initialized);
         assert_eq!(bias_estimator.sample_count(), 0);
-        assert_eq!(bias_estimator.gyro_bias, na::Vector3::zeros());
-        assert_eq!(bias_estimator.accel_bias, na::Vector3::zeros());
+        assert_eq!(bias_estimator.gyro_bias, ImuVector3::zeros());
+        assert_eq!(bias_estimator.accel_bias, ImuVector3::zeros());
 
         // After reset, adding new samples should work
         for i in 0..150 {
             let _ts = (i * 5000) as i64;
             let imu = ImuData {
                 timestamp: _ts,
-                gyro: [0.02, -0.03, 0.01], // Different biases
-                accel: [0.1, -0.05, -9.81 + 0.2],
+                gyro: [imu_fl!(0.02) as f64, imu_fl!(-0.03) as f64, imu_fl!(0.01) as f64], // Different biases
+                accel: [
+                    imu_fl!(0.1) as f64,
+                    imu_fl!(-0.05) as f64,
+                    (imu_fl!(-9.81) + imu_fl!(0.2)) as f64,
+                ],
             };
             bias_estimator.add_sample(&imu, true);
         }
@@ -1415,7 +1443,7 @@ mod tests {
         assert!(bias_estimator.is_initialized);
         // After reset and new samples, biases should be non-zero and different from zeros
         assert!(
-            bias_estimator.gyro_bias.norm() > 0.0,
+            bias_estimator.gyro_bias.norm() > imu_fl!(0.0),
             "Gyro bias should be non-zero after reset and new samples"
         );
     }

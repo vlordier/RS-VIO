@@ -117,10 +117,13 @@ impl ViewScreenshotRequest {
             height: self.height,
             timestamp_ns: {
                 use std::time::{SystemTime, UNIX_EPOCH};
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .map(|d| d.as_nanos() as i64)
-                    .unwrap_or(0)
+                let duration = ok_or_log!(
+                    SystemTime::now().duration_since(UNIX_EPOCH),
+                    std::time::Duration::from_nanos(0),
+                    "System time before UNIX_EPOCH when building screenshot metadata for {}",
+                    self.view_name
+                );
+                duration.as_nanos() as i64
             },
         }
     }

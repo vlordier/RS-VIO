@@ -10,6 +10,7 @@ pub mod macros;
 pub mod math;
 pub mod perf;
 pub mod realtime_monitor;
+pub mod safe_convert;
 #[cfg(test)]
 pub mod testing;
 pub mod types;

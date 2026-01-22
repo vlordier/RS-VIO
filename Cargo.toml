@@ -40,7 +40,7 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 
 imageproc = "0.25"
 nalgebra = "0.33.2"
-nalgebra034 = { package = "nalgebra", version = "0.34.1" } # TODO improve this, now this is dirty (needed for camera-intrinsic-model for now)
+nalgebra034 = { package = "nalgebra", version = "0.34.1" }
 camera-intrinsic-model = "0.7.2"
 rayon = "1.10"  # Parallel iteration for multi-core feature tracking
 core_affinity = "0.8"  # Thread pinning support (used on Raspberry Pi)
@@ -65,9 +65,26 @@ lightglue = ["ort", "ndarray"]
 # Feature flag for memory profiling with dhat
 dhat-heap = []
 # Feature flag for GPU acceleration framework (placeholder for future CUDA/OpenCL support)
-gpu = ["wgpu", "pollster"]
+gpu = ["wgpu", "pollster", "wgpu/spirv"]
 # Feature flag to enable debug/trace logging in hot paths (default off)
 debug-logging = []
+
+# === Swarm & Distributed Features ===
+# Enable full telemetry and health monitoring for fleet operations
+full-telemetry = []
+# Enable distributed system types (drone swarms, consensus, etc.)
+distributed = []
+# Enable both telemetry and distributed features
+swarm = ["full-telemetry", "distributed"]
+# Enable health checks and readiness probes
+health-checks = []
+
+# === Platform-Specific Optimizations ===
+# Enable embedded system optimizations (thread pinning, etc.)
+embedded = []
+# Enable Jetson-specific configurations and optimizations
+jetson-optimized = ["embedded"]
+
 # Stereo matching strategies - only one should be enabled per build
 # Basic RANSAC: 1000 iterations, standard 8-point algorithm (baseline, default)
 matching-basic-ransac = []

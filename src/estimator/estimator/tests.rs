@@ -30,6 +30,7 @@ feature_detection:
 optimization:
     bundle_adjustment_max_iterations: 10
     pnp_max_iterations: 5
+loop_closure: {}
 "#;
         serde_yaml::from_str(yaml).unwrap()
     }

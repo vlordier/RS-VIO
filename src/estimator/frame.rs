@@ -2,6 +2,7 @@ use crate::datasets::{CameraModelType, ImuData};
 use crate::estimator::state::State;
 use crate::feature_tracker::Feature;
 use crate::types::Matrix4x4;
+use crate::unwrap_or_log;
 use nalgebra034;
 
 /// Type of frame (only Stereo used for now; RGBD omitted).
@@ -133,17 +134,25 @@ impl FrameBuilder {
     pub fn build(self) -> Result<Frame, String> {
         let timestamp_ns = self.timestamp_ns.ok_or("timestamp_ns is required")?;
         let frame_id = self.frame_id.ok_or("frame_id is required")?;
-        let left_cam = self.left_cam.unwrap_or_else(|| {
+        let left_cam = unwrap_or_log!(
+            self.left_cam,
             crate::types::CameraFactory::opencv5(
                 500.0, 500.0, 320.0, 240.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0,
-            )
-        });
-        let right_cam = self.right_cam.unwrap_or_else(|| {
+            ),
+            "FrameBuilder missing left_cam; defaulting to synthetic intrinsics"
+        );
+        let right_cam = unwrap_or_log!(
+            self.right_cam,
             crate::types::CameraFactory::opencv5(
                 500.0, 500.0, 320.0, 240.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0,
-            )
-        });
-        let state = self.state.unwrap_or_else(State::identity);
+            ),
+            "FrameBuilder missing right_cam; defaulting to synthetic intrinsics"
+        );
+        let state = unwrap_or_log!(
+            self.state,
+            State::identity(),
+            "FrameBuilder missing state; defaulting to identity"
+        );
 
         Ok(Frame {
             timestamp_ns,

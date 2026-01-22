@@ -1,3 +1,4 @@
+use crate::optimization::loop_closure::LoopClosureConfig;
 use crate::{Result, VIOError};
 use serde::{Deserialize, Serialize};
 
@@ -17,6 +18,8 @@ pub struct Config {
     #[serde(default)]
     pub debug: DebugConfig,
     pub optimization: OptimizationConfig,
+    #[serde(default)]
+    pub loop_closure: LoopClosureConfig,
     #[serde(default)]
     pub marginalization: crate::optimization::marginalization::MarginalizationConfig,
 }
@@ -422,6 +425,7 @@ impl Config {
         self.keyframe_management.validate_and_clamp();
         self.feature_detection.validate_and_clamp();
         self.optimization.validate_and_clamp();
+        self.loop_closure.validate_and_clamp();
         self.marginalization.validate_and_clamp();
         Ok(())
     }

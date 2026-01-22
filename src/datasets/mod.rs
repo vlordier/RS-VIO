@@ -92,6 +92,7 @@ use camera_intrinsic_model::models::EUCM;
 // nalgebra 0.34 required by camera-intrinsic-model, while main codebase uses 0.33
 // TODO: Consider upgrading main codebase to 0.34 or using a unified approach
 use nalgebra034;
+use crate::unwrap_or_log;
 
 // Image data structure
 #[derive(Debug, Clone)]
@@ -178,32 +179,59 @@ pub fn create_camera_models_from_config(config: &Config) -> (CameraModelType, Ca
     // Determine camera model type (assuming same for left and right)
     // TODO make this code more generic (and elegant)
     // Using unwrap_or doesn't make sense here, if we can't get the params, we should error out
-    let left_model_str = cam.left_model.as_deref().unwrap_or("pinhole-radtan");
+    let left_model_str = unwrap_or_log!(
+        cam.left_model.as_deref(),
+        "pinhole-radtan",
+        "Missing left_model; defaulting to pinhole-radtan"
+    );
+
+    // Helpers to log when intrinsics/distortion parameters are missing.
+    let left_intrinsic = |idx: usize, label: &str, fallback: f64| {
+        unwrap_or_log!(
+            cam.left_intrinsics.get(idx).copied(),
+            fallback,
+            "Missing left {} (index {}); defaulting to {}",
+            label,
+            idx,
+            fallback
+        )
+    };
+
+    let left_distortion = |idx: usize, label: &str, fallback: f64| {
+        unwrap_or_log!(
+            cam.left_distortion.get(idx).copied(),
+            fallback,
+            "Missing left {} (index {}); defaulting to {}",
+            label,
+            idx,
+            fallback
+        )
+    };
 
     // Create left camera model
     let left_cam = if left_model_str == "EUCM" || left_model_str == "eucm" {
         // EUCM model: [fx, fy, cx, cy, alpha, beta]
         let eucm_params_vec: Vec<f64> = vec![
-            cam.left_intrinsics.first().copied().unwrap_or(500.0), // fx
-            cam.left_intrinsics.get(1).copied().unwrap_or(500.0),  // fy
-            cam.left_intrinsics.get(2).copied().unwrap_or(320.0),  // cx
-            cam.left_intrinsics.get(3).copied().unwrap_or(240.0),  // cy
-            cam.left_distortion.first().copied().unwrap_or(0.5),   // alpha
-            cam.left_distortion.get(1).copied().unwrap_or(1.0),    // beta
+            left_intrinsic(0, "fx", 500.0),
+            left_intrinsic(1, "fy", 500.0),
+            left_intrinsic(2, "cx", 320.0),
+            left_intrinsic(3, "cy", 240.0),
+            left_distortion(0, "alpha", 0.5),
+            left_distortion(1, "beta", 1.0),
         ];
         let eucm_params = nalgebra034::DVector::from_vec(eucm_params_vec);
         CameraModelType::EUCM(EUCM::new(&eucm_params, cam.image_width, cam.image_height))
     } else {
         let left_opencv_params_vec = vec![
-            cam.left_intrinsics.first().copied().unwrap_or(500.0), // fx
-            cam.left_intrinsics.get(1).copied().unwrap_or(500.0),  // fy
-            cam.left_intrinsics.get(2).copied().unwrap_or(320.0),  // cx
-            cam.left_intrinsics.get(3).copied().unwrap_or(240.0),  // cy
-            cam.left_distortion.first().copied().unwrap_or(0.0),   // k1
-            cam.left_distortion.get(1).copied().unwrap_or(0.0),    // k2
-            cam.left_distortion.get(2).copied().unwrap_or(0.0),    // p1
-            cam.left_distortion.get(3).copied().unwrap_or(0.0),    // p2
-            cam.left_distortion.get(4).copied().unwrap_or(0.0),    // k3
+            left_intrinsic(0, "fx", 500.0),
+            left_intrinsic(1, "fy", 500.0),
+            left_intrinsic(2, "cx", 320.0),
+            left_intrinsic(3, "cy", 240.0),
+            left_distortion(0, "k1", 0.0),
+            left_distortion(1, "k2", 0.0),
+            left_distortion(2, "p1", 0.0),
+            left_distortion(3, "p2", 0.0),
+            left_distortion(4, "k3", 0.0),
         ];
         let left_params = nalgebra034::DVector::from_vec(left_opencv_params_vec);
         CameraModelType::OpenCV5(OpenCVModel5::new(
@@ -214,30 +242,57 @@ pub fn create_camera_models_from_config(config: &Config) -> (CameraModelType, Ca
     };
 
     // Create right camera model (assuming same model type as left)
-    let right_model_str = cam.right_model.as_deref().unwrap_or(left_model_str);
+    let right_model_str = unwrap_or_log!(
+        cam.right_model.as_deref(),
+        left_model_str,
+        "Missing right_model; defaulting to {}",
+        left_model_str
+    );
+
+    let right_intrinsic = |idx: usize, label: &str, fallback: f64| {
+        unwrap_or_log!(
+            cam.right_intrinsics.get(idx).copied(),
+            fallback,
+            "Missing right {} (index {}); defaulting to {}",
+            label,
+            idx,
+            fallback
+        )
+    };
+
+    let right_distortion = |idx: usize, label: &str, fallback: f64| {
+        unwrap_or_log!(
+            cam.right_distortion.get(idx).copied(),
+            fallback,
+            "Missing right {} (index {}); defaulting to {}",
+            label,
+            idx,
+            fallback
+        )
+    };
     let right_cam = if right_model_str == "EUCM" || right_model_str == "eucm" {
         // EUCM model: [fx, fy, cx, cy, alpha, beta]
         let eucm_params_vec: Vec<f64> = vec![
-            cam.right_intrinsics.first().copied().unwrap_or(500.0), // fx
-            cam.right_intrinsics.get(1).copied().unwrap_or(500.0),  // fy
-            cam.right_intrinsics.get(2).copied().unwrap_or(320.0),  // cx
-            cam.right_intrinsics.get(3).copied().unwrap_or(240.0),  // cy
-            cam.right_distortion.first().copied().unwrap_or(0.5),   // alpha
-            cam.right_distortion.get(1).copied().unwrap_or(1.0),    // beta
+            right_intrinsic(0, "fx", 500.0),
+            right_intrinsic(1, "fy", 500.0),
+            right_intrinsic(2, "cx", 320.0),
+            right_intrinsic(3, "cy", 240.0),
+            right_distortion(0, "alpha", 0.5),
+            right_distortion(1, "beta", 1.0),
         ];
         let eucm_params = nalgebra034::DVector::from_vec(eucm_params_vec);
         CameraModelType::EUCM(EUCM::new(&eucm_params, cam.image_width, cam.image_height))
     } else {
         let right_opencv_params_vec = vec![
-            cam.right_intrinsics.first().copied().unwrap_or(500.0), // fx
-            cam.right_intrinsics.get(1).copied().unwrap_or(500.0),  // fy
-            cam.right_intrinsics.get(2).copied().unwrap_or(320.0),  // cx
-            cam.right_intrinsics.get(3).copied().unwrap_or(240.0),  // cy
-            cam.right_distortion.first().copied().unwrap_or(0.0),   // k1
-            cam.right_distortion.get(1).copied().unwrap_or(0.0),    // k2
-            cam.right_distortion.get(2).copied().unwrap_or(0.0),    // p1
-            cam.right_distortion.get(3).copied().unwrap_or(0.0),    // p2
-            cam.right_distortion.get(4).copied().unwrap_or(0.0),    // k3
+            right_intrinsic(0, "fx", 500.0),
+            right_intrinsic(1, "fy", 500.0),
+            right_intrinsic(2, "cx", 320.0),
+            right_intrinsic(3, "cy", 240.0),
+            right_distortion(0, "k1", 0.0),
+            right_distortion(1, "k2", 0.0),
+            right_distortion(2, "p1", 0.0),
+            right_distortion(3, "p2", 0.0),
+            right_distortion(4, "k3", 0.0),
         ];
         let right_params = nalgebra034::DVector::from_vec(right_opencv_params_vec);
         CameraModelType::OpenCV5(OpenCVModel5::new(

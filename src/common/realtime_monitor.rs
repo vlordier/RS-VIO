@@ -7,6 +7,7 @@
 //! - Resource usage monitoring
 //! - Fallback logic for deadline violations
 
+use crate::common::safe_convert::percentile_index;
 use crate::types::Float;
 use std::collections::VecDeque;
 use std::time::Instant;
@@ -220,15 +221,20 @@ impl RealtimeMonitor {
         let mut sorted = totals.clone();
         sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
-        let mean = totals.iter().sum::<Float>() / totals.len() as Float;
+        let n = sorted.len();
+        let mean = totals.iter().sum::<Float>() / n as Float;
         let min = sorted[0];
-        let max = sorted[sorted.len() - 1];
-        let p50 = sorted[sorted.len() / 2];
-        let p95 = sorted[(sorted.len() as f64 * 0.95) as usize];
-        let p99 = sorted[(sorted.len() as f64 * 0.99) as usize];
+        let max = sorted[n - 1];
+        let p50 = sorted[n / 2];
+
+        // Safe percentile calculation with proper error handling
+        let p95_idx = percentile_index(n, 0.95).unwrap_or(n - 1);
+        let p99_idx = percentile_index(n, 0.99).unwrap_or(n - 1);
+        let p95 = sorted[p95_idx];
+        let p99 = sorted[p99_idx];
 
         MonitorSummary {
-            frames_processed: self.timing_history.len(),
+            frames_processed: n,
             total_deadline_misses: self.deadline_misses,
             mean_latency_ms: mean,
             min_latency_ms: min,

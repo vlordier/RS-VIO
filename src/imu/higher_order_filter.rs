@@ -6,6 +6,7 @@
 /// - Snap: d/dt jerk (4th time derivative of position)
 ///
 /// Combined with spectral analysis at fundamental frequency (f0)
+use crate::assert_finite;
 use std::collections::VecDeque;
 
 /// Configuration for higher-order IMU filtering
@@ -465,12 +466,9 @@ mod tests {
             let output = filter.process_accel(accel);
 
             // All outputs should be finite
-            assert!(output.jerk_magnitude.is_finite(), "Jerk should be finite");
-            assert!(output.snap_magnitude.is_finite(), "Snap should be finite");
-            assert!(
-                output.f0_confidence.is_finite(),
-                "f0_confidence should be finite"
-            );
+            assert_finite!(output.jerk_magnitude, "Jerk should be finite");
+            assert_finite!(output.snap_magnitude, "Snap should be finite");
+            assert_finite!(output.f0_confidence, "f0_confidence should be finite");
         }
 
         // Should have reasonable peak magnitudes
@@ -543,9 +541,7 @@ mod tests {
             let output = filter.process_accel(accel);
 
             // Each axis should be processed independently
-            assert!(output.jerk[0].is_finite());
-            assert!(output.jerk[1].is_finite());
-            assert!(output.jerk[2].is_finite());
+            assert_all_finite!(output.jerk, "jerk components must be finite");
         }
     }
 

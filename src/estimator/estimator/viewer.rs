@@ -78,7 +78,7 @@ impl Estimator {
     /// Visualize optimization results: map points, keyframe poses, and camera frustums.
     pub fn view_optimization_results(&mut self, timestamp_ns: i64) {
         // History of keyframe poses with timestamps (update even without viewer for saving)
-        let keyframe_poses = self.sliding_window.get_keyframe_poses();
+        let keyframe_poses = self.backend.sliding_window.get_keyframe_poses();
         if let Some(&mat) = keyframe_poses.last() {
             self.trajectory.push((timestamp_ns, mat));
         }
@@ -87,7 +87,7 @@ impl Estimator {
         if let Some(v) = &mut self.viewer {
             // Map points
             let colored_points: Vec<(usize, [f32; 3])> = self
-                .sliding_window
+                .backend.sliding_window
                 .map_points
                 .iter()
                 .map(|(&feature_id, &point)| (feature_id, point))
@@ -95,7 +95,7 @@ impl Estimator {
             v.log_points_colored(&colored_points, "map/points");
 
             // Keyframe poses with left and right camera frustrums
-            let system_poses = self.sliding_window.get_keyframe_poses();
+            let system_poses = self.backend.sliding_window.get_keyframe_poses();
             for (pose_id, T_W_B) in system_poses.iter().enumerate() {
                 // pose is T_W_B
                 let pose_path = format!("pose_{}", pose_id);
@@ -184,7 +184,7 @@ impl Estimator {
         let fundamental_freq = self.estimate_fundamental_frequency(&processed_gyro_f32);
 
         // Log denoising filter quality
-        let _filter_quality = self.denoise_filter.quality();
+        let _filter_quality = self.imu_processor.denoise_filter.quality();
         debug_log!(
             "[DENOISE] Frame {}: quality={:.2}, samples={}",
             self.frame_count,
@@ -254,14 +254,14 @@ impl Estimator {
             if let Some((gravity, vibration)) = decomp_result {
                 // Log harmonic decomposition (gravity, bias, harmonics)
                 let bias_accel = [
-                    self.bias_estimator.accel_bias[0] as f32,
-                    self.bias_estimator.accel_bias[1] as f32,
-                    self.bias_estimator.accel_bias[2] as f32,
+                    self.imu_processor.bias_estimator.accel_bias[0] as f32,
+                    self.imu_processor.bias_estimator.accel_bias[1] as f32,
+                    self.imu_processor.bias_estimator.accel_bias[2] as f32,
                 ];
                 let bias_gyro = [
-                    self.bias_estimator.gyro_bias[0] as f32,
-                    self.bias_estimator.gyro_bias[1] as f32,
-                    self.bias_estimator.gyro_bias[2] as f32,
+                    self.imu_processor.bias_estimator.gyro_bias[0] as f32,
+                    self.imu_processor.bias_estimator.gyro_bias[1] as f32,
+                    self.imu_processor.bias_estimator.gyro_bias[2] as f32,
                 ];
 
                 v.log_imu_harmonics(

@@ -4,7 +4,7 @@
 //! with operator guidance and quality gates.
 
 use rs_vio::calibration::manual_workflow::{
-    ManualCalibrationWorkflow, WorkflowConfig,
+    ManualCalibrationWorkflow,
 };
 use std::io::{self, Write};
 
@@ -108,11 +108,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("No previous sessions found.");
             } else {
                 for (i, session_path) in sessions.iter().enumerate() {
-                    println!(
-                        "{}. {}",
-                        i + 1,
-                        session_path.file_name().unwrap().to_string_lossy()
-                    );
+                    let file_name = session_path.file_name()
+                        .map(|n| n.to_string_lossy())
+                        .unwrap_or_else(|| "unknown".into());
+                    println!("{}. {}", i + 1, file_name);
                 }
             }
         }

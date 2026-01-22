@@ -24,8 +24,8 @@ pub mod float_const {
     pub const ONE: Float = 1.0;
     pub const TWO: Float = 2.0;
     pub const HALF: Float = 0.5;
-    pub const PI: Float = std::f64::consts::PI as Float;
-    pub const EPSILON: Float = 1e-10 as Float;
+    pub const PI: Float = std::f64::consts::PI;
+    pub const EPSILON: Float = 1e-10;
 }
 
 /// Macro to cast literals to Float type (f32 or f64)

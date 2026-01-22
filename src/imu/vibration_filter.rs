@@ -4,6 +4,7 @@
 //! Used to identify dominant vibration frequencies and apply targeted filtering to reduce
 //! motion blur and improve VIO accuracy.
 //!
+use crate::assert_all_finite;
 use crate::datasets::ImuData;
 use crate::types::Float;
 use rustfft::algorithm::Radix4;
@@ -382,8 +383,8 @@ mod tests {
         let filter = NotchFilter::new(100.0, 1000.0, 10.0);
 
         // Check coefficients are finite
-        assert!(filter.a.iter().all(|&x| x.is_finite()));
-        assert!(filter.b.iter().all(|&x| x.is_finite()));
+        assert_all_finite!(filter.a, "Denominator coefficients must be finite");
+        assert_all_finite!(filter.b, "Numerator coefficients must be finite");
     }
 
     #[test]
@@ -394,7 +395,7 @@ mod tests {
         for i in 0..100 {
             let input = (i as f32 * 0.01 * std::f32::consts::PI * 2.0 * 100.0).sin();
             let output = filter.process(input);
-            assert!(output.is_finite());
+            assert_finite!(output, "Filter output must be finite");
         }
     }
 

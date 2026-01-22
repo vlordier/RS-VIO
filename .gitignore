@@ -4,7 +4,11 @@
 *.rlib
 *.rmeta
 *.pdb
-
+datasets/
+cargo-flamegraph.trace/
+.claude/
+.mypy_cache/
+.venv/ 
 # IDE and Editor
 .idea/
 .vscode/
@@ -46,7 +50,7 @@ flame-graph.svg
 
 # Dataset samples
 rs-vio-samples/
-datasets/
+# datasets/ <- Temporarily removed to access src/datasets/config.rs
 
 # OS files
 Thumbs.db

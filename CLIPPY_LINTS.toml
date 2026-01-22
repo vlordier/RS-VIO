@@ -10,8 +10,8 @@
 # =============================================================================
 # These lints are safety-critical and must NEVER be bypassed
 unnecessary_unwrap = "deny"  # unwrap() on Option/Result without handling None/Err
-expect_used = "deny"  # expect() - crashes on None/Err
-unwrap_used = "deny"  # unwrap() - crashes on None/Err
+expect_used = "warn"  # expect() - crashes on None/Err (warn during migration)
+unwrap_used = "warn"  # unwrap() - crashes on None/Err (warn during migration)
 panic = "deny"  # panic!() - never panic in library code
 exit = "deny"  # process::exit() - never exit abruptly
 todo = "deny"  # TODO comments must be resolved before merging

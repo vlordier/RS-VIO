@@ -3,6 +3,7 @@
 use na::DVector;
 use nalgebra as na;
 use serde::{Deserialize, Serialize};
+use crate::clamp_or;
 
 /// Result of marginalization operation
 #[derive(Debug, Clone)]
@@ -80,97 +81,61 @@ impl Default for MarginalizationConfig {
 impl MarginalizationConfig {
     /// Validate and clamp marginalization parameters.
     pub fn validate_and_clamp(&mut self) {
-        // Clamp damping to [1e-12, 1.0]
-        if self.damping < 1e-12 {
-            log::warn!(
-                "marginalization damping {} too small, clamping to 1e-12",
-                self.damping
-            );
-            self.damping = 1e-12;
-        }
-        if self.damping > 1.0 {
-            log::warn!(
-                "marginalization damping {} too large, clamping to 1.0",
-                self.damping
-            );
-            self.damping = 1.0;
-        }
+        self.damping = clamp_or!(
+            self.damping,
+            1e-12,
+            1.0,
+            1e-12,
+            "marginalization damping {} out of range [1e-12, 1.0], clamping",
+            self.damping
+        );
 
-        // Clamp max_keyframes to [2, 50]
-        if self.max_keyframes < 2 {
-            log::warn!(
-                "max_keyframes {} too small, clamping to 2",
-                self.max_keyframes
-            );
-            self.max_keyframes = 2;
-        }
-        if self.max_keyframes > 50 {
-            log::warn!(
-                "max_keyframes {} too large, clamping to 50",
-                self.max_keyframes
-            );
-            self.max_keyframes = 50;
-        }
+        self.max_keyframes = clamp_or!(
+            self.max_keyframes,
+            2,
+            50,
+            2,
+            "max_keyframes {} out of range [2, 50], clamping",
+            self.max_keyframes
+        );
 
-        // Clamp num_marginalize_per_step to [1, max_keyframes/2]
-        if self.num_marginalize_per_step == 0 {
-            log::warn!("num_marginalize_per_step cannot be 0, setting to 1");
-            self.num_marginalize_per_step = 1;
-        }
         let max_marg = self.max_keyframes / 2;
-        if self.num_marginalize_per_step > max_marg {
-            log::warn!(
-                "num_marginalize_per_step {} too large, clamping to {}",
-                self.num_marginalize_per_step,
-                max_marg
-            );
-            self.num_marginalize_per_step = max_marg;
-        }
+        self.num_marginalize_per_step = clamp_or!(
+            self.num_marginalize_per_step,
+            1,
+            max_marg,
+            1,
+            "num_marginalize_per_step {} out of range [1, {}], clamping",
+            self.num_marginalize_per_step,
+            max_marg
+        );
 
-        // Clamp min_landmark_observations to [2, 20]
-        if self.min_landmark_observations < 2 {
-            log::warn!(
-                "min_landmark_observations {} too small, clamping to 2",
-                self.min_landmark_observations
-            );
-            self.min_landmark_observations = 2;
-        }
-        if self.min_landmark_observations > 20 {
-            log::warn!(
-                "min_landmark_observations {} too large, clamping to 20",
-                self.min_landmark_observations
-            );
-            self.min_landmark_observations = 20;
-        }
+        self.min_landmark_observations = clamp_or!(
+            self.min_landmark_observations,
+            2,
+            20,
+            2,
+            "min_landmark_observations {} out of range [2, 20], clamping",
+            self.min_landmark_observations
+        );
 
-        // Clamp landmark_age_limit to [1, 1000]
-        if self.landmark_age_limit == 0 {
-            log::warn!("landmark_age_limit cannot be 0, setting to 1");
-            self.landmark_age_limit = 1;
-        }
-        if self.landmark_age_limit > 1000 {
-            log::warn!(
-                "landmark_age_limit {} too large, clamping to 1000",
-                self.landmark_age_limit
-            );
-            self.landmark_age_limit = 1000;
-        }
+        self.landmark_age_limit = clamp_or!(
+            self.landmark_age_limit,
+            1,
+            1000,
+            1,
+            "landmark_age_limit {} out of range [1, 1000], clamping",
+            self.landmark_age_limit
+        );
 
-        // Clamp prior_info_scale to [0.01, 10.0]
-        if self.prior_info_scale < 0.01 {
-            log::warn!(
-                "prior_info_scale {} too small, clamping to 0.01",
-                self.prior_info_scale
-            );
-            self.prior_info_scale = 0.01;
-        }
-        if self.prior_info_scale > 10.0 {
-            log::warn!(
-                "prior_info_scale {} too large, clamping to 10.0",
-                self.prior_info_scale
-            );
-            self.prior_info_scale = 10.0;
-        }
+        self.prior_info_scale = clamp_or!(
+            self.prior_info_scale,
+            0.01,
+            10.0,
+            0.01,
+            "prior_info_scale {} out of range [0.01, 10.0], clamping",
+            self.prior_info_scale
+        );
 
         // Validate string enums
         let valid_hessian = [

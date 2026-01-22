@@ -7,12 +7,14 @@
 //! - Pre-allocated buffers for feature tracking
 //! - Image pyramid reuse
 //! - Descriptor storage pooling
+//! - Lock-free atomic operations for hard real-time guarantees
 
 use crate::{
     estimator::{FrameWorkspace, WorkspaceConfig},
     traits::ResourcePool,
 };
-use std::sync::{Arc, Mutex};
+use std::sync::{atomic::{AtomicBool, Ordering}, Arc, Mutex};
+use std::cell::UnsafeCell;
 
 /// Configuration for `WorkspacePool` used by the generic `ResourcePool` trait.
 #[derive(Debug, Clone)]
@@ -32,43 +34,139 @@ impl Default for WorkspacePoolConfig {
     }
 }
 
-/// Pool of reusable frame workspaces
-///
-/// Reduces allocation overhead in the hotpath by maintaining
-/// a pool of pre-allocated workspace buffers.
-pub struct WorkspacePool {
-    frame_workspaces: Mutex<Vec<FrameWorkspace>>,
-    config: WorkspaceConfig,
-    max_pool_size: usize,
+/// Lock-free slot in the workspace pool
+struct PoolSlot {
+    workspace: UnsafeCell<Option<FrameWorkspace>>,
+    available: AtomicBool,
 }
 
-impl WorkspacePool {
-    /// Create new workspace pool
-    pub fn new(config: WorkspaceConfig, initial_size: usize, max_size: usize) -> Self {
-        let mut frame_workspaces = Vec::with_capacity(initial_size);
-        for _ in 0..initial_size {
-            frame_workspaces.push(FrameWorkspace::new(config.clone()));
-        }
+#[allow(unsafe_code)]
+unsafe impl Sync for PoolSlot {}
 
+impl PoolSlot {
+    fn new(workspace: FrameWorkspace) -> Self {
         Self {
-            frame_workspaces: Mutex::new(frame_workspaces),
-            config,
-            max_pool_size: max_size,
+            workspace: UnsafeCell::new(Some(workspace)),
+            available: AtomicBool::new(true),
         }
     }
 
-    /// Acquire a frame workspace from pool
+    fn empty() -> Self {
+        Self {
+            workspace: UnsafeCell::new(None),
+            available: AtomicBool::new(false),
+        }
+    }
+
+    /// Try to acquire this slot's workspace (lock-free)
+    fn try_acquire(&self) -> Option<FrameWorkspace> {
+        // Try to atomically claim this slot
+        if self.available.compare_exchange(
+            true,
+            false,
+            Ordering::Acquire,
+            Ordering::Relaxed,
+        ).is_ok() {
+            // We successfully claimed it, extract the workspace
+            #[allow(unsafe_code)]
+            unsafe {
+                (*self.workspace.get()).take()
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Try to release workspace back to this slot (lock-free)
+    #[allow(clippy::result_large_err)]
+    fn try_release(&self, workspace: FrameWorkspace) -> Result<(), FrameWorkspace> {
+        // Try to atomically claim this slot for release
+        if self.available.compare_exchange(
+            false, // Slot must be empty (not available)
+            true,  // Mark as available after filling
+            Ordering::Release,
+            Ordering::Relaxed,
+        ).is_ok() {
+            // We successfully claimed an empty slot, fill it
+            #[allow(unsafe_code)]
+            unsafe {
+                *self.workspace.get() = Some(workspace);
+            }
+            Ok(())
+        } else {
+            // Slot is already full
+            Err(workspace)
+        }
+    }
+}
+
+/// Lock-free pool of reusable frame workspaces
+///
+/// Reduces allocation overhead in the hotpath by maintaining
+/// a pool of pre-allocated workspace buffers with lock-free operations
+/// for hard real-time guarantees.
+///
+/// Uses a fixed-size array with atomic operations to provide O(1)
+/// lock-free acquire/release with zero contention in the common case.
+pub struct WorkspacePool {
+    /// Fixed-size array of workspace slots
+    slots: Vec<PoolSlot>,
+    /// Configuration for creating new workspaces
+    config: WorkspaceConfig,
+    /// Maximum pool size
+    max_pool_size: usize,
+    /// Fallback mutex-protected overflow storage
+    overflow: Mutex<Vec<FrameWorkspace>>,
+}
+
+impl WorkspacePool {
+    /// Create new lock-free workspace pool
+    pub fn new(config: WorkspaceConfig, initial_size: usize, max_size: usize) -> Self {
+        let mut slots = Vec::with_capacity(max_size);
+
+        // Pre-allocate initial workspaces in lock-free slots
+        for _ in 0..initial_size {
+            slots.push(PoolSlot::new(FrameWorkspace::new(config.clone())));
+        }
+
+        // Fill remaining slots with empty markers
+        for _ in initial_size..max_size {
+            slots.push(PoolSlot::empty());
+        }
+
+        Self {
+            slots,
+            config,
+            max_pool_size: max_size,
+            overflow: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Acquire a frame workspace from pool (lock-free fast path)
     ///
     /// If pool is empty, creates a new workspace.
-    /// This is the hotpath for frame processing.
+    /// This is the hotpath for frame processing with zero lock contention.
     #[inline]
-    #[allow(clippy::unwrap_used)] // Mutex poisoning is unrecoverable
     pub fn acquire_frame_workspace(&self) -> PooledFrameWorkspace<'_> {
-        let workspace = {
-            let mut pool = self.frame_workspaces.lock().unwrap();
-            pool.pop()
-                .unwrap_or_else(|| FrameWorkspace::new(self.config.clone()))
+        // Fast path: try to acquire from lock-free slots
+        for slot in &self.slots {
+            if let Some(workspace) = slot.try_acquire() {
+                return PooledFrameWorkspace {
+                    workspace: Some(workspace),
+                    pool: self,
+                };
+            }
+        }
+
+        // Fallback path: check overflow storage (rare)
+        let workspace = if let Ok(mut overflow) = self.overflow.try_lock() {
+            overflow.pop()
+        } else {
+            None
         };
+
+        // Last resort: allocate new workspace
+        let workspace = workspace.unwrap_or_else(|| FrameWorkspace::new(self.config.clone()));
 
         PooledFrameWorkspace {
             workspace: Some(workspace),
@@ -76,29 +174,44 @@ impl WorkspacePool {
         }
     }
 
-    /// Return a frame workspace to the pool
+    /// Return a frame workspace to the pool (lock-free fast path)
     #[inline]
-    #[allow(clippy::unwrap_used)] // Mutex poisoning is unrecoverable
     fn release_frame_workspace(&self, mut workspace: FrameWorkspace) {
         workspace.reset(); // Clear contents but keep allocations
-        let mut pool = self.frame_workspaces.lock().unwrap();
-        if pool.len() < self.max_pool_size {
-            pool.push(workspace);
+
+        // Fast path: try to release to any empty lock-free slot
+        for slot in &self.slots {
+            match slot.try_release(workspace) {
+                Ok(()) => return, // Successfully released
+                Err(ws) => workspace = ws, // Slot was full, try next
+            }
         }
-        // Otherwise drop the workspace (pool is full)
+
+        // If all slots are full, drop the workspace (pool at capacity)
+        // Note: overflow is not used for storage to maintain strict pool size limit
     }
 
-    /// Get current pool size
-    #[allow(clippy::unwrap_used)] // Mutex poisoning is unrecoverable
+    /// Get current pool size (approximate, may race)
     pub fn pool_size(&self) -> usize {
-        self.frame_workspaces.lock().unwrap().len()
+        let mut count = 0;
+        for slot in &self.slots {
+            if slot.available.load(Ordering::Relaxed) {
+                count += 1;
+            }
+        }
+        count
     }
 
     /// Clear all pooled workspaces (for testing)
     #[cfg(test)]
-    #[allow(clippy::unwrap_used)] // Test code
     pub fn clear(&self) {
-        self.frame_workspaces.lock().unwrap().clear();
+        for slot in &self.slots {
+            // Try to acquire and drop
+            let _ = slot.try_acquire();
+        }
+        if let Ok(mut overflow) = self.overflow.lock() {
+            overflow.clear();
+        }
     }
 }
 
@@ -158,38 +271,52 @@ impl ResourcePool for WorkspacePool {
     }
 
     fn acquire(&self) -> Self::Resource {
-        let mut pool = self
-            .frame_workspaces
-            .lock()
-            .expect("workspace pool mutex poisoned");
-        pool.pop()
-            .unwrap_or_else(|| FrameWorkspace::new(self.config.clone()))
+        // Try lock-free slots first
+        for slot in &self.slots {
+            if let Some(workspace) = slot.try_acquire() {
+                return workspace;
+            }
+        }
+
+        // Try overflow
+        if let Ok(mut overflow) = self.overflow.lock() {
+            if let Some(workspace) = overflow.pop() {
+                return workspace;
+            }
+        }
+
+        // Allocate new
+        FrameWorkspace::new(self.config.clone())
     }
 
     fn try_acquire(&self) -> Option<Self::Resource> {
-        let mut pool = self
-            .frame_workspaces
-            .lock()
-            .expect("workspace pool mutex poisoned");
-        pool.pop()
+        // Try lock-free slots first
+        for slot in &self.slots {
+            if let Some(workspace) = slot.try_acquire() {
+                return Some(workspace);
+            }
+        }
+
+        // Try overflow
+        if let Ok(mut overflow) = self.overflow.try_lock() {
+            return overflow.pop();
+        }
+
+        None
     }
 
     fn release(&self, mut resource: Self::Resource) {
         resource.reset();
-        let mut pool = self
-            .frame_workspaces
-            .lock()
-            .expect("workspace pool mutex poisoned");
-        if pool.len() < self.max_pool_size {
-            pool.push(resource);
-        }
+        self.release_frame_workspace(resource);
     }
 
     fn reset(&self) {
-        self.frame_workspaces
-            .lock()
-            .expect("workspace pool mutex poisoned")
-            .clear();
+        for slot in &self.slots {
+            let _ = slot.try_acquire();
+        }
+        if let Ok(mut overflow) = self.overflow.lock() {
+            overflow.clear();
+        }
     }
 
     fn utilization(&self) -> f32 {
@@ -206,10 +333,7 @@ impl ResourcePool for WorkspacePool {
     }
 
     fn available(&self) -> usize {
-        self.frame_workspaces
-            .lock()
-            .expect("workspace pool mutex poisoned")
-            .len()
+        self.pool_size()
     }
 }
 

@@ -192,6 +192,34 @@ impl FeatureTrackingCoordinator {
     }
 }
 
+pub struct Frontend<const N: u32> {
+    pub stereo_patch_tracker: StereoPatchTracker<N>,
+    pub feature_tracking_coordinator: FeatureTrackingCoordinator,
+}
+
+impl<const N: u32> Frontend<N> {
+    pub fn new(config: &crate::datasets::config::FeatureDetectionConfig) -> Self {
+        Self {
+            stereo_patch_tracker: StereoPatchTracker::from_config(config),
+            feature_tracking_coordinator: FeatureTrackingCoordinator,
+        }
+    }
+
+    pub fn track_features(
+        &mut self,
+        left_image: &GrayImage,
+        right_image: &GrayImage,
+        frame: &mut Frame,
+    ) -> std::time::Duration {
+        FeatureTrackingCoordinator::track_stereo_frame(
+            &mut self.stereo_patch_tracker,
+            left_image,
+            right_image,
+            frame,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
