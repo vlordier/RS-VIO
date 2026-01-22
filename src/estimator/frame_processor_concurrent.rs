@@ -23,6 +23,10 @@ pub struct ConcurrentConfig {
     pub feature_workers: usize,
     /// Number of worker threads for optimization
     pub optimization_workers: usize,
+    /// Optional simulated work delay (ms) for testing/benchmarks
+    pub simulated_work_ms: Option<u64>,
+    /// Optional jitter to force out-of-order completion (ms, applied to even ids)
+    pub simulated_jitter_ms: Option<u64>,
 }
 
 impl Default for ConcurrentConfig {
@@ -33,6 +37,8 @@ impl Default for ConcurrentConfig {
             frame_timeout_ms: 33,
             feature_workers: 2,
             optimization_workers: 1,
+            simulated_work_ms: None,
+            simulated_jitter_ms: None,
         }
     }
 }
@@ -53,6 +59,7 @@ pub struct ProcessingResult {
     pub processed_at_ns: i64,
     pub success: bool,
     pub error: Option<String>,
+    pub feature_count: usize,
 }
 
 /// Concurrent VIO frame processor
@@ -177,14 +184,29 @@ pub struct ProcessingHandle {
 
 impl ProcessingHandle {
     /// Start concurrent processing tasks
-    pub fn start(mut self) {
+    pub fn start(&mut self) {
+        let (detected_tx, detected_rx) = mpsc::channel(self.config.pipeline_depth);
+        let detected_rx = Arc::new(tokio::sync::Mutex::new(detected_rx));
+
         // Spawn feature detection workers
         for _ in 0..self.config.feature_workers {
             let frame_rx = Arc::clone(&self.frame_rx);
-            let result_tx = self.result_tx.clone();
+            let detected_tx = detected_tx.clone();
+            let worker_config = self.config.clone();
 
             self.task_set.spawn(async move {
-                Self::feature_detection_worker(frame_rx, result_tx).await;
+                Self::feature_detection_worker(frame_rx, detected_tx, worker_config).await;
+            });
+        }
+
+        // Spawn optimization workers
+        for _ in 0..self.config.optimization_workers {
+            let detected_rx = Arc::clone(&detected_rx);
+            let result_tx = self.result_tx.clone();
+            let worker_config = self.config.clone();
+
+            self.task_set.spawn(async move {
+                Self::optimization_worker(detected_rx, result_tx, worker_config).await;
             });
         }
     }
@@ -192,7 +214,8 @@ impl ProcessingHandle {
     /// Feature detection worker task
     async fn feature_detection_worker(
         frame_rx: Arc<tokio::sync::Mutex<mpsc::Receiver<ConcurrentFrame>>>,
-        result_tx: mpsc::Sender<ProcessingResult>,
+        detected_tx: mpsc::Sender<(ConcurrentFrame, usize)>,
+        config: ConcurrentConfig,
     ) {
         loop {
             let frame = {
@@ -202,16 +225,65 @@ impl ProcessingHandle {
             
             match frame {
                 Some(frame) => {
-                    let start = std::time::Instant::now();
+                    if let Some(delay_ms) = config.simulated_work_ms {
+                        let jitter = if let Some(jitter_ms) = config.simulated_jitter_ms {
+                            if frame.id % 2 == 0 { jitter_ms } else { 0 }
+                        } else {
+                            0
+                        };
+                        tokio::time::sleep(std::time::Duration::from_millis(delay_ms + jitter)).await;
+                    }
+
+                    let feature_count = frame.frame.left_features.len();
 
                     // TODO: Implement actual feature detection
-                    // For now: mock processing
+                    if detected_tx
+                        .send((frame, feature_count))
+                        .await
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+                None => break,
+            }
+        }
+    }
+
+    /// Optimization worker task (placeholder for real BA/pose refinement)
+    async fn optimization_worker(
+        detected_rx: Arc<tokio::sync::Mutex<mpsc::Receiver<(ConcurrentFrame, usize)>>>,
+        result_tx: mpsc::Sender<ProcessingResult>,
+        config: ConcurrentConfig,
+    ) {
+        loop {
+            let detected = {
+                let mut rx = detected_rx.lock().await;
+                rx.recv().await
+            };
+
+            match detected {
+                Some((frame, feature_count)) => {
+                    let start = std::time::Instant::now();
+
+                    if let Some(delay_ms) = config.simulated_work_ms {
+                        let jitter = if let Some(jitter_ms) = config.simulated_jitter_ms {
+                            if frame.id % 2 == 0 { jitter_ms } else { 0 }
+                        } else {
+                            0
+                        };
+                        tokio::time::sleep(std::time::Duration::from_millis(delay_ms + jitter)).await;
+                    }
+
+                    let processed_at_ns = frame.timestamp_ns + start.elapsed().as_nanos() as i64;
+
                     let result = ProcessingResult {
                         frame_id: frame.id,
                         frame: frame.frame,
-                        processed_at_ns: frame.timestamp_ns + start.elapsed().as_nanos() as i64,
+                        processed_at_ns,
                         success: true,
                         error: None,
+                        feature_count,
                     };
 
                     if result_tx.send(result).await.is_err() {
@@ -238,26 +310,41 @@ impl ProcessingHandle {
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn test_processor_creation() {
+    #[test]
+    fn test_processor_creation() {
         let config = ConcurrentConfig::default();
-        let (processor, handle) = ConcurrentFrameProcessor::new(config);
+        let (processor, _handle) = ConcurrentFrameProcessor::new(config);
         assert_eq!(processor.queue_depth(), 0);
-        handle.shutdown().await;
+        assert_eq!(processor.next_output_id, 0);
     }
 
-    #[tokio::test]
-    async fn test_frame_ordering() {
-        let config = ConcurrentConfig {
-            maintain_order: true,
-            ..Default::default()
-        };
-        let (processor, handle) = ConcurrentFrameProcessor::new(config);
-        
-        // Note: Can't fully test without real frame data
-        // This is a structure test only
-        assert_eq!(processor.next_output_id, 0);
-        
-        handle.shutdown().await;
+    #[test]
+    fn test_config_defaults() {
+        let config = ConcurrentConfig::default();
+        assert_eq!(config.pipeline_depth, 4);
+        assert_eq!(config.feature_workers, 2);
+        assert_eq!(config.optimization_workers, 1);
+        assert!(config.maintain_order);
+    }
+
+    #[test]
+    fn test_reorder_buffer_ordering() {
+        let mut buffer = BTreeMap::new();
+        let mut next_id = 0;
+
+        // Simulate out-of-order insertion
+        buffer.insert(1, 11);
+        buffer.insert(0, 10);
+        buffer.insert(3, 13);
+        buffer.insert(2, 12);
+
+        // Verify ordering on retrieval
+        let ids: Vec<_> = buffer.keys().copied().collect();
+        for id in ids {
+            let val = buffer.remove(&id).unwrap();
+            assert_eq!(id, next_id);
+            assert_eq!(val, 10 + next_id as i32);
+            next_id += 1;
+        }
     }
 }

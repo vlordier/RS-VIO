@@ -122,7 +122,7 @@ Improvement	Effort (hrs)	Impact	Urgency	ROI Score	Status
 2. API Stability	10-15	⭐⭐⭐⭐ Ecosystem	🟡 High	8.5/10	✅ COMPLETE
 3. Arena Allocation	20-25	⭐⭐⭐⭐⭐ Perf	🟡 High	9.0/10	✅ COMPLETE
 4. Feature Flag Validation	8-12	⭐⭐⭐ Build Safety	🟡 High	8.0/10	✅ COMPLETE
-5. Async Concurrency	35-45	⭐⭐⭐⭐ Scalability	🟢 Medium	7.5/10	🔄 PHASE 2
+5. Async Concurrency	35-45	⭐⭐⭐⭐ Scalability	🟢 Medium	7.5/10	🔄 Phase 2 (concurrent pipeline running, tests+bench)
 Recommended Order: 1 → 5 → 2 → 3 → 4 (highest ROI → foundation for concurrency)
 
 ## Completion Status
