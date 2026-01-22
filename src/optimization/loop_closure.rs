@@ -213,7 +213,7 @@ impl LoopClosureConfig {
         self.min_frame_gap = clamp_or!(
             self.min_frame_gap,
             1,
-            i32::MAX,
+            usize::MAX,
             1,
             "min_frame_gap must be > 0, setting to 1"
         );
@@ -228,7 +228,7 @@ impl LoopClosureConfig {
         self.num_candidates = clamp_or!(
             self.num_candidates,
             1,
-            u16::MAX,
+            usize::MAX,
             1,
             "num_candidates cannot be 0, setting to 1"
         );
@@ -236,7 +236,7 @@ impl LoopClosureConfig {
         self.min_matches_for_candidate = clamp_or!(
             self.min_matches_for_candidate,
             1,
-            u16::MAX,
+            usize::MAX,
             1,
             "min_matches_for_candidate cannot be 0, setting to 1"
         );
@@ -248,7 +248,7 @@ impl LoopClosureConfig {
         self.min_inliers = clamp_or!(
             self.min_inliers,
             1,
-            u16::MAX,
+            usize::MAX,
             1,
             "min_inliers cannot be 0, setting to 1"
         );

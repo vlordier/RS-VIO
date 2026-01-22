@@ -50,6 +50,8 @@ pub use higher_order_filter::{
 };
 pub use imu_types::{ImuFloat, ImuVector3, ImuUnitQuaternion}; // Import new IMU types
 pub use crate::imu_fl;
+use crate::debug_assert_approx;
+
 pub use initialization::{
     AdaptiveNoiseEstimator, BiasEstimate, ImuInitializationConfig, ImuInitializer,
     InitializationState,

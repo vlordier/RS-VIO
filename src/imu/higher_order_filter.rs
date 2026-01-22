@@ -6,7 +6,6 @@
 /// - Snap: d/dt jerk (4th time derivative of position)
 ///
 /// Combined with spectral analysis at fundamental frequency (f0)
-use crate::assert_finite;
 use std::collections::VecDeque;
 
 /// Configuration for higher-order IMU filtering
@@ -366,6 +365,7 @@ pub struct SnapStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{assert_all_finite, assert_finite};
 
     #[test]
     fn test_jerk_computation() {

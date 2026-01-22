@@ -7,6 +7,8 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
+use crate::ok_or_log;
+
 /// Unique identifier for screenshot requests
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub struct ScreenshotId(u64);

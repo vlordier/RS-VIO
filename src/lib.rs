@@ -290,4 +290,6 @@ pub use datasets::fourseasons_player::FourSeasonsPlayer;
 pub use datasets::tum_vi_player::TUMVIPlayer;
 pub use datasets::{PlayerConfig, PlayerResult};
 pub use optimization::marginalization::MarginalizationPrior;
+
+#[cfg(feature = "swarm")]
 pub use swarm::{DroneId, HealthStatus, HealthState, SwarmMessage, SwarmState, TelemetryFrame, VIOEvent};

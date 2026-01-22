@@ -4,7 +4,6 @@
 //! Used to identify dominant vibration frequencies and apply targeted filtering to reduce
 //! motion blur and improve VIO accuracy.
 //!
-use crate::assert_all_finite;
 use crate::datasets::ImuData;
 use crate::types::Float;
 use rustfft::algorithm::Radix4;
@@ -377,6 +376,7 @@ impl NotchFilter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{assert_all_finite, assert_finite};
 
     #[test]
     fn test_notch_filter_design() {

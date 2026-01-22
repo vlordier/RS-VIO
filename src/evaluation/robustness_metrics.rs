@@ -33,8 +33,6 @@ pub fn track_failure_rate(
     confidence_scores: &[f64], // Tracking confidence 0.0-1.0
     error_threshold: f64,      // Error threshold for failure
 ) -> Result<RobustnessMetrics, String> {
-    use crate::{ensure_not_empty, if_not_empty};
-    
     if pose_errors.len() != confidence_scores.len() {
         return Err("Arrays must have equal length".to_string());
     }
@@ -91,22 +89,22 @@ pub fn track_failure_rate(
         let jump = (pose_errors[i] - pose_errors[i - 1]).abs();
         pose_jumps.push(jump);
     }
- !pose_jumps.is_empty() {
-        pose_jumps.iter().sum::<f64>() / pose_jumps.len() as f64
-    } else {
-        0.0
-    }t avg_pose_jump = if_not_empty!(pose_jumps, {
-        pose_jumps.iter().sum::<f64>() / pose_jumps.len() as f64
-    });
 
-    // Compute velocity smoothness (variance of derivatives)
-    let mut velocities = Vec::new();
-    for i in 1..pose_errors.le !velocities.is_empty() {
-        let mean = velocities.iter().sum::<f64>() / velocities.len() as f64;
-        velocities.iter().map(|&v| (v - mean).powi(2)).sum::<f64>() / velocities.len() as f64
+    let avg_pose_jump = if !pose_jumps.is_empty() {
+        pose_jumps.iter().sum::<f64>() / pose_jumps.len() as f64
     } else {
         0.0
+    };
+
+    let max_pose_jump = pose_jumps.iter().copied().fold(0.0_f64, f64::max);
+
+    // Compute velocity smoothness (variance of derivatives, using unit time steps)
+    let mut velocities = Vec::new();
+    for i in 1..pose_errors.len() {
+        let velocity = pose_errors[i] - pose_errors[i - 1];
+        velocities.push(velocity);
     }
+
     let velocity_variance = if !velocities.is_empty() {
         let mean = velocities.iter().sum::<f64>() / velocities.len() as f64;
         velocities.iter().map(|&v| (v - mean).powi(2)).sum::<f64>() / velocities.len() as f64
