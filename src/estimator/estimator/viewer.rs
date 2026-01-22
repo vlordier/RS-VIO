@@ -135,6 +135,12 @@ impl Estimator {
             let trajectory_poses: Vec<Matrix4x4> =
                 self.trajectory.iter().map(|(_, pose)| *pose).collect();
             v.log_trajectory(&trajectory_poses, "trajectory/path");
+
+            // Visualize loop closure constraints (global drift correction)
+            let loop_closures = &self.backend.sliding_window.loop_closure_constraints;
+            if !loop_closures.is_empty() {
+                v.log_loop_closure(loop_closures, "loop_closure/edges");
+            }
         }
     }
 

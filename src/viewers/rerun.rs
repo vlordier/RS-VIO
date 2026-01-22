@@ -695,14 +695,14 @@ impl Viewer for RerunViewer {
         }
     }
 
-    /// Log IMU harmonics: gravity, bias, and harmonic components
+    /// Log IMU harmonics: gravity, bias, and harmonic components (simplified)
     fn log_imu_harmonics(
         &mut self,
         _timestamp: i64,
         gravity_component: [f32; 3],
         bias_accel: [f32; 3],
         bias_gyro: [f32; 3],
-        harmonic_accel: &[[f32; 3]],
+        _harmonic_accel: &[[f32; 3]],
         entity_path: &str,
     ) {
         if !self.initialized {
@@ -713,114 +713,42 @@ impl Viewer for RerunViewer {
             rec.set_time_sequence("frame", self.frame_id);
             rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
 
-            // Log gravity component as a vector at origin
-            let gravity_positions = vec![[0.0, 0.0, 0.0]];
-            let gravity_vectors = vec![[
-                gravity_component[0],
-                gravity_component[1],
-                gravity_component[2],
-            ]];
-
-            let gravity_arrows = rerun::Arrows3D::from_vectors(gravity_vectors)
-                .with_origins(gravity_positions)
-                .with_colors([Color::from_rgb(0, 255, 0)]); // Green for gravity
-
-            if let Err(e) = rec.log(
-                format!("{}/gravity_component", entity_path),
-                &gravity_arrows,
-            ) {
-                log::debug!("[RerunViewer] Failed to log gravity component: {}", e);
-            }
-
-            // Log accel bias as a point in space
-            let bias_accel_pos = vec![[bias_accel[0], bias_accel[1], bias_accel[2]]];
-            if let Err(e) = rec.log(
-                format!("{}/bias_accel", entity_path),
-                &rerun::Points3D::new(bias_accel_pos)
-                    .with_colors([Color::from_rgb(255, 165, 0)]) // Orange
-                    .with_radii([0.05]),
-            ) {
-                log::debug!("[RerunViewer] Failed to log accel bias: {}", e);
-            }
-
-            // Log gyro bias information
-            let bias_text =
-                format!(
-                "Accel Bias: [{:.4}, {:.4}, {:.4}] m/s²\nGyro Bias: [{:.4}, {:.4}, {:.4}] rad/s",
-                bias_accel[0], bias_accel[1], bias_accel[2],
-                bias_gyro[0], bias_gyro[1], bias_gyro[2]
-            );
-            if let Err(e) = rec.log(
-                format!("{}/bias_values", entity_path),
-                &rerun::TextDocument::new(bias_text),
-            ) {
-                log::debug!("[RerunViewer] Failed to log bias values: {}", e);
-            }
-
-            // Log harmonic components (residual noise after gravity and bias removal)
-            if !harmonic_accel.is_empty() {
-                let harmonic_3d: Vec<[f32; 3]> = harmonic_accel
-                    .iter()
-                    .enumerate()
-                    .map(|(i, &harmonic)| [i as f32 * 0.01, harmonic[0], harmonic[1]])
-                    .collect();
-
-                let harmonic_line =
-                    LineStrips3D::new([harmonic_3d]).with_colors([Color::from_rgb(255, 0, 255)]); // Magenta for harmonics/noise
-
-                if let Err(e) = rec.log(
-                    format!("{}/harmonic_components", entity_path),
-                    &harmonic_line,
-                ) {
-                    log::debug!("[RerunViewer] Failed to log harmonic components: {}", e);
-                }
-
-                // Log harmonic statistics
-                let harmonic_rms: f32 = harmonic_accel
-                    .iter()
-                    .map(|h| (h[0] * h[0] + h[1] * h[1] + h[2] * h[2]).sqrt())
-                    .sum::<f32>()
-                    / harmonic_accel.len() as f32;
-
-                let harmonic_stats = format!(
-                    "Harmonic Components: {} | RMS: {:.4} m/s²",
-                    harmonic_accel.len(),
-                    harmonic_rms
-                );
-                if let Err(e) = rec.log(
-                    format!("{}/harmonic_stats", entity_path),
-                    &rerun::TextDocument::new(harmonic_stats),
-                ) {
-                    log::debug!("[RerunViewer] Failed to log harmonic stats: {}", e);
-                }
-            }
-
-            // Log gravity magnitude
+            // Calculate gravity magnitude
             let gravity_mag = (gravity_component[0] * gravity_component[0]
                 + gravity_component[1] * gravity_component[1]
                 + gravity_component[2] * gravity_component[2])
                 .sqrt();
 
-            let gravity_info = format!(
-                "Gravity Magnitude: {:.3} m/s² | Direction: [{:.3}, {:.3}, {:.3}]",
-                gravity_mag, gravity_component[0], gravity_component[1], gravity_component[2]
+            // Log metrics as text for time-series analysis
+            if let Err(e) = rec.log(
+                format!("{}/metrics", entity_path),
+                &rerun::TextLog::new(format!("Gravity: {:.2} m/s²", gravity_mag)),
+            ) {
+                log::debug!("[RerunViewer] Failed to log gravity magnitude: {}", e);
+            }
+
+            // Log concise summary
+            let summary = format!(
+                "Gravity: {:.2} m/s² | Accel Bias: [{:.4}, {:.4}, {:.4}] | Gyro Bias: [{:.4}, {:.4}, {:.4}]",
+                gravity_mag, bias_accel[0], bias_accel[1], bias_accel[2],
+                bias_gyro[0], bias_gyro[1], bias_gyro[2]
             );
             if let Err(e) = rec.log(
-                format!("{}/gravity_info", entity_path),
-                &rerun::TextDocument::new(gravity_info),
+                format!("{}/summary", entity_path),
+                &rerun::TextDocument::new(summary),
             ) {
-                log::debug!("[RerunViewer] Failed to log gravity info: {}", e);
+                log::debug!("[RerunViewer] Failed to log harmonics summary: {}", e);
             }
         }
     }
 
-    /// Log IMU signal quality metrics
+    /// Log IMU signal quality metrics (simplified for efficiency)
     fn log_imu_signal_quality(
         &mut self,
         _timestamp: i64,
         signal_snr: [f32; 3],
         signal_rms: [f32; 3],
-        signal_peak: [f32; 3],
+        _signal_peak: [f32; 3],
         motor_state: &str,
         fundamental_freq_hz: f32,
         entity_path: &str,
@@ -833,291 +761,19 @@ impl Viewer for RerunViewer {
             rec.set_time_sequence("frame", self.frame_id);
             rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
 
-            // Log motor state prominently
-            let _motor_state_color = match motor_state {
-                "Off" => [0, 255, 0],             // Green
-                "Running" => [255, 0, 0],         // Red
-                "Transitioning" => [255, 165, 0], // Orange
-                _ => [128, 128, 128],             // Gray for unknown
-            };
-
-            if let Err(e) = rec.log(
-                format!("{}/motor_state", entity_path),
-                &rerun::TextDocument::new(format!("Motors: {}", motor_state))
-                    .with_media_type(rerun::MediaType::plain_text()),
-            ) {
-                log::debug!("[RerunViewer] Failed to log motor state: {}", e);
-            }
-
-            // Log fundamental frequency if motors running
-            if fundamental_freq_hz > 0.0 {
-                if let Err(e) = rec.log(
-                    format!("{}/freq_text", entity_path),
-                    &rerun::TextDocument::new(format!(
-                        "Rotor Frequency f₀: {:.1} Hz",
-                        fundamental_freq_hz
-                    )),
-                ) {
-                    log::debug!("[RerunViewer] Failed to log frequency text: {}", e);
-                }
-            }
-
-            // Log signal quality metrics as bar charts
-            let snr_bars = vec![
-                signal_snr[0] as f64,
-                signal_snr[1] as f64,
-                signal_snr[2] as f64,
-            ];
-            if let Err(e) = rec.log(
-                format!("{}/signal_snr", entity_path),
-                &rerun::BarChart::new(snr_bars),
-            ) {
-                log::debug!("[RerunViewer] Failed to log SNR: {}", e);
-            }
-
-            let rms_bars = vec![
-                signal_rms[0] as f64,
-                signal_rms[1] as f64,
-                signal_rms[2] as f64,
-            ];
-            if let Err(e) = rec.log(
-                format!("{}/signal_rms", entity_path),
-                &rerun::BarChart::new(rms_bars),
-            ) {
-                log::debug!("[RerunViewer] Failed to log RMS: {}", e);
-            }
-
-            let peak_bars = vec![
-                signal_peak[0] as f64,
-                signal_peak[1] as f64,
-                signal_peak[2] as f64,
-            ];
-            if let Err(e) = rec.log(
-                format!("{}/signal_peak", entity_path),
-                &rerun::BarChart::new(peak_bars),
-            ) {
-                log::debug!("[RerunViewer] Failed to log peak: {}", e);
-            }
-
-            // Log comprehensive signal quality report including motor state
-            let quality_report = format!(
-                "Motor State: {}\n\
-                 Fundamental Frequency: {:.1} Hz\n\
-                 SNR (X, Y, Z): [{:.2}, {:.2}, {:.2}] dB\n\
-                 RMS (X, Y, Z): [{:.4}, {:.4}, {:.4}] m/s²\n\
-                 Peak (X, Y, Z): [{:.4}, {:.4}, {:.4}] m/s²",
-                motor_state,
-                fundamental_freq_hz,
-                signal_snr[0],
-                signal_snr[1],
-                signal_snr[2],
-                signal_rms[0],
-                signal_rms[1],
-                signal_rms[2],
-                signal_peak[0],
-                signal_peak[1],
-                signal_peak[2]
-            );
-            if let Err(e) = rec.log(
-                format!("{}/quality_report", entity_path),
-                &rerun::TextDocument::new(quality_report),
-            ) {
-                log::debug!("[RerunViewer] Failed to log quality report: {}", e);
-            }
-
-            // Determine overall signal quality (adjusted for motor state)
+            // Log concise quality summary
             let avg_snr = (signal_snr[0] + signal_snr[1] + signal_snr[2]) / 3.0;
-
-            // SNR thresholds differ based on motor state
-            let (quality_level, context) = match motor_state {
-                "Off" => {
-                    // Higher SNR expected when motors off
-                    let level = if avg_snr > 40.0 {
-                        "Excellent"
-                    } else if avg_snr > 30.0 {
-                        "Good"
-                    } else if avg_snr > 20.0 {
-                        "Fair"
-                    } else {
-                        "Poor"
-                    };
-                    (level, "stationary")
-                },
-                "Running" => {
-                    // Lower SNR acceptable when motors running
-                    let level = if avg_snr > 25.0 {
-                        "Excellent"
-                    } else if avg_snr > 15.0 {
-                        "Good"
-                    } else if avg_snr > 10.0 {
-                        "Fair"
-                    } else {
-                        "Poor"
-                    };
-                    (level, "in-flight")
-                },
-                _ => {
-                    let level = if avg_snr > 20.0 {
-                        "Good"
-                    } else if avg_snr > 10.0 {
-                        "Fair"
-                    } else {
-                        "Poor"
-                    };
-                    (level, "transitioning")
-                },
-            };
-
-            let quality_summary = format!(
-                "Signal Quality: {} ({}) - SNR: {:.1} dB",
-                quality_level, context, avg_snr
+            let avg_rms = (signal_rms[0] + signal_rms[1] + signal_rms[2]) / 3.0;
+            
+            let summary = format!(
+                "Motor: {} | f₀: {:.1} Hz | SNR: {:.1} dB | RMS: {:.4} m/s²",
+                motor_state, fundamental_freq_hz, avg_snr, avg_rms
             );
             if let Err(e) = rec.log(
-                format!("{}/quality_summary", entity_path),
-                &rerun::TextDocument::new(quality_summary),
+                format!("{}/summary", entity_path),
+                &rerun::TextDocument::new(summary),
             ) {
                 log::debug!("[RerunViewer] Failed to log quality summary: {}", e);
-            }
-        }
-    }
-
-    /// Visualize vibration metrics and adaptive covariance
-    fn log_vibration_metrics(
-        &mut self,
-        gyro_rms: f32,
-        accel_rms: f32,
-        covariance_scale: f32,
-        entity_path: &str,
-    ) {
-        if !self.initialized {
-            return;
-        }
-
-        if let Some(ref rec) = self.rec {
-            rec.set_time_sequence("frame", self.frame_id);
-            rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
-
-            // Log vibration levels as a bar chart
-            let vibration_data = [
-                ("Gyro RMS", gyro_rms as f64),
-                ("Accel RMS", accel_rms as f64),
-                ("Covariance Scale", covariance_scale as f64),
-            ];
-
-            let bars: Vec<f64> = vibration_data.iter().map(|(_, v)| *v).collect();
-
-            if let Err(e) = rec.log(entity_path, &rerun::BarChart::new(bars)) {
-                log::warn!("[RerunViewer] Failed to log vibration metrics: {}", e);
-            }
-
-            // Log vibration level indicator
-            let vibration_level = (gyro_rms + accel_rms) / 2.0;
-            let _color = if vibration_level > 0.3 {
-                Color::from_rgb(255, 0, 0) // Red for high vibration
-            } else if vibration_level > 0.1 {
-                Color::from_rgb(255, 165, 0) // Orange for medium
-            } else {
-                Color::from_rgb(0, 255, 0) // Green for low
-            };
-
-            let indicator_text = format!("Vibration Level: {:.3}", vibration_level);
-            if let Err(e) = rec.log(
-                format!("{}/indicator", entity_path),
-                &rerun::TextDocument::new(indicator_text),
-            ) {
-                log::warn!("[RerunViewer] Failed to log vibration indicator: {}", e);
-            }
-        }
-    }
-
-    /// Visualize feature quality metrics
-    fn log_feature_quality(
-        &mut self,
-        features: &[crate::feature_tracker::Feature],
-        entity_path: &str,
-    ) {
-        if !self.initialized || features.is_empty() {
-            return;
-        }
-
-        if let Some(ref rec) = self.rec {
-            rec.set_time_sequence("frame", self.frame_id);
-            rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
-
-            // Count features by quality level
-            let high_quality = features
-                .iter()
-                .filter(|f| f.quality.confidence > 0.8)
-                .count();
-            let medium_quality = features
-                .iter()
-                .filter(|f| f.quality.confidence > 0.5)
-                .count();
-            let low_quality = features
-                .iter()
-                .filter(|f| f.quality.confidence <= 0.5)
-                .count();
-            let reliable = features.iter().filter(|f| f.quality.is_reliable).count();
-
-            // Create quality distribution chart
-            let quality_data = [
-                ("High Quality", high_quality as f64),
-                ("Medium Quality", medium_quality as f64),
-                ("Low Quality", low_quality as f64),
-                ("Reliable", reliable as f64),
-            ];
-
-            let bars: Vec<f64> = quality_data.iter().map(|(_, v)| *v).collect();
-
-            if let Err(e) = rec.log(
-                format!("{}/distribution", entity_path),
-                &rerun::BarChart::new(bars),
-            ) {
-                log::warn!("[RerunViewer] Failed to log quality distribution: {}", e);
-            }
-
-            // Log feature positions colored by quality
-            let positions: Vec<[f32; 3]> = features
-                .iter()
-                .map(|f| [f.pixel_coord[0], f.pixel_coord[1], 0.0])
-                .collect();
-
-            let colors: Vec<Color> = features
-                .iter()
-                .map(|f| {
-                    if f.quality.confidence > 0.8 {
-                        Color::from_rgb(0, 255, 0) // Green - high quality
-                    } else if f.quality.confidence > 0.5 {
-                        Color::from_rgb(255, 165, 0) // Orange - medium quality
-                    } else {
-                        Color::from_rgb(255, 0, 0) // Red - low quality
-                    }
-                })
-                .collect();
-
-            if let Err(e) = rec.log(
-                format!("{}/positions", entity_path),
-                &rerun::Points2D::new(positions.iter().map(|p| [p[0] as f32, p[1] as f32]))
-                    .with_colors(colors)
-                    .with_radii([3.0]),
-            ) {
-                log::warn!("[RerunViewer] Failed to log feature positions: {}", e);
-            }
-
-            // Log quality statistics
-            let stats = format!(
-                "Features: {} | High: {} | Medium: {} | Low: {} | Reliable: {}",
-                features.len(),
-                high_quality,
-                medium_quality,
-                low_quality,
-                reliable
-            );
-            if let Err(e) = rec.log(
-                format!("{}/stats", entity_path),
-                &rerun::TextDocument::new(stats),
-            ) {
-                log::warn!("[RerunViewer] Failed to log quality stats: {}", e);
             }
         }
     }
@@ -1172,81 +828,6 @@ impl Viewer for RerunViewer {
                 &rerun::TextDocument::new(stats),
             ) {
                 log::warn!("[RerunViewer] Failed to log loop closure stats: {}", e);
-            }
-        }
-    }
-
-    /// Comprehensive robustness dashboard
-    fn log_robustness_dashboard(
-        &mut self,
-        prosac_inliers: usize,
-        prosac_outliers: usize,
-        vibration_level: f32,
-        covariance_scale: f32,
-        feature_count: usize,
-        high_quality_features: usize,
-        loop_closures: usize,
-        entity_path: &str,
-    ) {
-        if !self.initialized {
-            return;
-        }
-
-        if let Some(ref rec) = self.rec {
-            rec.set_time_sequence("frame", self.frame_id);
-            rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
-
-            // Create comprehensive robustness metrics dashboard
-            let metrics = [
-                ("PROSAC Inliers", prosac_inliers as f64),
-                ("PROSAC Outliers", prosac_outliers as f64),
-                ("Vibration Level", vibration_level as f64),
-                ("Covariance Scale", covariance_scale as f64),
-                ("Total Features", feature_count as f64),
-                ("High Quality Features", high_quality_features as f64),
-                ("Loop Closures", loop_closures as f64),
-            ];
-
-            let values: Vec<f64> = metrics.iter().map(|(_, v)| *v).collect();
-
-            if let Err(e) = rec.log(
-                format!("{}/dashboard", entity_path),
-                &rerun::BarChart::new(values),
-            ) {
-                log::warn!("[RerunViewer] Failed to log robustness dashboard: {}", e);
-            }
-
-            // Calculate robustness score (0-100)
-            let robustness_score = if prosac_inliers + prosac_outliers > 0 {
-                let inlier_ratio =
-                    prosac_inliers as f32 / (prosac_inliers + prosac_outliers) as f32;
-                let quality_ratio = if feature_count > 0 {
-                    high_quality_features as f32 / feature_count as f32
-                } else {
-                    0.0
-                };
-                let vibration_penalty = (1.0 - vibration_level.min(1.0)).max(0.0);
-
-                ((inlier_ratio * 0.4 + quality_ratio * 0.4 + vibration_penalty * 0.2) * 100.0)
-                    as u32
-            } else {
-                0
-            };
-
-            let score_text = format!("Robustness Score: {}/100", robustness_score);
-            let _score_color = if robustness_score > 80 {
-                Color::from_rgb(0, 255, 0) // Green - excellent
-            } else if robustness_score > 60 {
-                Color::from_rgb(255, 165, 0) // Orange - good
-            } else {
-                Color::from_rgb(255, 0, 0) // Red - needs improvement
-            };
-
-            if let Err(e) = rec.log(
-                format!("{}/score", entity_path),
-                &rerun::TextDocument::new(score_text),
-            ) {
-                log::warn!("[RerunViewer] Failed to log robustness score: {}", e);
             }
         }
     }

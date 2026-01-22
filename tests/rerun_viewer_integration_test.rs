@@ -238,6 +238,40 @@ fn test_log_imu_signal_quality() {
 }
 
 #[test]
+fn test_log_loop_closure() {
+    use rs_vio::optimization::loop_closure::LoopClosureConstraint;
+    use nalgebra::{Isometry3, Matrix6, Translation3, UnitQuaternion};
+
+    let mut viewer = RerunViewer::new();
+    viewer.initialize().expect("initialize failed");
+
+    // Create mock loop closure constraints using Isometry3
+    let identity_iso = Isometry3::from_parts(
+        Translation3::new(0.0, 0.0, 0.0),
+        UnitQuaternion::identity(),
+    );
+
+    let constraint1 = LoopClosureConstraint {
+        keyframe_id_1: 0,
+        keyframe_id_2: 10,
+        relative_pose: identity_iso,
+        information_matrix: Matrix6::identity(),
+    };
+
+    let constraint2 = LoopClosureConstraint {
+        keyframe_id_1: 5,
+        keyframe_id_2: 15,
+        relative_pose: identity_iso,
+        information_matrix: Matrix6::identity(),
+    };
+
+    let constraints = vec![constraint1, constraint2];
+
+    // Should not panic and correctly handle loop closure visualization
+    viewer.log_loop_closure(&constraints, "loop_closure/test");
+}
+
+#[test]
 fn test_multiple_operations_sequence() {
     let mut viewer = RerunViewer::new();
     let _ = viewer.initialize();
