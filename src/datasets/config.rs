@@ -24,6 +24,107 @@ pub struct Config {
     pub marginalization: crate::optimization::marginalization::MarginalizationConfig,
 }
 
+impl Config {
+    /// Validate entire configuration, checking all sub-components.
+    ///
+    /// This method should be called after loading configuration from YAML
+    /// to catch errors early before runtime. Returns detailed error messages
+    /// indicating which parameter is invalid and why.
+    ///
+    /// # Example
+    /// ```
+    /// # use rs_vio::datasets::Config;
+    /// let config = Config::from_file("config/euroc_vio.yaml")?;
+    /// config.validate()?; // Catches invalid parameters before runtime
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn validate(&self) -> Result<()> {
+        // Validate camera configuration
+        self.camera.validate().map_err(|e| {
+            VIOError::Config(format!("Camera configuration invalid: {}", e))
+        })?;
+
+        // Feature detection validation
+        if self.feature_detection.grid_cols == 0 {
+            return Err(VIOError::Config(
+                "Feature detection grid_cols must be positive".to_string(),
+            ));
+        }
+        if self.feature_detection.grid_cols > 100 {
+            return Err(VIOError::Config(
+                "Feature detection grid_cols too large (>100)".to_string(),
+            ));
+        }
+
+        // Optimization validation
+        if self.optimization.pnp_max_iterations == 0 {
+            return Err(VIOError::Config(
+                "Optimization pnp_max_iterations must be positive".to_string(),
+            ));
+        }
+        if self.optimization.bundle_adjustment_max_iterations == 0 {
+            return Err(VIOError::Config(
+                "Optimization bundle_adjustment_max_iterations must be positive".to_string(),
+            ));
+        }
+
+        // Check for inconsistent camera/image settings
+        let fx_left = self.camera.left_intrinsics[0];
+        let fy_left = self.camera.left_intrinsics[1];
+        if fx_left <= 0.0 || fy_left <= 0.0 {
+            return Err(VIOError::Config(
+                "Camera focal lengths must be positive".to_string(),
+            ));
+        }
+
+        let cx = self.camera.left_intrinsics[2];
+        let cy = self.camera.left_intrinsics[3];
+        if cx < 0.0 || cx > self.camera.image_width as f64 {
+            return Err(VIOError::Config(format!(
+                "Left camera cx ({}) outside image bounds [0, {}]",
+                cx, self.camera.image_width
+            )));
+        }
+        if cy < 0.0 || cy > self.camera.image_height as f64 {
+            return Err(VIOError::Config(format!(
+                "Left camera cy ({}) outside image bounds [0, {}]",
+                cy, self.camera.image_height
+            )));
+        }
+
+        Ok(())
+    }
+
+    /// Validate and apply safe defaults/clamping to configuration.
+    ///
+    /// This method validates the configuration and automatically clamps
+    /// out-of-range values to safe defaults, logging warnings for any
+    /// adjustments made. Useful for robustness in production.
+    pub fn validate_and_fix(&mut self) -> Result<()> {
+        // First do strict validation for critical parameters
+        self.camera.validate()?;
+
+        // Then clamp other parameters with warnings
+        self.keyframe_management.validate_and_clamp();
+
+        // Additional auto-fixes
+        if self.feature_detection.max_features_per_grid == 0 {
+            log::warn!("max_features_per_grid is 0, setting to default 10");
+            self.feature_detection.max_features_per_grid = 10;
+        }
+
+        if self.optimization.pnp_max_iterations > 1000 {
+            log::warn!(
+                "Optimization pnp_max_iterations {} very large, clamping to 1000",
+                self.optimization.pnp_max_iterations
+            );
+            self.optimization.pnp_max_iterations = 1000;
+        }
+
+        Ok(())
+    }
+}
+
 /// Camera configuration including intrinsics, distortion, and extrinsics.
 ///
 /// Contains parameters for both left and right cameras in a stereo setup,
@@ -561,4 +662,117 @@ fn default_subpixel_iterations() -> u32 {
 
 fn default_subpixel_threshold() -> f64 {
     0.0005
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_valid_camera_config() -> CameraConfig {
+        CameraConfig {
+            image_width: 640,
+            image_height: 480,
+            left_intrinsics: vec![458.654, 457.296, 367.215, 248.375],
+            left_distortion: vec![-0.28340811, 0.07395907, 0.00019359, 1.76187114e-05],
+            right_intrinsics: vec![457.587, 456.134, 379.999, 255.238],
+            right_distortion: vec![-0.28368365, 0.07451284, -0.00010473, -3.55590700e-05],
+            left_model: Some("pinhole".to_string()),
+            right_model: Some("pinhole".to_string()),
+            T_B_Cl: vec![
+                1.0, 0.0, 0.0, 0.0, 
+                0.0, 1.0, 0.0, 0.0, 
+                0.0, 0.0, 1.0, 0.0,
+                0.0, 0.0, 0.0, 1.0
+            ],
+            T_B_Cr: vec![
+                1.0, 0.0, 0.0, 0.11, 
+                0.0, 1.0, 0.0, 0.0, 
+                0.0, 0.0, 1.0, 0.0,
+                0.0, 0.0, 0.0, 1.0
+            ],
+        }
+    }
+
+    #[test]
+    fn test_camera_config_validation_valid() {
+        let config = create_valid_camera_config();
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_camera_config_validation_zero_dimensions() {
+        let mut config = create_valid_camera_config();
+        config.image_width = 0;
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_camera_config_validation_oversized_dimensions() {
+        let mut config = create_valid_camera_config();
+        config.image_width = 20000;
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_camera_config_validation_insufficient_intrinsics() {
+        let mut config = create_valid_camera_config();
+        config.left_intrinsics = vec![458.0, 457.0]; // Only 2 params
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_camera_config_validation_wrong_transform_size() {
+        let mut config = create_valid_camera_config();
+        config.T_B_Cl = vec![1.0, 0.0, 0.0]; // Only 3 elements instead of 16
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_camera_config_validation_nan_intrinsics() {
+        let mut config = create_valid_camera_config();
+        config.left_intrinsics[0] = f64::NAN;
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_camera_config_validation_inf_transform() {
+        let mut config = create_valid_camera_config();
+        config.T_B_Cl[0] = f64::INFINITY;
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_keyframe_management_clamping() {
+        let mut config = KeyframeManagementConfig {
+            keyframe_window_size: 0, // Too small
+            translation_threshold: 0.001, // Too small
+            rotation_threshold: 10.0, // Too large
+            processing_timeout_ms: 0, // Invalid
+        };
+
+        config.validate_and_clamp();
+
+        assert_eq!(config.keyframe_window_size, 2);
+        assert_eq!(config.translation_threshold, 0.01);
+        assert_eq!(config.rotation_threshold, std::f64::consts::PI);
+        assert_eq!(config.processing_timeout_ms, 1);
+    }
+
+    #[test]
+    fn test_keyframe_management_reasonable_values() {
+        let mut config = KeyframeManagementConfig {
+            keyframe_window_size: 5,
+            translation_threshold: 0.15,
+            rotation_threshold: 0.3,
+            processing_timeout_ms: 100,
+        };
+
+        config.validate_and_clamp();
+
+        // Should remain unchanged
+        assert_eq!(config.keyframe_window_size, 5);
+        assert_eq!(config.translation_threshold, 0.15);
+        assert_eq!(config.rotation_threshold, 0.3);
+        assert_eq!(config.processing_timeout_ms, 100);
+    }
 }
