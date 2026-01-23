@@ -86,8 +86,8 @@ impl TumViSequence {
         // Load IMU
         let imu_data = Self::load_imu(&mav0.join("imu0/data.csv"))?;
         
-        // Load ground truth
-        let ground_truth = Self::load_ground_truth(&mav0.join("state_groundtruth_estimate0/data.csv"))?;
+        // Load ground truth (TUM-VI uses mocap0 instead of state_groundtruth_estimate0)
+        let ground_truth = Self::load_ground_truth(&mav0.join("mocap0/data.csv"))?;
         
         Ok(Self {
             name,
@@ -221,30 +221,40 @@ pub fn load_all_sequences(dataset_dir: impl AsRef<Path>) -> io::Result<Vec<TumVi
     let dataset_dir = dataset_dir.as_ref();
     let mut sequences = Vec::new();
     
-    // Expected sequence names
-    let sequence_names = vec![
-        "dataset-room1_512_16",
-        "dataset-room2_512_16",
-        "dataset-room3_512_16",
-        "dataset-room4_512_16",
-        "dataset-room5_512_16",
-        "dataset-room6_512_16",
-    ];
+    // Read all subdirectories and try to load those with mav0/ structure
+    if !dataset_dir.exists() {
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("Dataset directory not found: {}", dataset_dir.display())
+        ));
+    }
     
-    for name in sequence_names {
-        let seq_dir = dataset_dir.join(name);
-        if seq_dir.exists() {
-            match TumViSequence::load(&seq_dir) {
-                Ok(seq) => {
-                    println!("Loaded sequence: {} ({} frames @ {:.1} Hz)", 
-                             seq.name, seq.num_frames(), seq.frame_rate());
-                    sequences.push(seq);
-                }
-                Err(e) => {
-                    eprintln!("Warning: Failed to load {}: {}", name, e);
+    for entry in fs::read_dir(dataset_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        
+        if path.is_dir() {
+            // Check if this directory has the expected mav0 structure
+            if path.join("mav0").exists() {
+                match TumViSequence::load(&path) {
+                    Ok(seq) => {
+                        println!("Loaded sequence: {} ({} frames @ {:.1} Hz)", 
+                                 seq.name, seq.num_frames(), seq.frame_rate());
+                        sequences.push(seq);
+                    }
+                    Err(e) => {
+                        eprintln!("Warning: Failed to load {}: {}", path.display(), e);
+                    }
                 }
             }
         }
+    }
+    
+    if sequences.is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("No valid TUM-VI sequences found in {}", dataset_dir.display())
+        ));
     }
     
     Ok(sequences)
@@ -259,6 +269,37 @@ mod tests {
         // This test would run if dataset is downloaded
         // Skip for now since data may not be available in CI
         // For local testing: cargo test --test tum_vi -- --ignored
+    }
+    
+    #[test]
+    #[ignore] // Only run with --ignored flag when dataset is available
+    fn test_load_tum_vi_room1() {
+        // Check both common dataset locations
+        let dataset_dir = if std::path::Path::new("./datasets/tum_vi").exists() {
+            "./datasets/tum_vi"
+        } else if std::path::Path::new("./data/tum_vi").exists() {
+            "./data/tum_vi"
+        } else {
+            return; // Skip if no dataset found
+        };
+        
+        let sequences = load_all_sequences(dataset_dir).expect("Failed to load sequences");
+        assert!(!sequences.is_empty(), "Should find at least one sequence");
+        
+        // Check room1 specifically
+        let room1 = sequences.iter()
+            .find(|s| s.name == "room1")
+            .expect("Should find room1 sequence");
+        
+        // Verify data loaded
+        assert!(!room1.cam0_timestamps.is_empty(), "Should have camera timestamps");
+        assert!(!room1.imu_data.is_empty(), "Should have IMU data");
+        assert!(!room1.ground_truth.is_empty(), "Should have ground truth");
+        
+        println!("Loaded TUM-VI room1:");
+        println!("  - Camera frames: {}", room1.cam0_timestamps.len());
+        println!("  - IMU measurements: {}", room1.imu_data.len());
+        println!("  - Ground truth poses: {}", room1.ground_truth.len());
     }
     
     #[test]

@@ -380,7 +380,7 @@ mod tests {
 
     #[test]
     fn test_notch_filter_design() {
-        let filter = NotchFilter::new(100.0, 1000.0, 10.0);
+        let _filter = NotchFilter::new(100.0, 1000.0, 10.0);
 
         // Check coefficients are finite
         assert_all_finite!(filter.a, "Denominator coefficients must be finite");
@@ -394,8 +394,8 @@ mod tests {
         // Process some samples
         for i in 0..100 {
             let input = (i as f32 * 0.01 * std::f32::consts::PI * 2.0 * 100.0).sin();
-            let output = filter.process(input);
-            assert_finite!(output, "Filter output must be finite");
+            let _output = filter.process(input);
+            assert_finite!(_output, "Filter output must be finite");
         }
     }
 
