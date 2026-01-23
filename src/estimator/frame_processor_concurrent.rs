@@ -250,7 +250,12 @@ impl ProcessingHandle {
         }
     }
 
-    /// Optimization worker task (placeholder for real BA/pose refinement)
+    /// Optimization worker task
+    /// If `enable_real_optimization` is true, would perform real BA
+    /// Currently uses simulated delays for testing/benchmarking
+    ///
+    /// NOTE: Real optimization integration requires Backend to be Send+Sync.
+    /// See AsyncOptimizer for async optimization in a single-threaded context.
     async fn optimization_worker(
         detected_rx: Arc<tokio::sync::Mutex<mpsc::Receiver<(ConcurrentFrame, usize)>>>,
         result_tx: mpsc::Sender<ProcessingResult>,
@@ -266,6 +271,8 @@ impl ProcessingHandle {
                 Some((frame, feature_count)) => {
                     let start = std::time::Instant::now();
 
+                    // Use simulated delay for testing/benchmarking
+                    // Real optimization would go here if Backend were Send+Sync
                     if let Some(delay_ms) = config.simulated_work_ms {
                         let jitter = if let Some(jitter_ms) = config.simulated_jitter_ms {
                             if frame.id % 2 == 0 { jitter_ms } else { 0 }

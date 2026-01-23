@@ -109,11 +109,13 @@ pub mod concurrent;
 pub mod async_wrapper;
 pub mod frame_processor_concurrent;
 pub mod async_feature_detection;
+pub mod async_optimization;
 
 pub use constant_velocity_model::{ConstantVelocityConfig, ConstantVelocityModel};
 pub use concurrent::ConcurrentVIOPipeline;
 pub use async_wrapper::AsyncEstimator;
 pub use async_feature_detection::AsyncFeatureDetector;
+pub use async_optimization::AsyncOptimizer;
 pub use frame_processor_concurrent::{ConcurrentFrameProcessor, ConcurrentConfig};
 pub use estimator::Estimator;
 pub use frame::Frame;
