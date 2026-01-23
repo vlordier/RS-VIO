@@ -132,7 +132,8 @@ mod tests {
     use super::*;
 
     fn create_test_config() -> Config {
-        Config::load("config/tum_vi.yaml").expect("Test config should exist")
+        Config::load("config/tum_vi.yaml")
+            .expect("Test requires config/tum_vi.yaml")
     }
 
     #[tokio::test]
