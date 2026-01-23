@@ -260,10 +260,6 @@ name = "calibration_sensitivity"
 harness = false
 
 [[bench]]
-name = "tum_vi_async_pipeline"
-harness = false
-
-[[bench]]
 name = "robustness_benchmarks"
 harness = false
 
@@ -279,6 +275,13 @@ harness = false
 name = "strategy_comparison"
 harness = false
 
+
 [[bench]]
-name = "concurrent_pipeline"
+name = "extended_benchmarks"
 harness = false
+
+[[bench]]
+name = "tum_vi_async_pipeline"
+harness = false
+
+

@@ -356,13 +356,25 @@ mod tests {
     fn test_error_rate() {
         let metrics = PipelineMetrics::new();
         
+        // Record 6 frames with errors and 4 frames with success (60% error rate)
         for i in 0..10 {
-            metrics.record_detection(100, i % 2 == 0);
+            let is_error = i < 6;  // First 6 are errors, last 4 are successes
+            let frame_metrics = FrameMetrics {
+                frame_id: i,
+                timestamp_ns: (i as i64) * 1000,
+                detection_time_us: 100,
+                optimization_time_us: 200,
+                e2e_time_us: 300,
+                queue_depth: 1,
+                success: !is_error,
+                error_message: if is_error { Some("test error".to_string()) } else { None },
+            };
+            metrics.record_frame(frame_metrics);
         }
         
-        // 5 errors out of 10
+        // 6 errors out of 10 = 0.6 error rate
         let rate = metrics.error_rate();
-        assert!((rate - 0.5).abs() < 0.001);
+        assert!((rate - 0.6).abs() < 0.001, "Expected 0.6, got {}", rate);
     }
 
     #[test]
