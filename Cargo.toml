@@ -260,6 +260,10 @@ name = "calibration_sensitivity"
 harness = false
 
 [[bench]]
+name = "tum_vi_async_pipeline"
+harness = false
+
+[[bench]]
 name = "robustness_benchmarks"
 harness = false
 
