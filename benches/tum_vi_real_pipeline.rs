@@ -14,7 +14,8 @@ fn benchmark_tum_vi_loading(c: &mut Criterion) {
     
     if !Path::new(&dataset_dir).exists() {
         eprintln!("Warning: TUM-VI dataset not found at {}", dataset_dir);
-        eprintln!("Run: scripts/download_tum_vi.sh to download dataset");
+        eprintln!("Download from: https://vision.in.tum.de/data/datasets/visual-inertial-dataset");
+        eprintln!("Extract room sequences to: {}", dataset_dir);
         eprintln!("Or set TUM_VI_DIR environment variable");
         return;
     }

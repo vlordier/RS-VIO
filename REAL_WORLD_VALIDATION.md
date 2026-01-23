@@ -12,10 +12,9 @@ Phase 7 extends RS-VIO with **real-world dataset validation** using the TUM Visu
 
 **Key Deliverables**:
 - ✅ TUM-VI dataset loader (EuRoC format)
-- ✅ Automatic download script (room1-6 sequences)
 - ✅ Trajectory evaluation metrics (ATE, RPE)
 - ✅ Benchmark infrastructure for real images
-- ⏳ Performance validation (requires dataset download)
+- ⏳ Performance validation (requires manual dataset download)
 
 ---
 
@@ -23,17 +22,29 @@ Phase 7 extends RS-VIO with **real-world dataset validation** using the TUM Visu
 
 ### 1. Download TUM-VI Dataset
 
-```bash
-# Download all room sequences (room1-room6)
-./scripts/download_tum_vi.sh
+TUM-VI must be downloaded manually (~2GB per sequence):
 
-# Or set custom directory
+```bash
+# Visit the official TUM-VI dataset page:
+# https://vision.in.tum.de/data/datasets/visual-inertial-dataset
+
+# Download desired room sequences (room1-room6) as ZIP files
+# Extract to: ./data/tum_vi/
+#
+# Each sequence has EuRoC-compatible structure:
+#   data/tum_vi/room1/mav0/cam0/data.csv
+#   data/tum_vi/room1/mav0/cam1/data.csv
+#   data/tum_vi/room1/mav0/imu0/data.csv
+#   data/tum_vi/room1/mav0/mocap0/data.csv  (ground truth)
+
+# Or set environment variable to existing dataset:
 export TUM_VI_DIR=/path/to/tum_vi
-./scripts/download_tum_vi.sh
 ```
 
 **Dataset Size**: ~12GB total (6 sequences @ ~2GB each)  
 **Download Time**: 10-20 minutes (depending on network speed)
+
+**Note**: The existing [scripts/download_datasets.sh](scripts/download_datasets.sh) downloads TUM RGB-D (different format), which is NOT compatible. You need the TUM-VI Visual-Inertial dataset specifically.
 
 ### 2. Run Real-World Benchmarks
 
@@ -41,8 +52,8 @@ export TUM_VI_DIR=/path/to/tum_vi
 # Benchmark dataset loading and parsing
 cargo bench --bench tum_vi_real_pipeline
 
-# Run trajectory evaluation
-cargo test --test tum_vi_validation -- --ignored
+# Run VIO pipeline with real images
+cargo bench --bench tum_vi_async_pipeline
 ```
 
 ### 3. View Results

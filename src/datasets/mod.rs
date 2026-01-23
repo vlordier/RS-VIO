@@ -78,6 +78,8 @@ pub mod frame_processor_trait;
 pub mod live_camera_player;
 pub mod player_trait;
 pub mod tum_vi_player;
+pub mod tum_vi; // Real-world TUM-VI dataset loader
+pub mod trajectory_eval; // ATE/RPE trajectory evaluation
 
 // Re-export player types for convenience
 pub use euroc_player::EurocPlayer;
