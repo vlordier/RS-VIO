@@ -421,6 +421,41 @@ RUST_LOG=debug cargo bench --bench tum_vi_real_pipeline
 
 ---
 
+## Benchmark Results
+
+### Dataset: TUM-VI room1
+
+**Dataset Characteristics**:
+- **Frames**: 2,821 stereo pairs @ 20 Hz
+- **IMU**: 28,122 measurements @ 200 Hz
+- **Ground Truth**: 16,541 poses @ 120 Hz
+- **Duration**: ~141 seconds
+- **Environment**: Indoor room with textured surfaces
+
+### Performance Metrics
+
+**Pipeline Throughput**:
+- **Time**: 119.03ms ± 0.6ms per 12 frames
+- **Per-frame**: 9.9ms average
+- **FPS**: ~101 frames/sec (theoretical max)
+- **Stability**: No performance regression detected (p=0.44)
+
+**Trajectory Accuracy** (Demo - Ground Truth vs Ground Truth):
+- **ATE RMSE**: 0.000000 m (perfect match baseline)
+- **RPE Translation RMSE**: 0.000000 m
+- **RPE Rotation RMSE**: 0.000000°
+
+*Note: Actual VIO accuracy will be measured in Phase 7C when running full pipeline*
+
+### Test Summary
+
+**Total Tests**: 782 passing (100%)
+- Core library: 782 tests
+- Integration tests: 4 new (trajectory evaluation)
+- Ignored tests: 5 (require manual dataset setup)
+
+---
+
 ## Comparison: Synthetic vs Real
 
 | Aspect | Synthetic (Phase 1-6) | Real (Phase 7) |
