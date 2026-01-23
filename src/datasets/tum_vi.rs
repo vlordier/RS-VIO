@@ -51,7 +51,7 @@ impl TumViSequence {
     /// Load TUM-VI sequence from directory
     /// 
     /// Expected structure:
-    /// ```
+    /// ```text
     /// room1/
     ///   mav0/
     ///     cam0/

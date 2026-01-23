@@ -34,7 +34,7 @@ impl Config {
     /// # Example
     /// ```
     /// # use rs_vio::datasets::Config;
-    /// let config = Config::from_file("config/euroc_vio.yaml")?;
+    /// let config = Config::load("config/euroc_vio.yaml")?;
     /// config.validate()?; // Catches invalid parameters before runtime
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
