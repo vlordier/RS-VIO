@@ -6,7 +6,7 @@ use crate::types::Float;
 use std::sync::Arc;
 
 #[cfg(feature = "gpu")]
-use crate::gpu::orb_matcher::{GpuOrbMatcher, init_wgpu};
+use crate::gpu::orb_matcher::{init_wgpu, GpuOrbMatcher};
 #[cfg(feature = "gpu")]
 use pollster::block_on;
 
@@ -23,7 +23,8 @@ pub struct OrbMatcher {
     pub binary_pool: Option<Arc<OrbBinaryPool>>,
     /// Optional GPU matcher for accelerating Hamming distance calculation
     #[cfg(feature = "gpu")]
-    #[cfg_attr(not(feature = "gpu"), allow(dead_code))] // Allow dead code if GPU feature is not enabled
+    #[cfg_attr(not(feature = "gpu"), allow(dead_code))]
+    // Allow dead code if GPU feature is not enabled
     gpu_matcher: Option<Arc<GpuOrbMatcher>>,
 }
 
@@ -76,10 +77,10 @@ impl OrbMatcher {
                 let gpu_matcher = Arc::new(GpuOrbMatcher::new(device.clone(), queue.clone()).await);
                 matcher.gpu_matcher = Some(gpu_matcher);
                 log::info!("GpuOrbMatcher created.");
-            }
+            },
             None => {
                 log::warn!("WGPU initialization failed. Falling back to CPU OrbMatcher.");
-            }
+            },
         }
         matcher
     }
@@ -156,7 +157,8 @@ impl DescriptorMatcher for OrbMatcher {
                     } else {
                         let normalized_distance = *hamming_distance as Float / 256.0;
                         let similarity = (1.0 - normalized_distance).max(0.0);
-                        let match_count = (similarity * overlapping_features as Float).round() as usize;
+                        let match_count =
+                            (similarity * overlapping_features as Float).round() as usize;
                         let match_ratio = match_count as Float / overlapping_features as Float;
                         return MatchMetrics {
                             similarity,

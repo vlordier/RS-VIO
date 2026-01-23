@@ -148,19 +148,18 @@ impl ImuCalibrator {
     /// Begin collecting samples for a specific pose
     pub fn begin_pose(&mut self, pose_id: usize) -> Result<(), String> {
         match &self.state {
-            ImuCalibrationState::AwaitingNextPose { pose_id: expected_id } => {
+            ImuCalibrationState::AwaitingNextPose {
+                pose_id: expected_id,
+            } => {
                 if pose_id != *expected_id {
-                    return Err(format!(
-                        "Expected pose {}, got {}",
-                        expected_id, pose_id
-                    ));
+                    return Err(format!("Expected pose {}, got {}", expected_id, pose_id));
                 }
                 self.state = ImuCalibrationState::CollectingPose {
                     pose_id,
                     samples: Vec::with_capacity(self.config.samples_per_pose),
                 };
                 Ok(())
-            }
+            },
             _ => Err(format!("Cannot begin pose in state: {:?}", self.state)),
         }
     }
@@ -168,15 +167,19 @@ impl ImuCalibrator {
     /// Add IMU sample to current pose collection
     pub fn add_sample(&mut self, sample: ImuCalibrationSample) -> Result<(), String> {
         // Extract samples to avoid borrow checker issues
-        let (pose_id, samples) = match std::mem::replace(&mut self.state, ImuCalibrationState::Idle) {
-            ImuCalibrationState::CollectingPose { pose_id, mut samples } => {
+        let (pose_id, samples) = match std::mem::replace(&mut self.state, ImuCalibrationState::Idle)
+        {
+            ImuCalibrationState::CollectingPose {
+                pose_id,
+                mut samples,
+            } => {
                 samples.push(sample);
                 (pose_id, samples)
-            }
+            },
             other => {
                 self.state = other;
                 return Err("Not in sample collection state".to_string());
-            }
+            },
         };
 
         // Check if we've collected enough samples
@@ -186,9 +189,8 @@ impl ImuCalibrator {
             self.pose_results.push(pose_result);
 
             if !quality_passed {
-                self.state = ImuCalibrationState::Failed(
-                    format!("Pose {} failed quality checks", pose_id),
-                );
+                self.state =
+                    ImuCalibrationState::Failed(format!("Pose {} failed quality checks", pose_id));
                 return Err(format!("Pose {} failed quality checks", pose_id));
             }
 
@@ -205,7 +207,7 @@ impl ImuCalibrator {
             // Still collecting samples
             self.state = ImuCalibrationState::CollectingPose { pose_id, samples };
         }
-        
+
         Ok(())
     }
 
@@ -254,10 +256,18 @@ impl ImuCalibrator {
         let mut accel_clipped_count = 0;
 
         for sample in samples {
-            if sample.gyro.iter().any(|&x| x.abs() > self.config.gyro_clip_threshold) {
+            if sample
+                .gyro
+                .iter()
+                .any(|&x| x.abs() > self.config.gyro_clip_threshold)
+            {
                 gyro_clipped_count += 1;
             }
-            if sample.accel.iter().any(|&x| x.abs() > self.config.accel_clip_threshold) {
+            if sample
+                .accel
+                .iter()
+                .any(|&x| x.abs() > self.config.accel_clip_threshold)
+            {
                 accel_clipped_count += 1;
             }
         }
@@ -319,7 +329,11 @@ impl ImuCalibrator {
         let accel_noise_density = accel_noise_sum / self.pose_results.len() as Float;
 
         // Quality score (1.0 if all poses passed, lower if issues)
-        let passed_count = self.pose_results.iter().filter(|p| p.quality_passed).count();
+        let passed_count = self
+            .pose_results
+            .iter()
+            .filter(|p| p.quality_passed)
+            .count();
         let quality_score = passed_count as Float / self.pose_results.len() as Float;
 
         // Generate quality report
@@ -339,14 +353,26 @@ impl ImuCalibrator {
             gyro_bias: [gyro_bias[0], gyro_bias[1], gyro_bias[2]],
             accel_bias: [accel_bias[0], accel_bias[1], accel_bias[2]],
             gyro_scale: [
-                gyro_scale[(0, 0)], gyro_scale[(0, 1)], gyro_scale[(0, 2)],
-                gyro_scale[(1, 0)], gyro_scale[(1, 1)], gyro_scale[(1, 2)],
-                gyro_scale[(2, 0)], gyro_scale[(2, 1)], gyro_scale[(2, 2)],
+                gyro_scale[(0, 0)],
+                gyro_scale[(0, 1)],
+                gyro_scale[(0, 2)],
+                gyro_scale[(1, 0)],
+                gyro_scale[(1, 1)],
+                gyro_scale[(1, 2)],
+                gyro_scale[(2, 0)],
+                gyro_scale[(2, 1)],
+                gyro_scale[(2, 2)],
             ],
             accel_scale: [
-                accel_scale[(0, 0)], accel_scale[(0, 1)], accel_scale[(0, 2)],
-                accel_scale[(1, 0)], accel_scale[(1, 1)], accel_scale[(1, 2)],
-                accel_scale[(2, 0)], accel_scale[(2, 1)], accel_scale[(2, 2)],
+                accel_scale[(0, 0)],
+                accel_scale[(0, 1)],
+                accel_scale[(0, 2)],
+                accel_scale[(1, 0)],
+                accel_scale[(1, 1)],
+                accel_scale[(1, 2)],
+                accel_scale[(2, 0)],
+                accel_scale[(2, 1)],
+                accel_scale[(2, 2)],
             ],
             gyro_noise_density: [
                 gyro_noise_density[0],
@@ -374,12 +400,12 @@ impl ImuCalibrator {
     ) -> Result<(na::Vector3<Float>, na::Matrix3<Float>), String> {
         // For simplicity: compute bias as mean deviation from expected gravity direction
         // Full calibration requires known orientations (6-pose method)
-        
+
         // Simple approach: assume poses include at least one face-down (z = -g)
         // and compute bias + scale via least-squares
 
         let g = self.config.gravity_magnitude;
-        
+
         // Compute mean accel across all poses
         let mut accel_sum = na::Vector3::<Float>::zeros();
         for pose in &self.pose_results {
@@ -390,7 +416,7 @@ impl ImuCalibrator {
         // For scale: compute magnitude error relative to g
         // Scale matrix: assume diagonal (no cross-axis for now)
         let mut scale_diag = na::Vector3::<Float>::from_element(1.0);
-        
+
         for (i, pose) in self.pose_results.iter().enumerate() {
             let accel = na::Vector3::from_row_slice(&pose.accel_mean) - accel_bias;
             let mag = accel.norm();
@@ -454,11 +480,7 @@ impl ImuCalibrator {
                 pose.sample_count,
                 pose.gyro_clipped_count,
                 pose.accel_clipped_count,
-                if pose.quality_passed {
-                    "PASS"
-                } else {
-                    "FAIL"
-                }
+                if pose.quality_passed { "PASS" } else { "FAIL" }
             ));
         }
 
@@ -498,7 +520,7 @@ mod tests {
     #[test]
     fn test_imu_calibrator_basic_flow() {
         let mut calibrator = ImuCalibrator::new();
-        
+
         // Start calibration
         calibrator.start();
         assert!(matches!(
@@ -517,7 +539,7 @@ mod tests {
     #[test]
     fn test_pose_statistics_computation() {
         let calibrator = ImuCalibrator::new();
-        
+
         // Generate mock samples with known statistics
         let samples: Vec<ImuCalibrationSample> = (0..1000)
             .map(|i| ImuCalibrationSample {
@@ -528,7 +550,7 @@ mod tests {
             .collect();
 
         let result = calibrator.compute_pose_statistics(0, &samples).unwrap();
-        
+
         assert_eq!(result.sample_count, 1000);
         assert!(result.gyro_mean[0].abs() - 0.001 < 0.0001);
         assert!(result.accel_mean[2].abs() - 9.81 < 0.01);
@@ -564,7 +586,7 @@ mod tests {
         ];
 
         let result = calibrator.compute_pose_statistics(0, &samples).unwrap();
-        
+
         assert_eq!(result.gyro_clipped_count, 1);
         assert_eq!(result.accel_clipped_count, 1);
         assert!(!result.quality_passed);

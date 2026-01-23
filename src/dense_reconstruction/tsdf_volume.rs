@@ -27,8 +27,8 @@ impl Default for TSDFConfig {
             resolution_x: 256,
             resolution_y: 256,
             resolution_z: 256,
-            voxel_size: 0.01, // 1cm voxels
-            truncation_distance: 0.05, // 5cm truncation
+            voxel_size: 0.01,              // 1cm voxels
+            truncation_distance: 0.05,     // 5cm truncation
             origin: [-1.28, -1.28, -1.28], // Center volume at origin
         }
     }
@@ -101,11 +101,7 @@ impl CameraPose {
     pub fn identity() -> Self {
         Self {
             position: [0.0, 0.0, 0.0],
-            rotation: [
-                [1.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0],
-                [0.0, 0.0, 1.0],
-            ],
+            rotation: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
         }
     }
 
@@ -285,8 +281,8 @@ impl TSDFVolume {
                                 let new_weight = 1.0; // Uniform weight for now
                                 let total_weight = voxel.weight + new_weight;
 
-                                voxel.tsdf = (voxel.tsdf * voxel.weight + tsdf * new_weight)
-                                    / total_weight;
+                                voxel.tsdf =
+                                    (voxel.tsdf * voxel.weight + tsdf * new_weight) / total_weight;
                                 voxel.weight = total_weight;
                             }
                         }

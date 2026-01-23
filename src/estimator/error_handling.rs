@@ -39,9 +39,17 @@ impl fmt::Display for PipelineError {
         match self {
             Self::PoisonedState(msg) => write!(f, "Poisoned state: {}", msg),
             Self::ChannelClosed(msg) => write!(f, "Channel closed: {}", msg),
-            Self::Timeout { stage, limit_ms, elapsed_ms } => {
-                write!(f, "Timeout in {}: {}ms > {}ms limit", stage, elapsed_ms, limit_ms)
-            }
+            Self::Timeout {
+                stage,
+                limit_ms,
+                elapsed_ms,
+            } => {
+                write!(
+                    f,
+                    "Timeout in {}: {}ms > {}ms limit",
+                    stage, elapsed_ms, limit_ms
+                )
+            },
             Self::FeatureDetectionFailed(msg) => write!(f, "Feature detection failed: {}", msg),
             Self::OptimizationFailed(msg) => write!(f, "Optimization failed: {}", msg),
             Self::BufferOverflow(msg) => write!(f, "Buffer overflow: {}", msg),
@@ -79,7 +87,10 @@ pub enum RecoveryStrategy {
 
 impl Default for RecoveryStrategy {
     fn default() -> Self {
-        Self::Retry { max_attempts: 3, backoff_ms: 10 }
+        Self::Retry {
+            max_attempts: 3,
+            backoff_ms: 10,
+        }
     }
 }
 
@@ -88,33 +99,28 @@ impl RecoveryStrategy {
     pub fn for_error(err: &PipelineError) -> Self {
         match err {
             // Transient errors: retry with backoff
-            PipelineError::Transient(_) | PipelineError::ChannelClosed(_) => {
-                Self::Retry { max_attempts: 3, backoff_ms: 50 }
-            }
+            PipelineError::Transient(_) | PipelineError::ChannelClosed(_) => Self::Retry {
+                max_attempts: 3,
+                backoff_ms: 50,
+            },
             // Timeout: skip frame and slow down
-            PipelineError::Timeout { .. } => {
-                Self::SlowDown { backoff_ms: 33 }
-            }
+            PipelineError::Timeout { .. } => Self::SlowDown { backoff_ms: 33 },
             // Feature detection failure: try next frame
-            PipelineError::FeatureDetectionFailed(_) => {
-                Self::Skip
-            }
+            PipelineError::FeatureDetectionFailed(_) => Self::Skip,
             // Optimization failure: retry with backoff
-            PipelineError::OptimizationFailed(_) => {
-                Self::Retry { max_attempts: 2, backoff_ms: 100 }
-            }
+            PipelineError::OptimizationFailed(_) => Self::Retry {
+                max_attempts: 2,
+                backoff_ms: 100,
+            },
             // Poisoned state: try once more, then skip
-            PipelineError::PoisonedState(_) => {
-                Self::Retry { max_attempts: 1, backoff_ms: 0 }
-            }
+            PipelineError::PoisonedState(_) => Self::Retry {
+                max_attempts: 1,
+                backoff_ms: 0,
+            },
             // Buffer/config errors: shutdown
-            PipelineError::BufferOverflow(_) | PipelineError::ConfigError(_) => {
-                Self::Shutdown
-            }
+            PipelineError::BufferOverflow(_) | PipelineError::ConfigError(_) => Self::Shutdown,
             // Fatal: always shutdown
-            PipelineError::Fatal(_) => {
-                Self::Shutdown
-            }
+            PipelineError::Fatal(_) => Self::Shutdown,
         }
     }
 
@@ -125,10 +131,8 @@ impl RecoveryStrategy {
                 // Exponential backoff: backoff_ms, backoff_ms*2, backoff_ms*4, ...
                 let ms = backoff_ms * (2_u64.pow(attempt));
                 Duration::from_millis(ms)
-            }
-            Self::SlowDown { backoff_ms } => {
-                Duration::from_millis(*backoff_ms)
-            }
+            },
+            Self::SlowDown { backoff_ms } => Duration::from_millis(*backoff_ms),
             _ => Duration::ZERO,
         }
     }
@@ -191,7 +195,10 @@ mod tests {
 
     #[test]
     fn test_backoff_exponential() {
-        let strategy = RecoveryStrategy::Retry { max_attempts: 3, backoff_ms: 10 };
+        let strategy = RecoveryStrategy::Retry {
+            max_attempts: 3,
+            backoff_ms: 10,
+        };
         assert_eq!(strategy.backoff_for_attempt(0).as_millis(), 10);
         assert_eq!(strategy.backoff_for_attempt(1).as_millis(), 20);
         assert_eq!(strategy.backoff_for_attempt(2).as_millis(), 40);
@@ -207,7 +214,10 @@ mod tests {
         assert_eq!(ctx.attempt, 1);
         assert_eq!(ctx.error_count, 1);
 
-        let strategy = RecoveryStrategy::Retry { max_attempts: 3, backoff_ms: 10 };
+        let strategy = RecoveryStrategy::Retry {
+            max_attempts: 3,
+            backoff_ms: 10,
+        };
         assert!(ctx.can_retry(&strategy));
 
         ctx.next_attempt();

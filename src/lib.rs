@@ -45,7 +45,7 @@
 #![allow(
     rustdoc::broken_intra_doc_links,
     rustdoc::invalid_html_tags,
-    rustdoc::redundant_explicit_links,
+    rustdoc::redundant_explicit_links
 )]
 //! # RS-VIO
 //!
@@ -139,7 +139,7 @@ pub enum VIOError {
     Io(#[from] std::io::Error),
     #[error("Anyhow error: {0}")]
     Anyhow(#[from] anyhow::Error),
-    
+
     // === New error categories for swarm operations ===
     #[error("Transient error (can retry): {0}")]
     Transient(String),
@@ -147,7 +147,7 @@ pub enum VIOError {
     Permanent(String),
     #[error("Degraded state (continue with caution): {0}")]
     Degraded(String),
-    
+
     // === Network/distributed errors ===
     #[error("Message version incompatible: {0}")]
     VersionIncompatible(String),
@@ -166,7 +166,7 @@ impl VIOError {
             VIOError::Degraded(_) => ErrorCategory::Degraded,
             VIOError::Config(_) | VIOError::Parse(_) | VIOError::VersionIncompatible(_) => {
                 ErrorCategory::Permanent
-            }
+            },
             VIOError::Image(_) | VIOError::Io(_) => ErrorCategory::Transient,
             VIOError::Optimization(_) | VIOError::Solver(_) => ErrorCategory::Degraded,
             VIOError::Viewer(_) => ErrorCategory::Transient,
@@ -278,8 +278,8 @@ pub mod calibration;
 pub mod camera;
 pub mod common;
 pub mod datasets;
-pub mod estimator;
 pub mod dense_reconstruction;
+pub mod estimator;
 pub mod evaluation;
 pub mod feature_detection;
 pub mod feature_tracker;
@@ -309,4 +309,6 @@ pub use datasets::{PlayerConfig, PlayerResult};
 pub use optimization::marginalization::MarginalizationPrior;
 
 #[cfg(feature = "swarm")]
-pub use swarm::{DroneId, HealthStatus, HealthState, SwarmMessage, SwarmState, TelemetryFrame, VIOEvent};
+pub use swarm::{
+    DroneId, HealthState, HealthStatus, SwarmMessage, SwarmState, TelemetryFrame, VIOEvent,
+};

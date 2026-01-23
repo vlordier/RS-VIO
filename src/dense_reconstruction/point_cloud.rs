@@ -216,10 +216,7 @@ impl PointCloudGenerator {
                     let z_cam = depth;
 
                     // Transform to world coordinates
-                    let world_point = self.camera_to_world(
-                        Point3D::new(x_cam, y_cam, z_cam),
-                        pose,
-                    );
+                    let world_point = self.camera_to_world(Point3D::new(x_cam, y_cam, z_cam), pose);
 
                     // Get color from image
                     let color = if let Some(img) = image {

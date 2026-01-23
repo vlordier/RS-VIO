@@ -51,7 +51,8 @@ impl HardwareProfile {
 
     /// Get optimization timeout in milliseconds
     pub fn optimization_timeout_ms(&self) -> u64 {
-        (self.base_optimization_us as f64 * self.optimization_timeout_multiplier / 1000.0).ceil() as u64
+        (self.base_optimization_us as f64 * self.optimization_timeout_multiplier / 1000.0).ceil()
+            as u64
     }
 
     /// Jetson Nano profile (2 ARM cores, 4GB RAM)
@@ -175,7 +176,7 @@ impl TimeoutAutoTuner {
     pub fn new(profile: HardwareProfile) -> Self {
         let detection_ema = profile.base_detection_us as f64;
         let optimization_ema = profile.base_optimization_us as f64;
-        
+
         Self {
             profile,
             detection_ema,
@@ -195,7 +196,8 @@ impl TimeoutAutoTuner {
     /// Record observed optimization latency
     pub fn observe_optimization(&mut self, latency_us: u64) {
         let latency = latency_us as f64;
-        self.optimization_ema = self.ema_alpha * latency + (1.0 - self.ema_alpha) * self.optimization_ema;
+        self.optimization_ema =
+            self.ema_alpha * latency + (1.0 - self.ema_alpha) * self.optimization_ema;
         self.sample_count += 1;
     }
 
@@ -206,7 +208,8 @@ impl TimeoutAutoTuner {
 
     /// Get current recommended optimization timeout in milliseconds
     pub fn recommended_optimization_timeout_ms(&self) -> u64 {
-        (self.optimization_ema * self.profile.optimization_timeout_multiplier / 1000.0).ceil() as u64
+        (self.optimization_ema * self.profile.optimization_timeout_multiplier / 1000.0).ceil()
+            as u64
     }
 
     /// Get default timeout (before any tuning)
@@ -221,8 +224,7 @@ impl TimeoutAutoTuner {
 
     /// Check if tuning should happen (enough samples collected)
     pub fn should_tune(&self) -> bool {
-        self.profile.enable_autotuning && 
-        self.sample_count >= self.profile.tuning_sample_count
+        self.profile.enable_autotuning && self.sample_count >= self.profile.tuning_sample_count
     }
 
     /// Get current profile
@@ -322,7 +324,7 @@ mod tests {
     fn test_timeout_auto_tuner_creation() {
         let profile = HardwareProfile::jetson_nano();
         let tuner = TimeoutAutoTuner::new(profile);
-        
+
         assert_eq!(tuner.sample_count(), 0);
         assert!(!tuner.should_tune());
     }
@@ -331,13 +333,13 @@ mod tests {
     fn test_auto_tuner_ema_detection() {
         let profile = HardwareProfile::jetson_nano();
         let mut tuner = TimeoutAutoTuner::new(profile);
-        
+
         let default_timeout = tuner.recommended_detection_timeout_ms();
-        
+
         // Observe a higher latency
         tuner.observe_detection(200);
         let adjusted_timeout = tuner.recommended_detection_timeout_ms();
-        
+
         // EMA should move towards higher value
         assert!(adjusted_timeout >= default_timeout);
     }
@@ -346,10 +348,10 @@ mod tests {
     fn test_auto_tuner_ema_optimization() {
         let profile = HardwareProfile::jetson_nano();
         let mut tuner = TimeoutAutoTuner::new(profile);
-        
+
         tuner.observe_optimization(300);
         let timeout = tuner.recommended_optimization_timeout_ms();
-        
+
         assert!(timeout > 0);
     }
 
@@ -357,14 +359,14 @@ mod tests {
     fn test_auto_tuner_should_tune() {
         let mut profile = HardwareProfile::jetson_nano();
         profile.tuning_sample_count = 5;
-        
+
         let mut tuner = TimeoutAutoTuner::new(profile);
-        
+
         for _ in 0..4 {
             tuner.observe_detection(100);
         }
         assert!(!tuner.should_tune());
-        
+
         tuner.observe_detection(100);
         assert!(tuner.should_tune());
     }
@@ -373,11 +375,11 @@ mod tests {
     fn test_auto_tuner_reset() {
         let profile = HardwareProfile::jetson_nano();
         let mut tuner = TimeoutAutoTuner::new(profile);
-        
+
         tuner.observe_detection(200);
         tuner.observe_optimization(300);
         assert_eq!(tuner.sample_count(), 2);
-        
+
         tuner.reset();
         assert_eq!(tuner.sample_count(), 0);
     }

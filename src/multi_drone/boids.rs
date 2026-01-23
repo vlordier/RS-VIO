@@ -217,7 +217,7 @@ impl Boid {
     pub fn seek(&self, target: &Vector3, config: &BoidsConfig) -> Vector3 {
         let desired = target - self.position;
         let dist = desired.norm();
-        
+
         let desired = if dist > 0.0 {
             desired.normalize() * config.max_speed
         } else {
@@ -315,7 +315,7 @@ mod tests {
     fn test_vector3_operations_via_nalgebra() {
         let v1 = Vector3::new(1.0, 2.0, 3.0);
         let v2 = Vector3::new(4.0, 5.0, 6.0);
-        
+
         let sum = v1 + v2;
         assert_eq!(sum.x, 5.0);
         assert_eq!(sum.y, 7.0);
@@ -343,10 +343,10 @@ mod tests {
         let config = BoidsConfig::default();
         let boid1 = Boid::new(0, Vector3::new(0.0, 0.0, 0.0), Vector3::zeros());
         let boid2 = Boid::new(1, Vector3::new(1.0, 0.0, 0.0), Vector3::zeros());
-        
+
         let neighbors = vec![&boid2];
         let sep = boid1.separation(&neighbors, &config);
-        
+
         // Should push away from boid2 (in negative x direction)
         assert!(sep.x < 0.0 || sep.norm() < 0.001);
     }
@@ -356,10 +356,10 @@ mod tests {
         let config = BoidsConfig::default();
         let boid1 = Boid::new(0, Vector3::new(0.0, 0.0, 0.0), Vector3::new(0.0, 0.0, 0.0));
         let boid2 = Boid::new(1, Vector3::new(5.0, 0.0, 0.0), Vector3::new(1.0, 0.0, 0.0));
-        
+
         let neighbors = vec![&boid2];
         let align = boid1.alignment(&neighbors, &config);
-        
+
         // Should align with boid2's velocity
         assert!(align.norm() > 0.0);
     }
@@ -369,10 +369,10 @@ mod tests {
         let config = BoidsConfig::default();
         let boid1 = Boid::new(0, Vector3::new(0.0, 0.0, 0.0), Vector3::zeros());
         let boid2 = Boid::new(1, Vector3::new(5.0, 0.0, 0.0), Vector3::zeros());
-        
+
         let neighbors = vec![&boid2];
         let coh = boid1.cohesion(&neighbors, &config);
-        
+
         // Should move toward boid2
         assert!(coh.x > 0.0 || coh.norm() < 0.001);
     }
@@ -382,9 +382,9 @@ mod tests {
         let config = BoidsConfig::default();
         let boid = Boid::new(0, Vector3::new(0.0, 0.0, 0.0), Vector3::zeros());
         let target = Vector3::new(10.0, 0.0, 0.0);
-        
+
         let seek = boid.seek(&target, &config);
-        
+
         // Should move toward target (positive x)
         assert!(seek.x > 0.0);
     }
@@ -394,10 +394,10 @@ mod tests {
         let config = BoidsConfig::default();
         let mut boid = Boid::new(0, Vector3::new(0.0, 0.0, 0.0), Vector3::zeros());
         let target = Vector3::new(10.0, 0.0, 0.0);
-        
+
         let initial_pos = boid.position;
         boid.update(&[], Some(target), &config, 0.1);
-        
+
         // Position should have changed
         assert!((boid.position - initial_pos).norm() > 0.0);
     }
@@ -407,11 +407,11 @@ mod tests {
         let mut swarm = BoidsSwarm::new(BoidsConfig::default());
         swarm.add_boid(Boid::new(0, Vector3::new(0.0, 0.0, 0.0), Vector3::zeros()));
         swarm.add_boid(Boid::new(1, Vector3::new(5.0, 0.0, 0.0), Vector3::zeros()));
-        
+
         let initial_center = swarm.center_of_mass();
         swarm.update(None, 0.1);
         let new_center = swarm.center_of_mass();
-        
+
         // Center may have changed due to flocking
         assert!((initial_center - new_center).norm() >= 0.0);
     }

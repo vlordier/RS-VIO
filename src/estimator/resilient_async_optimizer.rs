@@ -3,7 +3,7 @@
 //! Wraps the AsyncOptimizer with timeout, error recovery, and metrics collection.
 
 use crate::datasets::config::Config;
-use crate::estimator::{AsyncOptimizer, Frame, PipelineError, PipelineMetrics, MetricsTimer};
+use crate::estimator::{AsyncOptimizer, Frame, MetricsTimer, PipelineError, PipelineMetrics};
 use std::time::Duration;
 use tokio::time::timeout;
 
@@ -48,23 +48,24 @@ impl ResilientAsyncOptimizer {
         run_ba: bool,
     ) -> std::result::Result<bool, PipelineError> {
         let timer = MetricsTimer::new_optimization(&self.metrics);
-        
+
         let timeout_duration = Duration::from_millis(self.timeout_ms);
-        
+
         match timeout(
             timeout_duration,
             self.optimizer.add_frame_and_optimize(frame, run_ba),
-        ).await
+        )
+        .await
         {
             Ok(Ok((success, _))) => {
                 timer.stop(false);
                 Ok(success)
-            }
+            },
             Ok(Err(e)) => {
                 timer.stop(true);
                 self.metrics.record_recovered_error();
                 Err(PipelineError::OptimizationFailed(e.to_string()))
-            }
+            },
             Err(_) => {
                 let elapsed_ms = timer.elapsed_us() / 1000;
                 timer.stop(true);
@@ -74,7 +75,7 @@ impl ResilientAsyncOptimizer {
                     limit_ms: self.timeout_ms,
                     elapsed_ms,
                 })
-            }
+            },
         }
     }
 
@@ -98,15 +99,14 @@ mod tests {
     use crate::datasets::config::Config;
 
     fn create_test_config() -> Config {
-        Config::load("config/tum_vi.yaml")
-            .expect("Test requires config/tum_vi.yaml")
+        Config::load("config/tum_vi.yaml").expect("Test requires config/tum_vi.yaml")
     }
 
     #[tokio::test]
     async fn test_resilient_optimizer_creation() {
         let config = create_test_config();
         let optimizer = ResilientAsyncOptimizer::new(&config, None);
-        
+
         assert_eq!(optimizer.keyframe_count().await, 0);
         assert_eq!(optimizer.map_point_count().await, 0);
     }
@@ -114,9 +114,8 @@ mod tests {
     #[tokio::test]
     async fn test_resilient_optimizer_with_custom_timeout() {
         let config = create_test_config();
-        let optimizer = ResilientAsyncOptimizer::new(&config, None)
-            .with_timeout(1000);
-        
+        let optimizer = ResilientAsyncOptimizer::new(&config, None).with_timeout(1000);
+
         assert_eq!(optimizer.timeout_ms, 1000);
     }
 
@@ -125,7 +124,7 @@ mod tests {
         let config = create_test_config();
         let metrics = PipelineMetrics::new();
         let _optimizer = ResilientAsyncOptimizer::new(&config, Some(metrics.clone()));
-        
+
         let initial_frames = metrics.total_frames_processed();
         assert_eq!(initial_frames, 0);
     }

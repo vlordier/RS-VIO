@@ -32,9 +32,9 @@ pub mod types;
 
 // Re-export commonly used types
 pub use distributed::{
-    ConsensusStats, LoopClosureConsensus, LoopClosureVote, MessagePayload,
-    SwarmMessage, SwarmState, TraceContext,
+    ConsensusStats, LoopClosureConsensus, LoopClosureVote, MessagePayload, SwarmMessage,
+    SwarmState, TraceContext,
 };
-pub use types::MessageVersion;
 pub use telemetry::{ComponentHealth, HealthState, HealthStatus, TelemetryFrame, VIOEvent};
+pub use types::MessageVersion;
 pub use types::{DroneId, NetworkPartitionState};

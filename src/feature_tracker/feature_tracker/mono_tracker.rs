@@ -3,9 +3,9 @@ use image::GrayImage;
 use nalgebra as na;
 use std::collections::HashMap;
 
+use crate::common::FeatureTrackingArena;
 use crate::datasets::config::FeatureDetectionConfig;
 use crate::feature_tracker::image_utilities;
-use crate::common::FeatureTrackingArena;
 
 use super::tracking::{add_points, track_points};
 
@@ -82,7 +82,7 @@ impl<const LEVELS: u32> PatchTracker<LEVELS> {
 }
 
 /// Arena-backed monocular tracker for zero-copy allocation
-/// 
+///
 /// This implementation optimizes allocation patterns for feature tracking,
 /// preparing for integration into high-frequency loops.
 /// Currently alongside PatchTracker for gradual migration.
@@ -104,7 +104,7 @@ impl<const LEVELS: u32> ArenaPatchTracker<LEVELS> {
     pub fn from_config(config: &FeatureDetectionConfig) -> Self {
         // Pre-allocate arena for typical frame size
         let estimated_features = (config.grid_cols * config.max_features_per_grid) as usize;
-        
+
         Self {
             last_keypoint_id: 0,
             tracked_points: HashMap::new(),
@@ -128,7 +128,7 @@ impl<const LEVELS: u32> ArenaPatchTracker<LEVELS> {
 
         if !self.previous_image_pyramid.is_empty() {
             log::info!("old points {}", self.tracked_points.len());
-            
+
             // Convert tracked points to Affine2 for tracking algorithm
             let mut affine_map = HashMap::new();
             for (id, (point, _, _, _)) in &self.tracked_points {
@@ -152,13 +152,10 @@ impl<const LEVELS: u32> ArenaPatchTracker<LEVELS> {
             let mut updated = HashMap::new();
             for (id, new_affine) in tracked {
                 let new_point = [new_affine.matrix().m13, new_affine.matrix().m23];
-                
+
                 if let Some((old_point, _, old_age, old_conf)) = self.tracked_points.get(&id) {
                     // Calculate velocity from old to new position
-                    let velocity = Some([
-                        new_point[0] - old_point[0],
-                        new_point[1] - old_point[1],
-                    ]);
+                    let velocity = Some([new_point[0] - old_point[0], new_point[1] - old_point[1]]);
                     // Increment age and maintain confidence
                     updated.insert(id, (new_point, velocity, old_age + 1, *old_conf));
                 } else {
@@ -181,10 +178,8 @@ impl<const LEVELS: u32> ArenaPatchTracker<LEVELS> {
 
         let new_points = add_points(&affine_map, greyscale_image, self.grid_cols);
         for (x, y, _score) in &new_points {
-            self.tracked_points.insert(
-                self.last_keypoint_id,
-                ([*x, *y], None, 1, 0.5),
-            );
+            self.tracked_points
+                .insert(self.last_keypoint_id, ([*x, *y], None, 1, 0.5));
             self.last_keypoint_id += 1;
         }
 

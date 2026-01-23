@@ -28,4 +28,3 @@ pub use realtime_monitor::{
 };
 pub use types::{CameraId, Confidence, FeatureId, FrameId, Timestamp};
 pub use validation::{validate_matrix, validate_pose, validate_quaternion};
-

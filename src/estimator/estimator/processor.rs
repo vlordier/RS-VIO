@@ -124,28 +124,30 @@ impl Estimator {
 
                 for imu_sample in imu.iter() {
                     if self.imu_processor.is_initializing {
-                        self.imu_processor.bias_estimator.add_sample(imu_sample, true);
+                        self.imu_processor
+                            .bias_estimator
+                            .add_sample(imu_sample, true);
                     }
 
-                                            let (gyro_corrected, accel_corrected) = if bias_initialized {
-                                                (
-                                                    self.imu_processor.bias_estimator.correct_gyro(imu_sample),
-                                                    self.imu_processor.bias_estimator.correct_accel(imu_sample),
-                                                )
-                                            } else {
-                                                (
-                                                    ImuVector3::new(
-                                                        imu_fl!(imu_sample.gyro[0]),
-                                                        imu_fl!(imu_sample.gyro[1]),
-                                                        imu_fl!(imu_sample.gyro[2]),
-                                                    ),
-                                                    ImuVector3::new(
-                                                        imu_fl!(imu_sample.accel[0]),
-                                                        imu_fl!(imu_sample.accel[1]),
-                                                        imu_fl!(imu_sample.accel[2]),
-                                                    ),
-                                                )
-                                            };
+                    let (gyro_corrected, accel_corrected) = if bias_initialized {
+                        (
+                            self.imu_processor.bias_estimator.correct_gyro(imu_sample),
+                            self.imu_processor.bias_estimator.correct_accel(imu_sample),
+                        )
+                    } else {
+                        (
+                            ImuVector3::new(
+                                imu_fl!(imu_sample.gyro[0]),
+                                imu_fl!(imu_sample.gyro[1]),
+                                imu_fl!(imu_sample.gyro[2]),
+                            ),
+                            ImuVector3::new(
+                                imu_fl!(imu_sample.accel[0]),
+                                imu_fl!(imu_sample.accel[1]),
+                                imu_fl!(imu_sample.accel[2]),
+                            ),
+                        )
+                    };
                     let gyro_f32 = [
                         gyro_corrected[0] as f32,
                         gyro_corrected[1] as f32,
@@ -157,19 +159,27 @@ impl Estimator {
                         accel_corrected[2] as f32,
                     ];
 
-                    let accel_denoised = self.imu_processor.denoise_filter.process_accel(&accel_f32);
+                    let accel_denoised =
+                        self.imu_processor.denoise_filter.process_accel(&accel_f32);
                     let gyro_denoised = self.imu_processor.denoise_filter.process_gyro(&gyro_f32);
 
                     // Get updated weight after processing
                     let current_weight = self.imu_processor.denoise_filter.weight_scale;
 
                     // Process acceleration through higher-order filter for jerk/snap and f0 analysis
-                    let higher_order_output =
-                        self.imu_processor.higher_order_filter.process_accel(accel_denoised);
+                    let higher_order_output = self
+                        .imu_processor
+                        .higher_order_filter
+                        .process_accel(accel_denoised);
 
                     // Use f0 confidence to further weight the measurement
                     // Combine denoise weight with f0 confidence
-                    let f0_weighted = if self.imu_processor.higher_order_filter.config.enable_f0_weighting {
+                    let f0_weighted = if self
+                        .imu_processor
+                        .higher_order_filter
+                        .config
+                        .enable_f0_weighting
+                    {
                         current_weight * higher_order_output.f0_confidence
                     } else {
                         current_weight
@@ -204,7 +214,8 @@ impl Estimator {
                     if let Some(last_ts) = self.imu_processor.last_timestamp {
                         let dt = (imu_sample.timestamp - last_ts) as f64 / 1e9;
                         if dt > 0.0 {
-                            self.imu_processor.preintegrator
+                            self.imu_processor
+                                .preintegrator
                                 .propagate_corrected(gyro_vec, accel_vec, dt);
                         }
                     }
@@ -213,11 +224,7 @@ impl Estimator {
 
                     filtered_imu.push(ImuData {
                         timestamp: imu_sample.timestamp,
-                        gyro: [
-                            gyro_vec[0] as f64,
-                            gyro_vec[1] as f64,
-                            gyro_vec[2] as f64,
-                        ],
+                        gyro: [gyro_vec[0] as f64, gyro_vec[1] as f64, gyro_vec[2] as f64],
                         accel: [
                             accel_vec[0] as f64,
                             accel_vec[1] as f64,
@@ -225,7 +232,9 @@ impl Estimator {
                         ],
                     });
 
-                    if self.imu_processor.is_initializing && self.imu_processor.bias_estimator.sample_count() >= 100 {
+                    if self.imu_processor.is_initializing
+                        && self.imu_processor.bias_estimator.sample_count() >= 100
+                    {
                         self.imu_processor.is_initializing = false;
                         log::info!(
                             "[Estimator] IMU initialization complete. Gyro bias: [{:.4}, {:.4}, {:.4}] rad/s, Accel bias: [{:.4}, {:.4}, {:.4}] m/s²",
@@ -254,11 +263,14 @@ impl Estimator {
                 // Use motion predictor for feature tracking
                 let focal_length = self.config.camera.left_intrinsics[0] as f64;
                 for feature in &mut current_frame.left_features {
-                    let (du, dv) = self.imu_processor.motion_predictor.predict_feature_displacement(
-                        &filtered_imu,
-                        (feature.pixel_coord[0] as f64, feature.pixel_coord[1] as f64),
-                        focal_length,
-                    );
+                    let (du, dv) = self
+                        .imu_processor
+                        .motion_predictor
+                        .predict_feature_displacement(
+                            &filtered_imu,
+                            (feature.pixel_coord[0] as f64, feature.pixel_coord[1] as f64),
+                            focal_length,
+                        );
                     // Apply predicted displacement as initial guess for optical flow
                     feature.pixel_coord[0] = (feature.pixel_coord[0] as f64 + du) as f32;
                     feature.pixel_coord[1] = (feature.pixel_coord[1] as f64 + dv) as f32;
@@ -274,7 +286,8 @@ impl Estimator {
                 // Initialize velocity estimator on first IMU batch
                 if !self.imu_processor.velocity_estimator_initialized && !filtered_imu.is_empty() {
                     let initial_orientation = na::UnitQuaternion::identity();
-                    self.imu_processor.velocity_estimator
+                    self.imu_processor
+                        .velocity_estimator
                         .initialize_from_imu(&filtered_imu, &initial_orientation);
                     self.imu_processor.velocity_estimator_initialized = true;
                     if should_log {
@@ -286,7 +299,9 @@ impl Estimator {
                 }
 
                 // Update velocity estimator
-                self.imu_processor.velocity_estimator.update(&filtered_imu, dt);
+                self.imu_processor
+                    .velocity_estimator
+                    .update(&filtered_imu, dt);
 
                 // Accumulate for extrinsic calibration
                 if self.backend.sliding_window.is_full() {
@@ -297,7 +312,8 @@ impl Estimator {
                             T_W_B_copy.fixed_view::<3, 3>(0, 0).into_owned(),
                         );
                         let R_W_B = na::UnitQuaternion::from_rotation_matrix(&rotmat);
-                        self.imu_processor.extrinsic_calibrator
+                        self.imu_processor
+                            .extrinsic_calibrator
                             .add_measurement(&T_W_B_copy, R_W_B);
 
                         // NOTE: Periodic calibration disabled due to NaN instabilities in edge cases
@@ -379,13 +395,15 @@ impl Estimator {
                 .unwrap_or(240.0) as f32;
 
             // Always set calibrated intrinsics for geometric gating
-            self.frontend.stereo_patch_tracker
+            self.frontend
+                .stereo_patch_tracker
                 .set_camera_intrinsics(fx, fy, cx, cy);
 
             if self.config.debug.use_imu {
-                self.frontend.stereo_patch_tracker
+                self.frontend
+                    .stereo_patch_tracker
                     .set_imu_rotation_hint(imu, (fx, fy, cx, cy));
-                    
+
                 // Provide velocity estimate for improved feature tracking
                 if let Some(velocity) = self.get_velocity() {
                     self.frontend.stereo_patch_tracker.set_velocity_hint([
@@ -398,7 +416,8 @@ impl Estimator {
         }
 
         let tracking_start = Instant::now();
-        self.frontend.stereo_patch_tracker
+        self.frontend
+            .stereo_patch_tracker
             .process_frame(&left_img, &right_img, &mut current_frame);
         _patch_tracking_time_ms = tracking_start.elapsed().as_secs_f64() * 1000.0;
         self.view_patch_tracking_results(&current_frame, &left_img, &right_img, img_w, img_h);
@@ -534,28 +553,35 @@ impl Estimator {
         // Buffer frames and call fusion strategy if available
         if let Some(fusion_strat) = self.fusion_strategy.as_mut() {
             // Add current frame to buffer (Arc-wrapped to avoid expensive clones)
-            self.fusion_frame_buffer.push_back(std::sync::Arc::new(current_frame.clone()));
-            
+            self.fusion_frame_buffer
+                .push_back(std::sync::Arc::new(current_frame.clone()));
+
             // Keep buffer within capacity (default 5 frames)
             if self.fusion_frame_buffer.len() > 5 {
                 self.fusion_frame_buffer.pop_front();
             }
-            
+
             // Apply fusion when we have at least 2 frames
             if self.fusion_frame_buffer.len() >= 2 {
-                let frames_vec: Vec<_> = self.fusion_frame_buffer.iter()
+                let frames_vec: Vec<_> = self
+                    .fusion_frame_buffer
+                    .iter()
                     .map(|arc_frame| (**arc_frame).clone())
                     .collect();
-                
+
                 if let Ok(fused) = fusion_strat.fuse(&frames_vec) {
                     // Apply per-feature confidence from fusion to current frame
                     let feature_count = current_frame.left_features.len();
                     if fused.feature_confidence.len() >= feature_count {
-                        for (feat, conf) in current_frame.left_features.iter_mut()
+                        for (feat, conf) in current_frame
+                            .left_features
+                            .iter_mut()
                             .zip(fused.feature_confidence.iter())
                         {
                             // Blend fusion confidence with existing tracking confidence
-                            feat.quality.confidence = ((feat.quality.confidence as crate::types::Float + conf) / 2.0) as f32;
+                            feat.quality.confidence =
+                                ((feat.quality.confidence as crate::types::Float + conf) / 2.0)
+                                    as f32;
                         }
                         if should_log {
                             debug_log!(
@@ -619,7 +645,8 @@ impl Estimator {
 
                     // Use IMU-aided keyframe selector
                     let (is_imu_keyframe, keyframe_reason) = self
-                        .imu_processor.keyframe_selector
+                        .imu_processor
+                        .keyframe_selector
                         .should_be_keyframe(&T_W_B, timestamp_ns, imu_visual_deviation.abs());
 
                     // Fallback to visual-only check
@@ -746,7 +773,8 @@ impl Estimator {
             // Store IMU preintegration for tight coupling BEFORE optimization
             // This ensures the most recent preintegration (between last two KFs) is available
             let preintegration_for_storage = if self.config.optimization.imu_prior_enable {
-                self.imu_processor.preintegrator
+                self.imu_processor
+                    .preintegrator
                     .create_tight_coupling_preintegration()
             } else {
                 None
@@ -765,10 +793,11 @@ impl Estimator {
                 }
             }
 
-            if let Err(e) =
-                self.backend.sliding_window
-                    .optimize_with_imu(imu_prior, imu_weights, imu_huber_delta)
-            {
+            if let Err(e) = self.backend.sliding_window.optimize_with_imu(
+                imu_prior,
+                imu_weights,
+                imu_huber_delta,
+            ) {
                 log::error!("[Estimator] Bundle adjustment optimization failed: {:?}", e);
                 // Continue execution even if optimization fails
             }

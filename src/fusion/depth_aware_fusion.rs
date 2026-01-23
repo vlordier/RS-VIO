@@ -14,7 +14,7 @@
 //!    - Select best-fused patch
 //! 3. Per-measurement confidence = fusion quality metric
 
-use super::{FusionError, FusionMetrics, FusionResult, FusedFrame};
+use super::{FusedFrame, FusionError, FusionMetrics, FusionResult};
 use crate::estimator::Frame;
 use crate::types::Float;
 
@@ -155,9 +155,10 @@ impl super::FusionStrategyImpl for DepthAwareFusion {
         let num_to_use = std::cmp::min(frames.len(), self.config.num_frames);
 
         // Borrow reference image if present for patch scoring
-        let (image_slice, img_w, img_h) = reference_frame
-            .left_image_plane()
-            .unwrap_or((&[][..], 0, 0));
+        let (image_slice, img_w, img_h) =
+            reference_frame
+                .left_image_plane()
+                .unwrap_or((&[][..], 0, 0));
 
         // Process each feature
         let feature_count = reference_frame.left_features().len();
@@ -186,7 +187,8 @@ impl super::FusionStrategyImpl for DepthAwareFusion {
 
                 // Simplified: would test each hypothesis
                 let depth_uncertainty = 0.1;
-                let fused_conf = self.compute_fusion_confidence(quality, num_to_use, depth_uncertainty);
+                let fused_conf =
+                    self.compute_fusion_confidence(quality, num_to_use, depth_uncertainty);
                 total_depth_inliers += 1;
 
                 sparse_depth.push(Some(2.0)); // placeholder

@@ -24,7 +24,8 @@ impl Estimator {
         );
 
         // Try ORB descriptor if extractor is available
-        if false { // self.orb_extractor.is_some() {
+        if false {
+            // self.orb_extractor.is_some() {
             // Use ORB features from left image
             // Note: In a real implementation, you would pass the actual grayscale image data
             // For now, we'll extract features from the first frame's features
@@ -32,7 +33,8 @@ impl Estimator {
 
             // Create a simple descriptor from feature statistics combined with presence flag
             let mut descriptor = vec![fl!(0.0); 10];
-            descriptor[0] = if false { // self.orb_extractor.is_some() {
+            descriptor[0] = if false {
+                // self.orb_extractor.is_some() {
                 fl!(1.0)
             } else {
                 fl!(0.0)

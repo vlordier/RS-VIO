@@ -102,9 +102,21 @@ impl Transform {
     pub fn inverse(&self) -> Self {
         // R^T
         let r_t = [
-            [self.rotation[0][0], self.rotation[1][0], self.rotation[2][0]],
-            [self.rotation[0][1], self.rotation[1][1], self.rotation[2][1]],
-            [self.rotation[0][2], self.rotation[1][2], self.rotation[2][2]],
+            [
+                self.rotation[0][0],
+                self.rotation[1][0],
+                self.rotation[2][0],
+            ],
+            [
+                self.rotation[0][1],
+                self.rotation[1][1],
+                self.rotation[2][1],
+            ],
+            [
+                self.rotation[0][2],
+                self.rotation[1][2],
+                self.rotation[2][2],
+            ],
         ];
 
         // t' = -R^T * t
@@ -293,11 +305,7 @@ impl MapMerger {
     }
 
     /// Estimate relative transformation between two drone maps
-    pub fn estimate_transform(
-        &self,
-        source_id: usize,
-        target_id: usize,
-    ) -> Option<Transform> {
+    pub fn estimate_transform(&self, source_id: usize, target_id: usize) -> Option<Transform> {
         let source_map = self.drone_maps.get(&source_id)?;
         let target_map = self.drone_maps.get(&target_id)?;
 
@@ -361,7 +369,9 @@ impl MapMerger {
             if *drone_id == reference_drone {
                 // Reference frame - no transformation
                 global_landmarks.extend(map.landmarks.iter().copied());
-            } else if let Some(transform) = self.relative_transforms.get(&(*drone_id, reference_drone)) {
+            } else if let Some(transform) =
+                self.relative_transforms.get(&(*drone_id, reference_drone))
+            {
                 // Transform to reference frame
                 for landmark in &map.landmarks {
                     global_landmarks.push(transform.transform_point(landmark));
@@ -433,10 +443,10 @@ mod tests {
         };
         let t_inv = t.inverse();
         let p = Point3D::new(5.0, 6.0, 7.0);
-        
+
         let transformed = t.transform_point(&p);
         let back = t_inv.transform_point(&transformed);
-        
+
         assert!((back.x - p.x).abs() < 0.001);
         assert!((back.y - p.y).abs() < 0.001);
         assert!((back.z - p.z).abs() < 0.001);
@@ -452,11 +462,11 @@ mod tests {
             rotation: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
             translation: [0.0, 1.0, 0.0],
         };
-        
+
         let composed = t1.compose(&t2);
         let p = Point3D::new(0.0, 0.0, 0.0);
         let result = composed.transform_point(&p);
-        
+
         assert!((result.x - 1.0).abs() < 0.001);
         assert!((result.y - 1.0).abs() < 0.001);
     }
@@ -501,20 +511,20 @@ mod tests {
     #[test]
     fn test_map_merger_estimate_transform() {
         let mut merger = MapMerger::new(MapMergingConfig::default());
-        
+
         let mut map1 = DroneMap::new(0, 100.0);
         for i in 0..15 {
             map1.add_landmark(Point3D::new(i as f64, 0.0, 0.0));
         }
-        
+
         let mut map2 = DroneMap::new(1, 101.0);
         for i in 0..15 {
             map2.add_landmark(Point3D::new(i as f64 + 10.0, 5.0, 0.0));
         }
-        
+
         merger.add_drone_map(map1);
         merger.add_drone_map(map2);
-        
+
         let transform = merger.estimate_transform(0, 1);
         assert!(transform.is_some());
     }
@@ -522,18 +532,18 @@ mod tests {
     #[test]
     fn test_map_merger_global_map() {
         let mut merger = MapMerger::new(MapMergingConfig::default());
-        
+
         let mut map1 = DroneMap::new(0, 100.0);
         map1.add_landmark(Point3D::new(0.0, 0.0, 0.0));
         map1.add_landmark(Point3D::new(1.0, 0.0, 0.0));
-        
+
         let mut map2 = DroneMap::new(1, 101.0);
         map2.add_landmark(Point3D::new(10.0, 0.0, 0.0));
         map2.add_landmark(Point3D::new(11.0, 0.0, 0.0));
-        
+
         merger.add_drone_map(map1);
         merger.add_drone_map(map2);
-        
+
         let global = merger.get_global_map(0);
         assert_eq!(global.len(), 2); // Only reference drone's points (no transform)
     }
@@ -541,20 +551,20 @@ mod tests {
     #[test]
     fn test_map_merger_has_transform() {
         let mut merger = MapMerger::new(MapMergingConfig::default());
-        
+
         let mut map1 = DroneMap::new(0, 100.0);
         for i in 0..15 {
             map1.add_landmark(Point3D::new(i as f64, 0.0, 0.0));
         }
-        
+
         let mut map2 = DroneMap::new(1, 101.0);
         for i in 0..15 {
             map2.add_landmark(Point3D::new(i as f64, 0.0, 0.0));
         }
-        
+
         merger.add_drone_map(map1);
         merger.add_drone_map(map2);
-        
+
         assert!(!merger.has_transform(0, 1));
         merger.merge_maps(0, 1);
         assert!(merger.has_transform(0, 1));

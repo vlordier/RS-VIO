@@ -28,7 +28,11 @@ fn test_processor_creation_variants() {
 
     for config in configs {
         let (processor, _handle) = ConcurrentFrameProcessor::new(config.clone());
-        assert_eq!(processor.queue_depth(), 0, "New processor should have 0 queue depth");
+        assert_eq!(
+            processor.queue_depth(),
+            0,
+            "New processor should have 0 queue depth"
+        );
     }
 }
 
@@ -39,7 +43,11 @@ async fn test_processor_channel_creation() {
     let (processor, _handle) = ConcurrentFrameProcessor::new(config);
 
     // Verify initial state
-    assert_eq!(processor.queue_depth(), 0, "Queue should be empty initially");
+    assert_eq!(
+        processor.queue_depth(),
+        0,
+        "Queue should be empty initially"
+    );
 }
 
 /// Test configuration with simulated work delays
@@ -87,7 +95,11 @@ fn test_frame_ordering_logic() {
     }
 
     // Verify we extracted 0 and 1
-    assert_eq!(extracted, vec![0, 1], "Frames 0 and 1 should be extracted in order");
+    assert_eq!(
+        extracted,
+        vec![0, 1],
+        "Frames 0 and 1 should be extracted in order"
+    );
     // Frame 2 is still in the buffer, waiting for output
     assert!(buffer.contains_key(&2), "Frame 2 should still be buffered");
 }

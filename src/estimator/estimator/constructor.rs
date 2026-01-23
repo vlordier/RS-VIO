@@ -2,18 +2,16 @@ use super::state::Estimator;
 use crate::calibration::online_intrinsics::OnlineIntrinsicsRefiner;
 use crate::datasets::config::Config;
 use crate::datasets::CameraModelType;
-use crate::estimator::keyframe_culler::AggressiveCullingConfig;
-use crate::estimator::point_quality::PointQualityConfig;
 use crate::estimator::frame_processor::Frontend;
 use crate::estimator::imu_processor::ImuProcessor;
+use crate::estimator::keyframe_culler::AggressiveCullingConfig;
+use crate::estimator::point_quality::PointQualityConfig;
 use crate::estimator::sliding_window::Backend;
 use crate::estimator::{FrameWorkspace, WorkspaceConfig};
 use crate::fl;
 use crate::fusion::depth_aware_fusion::{DepthAwareFusion, DepthAwareFusionConfig};
 use crate::fusion::rotation_stabilizer::{RotationStabilizer, RotationStabilizerConfig};
-use crate::imu::{
-    ImuConfig,
-};
+use crate::imu::ImuConfig;
 use crate::optimization::loop_closure::LoopClosureDetector;
 use crate::types::Float;
 use crate::viewers::Viewer;

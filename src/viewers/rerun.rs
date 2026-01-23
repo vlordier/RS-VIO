@@ -764,7 +764,7 @@ impl Viewer for RerunViewer {
             // Log concise quality summary
             let avg_snr = (signal_snr[0] + signal_snr[1] + signal_snr[2]) / 3.0;
             let avg_rms = (signal_rms[0] + signal_rms[1] + signal_rms[2]) / 3.0;
-            
+
             let summary = format!(
                 "Motor: {} | f₀: {:.1} Hz | SNR: {:.1} dB | RMS: {:.4} m/s²",
                 motor_state, fundamental_freq_hz, avg_snr, avg_rms

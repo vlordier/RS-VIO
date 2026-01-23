@@ -5,9 +5,9 @@
 //! - Async integration patterns work
 //! - Concurrent access works properly with multiple detectors
 
-use rs_vio::estimator::{AsyncFeatureDetector, Frame};
-use rs_vio::datasets::config::FeatureDetectionConfig;
 use image::{ImageBuffer, Luma};
+use rs_vio::datasets::config::FeatureDetectionConfig;
+use rs_vio::estimator::{AsyncFeatureDetector, Frame};
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -53,7 +53,7 @@ fn load_test_image(filename: &str) -> Option<image::DynamicImage> {
         "/Users/vincent/Work/RS-VIO/datasets/tum_vi/magistrale1/mav0/cam1/data/{}",
         filename
     ));
-    
+
     if path.exists() {
         image::open(&path).ok()
     } else {
@@ -79,7 +79,9 @@ async fn test_async_detector_with_real_images() {
     frame.timestamp_ns = 0;
 
     let start = Instant::now();
-    let result = detector.detect_features_from_dynamic(&left_img, &right_img, &mut frame).await;
+    let result = detector
+        .detect_features_from_dynamic(&left_img, &right_img, &mut frame)
+        .await;
     let elapsed = start.elapsed();
 
     assert!(result.is_ok(), "Feature detection should succeed");
@@ -108,18 +110,25 @@ async fn test_concurrent_detectors() {
     let detector2 = detector.clone_detector();
 
     // Verify they share the same underlying state
-    assert!(detector1.shares_state_with(&detector2), "Cloned detectors should share state");
+    assert!(
+        detector1.shares_state_with(&detector2),
+        "Cloned detectors should share state"
+    );
 
     // Run detection with shared detector
     let mut frame1 = Frame::new(0, 0);
     let mut frame2 = Frame::new(1, 1);
 
     let start = Instant::now();
-    let result = detector1.detect_features_from_dynamic(&left_img, &right_img, &mut frame1).await;
+    let result = detector1
+        .detect_features_from_dynamic(&left_img, &right_img, &mut frame1)
+        .await;
     let elapsed1 = start.elapsed();
 
     let start = Instant::now();
-    let result2 = detector2.detect_features_from_dynamic(&left_img, &right_img, &mut frame2).await;
+    let result2 = detector2
+        .detect_features_from_dynamic(&left_img, &right_img, &mut frame2)
+        .await;
     let elapsed2 = start.elapsed();
 
     assert!(result.is_ok());
@@ -128,13 +137,20 @@ async fn test_concurrent_detectors() {
     let (count1, _) = result.unwrap();
     let (count2, _) = result2.unwrap();
 
-    println!("Detection 1: {} features in {:.1}ms", count1, elapsed1.as_secs_f64() * 1000.0);
-    println!("Detection 2: {} features in {:.1}ms", count2, elapsed2.as_secs_f64() * 1000.0);
+    println!(
+        "Detection 1: {} features in {:.1}ms",
+        count1,
+        elapsed1.as_secs_f64() * 1000.0
+    );
+    println!(
+        "Detection 2: {} features in {:.1}ms",
+        count2,
+        elapsed2.as_secs_f64() * 1000.0
+    );
 
     // Both should process successfully
     println!("  Test completed successfully");
 }
-
 
 #[tokio::test]
 async fn test_detector_latency_distribution() {
@@ -145,13 +161,15 @@ async fn test_detector_latency_distribution() {
 
     // Run multiple detections and collect latencies
     let mut latencies = Vec::new();
-    
+
     for i in 0..3 {
         let mut frame = Frame::new(i, i as i32);
         let start = Instant::now();
-        let result = detector.detect_features_from_dynamic(&left_img, &right_img, &mut frame).await;
+        let result = detector
+            .detect_features_from_dynamic(&left_img, &right_img, &mut frame)
+            .await;
         let elapsed_ms = start.elapsed().as_millis() as u64;
-        
+
         assert!(result.is_ok());
         latencies.push(elapsed_ms);
     }

@@ -3,8 +3,7 @@
 /// This module provides concrete integration patterns for using arena allocators
 /// in the most performance-critical paths: feature tracking, descriptor matching,
 /// and IMU data processing.
-
-use crate::common::arena::{FeatureTrackingArena, DescriptorArena, ImuDataArena};
+use crate::common::arena::{DescriptorArena, FeatureTrackingArena, ImuDataArena};
 use std::fmt;
 
 /// Context for arena-backed feature tracking operations

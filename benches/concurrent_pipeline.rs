@@ -40,7 +40,7 @@ async fn run_sequential(n: usize, config: ConcurrentConfig) {
 
 fn bench_concurrent_pipeline(c: &mut Criterion) {
     let mut group = c.benchmark_group("concurrent_pipeline");
-    
+
     group.sample_size(10);
     group.measurement_time(std::time::Duration::from_secs(10));
 

@@ -5,8 +5,8 @@
 //! - Concurrent access patterns work
 //! - State management is thread-safe
 
-use rs_vio::estimator::{AsyncOptimizer, Frame};
 use rs_vio::datasets::config::Config;
+use rs_vio::estimator::{AsyncOptimizer, Frame};
 use std::time::Instant;
 
 fn create_test_config() -> Config {
@@ -32,7 +32,7 @@ async fn test_async_optimizer_basic_operation() {
     // Add a keyframe
     let frame1 = create_test_keyframe(0, 0);
     let result = optimizer.add_frame_and_optimize(frame1, false).await;
-    
+
     assert!(result.is_ok(), "Adding keyframe should succeed");
     let (success, _time_ms) = result.unwrap();
     assert!(success, "Frame should be added successfully");
@@ -66,7 +66,10 @@ async fn test_concurrent_optimizers() {
     // Both optimizers should see same state
     let count1 = optimizer1.keyframe_count().await;
     let count2 = optimizer2.keyframe_count().await;
-    assert_eq!(count1, count2, "Both optimizers should see same keyframe count");
+    assert_eq!(
+        count1, count2,
+        "Both optimizers should see same keyframe count"
+    );
     assert_eq!(count1, 2);
 }
 
@@ -117,7 +120,7 @@ async fn test_optimization_with_ba() {
     let elapsed_ms = start.elapsed().as_millis() as u64;
 
     println!("Bundle adjustment: {:?} in {}ms", result, elapsed_ms);
-    
+
     // BA might fail if there are no valid observations, but shouldn't panic
     // Just verify it completes
 }
@@ -132,7 +135,7 @@ async fn test_sliding_window_capacity() {
     for i in 0..20 {
         let frame = create_test_keyframe(i, i as i64 * 100000000);
         let result = optimizer.add_frame_and_optimize(frame, false).await;
-        
+
         if result.is_ok() {
             added_count += 1;
         }

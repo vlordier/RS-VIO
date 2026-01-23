@@ -39,10 +39,10 @@ impl Default for DistributionConfig {
 /// Grid cell occupancy status
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CellStatus {
-    Underoccupied,  // Below target density
-    Balanced,       // At target density
-    Overoccupied,   // Above target density
-    Critical,       // Empty or nearly empty
+    Underoccupied, // Below target density
+    Balanced,      // At target density
+    Overoccupied,  // Above target density
+    Critical,      // Empty or nearly empty
 }
 
 /// Feature distribution analyzer and controller
@@ -90,10 +90,8 @@ impl FeatureDistributor {
         self.grid_height = (height + self.config.grid_cell_size - 1) / self.config.grid_cell_size;
 
         self.grid = vec![vec![0; self.grid_width as usize]; self.grid_height as usize];
-        self.status_map = vec![
-            vec![CellStatus::Critical; self.grid_width as usize];
-            self.grid_height as usize
-        ];
+        self.status_map =
+            vec![vec![CellStatus::Critical; self.grid_width as usize]; self.grid_height as usize];
     }
 
     /// Get grid width
@@ -107,11 +105,7 @@ impl FeatureDistributor {
     }
 
     /// Update occupancy based on current feature positions
-    pub fn update_occupancy(
-        &mut self,
-        feature_positions: &[Point2<f64>],
-        pyramid_levels: &[u32],
-    ) {
+    pub fn update_occupancy(&mut self, feature_positions: &[Point2<f64>], pyramid_levels: &[u32]) {
         // Reset grid
         for row in &mut self.grid {
             for cell in row {
@@ -145,7 +139,7 @@ impl FeatureDistributor {
                     c if c < self.config.min_per_cell => CellStatus::Underoccupied,
                     c if c >= self.config.target_per_cell && c <= self.config.max_per_cell => {
                         CellStatus::Balanced
-                    }
+                    },
                     _ => CellStatus::Overoccupied,
                 };
             }
@@ -174,7 +168,9 @@ impl FeatureDistributor {
         regions.sort_by(|a, b| {
             let dist_a = (a.0 as f32 - center_x).powi(2) + (a.1 as f32 - center_y).powi(2);
             let dist_b = (b.0 as f32 - center_x).powi(2) + (b.1 as f32 - center_y).powi(2);
-            dist_a.partial_cmp(&dist_b).unwrap_or(std::cmp::Ordering::Equal)
+            dist_a
+                .partial_cmp(&dist_b)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         regions
@@ -342,10 +338,7 @@ mod tests {
         let mut distributor = FeatureDistributor::new(config);
         distributor.initialize(640, 480);
 
-        let positions = vec![
-            Point2::new(50.0, 50.0),
-            Point2::new(100.0, 100.0),
-        ];
+        let positions = vec![Point2::new(50.0, 50.0), Point2::new(100.0, 100.0)];
         let levels = vec![0, 0];
 
         distributor.update_occupancy(&positions, &levels);
@@ -374,10 +367,7 @@ mod tests {
         let mut distributor = FeatureDistributor::new(DistributionConfig::default());
         distributor.initialize(640, 480);
 
-        let positions = vec![
-            Point2::new(32.0, 32.0),
-            Point2::new(96.0, 96.0),
-        ];
+        let positions = vec![Point2::new(32.0, 32.0), Point2::new(96.0, 96.0)];
         let levels = vec![0, 0];
 
         distributor.update_occupancy(&positions, &levels);
@@ -391,10 +381,7 @@ mod tests {
         let mut distributor = FeatureDistributor::new(DistributionConfig::default());
         distributor.initialize(640, 480);
 
-        let positions = vec![
-            Point2::new(32.0, 32.0),
-            Point2::new(96.0, 96.0),
-        ];
+        let positions = vec![Point2::new(32.0, 32.0), Point2::new(96.0, 96.0)];
         let levels = vec![0, 0];
 
         distributor.update_occupancy(&positions, &levels);
@@ -415,7 +402,7 @@ mod tests {
 
         // Empty cell should have lower threshold
         let empty_threshold = distributor.get_adaptive_quality_threshold(5, 5);
-        
+
         // Add features to another cell
         let positions = vec![Point2::new(200.0, 200.0), Point2::new(205.0, 205.0)];
         let levels = vec![0, 0];

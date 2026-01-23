@@ -11,9 +11,9 @@
 use crate::datasets::config::Config;
 use crate::datasets::ImuData;
 use crate::imu::{
-    DenoiseConfig, ExtrinsicCalibrator, HigherOrderFilter, HigherOrderFilterConfig, ImuAidedKeyframeSelector, ImuBiasEstimator,
-    ImuConfig, ImuDenoiseFilter, ImuMotionPredictor, ImuMotionPrior, ImuPreintegrator, PreintegratedImu,
-    VelocityEstimator,
+    DenoiseConfig, ExtrinsicCalibrator, HigherOrderFilter, HigherOrderFilterConfig,
+    ImuAidedKeyframeSelector, ImuBiasEstimator, ImuConfig, ImuDenoiseFilter, ImuMotionPredictor,
+    ImuMotionPrior, ImuPreintegrator, PreintegratedImu, VelocityEstimator,
 };
 use crate::types::{Float, Matrix4x4, Vector3};
 use nalgebra as na;
@@ -119,7 +119,8 @@ impl ImuProcessor {
             if i == num_measurements - 1 {
                 // Only update motion predictor on last measurement to reduce overhead
                 let preint = self.preintegrator.get();
-                self.motion_predictor.update(imu.timestamp, preint.delta_rotation);
+                self.motion_predictor
+                    .update(imu.timestamp, preint.delta_rotation);
             }
 
             // Velocity estimation initialization (done once)
@@ -133,7 +134,8 @@ impl ImuProcessor {
             // Velocity estimation update (zero-copy via slice)
             if self.velocity_estimator_initialized {
                 // Pass single-element slice instead of cloning
-                self.velocity_estimator.update(std::slice::from_ref(imu), dt);
+                self.velocity_estimator
+                    .update(std::slice::from_ref(imu), dt);
                 self.current_velocity = self.velocity_estimator.get_velocity();
             }
 
@@ -280,7 +282,9 @@ pub struct ImuProcessingResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::datasets::config::{Config, CameraConfig, KeyframeManagementConfig, OptimizationConfig};
+    use crate::datasets::config::{
+        CameraConfig, Config, KeyframeManagementConfig, OptimizationConfig,
+    };
     use nalgebra::Matrix4;
 
     fn create_test_processor() -> ImuProcessor {
@@ -293,8 +297,12 @@ mod tests {
             right_distortion: vec![0.0, 0.0, 0.0, 0.0],
             left_model: None,
             right_model: None,
-            T_B_Cl: vec![1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0],
-            T_B_Cr: vec![1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+            T_B_Cl: vec![
+                1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+            ],
+            T_B_Cr: vec![
+                1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+            ],
         };
         let keyframe_management = KeyframeManagementConfig {
             keyframe_window_size: 10,

@@ -57,9 +57,16 @@ pub enum FusionError {
 impl std::fmt::Display for FusionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::InsufficientFrames { required, available } => {
-                write!(f, "Insufficient frames: need {}, have {}", required, available)
-            }
+            Self::InsufficientFrames {
+                required,
+                available,
+            } => {
+                write!(
+                    f,
+                    "Insufficient frames: need {}, have {}",
+                    required, available
+                )
+            },
             Self::InvalidConfig(msg) => write!(f, "Invalid config: {}", msg),
             Self::ComputationError(msg) => write!(f, "Computation error: {}", msg),
             Self::ImuDataError(msg) => write!(f, "IMU error: {}", msg),

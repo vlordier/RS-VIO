@@ -87,7 +87,8 @@ impl Estimator {
         if let Some(v) = &mut self.viewer {
             // Map points
             let colored_points: Vec<(usize, [f32; 3])> = self
-                .backend.sliding_window
+                .backend
+                .sliding_window
                 .map_points
                 .iter()
                 .map(|(&feature_id, &point)| (feature_id, point))

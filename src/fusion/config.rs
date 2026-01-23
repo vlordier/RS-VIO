@@ -3,8 +3,8 @@
 //! Provides YAML-based configuration to enable pluggable fusion strategies
 //! with per-strategy parameter tuning.
 
-use serde::{Deserialize, Serialize};
 use super::{FusionError, FusionResult};
+use serde::{Deserialize, Serialize};
 
 /// High-level fusion strategy selection
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -51,9 +51,15 @@ pub struct RotationStabilizerConfig {
     pub weighting_strategy: String,
 }
 
-fn default_num_frames() -> usize { 3 }
-fn default_min_rotation_threshold() -> f64 { 0.01 }
-fn default_weighting_strategy() -> String { "exponential".to_string() }
+fn default_num_frames() -> usize {
+    3
+}
+fn default_min_rotation_threshold() -> f64 {
+    0.01
+}
+fn default_weighting_strategy() -> String {
+    "exponential".to_string()
+}
 
 impl Default for RotationStabilizerConfig {
     fn default() -> Self {
@@ -69,9 +75,10 @@ impl RotationStabilizerConfig {
     /// Validate configuration
     pub fn validate(&self) -> FusionResult<()> {
         if self.num_frames < 2 || self.num_frames > 10 {
-            return Err(FusionError::InvalidConfig(
-                format!("num_frames must be 2-10, got {}", self.num_frames),
-            ));
+            return Err(FusionError::InvalidConfig(format!(
+                "num_frames must be 2-10, got {}",
+                self.num_frames
+            )));
         }
         if self.min_rotation_threshold < 0.0 || self.min_rotation_threshold > 1.0 {
             return Err(FusionError::InvalidConfig(
@@ -80,9 +87,10 @@ impl RotationStabilizerConfig {
         }
         match self.weighting_strategy.as_str() {
             "uniform" | "exponential" | "sharpness-adaptive" => Ok(()),
-            _ => Err(FusionError::InvalidConfig(
-                format!("unknown weighting strategy: {}", self.weighting_strategy),
-            )),
+            _ => Err(FusionError::InvalidConfig(format!(
+                "unknown weighting strategy: {}",
+                self.weighting_strategy
+            ))),
         }
     }
 }
@@ -104,9 +112,15 @@ pub struct DepthAwareFusionConfig {
     pub num_depth_hypotheses: usize,
 }
 
-fn default_texture_threshold() -> f64 { 0.6 }
-fn default_depth_range() -> f64 { 0.2 }
-fn default_num_hypotheses() -> usize { 5 }
+fn default_texture_threshold() -> f64 {
+    0.6
+}
+fn default_depth_range() -> f64 {
+    0.2
+}
+fn default_num_hypotheses() -> usize {
+    5
+}
 
 impl Default for DepthAwareFusionConfig {
     fn default() -> Self {
@@ -123,9 +137,10 @@ impl DepthAwareFusionConfig {
     /// Validate configuration
     pub fn validate(&self) -> FusionResult<()> {
         if self.num_frames < 2 || self.num_frames > 10 {
-            return Err(FusionError::InvalidConfig(
-                format!("num_frames must be 2-10, got {}", self.num_frames),
-            ));
+            return Err(FusionError::InvalidConfig(format!(
+                "num_frames must be 2-10, got {}",
+                self.num_frames
+            )));
         }
         if self.texture_confidence_threshold < 0.0 || self.texture_confidence_threshold > 1.0 {
             return Err(FusionError::InvalidConfig(
@@ -158,7 +173,9 @@ pub struct FusionConfig {
     pub log_metrics: bool,
 }
 
-fn default_log_metrics() -> bool { false }
+fn default_log_metrics() -> bool {
+    false
+}
 
 impl FusionConfig {
     /// Validate entire configuration

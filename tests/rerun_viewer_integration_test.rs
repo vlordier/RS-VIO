@@ -3,8 +3,8 @@
 //! Integration tests for Rerun viewer functionality
 //! Tests the core visualization methods that are actually used in production
 
-use rs_vio::viewers::{Viewer, RerunViewer};
 use nalgebra::Matrix4;
+use rs_vio::viewers::{RerunViewer, Viewer};
 
 #[test]
 fn test_rerun_viewer_initialization() {
@@ -202,10 +202,7 @@ fn test_log_imu_harmonics() {
     let gravity = [0.0_f32, 0.0_f32, 9.81_f32];
     let bias_accel = [0.01_f32, 0.02_f32, 0.03_f32];
     let bias_gyro = [0.001_f32, 0.002_f32, 0.003_f32];
-    let harmonic_accel = vec![
-        [0.1_f32, 0.2_f32, 0.3_f32],
-        [0.15_f32, 0.25_f32, 0.35_f32],
-    ];
+    let harmonic_accel = vec![[0.1_f32, 0.2_f32, 0.3_f32], [0.15_f32, 0.25_f32, 0.35_f32]];
 
     viewer.log_imu_harmonics(
         1000000,
@@ -239,17 +236,15 @@ fn test_log_imu_signal_quality() {
 
 #[test]
 fn test_log_loop_closure() {
-    use rs_vio::optimization::loop_closure::LoopClosureConstraint;
     use nalgebra::{Isometry3, Matrix6, Translation3, UnitQuaternion};
+    use rs_vio::optimization::loop_closure::LoopClosureConstraint;
 
     let mut viewer = RerunViewer::new();
     viewer.initialize().expect("initialize failed");
 
     // Create mock loop closure constraints using Isometry3
-    let identity_iso = Isometry3::from_parts(
-        Translation3::new(0.0, 0.0, 0.0),
-        UnitQuaternion::identity(),
-    );
+    let identity_iso =
+        Isometry3::from_parts(Translation3::new(0.0, 0.0, 0.0), UnitQuaternion::identity());
 
     let constraint1 = LoopClosureConstraint {
         keyframe_id_1: 0,
@@ -287,10 +282,7 @@ fn test_multiple_operations_sequence() {
     viewer.log_camera_frustum(500.0, 640, 480, "camera", 0.1);
 
     // Log points
-    let points = vec![
-        [0.0_f32, 0.0_f32, 1.0_f32],
-        [1.0_f32, 0.0_f32, 1.0_f32],
-    ];
+    let points = vec![[0.0_f32, 0.0_f32, 1.0_f32], [1.0_f32, 0.0_f32, 1.0_f32]];
     viewer.log_points(&points, "map/points");
 
     // Log IMU data

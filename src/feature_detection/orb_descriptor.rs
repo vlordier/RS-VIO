@@ -4,7 +4,7 @@
 //! adding rotation invariance for robust matching across frames and keyframes.
 //! Integrated with Bag-of-Words for loop closure detection.
 
-use super::{Keypoint, Descriptor, DescriptorData, FeatureResult, FeatureError};
+use super::{Descriptor, DescriptorData, FeatureError, FeatureResult, Keypoint};
 
 /// ORB configuration
 #[derive(Debug, Clone)]
@@ -144,7 +144,7 @@ impl Descriptor for ORBDescriptor {
                     distance += (b1 ^ b2).count_ones();
                 }
                 distance
-            }
+            },
             _ => u32::MAX, // Incompatible descriptor types
         }
     }

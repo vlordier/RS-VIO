@@ -1,12 +1,12 @@
 //! TUM-VI Dataset Loader
-//! 
+//!
 //! Loads TUM Visual-Inertial Dataset (https://vision.in.tum.de/data/datasets/visual-inertial-dataset)
 //! Format: EuRoC-compatible (stereo images + IMU + ground truth poses)
 
-use std::path::{Path, PathBuf};
+use nalgebra as na;
 use std::fs;
 use std::io::{self, BufRead};
-use nalgebra as na;
+use std::path::{Path, PathBuf};
 
 /// TUM-VI dataset sequence
 #[derive(Debug, Clone)]
@@ -49,7 +49,7 @@ pub struct GroundTruthPose {
 
 impl TumViSequence {
     /// Load TUM-VI sequence from directory
-    /// 
+    ///
     /// Expected structure:
     /// ```text
     /// room1/
@@ -70,25 +70,26 @@ impl TumViSequence {
     /// ```
     pub fn load(root_dir: impl AsRef<Path>) -> io::Result<Self> {
         let root_dir = root_dir.as_ref();
-        let name = root_dir.file_name()
+        let name = root_dir
+            .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("unknown")
             .to_string();
-        
+
         let mav0 = root_dir.join("mav0");
-        
+
         // Load camera 0 (left)
         let (cam0_timestamps, cam0_images) = Self::load_camera(&mav0.join("cam0"))?;
-        
+
         // Load camera 1 (right)
         let (cam1_timestamps, cam1_images) = Self::load_camera(&mav0.join("cam1"))?;
-        
+
         // Load IMU
         let imu_data = Self::load_imu(&mav0.join("imu0/data.csv"))?;
-        
+
         // Load ground truth (TUM-VI uses mocap0 instead of state_groundtruth_estimate0)
         let ground_truth = Self::load_ground_truth(&mav0.join("mocap0/data.csv"))?;
-        
+
         Ok(Self {
             name,
             root_dir: root_dir.to_path_buf(),
@@ -100,46 +101,48 @@ impl TumViSequence {
             ground_truth,
         })
     }
-    
+
     /// Load camera data (timestamps + image paths)
     fn load_camera(cam_dir: &Path) -> io::Result<(Vec<u64>, Vec<PathBuf>)> {
         let data_csv = cam_dir.join("data.csv");
         let data_dir = cam_dir.join("data");
-        
+
         let file = fs::File::open(data_csv)?;
         let reader = io::BufReader::new(file);
-        
+
         let mut timestamps = Vec::new();
         let mut images = Vec::new();
-        
-        for line in reader.lines().skip(1) { // Skip CSV header
+
+        for line in reader.lines().skip(1) {
+            // Skip CSV header
             let line = line?;
             let parts: Vec<&str> = line.split(',').collect();
-            
+
             if parts.len() >= 2 {
                 let timestamp: u64 = parts[0].parse().unwrap_or(0);
                 let filename = parts[1].trim();
                 let image_path = data_dir.join(filename);
-                
+
                 timestamps.push(timestamp);
                 images.push(image_path);
             }
         }
-        
+
         Ok((timestamps, images))
     }
-    
+
     /// Load IMU measurements
     fn load_imu(imu_csv: &Path) -> io::Result<Vec<ImuMeasurement>> {
         let file = fs::File::open(imu_csv)?;
         let reader = io::BufReader::new(file);
-        
+
         let mut measurements = Vec::new();
-        
-        for line in reader.lines().skip(1) { // Skip CSV header
+
+        for line in reader.lines().skip(1) {
+            // Skip CSV header
             let line = line?;
             let parts: Vec<&str> = line.split(',').collect();
-            
+
             if parts.len() >= 7 {
                 measurements.push(ImuMeasurement {
                     timestamp_ns: parts[0].parse().unwrap_or(0),
@@ -152,21 +155,22 @@ impl TumViSequence {
                 });
             }
         }
-        
+
         Ok(measurements)
     }
-    
+
     /// Load ground truth poses
     fn load_ground_truth(gt_csv: &Path) -> io::Result<Vec<GroundTruthPose>> {
         let file = fs::File::open(gt_csv)?;
         let reader = io::BufReader::new(file);
-        
+
         let mut poses = Vec::new();
-        
-        for line in reader.lines().skip(1) { // Skip CSV header
+
+        for line in reader.lines().skip(1) {
+            // Skip CSV header
             let line = line?;
             let parts: Vec<&str> = line.split(',').collect();
-            
+
             // Format: timestamp, px, py, pz, qw, qx, qy, qz, ...
             if parts.len() >= 8 {
                 let timestamp_ns: u64 = parts[0].parse().unwrap_or(0);
@@ -177,35 +181,36 @@ impl TumViSequence {
                 let qx: f64 = parts[5].parse().unwrap_or(0.0);
                 let qy: f64 = parts[6].parse().unwrap_or(0.0);
                 let qz: f64 = parts[7].parse().unwrap_or(0.0);
-                
+
                 poses.push(GroundTruthPose {
                     timestamp_ns,
                     position: na::Vector3::new(px, py, pz),
-                    orientation: na::UnitQuaternion::from_quaternion(
-                        na::Quaternion::new(qw, qx, qy, qz)
-                    ),
+                    orientation: na::UnitQuaternion::from_quaternion(na::Quaternion::new(
+                        qw, qx, qy, qz,
+                    )),
                 });
             }
         }
-        
+
         Ok(poses)
     }
-    
+
     /// Get number of frames in sequence
     pub fn num_frames(&self) -> usize {
         self.cam0_timestamps.len().min(self.cam1_timestamps.len())
     }
-    
+
     /// Get frame duration (average time between frames)
     pub fn avg_frame_duration_ns(&self) -> u64 {
         if self.cam0_timestamps.len() < 2 {
             return 0;
         }
-        
-        let total_duration = self.cam0_timestamps.last().unwrap() - self.cam0_timestamps.first().unwrap();
+
+        let total_duration =
+            self.cam0_timestamps.last().unwrap() - self.cam0_timestamps.first().unwrap();
         total_duration / (self.cam0_timestamps.len() as u64 - 1)
     }
-    
+
     /// Calculate frame rate (Hz)
     pub fn frame_rate(&self) -> f64 {
         let duration_ns = self.avg_frame_duration_ns();
@@ -220,57 +225,64 @@ impl TumViSequence {
 pub fn load_all_sequences(dataset_dir: impl AsRef<Path>) -> io::Result<Vec<TumViSequence>> {
     let dataset_dir = dataset_dir.as_ref();
     let mut sequences = Vec::new();
-    
+
     // Read all subdirectories and try to load those with mav0/ structure
     if !dataset_dir.exists() {
         return Err(io::Error::new(
             io::ErrorKind::NotFound,
-            format!("Dataset directory not found: {}", dataset_dir.display())
+            format!("Dataset directory not found: {}", dataset_dir.display()),
         ));
     }
-    
+
     for entry in fs::read_dir(dataset_dir)? {
         let entry = entry?;
         let path = entry.path();
-        
+
         if path.is_dir() {
             // Check if this directory has the expected mav0 structure
             if path.join("mav0").exists() {
                 match TumViSequence::load(&path) {
                     Ok(seq) => {
-                        println!("Loaded sequence: {} ({} frames @ {:.1} Hz)", 
-                                 seq.name, seq.num_frames(), seq.frame_rate());
+                        println!(
+                            "Loaded sequence: {} ({} frames @ {:.1} Hz)",
+                            seq.name,
+                            seq.num_frames(),
+                            seq.frame_rate()
+                        );
                         sequences.push(seq);
-                    }
+                    },
                     Err(e) => {
                         eprintln!("Warning: Failed to load {}: {}", path.display(), e);
-                    }
+                    },
                 }
             }
         }
     }
-    
+
     if sequences.is_empty() {
         return Err(io::Error::new(
             io::ErrorKind::NotFound,
-            format!("No valid TUM-VI sequences found in {}", dataset_dir.display())
+            format!(
+                "No valid TUM-VI sequences found in {}",
+                dataset_dir.display()
+            ),
         ));
     }
-    
+
     Ok(sequences)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_tum_vi_sequence_structure() {
         // This test would run if dataset is downloaded
         // Skip for now since data may not be available in CI
         // For local testing: cargo test --test tum_vi -- --ignored
     }
-    
+
     #[test]
     #[ignore] // Only run with --ignored flag when dataset is available
     fn test_load_tum_vi_room1() {
@@ -282,26 +294,30 @@ mod tests {
         } else {
             return; // Skip if no dataset found
         };
-        
+
         let sequences = load_all_sequences(dataset_dir).expect("Failed to load sequences");
         assert!(!sequences.is_empty(), "Should find at least one sequence");
-        
+
         // Check room1 specifically
-        let room1 = sequences.iter()
+        let room1 = sequences
+            .iter()
             .find(|s| s.name == "room1")
             .expect("Should find room1 sequence");
-        
+
         // Verify data loaded
-        assert!(!room1.cam0_timestamps.is_empty(), "Should have camera timestamps");
+        assert!(
+            !room1.cam0_timestamps.is_empty(),
+            "Should have camera timestamps"
+        );
         assert!(!room1.imu_data.is_empty(), "Should have IMU data");
         assert!(!room1.ground_truth.is_empty(), "Should have ground truth");
-        
+
         println!("Loaded TUM-VI room1:");
         println!("  - Camera frames: {}", room1.cam0_timestamps.len());
         println!("  - IMU measurements: {}", room1.imu_data.len());
         println!("  - Ground truth poses: {}", room1.ground_truth.len());
     }
-    
+
     #[test]
     fn test_imu_measurement_creation() {
         let imu = ImuMeasurement {
@@ -313,11 +329,11 @@ mod tests {
             accel_y: 0.0,
             accel_z: 0.0,
         };
-        
+
         assert_eq!(imu.timestamp_ns, 1000);
         assert_eq!(imu.accel_x, 9.8);
     }
-    
+
     #[test]
     fn test_ground_truth_pose_creation() {
         let pose = GroundTruthPose {
@@ -325,7 +341,7 @@ mod tests {
             position: na::Vector3::new(1.0, 2.0, 3.0),
             orientation: na::UnitQuaternion::identity(),
         };
-        
+
         assert_eq!(pose.position.x, 1.0);
         assert_eq!(pose.position.y, 2.0);
         assert_eq!(pose.position.z, 3.0);

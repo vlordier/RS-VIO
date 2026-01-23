@@ -1,5 +1,5 @@
 /// Build script for RS-VIO
-/// 
+///
 /// Validates feature flag combinations at compile time to prevent invalid configurations
 #[allow(clippy::panic)]
 fn main() {
@@ -15,7 +15,10 @@ fn main() {
     let enabled_strategies: Vec<&str> = matching_strategies
         .iter()
         .filter(|strategy| {
-            let env_var = format!("CARGO_FEATURE_{}", strategy.to_uppercase().replace('-', "_"));
+            let env_var = format!(
+                "CARGO_FEATURE_{}",
+                strategy.to_uppercase().replace('-', "_")
+            );
             std::env::var_os(&env_var).is_some()
         })
         .copied()
@@ -26,14 +29,14 @@ fn main() {
         0 => {
             // Default to basic-ransac if none specified
             println!("cargo:rustc-cfg=feature=\"matching-basic-ransac\"");
-        }
+        },
         1 => {
             // Valid: exactly one strategy enabled
             println!(
                 "cargo:warning=Using matching strategy: {}",
                 enabled_strategies[0]
             );
-        }
+        },
         _ => {
             panic!(
                 "Feature flag error: Exactly ONE matching strategy must be enabled.\n\
@@ -42,7 +45,7 @@ fn main() {
                 enabled_strategies.len(),
                 enabled_strategies
             );
-        }
+        },
     }
 
     // Validate feature combinations
@@ -52,7 +55,9 @@ fn main() {
 
     // GPU + LightGlue combination is beneficial
     if has_gpu && has_lightglue {
-        println!("cargo:warning=Optimizing for GPU-accelerated feature matching (LightGlue + WGPU)");
+        println!(
+            "cargo:warning=Optimizing for GPU-accelerated feature matching (LightGlue + WGPU)"
+        );
     }
 
     // Rerun + any feature is fine

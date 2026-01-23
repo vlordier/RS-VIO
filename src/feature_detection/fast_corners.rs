@@ -3,7 +3,7 @@
 //! High-speed corner detection suitable for embedded systems.
 //! Optional non-maximum suppression for better spatial distribution.
 
-use super::{Keypoint, KeypointDetector, FeatureResult, FeatureError};
+use super::{FeatureError, FeatureResult, Keypoint, KeypointDetector};
 use crate::types::Float;
 
 /// FAST corner detector configuration
@@ -37,13 +37,7 @@ impl FASTDetector {
     }
 
     /// Check if pixel is FAST corner using circle of 16 pixels
-    fn is_fast_corner(
-        &self,
-        image: &[u8],
-        width: u32,
-        x: u32,
-        y: u32,
-    ) -> bool {
+    fn is_fast_corner(&self, image: &[u8], width: u32, x: u32, y: u32) -> bool {
         if x < 3 || x >= width - 3 || y < 3 {
             return false;
         }
@@ -145,7 +139,11 @@ impl FASTDetector {
             .collect();
 
         // Sort by strength
-        result.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        result.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Limit to max_corners
         result.truncate(self.config.max_corners as usize);
@@ -155,12 +153,7 @@ impl FASTDetector {
 }
 
 impl KeypointDetector for FASTDetector {
-    fn detect(
-        &self,
-        image: &[u8],
-        width: u32,
-        height: u32,
-    ) -> FeatureResult<Vec<Keypoint>> {
+    fn detect(&self, image: &[u8], width: u32, height: u32) -> FeatureResult<Vec<Keypoint>> {
         if image.is_empty() {
             return Err(FeatureError::InvalidImage("Empty image".to_string()));
         }

@@ -30,7 +30,10 @@ impl Estimator {
 
         // Run calibration periodically (every 100 measurements after initial collection)
         if measurement_count % 100 == 0 {
-            let _error = self.imu_processor.extrinsic_calibrator.calibrate_iteration();
+            let _error = self
+                .imu_processor
+                .extrinsic_calibrator
+                .calibrate_iteration();
             debug_log!(
                 "[Estimator] IMU extrinsic calibration iteration {}, error: {:.6} rad",
                 self.imu_processor.extrinsic_calibrator.iterations(),
@@ -39,7 +42,8 @@ impl Estimator {
         }
 
         // Apply calibrated extrinsics periodically
-        if self.imu_processor.extrinsic_calibrator.iterations() > 0 && measurement_count % 500 == 0 {
+        if self.imu_processor.extrinsic_calibrator.iterations() > 0 && measurement_count % 500 == 0
+        {
             let calibrated_T_BC = self.imu_processor.extrinsic_calibrator.get_extrinsics();
 
             // Update the stored extrinsics

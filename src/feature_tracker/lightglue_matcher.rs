@@ -114,7 +114,7 @@ impl LightGlueMatcher {
 
         // TODO: Implement cross-attention matching via ONNX
         // For now, use simple nearest neighbor matching as fallback
-        
+
         self.simple_nn_matching()?;
 
         Ok(self.matches.clone())
@@ -173,30 +173,30 @@ impl LightGlueMatcher {
     /// match positions to subpixel accuracy
     pub fn refine_matches_subpixel(&mut self) -> Result<(), String> {
         for match_result in &mut self.matches {
-            let query = match self
-                .query_descriptors
-                .iter()
-                .find(|k| k.descriptor.iter().zip(
-                    self.query_descriptors[match_result.query_id as usize]
-                        .descriptor
-                        .iter()
+            let query = match self.query_descriptors.iter().find(|k| {
+                k.descriptor
+                    .iter()
+                    .zip(
+                        self.query_descriptors[match_result.query_id as usize]
+                            .descriptor
+                            .iter(),
                     )
-                    .all(|(a, b)| (a - b).abs() < 1e-6))
-            {
+                    .all(|(a, b)| (a - b).abs() < 1e-6)
+            }) {
                 Some(k) => k,
                 None => continue,
             };
 
-            let reference = match self
-                .reference_descriptors
-                .iter()
-                .find(|k| k.descriptor.iter().zip(
-                    self.reference_descriptors[match_result.reference_id as usize]
-                        .descriptor
-                        .iter()
+            let reference = match self.reference_descriptors.iter().find(|k| {
+                k.descriptor
+                    .iter()
+                    .zip(
+                        self.reference_descriptors[match_result.reference_id as usize]
+                            .descriptor
+                            .iter(),
                     )
-                    .all(|(a, b)| (a - b).abs() < 1e-6))
-            {
+                    .all(|(a, b)| (a - b).abs() < 1e-6)
+            }) {
                 Some(k) => k,
                 None => continue,
             };
@@ -204,8 +204,16 @@ impl LightGlueMatcher {
             // Simple subpixel refinement: estimate offset via descriptor gradient
             // In practice, this would use image gradients and iterative refinement
 
-            let dx = if reference.position.x > query.position.x { 0.1 } else { -0.1 };
-            let dy = if reference.position.y > query.position.y { 0.1 } else { -0.1 };
+            let dx = if reference.position.x > query.position.x {
+                0.1
+            } else {
+                -0.1
+            };
+            let dy = if reference.position.y > query.position.y {
+                0.1
+            } else {
+                -0.1
+            };
 
             match_result.query_offset = (dx, dy);
         }
@@ -230,7 +238,10 @@ impl LightGlueMatcher {
             avg_confidence: if self.matches.is_empty() {
                 0.0
             } else {
-                self.matches.iter().map(|m| m.confidence as f64).sum::<f64>()
+                self.matches
+                    .iter()
+                    .map(|m| m.confidence as f64)
+                    .sum::<f64>()
                     / self.matches.len() as f64
             },
             match_rate: if self.query_descriptors.is_empty() {
@@ -310,7 +321,7 @@ mod tests {
         matcher.set_reference_descriptors(vec![ref1, ref2]);
 
         let matches = matcher.match_descriptors().unwrap();
-        
+
         // Should match query to ref1
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0].reference_id, 0);

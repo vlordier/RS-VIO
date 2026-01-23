@@ -1,13 +1,12 @@
 /// Circuit Breaker Pattern Implementation for VIO Pipeline
-/// 
+///
 /// Implements the circuit breaker pattern with three states:
 /// - Closed: Normal operation, requests pass through
 /// - Open: Failure threshold exceeded, requests fail fast
 /// - HalfOpen: Testing recovery, limited requests allowed
-/// 
+///
 /// Enables graceful degradation and prevention of cascade failures
 /// in distributed drone swarms.
-
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -138,7 +137,7 @@ impl CircuitBreaker {
     /// Record a successful operation
     pub fn record_success(&self) {
         self.total_requests.fetch_add(1, Ordering::Relaxed);
-        
+
         let mut state = self.state.lock().unwrap();
         state.success_count += 1;
         let config = self.config.lock().unwrap();
@@ -154,7 +153,7 @@ impl CircuitBreaker {
                         state.last_state_change = current_time_ms();
                     }
                 }
-            }
+            },
             CircuitState::Open => {
                 // Attempt recovery in half-open state
                 let elapsed = current_time_ms() - state.last_state_change;
@@ -165,7 +164,7 @@ impl CircuitBreaker {
                     state.half_open_requests = 1;
                     state.last_state_change = current_time_ms();
                 }
-            }
+            },
             CircuitState::HalfOpen => {
                 state.half_open_requests += 1;
                 // After successful requests, close circuit
@@ -175,7 +174,7 @@ impl CircuitBreaker {
                     state.success_count = 0;
                     state.last_state_change = current_time_ms();
                 }
-            }
+            },
         }
     }
 
@@ -223,11 +222,11 @@ impl CircuitBreaker {
                 let config = self.config.lock().unwrap();
                 let elapsed = current_time_ms() - state.last_state_change;
                 elapsed >= config.recovery_timeout_ms
-            }
+            },
             CircuitState::HalfOpen => {
                 let config = self.config.lock().unwrap();
                 state.half_open_requests < config.half_open_max_requests
-            }
+            },
         }
     }
 

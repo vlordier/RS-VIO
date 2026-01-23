@@ -3,8 +3,8 @@
 //! YAML-based configuration for selecting and tuning detectors, trackers,
 //! and descriptors based on platform capabilities and performance requirements.
 
-use serde::{Deserialize, Serialize};
 use super::FeatureError;
+use serde::{Deserialize, Serialize};
 
 /// Feature detection strategy selection
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -83,11 +83,21 @@ pub struct GFTTConfig {
     pub pyramid_levels: u32,
 }
 
-fn default_quality_level() -> f64 { 0.01 }
-fn default_min_distance() -> u32 { 10 }
-fn default_grid_size() -> u32 { 30 }
-fn default_max_per_grid() -> u32 { 200 }
-fn default_pyramid_levels() -> u32 { 4 }
+fn default_quality_level() -> f64 {
+    0.01
+}
+fn default_min_distance() -> u32 {
+    10
+}
+fn default_grid_size() -> u32 {
+    30
+}
+fn default_max_per_grid() -> u32 {
+    200
+}
+fn default_pyramid_levels() -> u32 {
+    4
+}
 
 impl Default for GFTTConfig {
     fn default() -> Self {
@@ -137,9 +147,15 @@ pub struct KLTConfig {
     pub convergence_threshold: f64,
 }
 
-fn default_window_size() -> u32 { 15 }
-fn default_max_iterations() -> u32 { 30 }
-fn default_convergence_threshold() -> f64 { 0.001 }
+fn default_window_size() -> u32 {
+    15
+}
+fn default_max_iterations() -> u32 {
+    30
+}
+fn default_convergence_threshold() -> f64 {
+    0.001
+}
 
 impl Default for KLTConfig {
     fn default() -> Self {
@@ -182,9 +198,15 @@ pub struct FASTConfig {
     pub max_corners: u32,
 }
 
-fn default_threshold() -> u8 { 20 }
-fn default_nms_radius() -> u32 { 3 }
-fn default_max_corners() -> u32 { 500 }
+fn default_threshold() -> u8 {
+    20
+}
+fn default_nms_radius() -> u32 {
+    3
+}
+fn default_max_corners() -> u32 {
+    500
+}
 
 impl Default for FASTConfig {
     fn default() -> Self {
@@ -213,10 +235,18 @@ pub struct ORBConfig {
     pub fast_threshold: u8,
 }
 
-fn default_num_features() -> u32 { 500 }
-fn default_scale_factor() -> f64 { 1.2 }
-fn default_num_levels() -> u32 { 8 }
-fn default_fast_threshold() -> u8 { 20 }
+fn default_num_features() -> u32 {
+    500
+}
+fn default_scale_factor() -> f64 {
+    1.2
+}
+fn default_num_levels() -> u32 {
+    8
+}
+fn default_fast_threshold() -> u8 {
+    20
+}
 
 impl Default for ORBConfig {
     fn default() -> Self {
@@ -249,10 +279,18 @@ pub struct SuperPointConfig {
     pub max_keypoints: u32,
 }
 
-fn default_model_path() -> String { "models/superpoint.onnx".to_string() }
-fn default_confidence_threshold() -> f32 { 0.015 }
-fn default_superpoint_nms() -> u32 { 4 }
-fn default_max_keypoints() -> u32 { 1000 }
+fn default_model_path() -> String {
+    "models/superpoint.onnx".to_string()
+}
+fn default_confidence_threshold() -> f32 {
+    0.015
+}
+fn default_superpoint_nms() -> u32 {
+    4
+}
+fn default_max_keypoints() -> u32 {
+    1000
+}
 
 impl Default for SuperPointConfig {
     fn default() -> Self {

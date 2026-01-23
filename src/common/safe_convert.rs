@@ -18,16 +18,16 @@ impl fmt::Display for ConversionError {
         match self {
             ConversionError::Overflow { from, to } => {
                 write!(f, "Overflow converting {} to {}", from, to)
-            }
+            },
             ConversionError::Underflow { from, to } => {
                 write!(f, "Underflow converting {} to {}", from, to)
-            }
+            },
             ConversionError::Precision { from, to } => {
                 write!(f, "Precision loss converting {} to {}", from, to)
-            }
+            },
             ConversionError::OutOfRange { value, target_type } => {
                 write!(f, "Value {} out of range for {}", value, target_type)
-            }
+            },
         }
     }
 }

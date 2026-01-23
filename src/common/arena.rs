@@ -1,5 +1,5 @@
 /// Arena-backed allocation for feature tracking
-/// 
+///
 /// This module provides efficient, zero-copy allocation strategies for
 /// feature tracking data structures using typed-arena for automatic lifetime management.
 ///
@@ -18,7 +18,6 @@
 /// }
 /// // All tracks freed automatically when arena dropped
 /// ```
-
 use typed_arena::Arena;
 
 /// Feature track arena for zero-copy track allocation

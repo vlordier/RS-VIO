@@ -4,7 +4,7 @@ use crate::datasets::{
 };
 use crate::debug_log;
 use crate::estimator::Estimator;
-use crate::{Result, VIOError, ok_or_log};
+use crate::{ok_or_log, Result, VIOError};
 use image::ImageReader;
 use std::fs::File;
 use std::io::{BufRead, BufReader};

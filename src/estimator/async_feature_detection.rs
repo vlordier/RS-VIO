@@ -7,8 +7,8 @@
 //! across async tasks while maintaining Rust's safety guarantees.
 
 use crate::datasets::config::FeatureDetectionConfig;
-use crate::estimator::Frame;
 use crate::estimator::frame_processor::Frontend;
+use crate::estimator::Frame;
 use crate::Result;
 use image::{DynamicImage, GrayImage};
 use std::sync::Arc;
@@ -97,7 +97,7 @@ mod tests {
     async fn test_async_detector_creation() {
         let config = FeatureDetectionConfig::default();
         let detector = AsyncFeatureDetector::<8>::new(&config);
-        
+
         // Verify detector was created successfully
         let _frontend = detector.frontend.lock().await;
         // Just verify we can lock successfully
@@ -110,7 +110,10 @@ mod tests {
         let detector2 = detector1.clone_detector();
 
         // Both should reference the same underlying tracker
-        assert!(detector1.shares_state_with(&detector2), "Cloned detectors should share state");
+        assert!(
+            detector1.shares_state_with(&detector2),
+            "Cloned detectors should share state"
+        );
     }
 
     #[tokio::test]
@@ -120,7 +123,7 @@ mod tests {
 
         // First lock should succeed
         let _lock1 = detector.frontend.lock().await;
-        
+
         // Second lock would block (but we don't wait)
         // Just verify lock1 is held
     }

@@ -65,7 +65,7 @@ impl AsyncOptimizer {
 
         // Add frame to sliding window
         let added = backend.sliding_window.add_frame(frame);
-        
+
         if !added {
             return Ok((false, start.elapsed().as_millis() as u64));
         }
@@ -76,7 +76,7 @@ impl AsyncOptimizer {
                 Ok(optimized) => {
                     let elapsed_ms = start.elapsed().as_millis() as u64;
                     Ok((optimized, elapsed_ms))
-                }
+                },
                 Err(e) => Err(VIOError::Optimization(format!(
                     "Bundle adjustment failed: {}",
                     e
@@ -101,7 +101,7 @@ impl AsyncOptimizer {
             Ok(optimized) => {
                 let elapsed_ms = start.elapsed().as_millis() as u64;
                 Ok((optimized, elapsed_ms))
-            }
+            },
             Err(e) => Err(VIOError::Optimization(format!(
                 "Bundle adjustment failed: {}",
                 e
@@ -133,15 +133,14 @@ mod tests {
     use super::*;
 
     fn create_test_config() -> Config {
-        Config::load("config/tum_vi.yaml")
-            .expect("Test requires config/tum_vi.yaml")
+        Config::load("config/tum_vi.yaml").expect("Test requires config/tum_vi.yaml")
     }
 
     #[tokio::test]
     async fn test_async_optimizer_creation() {
         let config = create_test_config();
         let optimizer = AsyncOptimizer::new(&config);
-        
+
         // Verify optimizer was created successfully
         let count = optimizer.keyframe_count().await;
         assert_eq!(count, 0, "New optimizer should have 0 keyframes");

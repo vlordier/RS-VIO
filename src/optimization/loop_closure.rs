@@ -47,7 +47,7 @@ pub mod orb_matcher;
 pub mod pnp_ransac;
 pub mod vocabulary;
 
-use crate::{fl, types::Float, Result, clamp_or};
+use crate::{clamp_or, fl, types::Float, Result};
 use nalgebra as na;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -469,7 +469,9 @@ impl LoopClosureDetector {
         }
 
         // Search for candidates
-        let candidates = self.database.search_candidates(&descriptor, self.matcher.as_ref());
+        let candidates = self
+            .database
+            .search_candidates(&descriptor, self.matcher.as_ref());
         let mut valid_closures = Vec::new();
 
         // Verify each candidate

@@ -3,7 +3,7 @@
 //! Wraps AsyncFeatureDetector with timeout, validation, and graceful degradation.
 
 use crate::datasets::config::FeatureDetectionConfig;
-use crate::estimator::{AsyncFeatureDetector, Frame, PipelineError, PipelineMetrics, MetricsTimer};
+use crate::estimator::{AsyncFeatureDetector, Frame, MetricsTimer, PipelineError, PipelineMetrics};
 use image::GrayImage;
 use std::time::Duration;
 use tokio::time::timeout;
@@ -76,7 +76,8 @@ impl<const LEVELS: u32> ResilientAsyncFeatureDetector<LEVELS> {
 
         match timeout(
             timeout_duration,
-            self.detector.detect_features(left_image, right_image, frame),
+            self.detector
+                .detect_features(left_image, right_image, frame),
         )
         .await
         {
@@ -92,12 +93,12 @@ impl<const LEVELS: u32> ResilientAsyncFeatureDetector<LEVELS> {
                 }
                 timer.stop(false);
                 Ok(feature_count)
-            }
+            },
             Ok(Err(e)) => {
                 timer.stop(true);
                 self.metrics.record_recovered_error();
                 Err(PipelineError::FeatureDetectionFailed(e.to_string()))
-            }
+            },
             Err(_) => {
                 let elapsed_ms = timer.elapsed_us() / 1000;
                 timer.stop(true);
@@ -107,7 +108,7 @@ impl<const LEVELS: u32> ResilientAsyncFeatureDetector<LEVELS> {
                     limit_ms: self.timeout_ms,
                     elapsed_ms,
                 })
-            }
+            },
         }
     }
 
@@ -140,7 +141,7 @@ mod tests {
         let detector = ResilientAsyncFeatureDetector::<3>::new(&config, None)
             .with_timeout(200)
             .with_min_features(100);
-        
+
         assert_eq!(detector.timeout_ms, 200);
         assert_eq!(detector.min_features, 100);
     }
@@ -150,7 +151,7 @@ mod tests {
         let config = FeatureDetectionConfig::default();
         let detector1 = ResilientAsyncFeatureDetector::<3>::new(&config, None);
         let detector2 = detector1.clone_detector();
-        
+
         assert!(detector1.shares_state_with(&detector2));
     }
 
@@ -159,7 +160,7 @@ mod tests {
         let config = FeatureDetectionConfig::default();
         let metrics = PipelineMetrics::new();
         let _detector = ResilientAsyncFeatureDetector::<3>::new(&config, Some(metrics.clone()));
-        
+
         assert_eq!(metrics.total_frames_processed(), 0);
     }
 }

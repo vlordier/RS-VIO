@@ -94,61 +94,61 @@
 
 #![allow(clippy::module_inception)]
 
+pub mod async_feature_detection;
+pub mod async_optimization;
+pub mod async_wrapper;
+pub mod circuit_breaker;
+pub mod concurrent;
 pub mod constant_velocity_model;
+pub mod error_handling;
 pub mod estimator;
 pub mod frame;
 pub mod frame_processor;
+pub mod frame_processor_concurrent;
 pub mod frame_workspace;
+pub mod hardware_profile;
 pub mod imu_processor;
 pub mod keyframe_culler;
+pub mod metrics_export;
+pub mod metrics_server;
+pub mod otel_exporter;
+pub mod pipeline_metrics;
 pub mod point_quality;
+pub mod resilient_async_feature_detector;
+pub mod resilient_async_optimizer;
 pub mod sliding_window;
 pub mod state;
 pub mod workspace_pool;
-pub mod concurrent;
-pub mod async_wrapper;
-pub mod frame_processor_concurrent;
-pub mod async_feature_detection;
-pub mod async_optimization;
-pub mod error_handling;
-pub mod pipeline_metrics;
-pub mod resilient_async_optimizer;
-pub mod resilient_async_feature_detector;
-pub mod metrics_export;
-pub mod otel_exporter;
-pub mod metrics_server;
-pub mod hardware_profile;
-pub mod circuit_breaker;
 
-pub use constant_velocity_model::{ConstantVelocityConfig, ConstantVelocityModel};
-pub use concurrent::ConcurrentVIOPipeline;
-pub use async_wrapper::AsyncEstimator;
 pub use async_feature_detection::AsyncFeatureDetector;
 pub use async_optimization::AsyncOptimizer;
-pub use error_handling::{PipelineError, RecoveryStrategy, RecoveryContext};
-pub use pipeline_metrics::{PipelineMetrics, FrameMetrics, StageMetrics, MetricsTimer};
-pub use resilient_async_optimizer::ResilientAsyncOptimizer;
-pub use resilient_async_feature_detector::ResilientAsyncFeatureDetector;
-pub use metrics_export::{MetricsExporter, PrometheusMetrics};
-pub use otel_exporter::{OtelMetricsExporter, OtelMetricsBatch, MetricDataPoint};
-pub use metrics_server::{MetricsServer, MetricsServerConfig};
-pub use hardware_profile::{HardwareProfile, TimeoutAutoTuner};
-pub use circuit_breaker::{CircuitBreaker, CircuitState, CircuitBreakerConfig, SwarmHealthStatus};
-pub use frame_processor_concurrent::{ConcurrentFrameProcessor, ConcurrentConfig};
+pub use async_wrapper::AsyncEstimator;
+pub use circuit_breaker::{CircuitBreaker, CircuitBreakerConfig, CircuitState, SwarmHealthStatus};
+pub use concurrent::ConcurrentVIOPipeline;
+pub use constant_velocity_model::{ConstantVelocityConfig, ConstantVelocityModel};
+pub use error_handling::{PipelineError, RecoveryContext, RecoveryStrategy};
 pub use estimator::Estimator;
 pub use frame::Frame;
 pub use frame_processor::{
     FeatureTrackingCoordinator, ImageBufferManager, KeyframeDecider, KeyframeDecision,
 };
+pub use frame_processor_concurrent::{ConcurrentConfig, ConcurrentFrameProcessor};
 pub use frame_workspace::{FrameWorkspace, WorkspaceConfig};
+pub use hardware_profile::{HardwareProfile, TimeoutAutoTuner};
 pub use imu_processor::{ImuProcessingResult, ImuProcessor, ImuStatistics};
 pub use keyframe_culler::{
     AggressiveCullingConfig, AggressiveKeyframeCuller, CullingAnalysis, CullingReason,
 };
+pub use metrics_export::{MetricsExporter, PrometheusMetrics};
+pub use metrics_server::{MetricsServer, MetricsServerConfig};
+pub use otel_exporter::{MetricDataPoint, OtelMetricsBatch, OtelMetricsExporter};
+pub use pipeline_metrics::{FrameMetrics, MetricsTimer, PipelineMetrics, StageMetrics};
 pub use point_quality::{
     MapQuality, PointObservation, PointQuality, PointQualityConfig, PointQualityScorer,
     TrackedPoint,
 };
+pub use resilient_async_feature_detector::ResilientAsyncFeatureDetector;
+pub use resilient_async_optimizer::ResilientAsyncOptimizer;
 pub use sliding_window::SlidingWindow;
 pub use state::State;
 pub use workspace_pool::{global_pool, PooledFrameWorkspace, WorkspacePool};

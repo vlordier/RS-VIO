@@ -112,18 +112,20 @@ impl ConcurrentVIOPipeline {
             imu_data,
         };
 
-        self.frame_sender.send(sequenced).await.map_err(|_| {
-            VIOError::Transient("Pipeline channel closed".to_string())
-        })?;
+        self.frame_sender
+            .send(sequenced)
+            .await
+            .map_err(|_| VIOError::Transient("Pipeline channel closed".to_string()))?;
 
         Ok(sequence_num)
     }
 
     /// Receive next optimized result (order preserved by sequence numbers)
     pub async fn recv_result(&mut self) -> Result<OptimizationResult> {
-        self.result_receiver.recv().await.ok_or_else(|| {
-            VIOError::Transient("Pipeline closed".to_string())
-        })
+        self.result_receiver
+            .recv()
+            .await
+            .ok_or_else(|| VIOError::Transient("Pipeline closed".to_string()))
     }
 
     /// Get pipeline depth (frames in flight)
@@ -218,7 +220,7 @@ pub async fn optimization_stage(
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_pipeline_creation() {
         let pipeline = ConcurrentVIOPipeline::new(4);

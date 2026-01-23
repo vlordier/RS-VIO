@@ -201,7 +201,10 @@ pub enum VIOEvent {
     /// Lost visual tracking
     LostTracking { frame_id: u32, reason: String },
     /// Recovered visual tracking
-    RecoveredTracking { frame_id: u32, recovery_time_ms: Float },
+    RecoveredTracking {
+        frame_id: u32,
+        recovery_time_ms: Float,
+    },
     /// Loop closure detected
     LoopClosureFound {
         frame_id: u32,
@@ -209,14 +212,14 @@ pub enum VIOEvent {
         confidence: Float,
     },
     /// Drift detected in estimate
-    DriftDetected {
-        frame_id: u32,
-        drift_rate: Float,
-    },
+    DriftDetected { frame_id: u32, drift_rate: Float },
     /// Initialization complete
     InitializationComplete { frame_id: u32, duration_ms: Float },
     /// Configuration changed
-    ConfigurationChanged { old_config: String, new_config: String },
+    ConfigurationChanged {
+        old_config: String,
+        new_config: String,
+    },
     /// Resource pressure (CPU/memory)
     ResourcePressure {
         frame_id: u32,
@@ -266,13 +269,17 @@ impl std::fmt::Display for VIOEvent {
         match self {
             Self::LostTracking { frame_id, reason } => {
                 write!(f, "LostTracking(frame={}, reason={})", frame_id, reason)
-            }
+            },
             Self::RecoveredTracking {
                 frame_id,
                 recovery_time_ms,
             } => {
-                write!(f, "RecoveredTracking(frame={}, time={}ms)", frame_id, recovery_time_ms)
-            }
+                write!(
+                    f,
+                    "RecoveredTracking(frame={}, time={}ms)",
+                    frame_id, recovery_time_ms
+                )
+            },
             Self::LoopClosureFound {
                 frame_id,
                 loop_frame_id,
@@ -283,25 +290,29 @@ impl std::fmt::Display for VIOEvent {
                     "LoopClosureFound(frame={}, loop={}, conf={})",
                     frame_id, loop_frame_id, confidence
                 )
-            }
+            },
             Self::DriftDetected {
                 frame_id,
                 drift_rate,
             } => {
                 write!(f, "DriftDetected(frame={}, drift={})", frame_id, drift_rate)
-            }
+            },
             Self::InitializationComplete {
                 frame_id,
                 duration_ms,
             } => {
-                write!(f, "InitializationComplete(frame={}, duration={}ms)", frame_id, duration_ms)
-            }
+                write!(
+                    f,
+                    "InitializationComplete(frame={}, duration={}ms)",
+                    frame_id, duration_ms
+                )
+            },
             Self::ConfigurationChanged {
                 old_config,
                 new_config,
             } => {
                 write!(f, "ConfigurationChanged({} -> {})", old_config, new_config)
-            }
+            },
             Self::ResourcePressure {
                 frame_id,
                 memory_usage_mb,
@@ -312,14 +323,18 @@ impl std::fmt::Display for VIOEvent {
                     "ResourcePressure(frame={}, mem={}MB, cpu={})",
                     frame_id, memory_usage_mb, cpu_load
                 )
-            }
+            },
             Self::Error {
                 frame_id,
                 error_type,
                 description,
             } => {
-                write!(f, "Error(frame={}, type={}, desc={})", frame_id, error_type, description)
-            }
+                write!(
+                    f,
+                    "Error(frame={}, type={}, desc={})",
+                    frame_id, error_type, description
+                )
+            },
         }
     }
 }

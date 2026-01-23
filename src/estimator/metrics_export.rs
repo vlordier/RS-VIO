@@ -40,7 +40,7 @@ impl PrometheusMetrics {
     pub fn from_pipeline(metrics: &PipelineMetrics) -> Self {
         let det = metrics.detection_metrics();
         let opt = metrics.optimization_metrics();
-        
+
         Self {
             timestamp_ms: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -204,11 +204,11 @@ mod tests {
     #[test]
     fn test_prometheus_metrics_from_pipeline() {
         let pipeline = PipelineMetrics::new();
-        
+
         // Record some metrics
         pipeline.record_detection(100, false);
         pipeline.record_optimization(200, false);
-        
+
         let frame = FrameMetrics {
             frame_id: 0,
             timestamp_ns: 0,
@@ -222,7 +222,7 @@ mod tests {
         pipeline.record_frame(frame);
 
         let prometheus = PrometheusMetrics::from_pipeline(&pipeline);
-        
+
         assert!(prometheus.frames_total > 0);
         assert_eq!(prometheus.errors_total, 0);
         assert!(prometheus.error_rate >= 0.0 && prometheus.error_rate <= 1.0);
@@ -245,16 +245,16 @@ mod tests {
         };
 
         let text = metrics.to_prometheus_text();
-        
+
         // Verify key metrics are present
         assert!(text.contains("vio_detection_latency_us"));
         assert!(text.contains("vio_optimization_latency_us"));
         assert!(text.contains("vio_frames_total"));
         assert!(text.contains("vio_error_rate"));
-        
+
         // Verify values
-        assert!(text.contains("100"));  // detection_latency_us
-        assert!(text.contains("200"));  // optimization_latency_us
+        assert!(text.contains("100")); // detection_latency_us
+        assert!(text.contains("200")); // optimization_latency_us
         assert!(text.contains("0.0500")); // error_rate
     }
 
@@ -275,7 +275,7 @@ mod tests {
         };
 
         let text = metrics.to_openmetrics_text();
-        
+
         // Verify EOF marker
         assert!(text.ends_with("# EOF\n"));
         // Verify content
@@ -286,13 +286,13 @@ mod tests {
     fn test_metrics_exporter() {
         let exporter = MetricsExporter::new();
         let pipeline = PipelineMetrics::new();
-        
+
         // Initially no metrics
         assert!(exporter.snapshot().unwrap().is_none());
-        
+
         // Export metrics
         assert!(exporter.export(&pipeline).is_ok());
-        
+
         // Now metrics should be available
         assert!(exporter.snapshot().unwrap().is_some());
         assert!(exporter.prometheus_text().unwrap().is_some());
@@ -302,17 +302,17 @@ mod tests {
     fn test_exporter_continuous_updates() {
         let exporter = MetricsExporter::new();
         let pipeline = PipelineMetrics::new();
-        
+
         // Record frame 1
         pipeline.record_detection(50, false);
         exporter.export(&pipeline).unwrap();
         let snap1 = exporter.snapshot().unwrap().unwrap();
-        
+
         // Record frame 2
         pipeline.record_detection(100, false);
         exporter.export(&pipeline).unwrap();
         let snap2 = exporter.snapshot().unwrap().unwrap();
-        
+
         // Verify detection latency increased
         assert!(snap2.detection_latency_us >= snap1.detection_latency_us);
     }

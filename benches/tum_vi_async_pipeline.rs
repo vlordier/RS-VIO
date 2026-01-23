@@ -48,7 +48,9 @@ fn find_tumvi_root() -> Option<String> {
         .filter(|e| e.path().join("mav0").exists())
         .collect::<Vec<_>>();
     candidates.sort_by_key(|e| e.path());
-    candidates.first().map(|e| e.path().to_string_lossy().into_owned())
+    candidates
+        .first()
+        .map(|e| e.path().to_string_lossy().into_owned())
 }
 
 fn gray_from_bytes(width: u32, height: u32, bytes: Vec<u8>) -> Option<GrayImage> {
@@ -58,7 +60,9 @@ fn gray_from_bytes(width: u32, height: u32, bytes: Vec<u8>) -> Option<GrayImage>
     GrayImage::from_vec(width, height, bytes)
 }
 
-fn load_tumvi_frames(max_frames: usize) -> Option<(Vec<StereoFrame>, FeatureDetectionConfig, Config)> {
+fn load_tumvi_frames(
+    max_frames: usize,
+) -> Option<(Vec<StereoFrame>, FeatureDetectionConfig, Config)> {
     let ds_path = find_tumvi_root()?;
     let vio_cfg = Config::load("config/tum_vi.yaml").ok()?;
     let (w, h) = (vio_cfg.camera.image_width, vio_cfg.camera.image_height);

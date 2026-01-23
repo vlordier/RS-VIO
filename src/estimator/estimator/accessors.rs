@@ -5,7 +5,9 @@ use crate::types::{Float, Matrix4x4, Vector3};
 impl Estimator {
     /// Test hook: set maximum map points for bounding memory during tests.
     pub fn set_max_map_points(&mut self, max_map_points: usize) {
-        self.backend.sliding_window.set_max_map_points(max_map_points);
+        self.backend
+            .sliding_window
+            .set_max_map_points(max_map_points);
     }
 
     /// Test hook: inspect current map point count.
@@ -76,7 +78,8 @@ impl Estimator {
         };
 
         // Use the preintegrator's method to create the prior with proper config
-        self.imu_processor.preintegrator
+        self.imu_processor
+            .preintegrator
             .create_motion_prior(*last_keyframe_pose, velocity)
     }
 

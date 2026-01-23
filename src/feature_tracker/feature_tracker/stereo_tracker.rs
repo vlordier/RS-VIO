@@ -563,7 +563,7 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
                 } else {
                     na::Vector3::zeros()
                 };
-                
+
                 Some(crate::feature_tracker::IMUState {
                     velocity,
                     angular_velocity: na::Vector3::new(omega[0], omega[1], omega[2]),

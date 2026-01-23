@@ -1,5 +1,5 @@
 /// Phase 8C: Loop Closure Detection and Global Optimization
-/// 
+///
 /// This example demonstrates loop closure detection - identifying when the camera
 /// revisits a previously seen location - and using this constraint to correct
 /// accumulated drift in the trajectory.
@@ -9,10 +9,9 @@
 /// 2. Loop detection: Matching current keyframe to historical keyframes
 /// 3. Pose graph constraint from loop closure
 /// 4. Global optimization to distribute drift
-/// 
+///
 /// Expected result: Scale and drift errors significantly reduced through
 /// loop closure constraints, even with monocular stereo vision.
-
 use nalgebra as na;
 use std::collections::HashMap;
 
@@ -23,7 +22,7 @@ struct LoopClosureKeyframe {
     id: usize,
     #[allow(dead_code)]
     timestamp: f64,
-    pose: na::Isometry3<f64>,  // Absolute pose T_w_c
+    pose: na::Isometry3<f64>,   // Absolute pose T_w_c
     descriptors: Vec<[u8; 32]>, // ORB descriptors (32 bytes each)
     #[allow(dead_code)]
     n_features: usize,
@@ -33,7 +32,7 @@ struct LoopClosureKeyframe {
 struct LoopClosure {
     from_id: usize,
     to_id: usize,
-    pose_delta: na::Isometry3<f64>,  // Relative pose from 'from' to 'to'
+    pose_delta: na::Isometry3<f64>, // Relative pose from 'from' to 'to'
     confidence: f64,
     n_matches: usize,
 }
@@ -42,7 +41,7 @@ struct LoopClosureDetector {
     keyframes: HashMap<usize, LoopClosureKeyframe>,
     loop_closures: Vec<LoopClosure>,
     num_matches_threshold: usize,
-    min_temporal_distance: usize,  // Minimum keyframes between loop closure
+    min_temporal_distance: usize, // Minimum keyframes between loop closure
 }
 
 impl LoopClosureDetector {
@@ -50,8 +49,8 @@ impl LoopClosureDetector {
         Self {
             keyframes: HashMap::new(),
             loop_closures: Vec::new(),
-            num_matches_threshold: 20,  // Need >=20 feature matches
-            min_temporal_distance: 50,  // >= 50 frames apart
+            num_matches_threshold: 20, // Need >=20 feature matches
+            min_temporal_distance: 50, // >= 50 frames apart
         }
     }
 
@@ -107,7 +106,7 @@ impl LoopClosureDetector {
                 from_id: current_id,
                 to_id: past_id,
                 pose_delta,
-                confidence: (n_matches as f64) / 100.0,  // Confidence increases with matches
+                confidence: (n_matches as f64) / 100.0, // Confidence increases with matches
                 n_matches,
             };
 
@@ -118,14 +117,14 @@ impl LoopClosureDetector {
     /// Match descriptors using Hamming distance (for ORB descriptors)
     fn match_descriptors(&self, query: &[[u8; 32]], database: &[[u8; 32]]) -> usize {
         let mut matches = 0;
-        const HAMMING_THRESHOLD: u32 = 30;  // Max Hamming distance for match
+        const HAMMING_THRESHOLD: u32 = 30; // Max Hamming distance for match
 
         for q_desc in query {
             for db_desc in database {
                 let dist = Self::hamming_distance(q_desc, db_desc);
                 if dist < HAMMING_THRESHOLD {
                     matches += 1;
-                    break;  // One match per query descriptor
+                    break; // One match per query descriptor
                 }
             }
         }
@@ -147,7 +146,7 @@ impl LoopClosureDetector {
         // Simplified: assume small rotation, primarily translational motion
         // Real system would use PnP with matched features and RANSAC
         let identity = na::Isometry3::identity();
-        identity  // Placeholder: actual implementation estimates from features
+        identity // Placeholder: actual implementation estimates from features
     }
 
     /// Apply loop closure constraints via pose graph optimization
@@ -182,7 +181,7 @@ impl LoopClosureDetector {
 
             // Correction (simplified): scale back accumulated drift
             for i in to_idx..from_idx {
-                let scale_factor = 1.0 - (correction_factor * 0.1);  // Smooth correction
+                let scale_factor = 1.0 - (correction_factor * 0.1); // Smooth correction
                 if scale_factor > 0.0 {
                     // Reduce accumulated position by small factor
                     let translation = poses[i].translation.vector;
@@ -197,8 +196,13 @@ impl LoopClosureDetector {
         let total_closures = self.loop_closures.len();
         let total_matches: usize = self.loop_closures.iter().map(|lc| lc.n_matches).sum();
         let avg_confidence = if !self.loop_closures.is_empty() {
-            (self.loop_closures.iter().map(|lc| lc.confidence).sum::<f64>()
-                / self.loop_closures.len() as f64 * 100.0) as usize
+            (self
+                .loop_closures
+                .iter()
+                .map(|lc| lc.confidence)
+                .sum::<f64>()
+                / self.loop_closures.len() as f64
+                * 100.0) as usize
         } else {
             0
         };
@@ -233,28 +237,28 @@ fn main() {
     let num_keyframes = 100;
     let mut poses = vec![na::Isometry3::identity(); num_keyframes];
 
-    println!("📍 Simulating {} keyframes with loop closure...\n", num_keyframes);
+    println!(
+        "📍 Simulating {} keyframes with loop closure...\n",
+        num_keyframes
+    );
 
     // Initialize poses with simulated odometry (straight line + drift)
     for i in 0..num_keyframes {
         let t = (i as f64) * 0.1;
         let x = t;
-        let y = (t * 0.05).sin() * 0.2;  // Small sinusoidal drift
+        let y = (t * 0.05).sin() * 0.2; // Small sinusoidal drift
         let z = 0.0;
 
         let translation = na::Translation3::new(x, y, z);
         poses[i] = na::Isometry3::from_parts(
             translation,
-            na::UnitQuaternion::from_axis_angle(
-                &na::Vector3::z_axis(),
-                (t * 0.02).sin() * 0.1,
-            ),
+            na::UnitQuaternion::from_axis_angle(&na::Vector3::z_axis(), (t * 0.02).sin() * 0.1),
         );
     }
 
     // Add keyframes to detector and generate loop closures
     for i in 0..num_keyframes {
-        let descriptors = generate_synthetic_descriptors(i, 50);  // 50 features per frame
+        let descriptors = generate_synthetic_descriptors(i, 50); // 50 features per frame
         detector.add_keyframe(i, i as f64 * 0.033, poses[i], descriptors.clone());
 
         // Simulate loop closure: frame i should match frame (i-60) if i >= 60
@@ -277,7 +281,10 @@ fn main() {
         for lc in detector.loop_closures.iter().take(5) {
             println!(
                 "  Frame {} ←→ Frame {}: {} matches, confidence={:.1}%",
-                lc.from_id, lc.to_id, lc.n_matches, lc.confidence * 100.0
+                lc.from_id,
+                lc.to_id,
+                lc.n_matches,
+                lc.confidence * 100.0
             );
         }
         if detector.loop_closures.len() > 5 {
@@ -298,7 +305,10 @@ fn main() {
     println!("═══════════════════════════════════════");
     println!("     Pose Graph Optimization Results");
     println!("═══════════════════════════════════════");
-    println!("Trajectory length: {:.2}m", poses[num_keyframes - 1].translation.vector.norm());
+    println!(
+        "Trajectory length: {:.2}m",
+        poses[num_keyframes - 1].translation.vector.norm()
+    );
     println!("Drift before correction: {:.4}m", drift_before);
     println!("Drift after correction:  {:.4}m", drift_after);
     println!(
@@ -314,8 +324,10 @@ fn main() {
     println!("        Phase 8C Results Summary");
     println!("═══════════════════════════════════════");
     println!("✓ Loop closure detection: ACTIVE");
-    println!("✓ {:.0}% of trajectory has loop constraints", 
-        (closures as f64 / num_keyframes as f64) * 100.0);
+    println!(
+        "✓ {:.0}% of trajectory has loop constraints",
+        (closures as f64 / num_keyframes as f64) * 100.0
+    );
     println!("✓ Pose graph optimization: COMPLETE");
     println!("✓ Trajectory corrected for global drift\n");
 

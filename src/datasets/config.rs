@@ -40,9 +40,9 @@ impl Config {
     /// ```
     pub fn validate(&self) -> Result<()> {
         // Validate camera configuration
-        self.camera.validate().map_err(|e| {
-            VIOError::Config(format!("Camera configuration invalid: {}", e))
-        })?;
+        self.camera
+            .validate()
+            .map_err(|e| VIOError::Config(format!("Camera configuration invalid: {}", e)))?;
 
         // Feature detection validation
         if self.feature_detection.grid_cols == 0 {
@@ -603,7 +603,6 @@ fn default_fusion_strategy() -> String {
     "depth-aware".to_string()
 }
 
-
 impl Default for VisualizationConfig {
     fn default() -> Self {
         Self {
@@ -679,16 +678,10 @@ mod tests {
             left_model: Some("pinhole".to_string()),
             right_model: Some("pinhole".to_string()),
             T_B_Cl: vec![
-                1.0, 0.0, 0.0, 0.0, 
-                0.0, 1.0, 0.0, 0.0, 
-                0.0, 0.0, 1.0, 0.0,
-                0.0, 0.0, 0.0, 1.0
+                1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
             ],
             T_B_Cr: vec![
-                1.0, 0.0, 0.0, 0.11, 
-                0.0, 1.0, 0.0, 0.0, 
-                0.0, 0.0, 1.0, 0.0,
-                0.0, 0.0, 0.0, 1.0
+                1.0, 0.0, 0.0, 0.11, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
             ],
         }
     }
@@ -744,10 +737,10 @@ mod tests {
     #[test]
     fn test_keyframe_management_clamping() {
         let mut config = KeyframeManagementConfig {
-            keyframe_window_size: 0, // Too small
+            keyframe_window_size: 0,      // Too small
             translation_threshold: 0.001, // Too small
-            rotation_threshold: 10.0, // Too large
-            processing_timeout_ms: 0, // Invalid
+            rotation_threshold: 10.0,     // Too large
+            processing_timeout_ms: 0,     // Invalid
         };
 
         config.validate_and_clamp();

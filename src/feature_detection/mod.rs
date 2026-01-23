@@ -12,8 +12,8 @@
 //! - **Configuration:** YAML-based strategy selection
 
 pub mod config;
-pub mod gftt_klt;
 pub mod fast_corners;
+pub mod gftt_klt;
 pub mod orb_descriptor;
 
 pub use config::FeatureDetectionConfig;
@@ -85,12 +85,7 @@ pub struct FeatureTrack {
 /// Trait for pluggable keypoint detectors
 pub trait KeypointDetector: Send + Sync {
     /// Detect keypoints in image
-    fn detect(
-        &self,
-        image: &[u8],
-        width: u32,
-        height: u32,
-    ) -> FeatureResult<Vec<Keypoint>>;
+    fn detect(&self, image: &[u8], width: u32, height: u32) -> FeatureResult<Vec<Keypoint>>;
 
     /// Get detector name
     fn name(&self) -> &str;

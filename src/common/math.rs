@@ -247,7 +247,11 @@ pub fn clamp_stable(value: Float, min: Float, max: Float) -> Float {
     if value.is_nan() {
         (min + max) / 2.0
     } else if value.is_infinite() {
-        if value > 0.0 { max } else { min }
+        if value > 0.0 {
+            max
+        } else {
+            min
+        }
     } else {
         clamp(value, min, max)
     }

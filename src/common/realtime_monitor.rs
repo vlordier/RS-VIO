@@ -92,7 +92,10 @@ impl RealtimeMonitor {
     /// Create new monitor
     pub fn new(config: RealtimeMonitorConfig) -> Self {
         if config.enable_csv_export {
-            log::info!("[RealtimeMonitor] CSV export enabled: {}", config.csv_output_path);
+            log::info!(
+                "[RealtimeMonitor] CSV export enabled: {}",
+                config.csv_output_path
+            );
         }
 
         Self {
@@ -172,7 +175,10 @@ impl RealtimeMonitor {
     fn update_gating(&mut self) {
         // Compute moving average of budget utilization
         let avg_utilization = if !self.timing_history.is_empty() {
-            self.timing_history.iter().map(|t| t.budget_utilization).sum::<Float>()
+            self.timing_history
+                .iter()
+                .map(|t| t.budget_utilization)
+                .sum::<Float>()
                 / self.timing_history.len() as Float
         } else {
             0.0

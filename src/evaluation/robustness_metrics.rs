@@ -78,7 +78,7 @@ pub fn track_failure_rate(
     } else {
         0.0
     };
-    
+
     let max_failure_duration = failure_durations.iter().copied().max().unwrap_or(0);
 
     let failure_rate = failures.iter().filter(|&&f| f).count() as f64 / failures.len() as f64;
@@ -124,7 +124,6 @@ pub fn track_failure_rate(
     } else {
         0.0
     };
-
 
     Ok(RobustnessMetrics {
         failure_rate,

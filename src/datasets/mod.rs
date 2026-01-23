@@ -77,9 +77,9 @@ pub mod fourseasons_player;
 pub mod frame_processor_trait;
 pub mod live_camera_player;
 pub mod player_trait;
-pub mod tum_vi_player;
+pub mod trajectory_eval;
 pub mod tum_vi; // Real-world TUM-VI dataset loader
-pub mod trajectory_eval; // ATE/RPE trajectory evaluation
+pub mod tum_vi_player; // ATE/RPE trajectory evaluation
 
 // Re-export player types for convenience
 pub use euroc_player::EurocPlayer;
@@ -93,8 +93,8 @@ use camera_intrinsic_model::models::opencv5::OpenCVModel5;
 use camera_intrinsic_model::models::EUCM;
 // nalgebra 0.34 required by camera-intrinsic-model, while main codebase uses 0.33
 // TODO: Consider upgrading main codebase to 0.34 or using a unified approach
-use nalgebra034;
 use crate::unwrap_or_log;
+use nalgebra034;
 
 // Image data structure
 #[derive(Debug, Clone)]

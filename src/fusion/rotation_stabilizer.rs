@@ -17,7 +17,7 @@
 //! - **Typical time**: 5-15ms for N=3-5 frames @ 640×480
 //! - **Memory**: O(N × W × H) for frame buffer
 
-use super::{FusionError, FusionMetrics, FusionResult, FusedFrame};
+use super::{FusedFrame, FusionError, FusionMetrics, FusionResult};
 use crate::estimator::Frame;
 use crate::types::{Float, Matrix3x3};
 #[cfg(test)]
@@ -61,7 +61,7 @@ pub enum WeightingStrategy {
 pub struct RotationStabilizer {
     config: RotationStabilizerConfig,
     frame_buffer: VecDeque<(i32, Vec<u8>)>, // (frame_id, image data)
-    rotation_buffer: VecDeque<Matrix3x3>,    // accumulated rotations
+    rotation_buffer: VecDeque<Matrix3x3>,   // accumulated rotations
     last_frame_id: Option<i32>,
 }
 
@@ -77,7 +77,7 @@ impl RotationStabilizer {
     }
 
     /// Integrate IMU gyro data to estimate rotation (test helper)
-    /// 
+    ///
     /// NOTE: This is a simplified implementation for testing. Production integration
     /// would use proper SO(3) exponential map. Kept for future fusion enhancements.
     #[cfg(test)]
@@ -93,7 +93,11 @@ impl RotationStabilizer {
 
         for i in 1..imu_data.len() {
             let dt = (imu_data[i].timestamp - imu_data[i - 1].timestamp) as Float / 1e9;
-            let omega = Vector3::new(imu_data[i].gyro[0], imu_data[i].gyro[1], imu_data[i].gyro[2]);
+            let omega = Vector3::new(
+                imu_data[i].gyro[0],
+                imu_data[i].gyro[1],
+                imu_data[i].gyro[2],
+            );
             rotation_vec += omega * dt;
         }
 
@@ -107,15 +111,7 @@ impl RotationStabilizer {
             // Rodrigues' formula for SO(3) exponential
             let axis = rotation_vec.normalize();
             let K = Matrix3x3::new(
-                0.0,
-                -axis.z,
-                axis.y,
-                axis.z,
-                0.0,
-                -axis.x,
-                -axis.y,
-                axis.x,
-                0.0,
+                0.0, -axis.z, axis.y, axis.z, 0.0, -axis.x, -axis.y, axis.x, 0.0,
             );
 
             let rotation = Matrix3x3::identity() + K * angle.sin() + (K * K) * (1.0 - angle.cos());
@@ -125,7 +121,7 @@ impl RotationStabilizer {
     }
 
     /// Warp frame to reference using rotation (test helper)
-    /// 
+    ///
     /// NOTE: Simplified bilinear resampling for testing. Production would use
     /// OpenCV remap or SIMD-accelerated implementation. Kept for future enhancements.
     #[cfg(test)]
@@ -202,17 +198,15 @@ impl RotationStabilizer {
             WeightingStrategy::Exponential => {
                 let decay = 0.8;
                 let decay: f64 = decay;
-                let total: Float = (0..num_frames)
-                    .map(|i| decay.powi(i as i32))
-                    .sum();
+                let total: Float = (0..num_frames).map(|i| decay.powi(i as i32)).sum();
                 (0..num_frames)
                     .map(|i| decay.powi(i as i32) / total)
                     .collect()
-            }
+            },
             WeightingStrategy::SharpnessAdaptive => {
                 // Placeholder: equal weight (could estimate sharpness via Laplacian)
                 vec![1.0 / num_frames as Float; num_frames]
-            }
+            },
         }
     }
 }

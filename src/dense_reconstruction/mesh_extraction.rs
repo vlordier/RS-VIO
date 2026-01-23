@@ -263,7 +263,7 @@ impl MarchingCubes {
         if has_negative && has_positive {
             // Get voxel center position
             let center = volume.voxel_to_world(x, y, z);
-            
+
             // Simple triangulation: create 2 triangles forming a quad
             let v0 = mesh.add_vertex(Vertex::new(center));
             let v1 = mesh.add_vertex(Vertex::new(Point3D::new(
@@ -328,7 +328,7 @@ mod tests {
     fn test_normal_normalization() {
         let mut n = Normal::new(3.0, 4.0, 0.0);
         n.normalize();
-        
+
         let len = (n.x * n.x + n.y * n.y + n.z * n.z).sqrt();
         assert!((len - 1.0).abs() < 0.001);
     }
@@ -353,7 +353,7 @@ mod tests {
         let mut mesh = Mesh::new();
         let v = Vertex::new(Point3D::new(1.0, 2.0, 3.0));
         let idx = mesh.add_vertex(v);
-        
+
         assert_eq!(idx, 0);
         assert_eq!(mesh.num_vertices(), 1);
     }
@@ -364,7 +364,7 @@ mod tests {
         mesh.add_vertex(Vertex::new(Point3D::new(0.0, 0.0, 0.0)));
         mesh.add_vertex(Vertex::new(Point3D::new(1.0, 0.0, 0.0)));
         mesh.add_vertex(Vertex::new(Point3D::new(0.0, 1.0, 0.0)));
-        
+
         mesh.add_triangle(Triangle::new(0, 1, 2));
         assert_eq!(mesh.num_triangles(), 1);
     }
@@ -375,11 +375,11 @@ mod tests {
         mesh.add_vertex(Vertex::new(Point3D::new(0.0, 0.0, 0.0)));
         mesh.add_vertex(Vertex::new(Point3D::new(1.0, 0.0, 0.0)));
         mesh.add_vertex(Vertex::new(Point3D::new(0.0, 1.0, 0.0)));
-        
+
         // Valid triangle
         mesh.add_triangle(Triangle::new(0, 1, 2));
         assert!(mesh.is_valid());
-        
+
         // Invalid triangle (index out of bounds)
         mesh.add_triangle(Triangle::new(0, 1, 10));
         assert!(!mesh.is_valid());
@@ -392,11 +392,11 @@ mod tests {
         mesh.add_vertex(Vertex::new(Point3D::new(1.0, 0.0, 0.0)));
         mesh.add_vertex(Vertex::new(Point3D::new(0.0, 1.0, 0.0)));
         mesh.add_triangle(Triangle::new(0, 1, 2));
-        
+
         mesh.compute_normals();
-        
+
         assert_eq!(mesh.normals.len(), 3);
-        
+
         // Check normals are normalized
         for normal in &mesh.normals {
             let len = (normal.x * normal.x + normal.y * normal.y + normal.z * normal.z).sqrt();
@@ -419,9 +419,9 @@ mod tests {
             resolution_z: 10,
             ..Default::default()
         });
-        
+
         let mesh = mc.extract_mesh(&volume);
-        
+
         // Empty volume should produce empty mesh
         assert_eq!(mesh.num_triangles(), 0);
     }

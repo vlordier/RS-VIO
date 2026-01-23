@@ -3,11 +3,11 @@
 //! Demonstrates track-first detect-to-fill, SuperPoint descriptors,
 //! LightGlue matching, and adaptive feature distribution.
 
-use rs_vio::feature_tracker::{
-    DistributionConfig, FeatureDistributor, LightGlueConfig, LightGlueMatcher,
-    SuperPointConfig, SuperPointDescriptor, TrackFirstConfig, TrackFirstDetector,
-};
 use nalgebra::Point2;
+use rs_vio::feature_tracker::{
+    DistributionConfig, FeatureDistributor, LightGlueConfig, LightGlueMatcher, SuperPointConfig,
+    SuperPointDescriptor, TrackFirstConfig, TrackFirstDetector,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("═══════════════════════════════════════════════════════════");
@@ -25,7 +25,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut distributor = FeatureDistributor::new(dist_config);
     distributor.initialize(640, 480);
 
-    println!("  ✓ Grid: {}×{}", distributor.grid_width(), distributor.grid_height());
+    println!(
+        "  ✓ Grid: {}×{}",
+        distributor.grid_width(),
+        distributor.grid_height()
+    );
 
     // ─────────────────────────────────────────────────────────────
     // 2. Track-First Detector Setup
@@ -45,12 +49,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sp_config = SuperPointConfig::default();
     let _sp_extractor = SuperPointDescriptor::new(sp_config);
 
-    println!("  ✓ Descriptor dimension: {} ({}B per feature)", 
-             sp_config.descriptor_size,
-             sp_config.descriptor_size * 4);
-    println!("  ✓ Keypoint threshold: {:.4}", sp_config.keypoint_threshold);
-    println!("  ✓ Mode: {} (fallback to NN)",
-             if sp_config.use_onnx { "ONNX" } else { "CPU" });
+    println!(
+        "  ✓ Descriptor dimension: {} ({}B per feature)",
+        sp_config.descriptor_size,
+        sp_config.descriptor_size * 4
+    );
+    println!(
+        "  ✓ Keypoint threshold: {:.4}",
+        sp_config.keypoint_threshold
+    );
+    println!(
+        "  ✓ Mode: {} (fallback to NN)",
+        if sp_config.use_onnx { "ONNX" } else { "CPU" }
+    );
 
     // ─────────────────────────────────────────────────────────────
     // 4. LightGlue Matcher Setup
@@ -63,8 +74,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  ✓ Transformer depth: {} layers", lg_config.depth);
     println!("  ✓ Match threshold: {:.2}", lg_config.match_threshold);
     println!("  ✓ Max matches: {}", lg_config.max_matches);
-    println!("  ✓ Mode: {} (fallback to NN + ratio test)",
-             if lg_config.use_flash_attention { "Flash-v2" } else { "Standard" });
+    println!(
+        "  ✓ Mode: {} (fallback to NN + ratio test)",
+        if lg_config.use_flash_attention {
+            "Flash-v2"
+        } else {
+            "Standard"
+        }
+    );
 
     // ─────────────────────────────────────────────────────────────
     // 5. Demonstration: Simulated Feature Tracking
@@ -94,24 +111,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  └─ Overoccupied cells: {}", stats.overoccupied_cells);
     println!();
     println!("  Coverage: {:.1}%", stats.coverage_percentage);
-    println!("  Uniformity: {:.3} (0=non-uniform, 1=perfect)", stats.uniformity);
+    println!(
+        "  Uniformity: {:.3} (0=non-uniform, 1=perfect)",
+        stats.uniformity
+    );
 
     // Identify regions needing new detections
     let detection_regions = distributor.get_detection_regions();
-    println!("\n  Detection needed in {} regions", detection_regions.len());
+    println!(
+        "\n  Detection needed in {} regions",
+        detection_regions.len()
+    );
     if !detection_regions.is_empty() {
         println!("  Top 5 detection priority regions:");
         for (i, (cx, cy)) in detection_regions.iter().take(5).enumerate() {
             let threshold = distributor.get_adaptive_quality_threshold(*cx, *cy);
-            println!("    {}. Cell({}, {}) - quality threshold: {:.4}",
-                     i + 1, cx, cy, threshold);
+            println!(
+                "    {}. Cell({}, {}) - quality threshold: {:.4}",
+                i + 1,
+                cx,
+                cy,
+                threshold
+            );
         }
     }
 
     // Identify overcrowded regions
     let overcrowded = distributor.get_overcrowded_regions();
     if !overcrowded.is_empty() {
-        println!("\n  {} regions are overcrowded (pruning candidates)", overcrowded.len());
+        println!(
+            "\n  {} regions are overcrowded (pruning candidates)",
+            overcrowded.len()
+        );
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -167,7 +198,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n  Lowe's Ratio Test:");
     println!("    Ratio: {:.3} / {:.3} = {:.3}", dist_1, dist_2, ratio);
     println!("    Threshold: {:.2}", threshold);
-    println!("    ✓ Good match: {}", if is_good_match { "YES" } else { "NO" });
+    println!(
+        "    ✓ Good match: {}",
+        if is_good_match { "YES" } else { "NO" }
+    );
 
     // ─────────────────────────────────────────────────────────────
     // 7. Performance Summary

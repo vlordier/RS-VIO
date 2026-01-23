@@ -3,8 +3,8 @@
 //! Implements gravity-aligned initialization using IMU data to establish
 //! proper metric scale in the VIO system.
 
-use rs_vio::datasets::ImuData;
 use nalgebra as na;
+use rs_vio::datasets::ImuData;
 use std::time::Instant;
 
 /// Configuration for IMU-aided initialization
@@ -61,17 +61,17 @@ pub struct GravityEstimate {
 pub struct ImuAidedInitializer {
     config: ImuInitConfig,
     state: InitializationState,
-    
+
     // Static period detection
     accel_samples: Vec<na::Vector3<f64>>,
     gyro_samples: Vec<na::Vector3<f64>>,
     timestamps: Vec<i64>,
-    
+
     // Gravity estimation
     gravity_estimate: na::Vector3<f64>,
     last_accel_variance: f64,
     static_frame_count: usize,
-    
+
     // Scale estimation
     #[allow(dead_code)]
     first_keyframe_scale: Option<f64>,
@@ -92,50 +92,50 @@ impl ImuAidedInitializer {
             first_keyframe_scale: None,
         }
     }
-    
+
     /// Process IMU measurement
     pub fn process_imu(&mut self, imu: &ImuData) {
         let accel = na::Vector3::new(imu.accel[0], imu.accel[1], imu.accel[2]);
         let gyro = na::Vector3::new(imu.gyro[0], imu.gyro[1], imu.gyro[2]);
-        
+
         self.accel_samples.push(accel);
         self.gyro_samples.push(gyro);
         self.timestamps.push(imu.timestamp);
-        
+
         match self.state {
             InitializationState::WaitingForStatic => {
                 self.detect_static_period();
-            }
+            },
             InitializationState::Initializing => {
                 self.update_gravity_estimate();
-            }
-            _ => {}
+            },
+            _ => {},
         }
     }
-    
+
     /// Detect if device is in a static period
     fn detect_static_period(&mut self) {
         if self.accel_samples.len() < 20 {
             return; // Need at least ~100ms of data
         }
-        
+
         // Compute accelerometer variance over recent samples
         let recent_start = (self.accel_samples.len() - 20).max(0);
         let recent_accel = &self.accel_samples[recent_start..];
-        
+
         let mean_accel = recent_accel.iter().sum::<na::Vector3<f64>>() / recent_accel.len() as f64;
         let variance = recent_accel
             .iter()
             .map(|a| (a - mean_accel).norm_squared())
             .sum::<f64>()
             / recent_accel.len() as f64;
-        
+
         self.last_accel_variance = variance;
-        
+
         // Check if static
         if variance < self.config.static_accel_variance_threshold {
             self.static_frame_count += 1;
-            
+
             // Enough samples for initialization?
             if self.static_frame_count >= self.config.min_static_samples {
                 self.state = InitializationState::Initializing;
@@ -148,20 +148,20 @@ impl ImuAidedInitializer {
             self.timestamps.clear();
         }
     }
-    
+
     /// Update gravity estimate from accelerometer samples
     fn update_gravity_estimate(&mut self) {
         if self.accel_samples.len() < self.config.min_static_samples {
             return;
         }
-        
+
         // Use recent samples for gravity (better convergence)
         let start = (self.accel_samples.len() - self.config.min_static_samples).max(0);
         let accel_window = &self.accel_samples[start..];
-        
+
         // Compute mean acceleration
         let mean_accel = accel_window.iter().sum::<na::Vector3<f64>>() / accel_window.len() as f64;
-        
+
         // Gravity points opposite to acceleration bias
         // In static case: a = g + bias → gravity = -mean_accel (normalized)
         let accel_norm = mean_accel.norm();
@@ -170,33 +170,33 @@ impl ImuAidedInitializer {
             self.state = InitializationState::Complete;
         }
     }
-    
+
     /// Get current gravity estimate
     pub fn gravity(&self) -> na::Vector3<f64> {
         self.gravity_estimate
     }
-    
+
     /// Get initialization state
     pub fn state(&self) -> InitializationState {
         self.state
     }
-    
+
     /// Check if gravity has converged
     pub fn is_gravity_converged(&self) -> bool {
         self.state == InitializationState::Complete
     }
-    
+
     /// Get accelerometer bias estimate
     pub fn accel_bias(&self) -> na::Vector3<f64> {
         if self.accel_samples.is_empty() {
             return na::Vector3::zeros();
         }
-        
-        let mean_accel = self.accel_samples.iter().sum::<na::Vector3<f64>>()
-            / self.accel_samples.len() as f64;
+
+        let mean_accel =
+            self.accel_samples.iter().sum::<na::Vector3<f64>>() / self.accel_samples.len() as f64;
         mean_accel - self.gravity_estimate
     }
-    
+
     /// Estimate metric scale from visual + IMU constraint
     ///
     /// After first keyframe: compare visual-only depth scale with
@@ -214,7 +214,7 @@ impl ImuAidedInitializer {
             1.0 // No IMU velocity, use unit scale
         }
     }
-    
+
     /// Get complete initialization report
     pub fn report(&self) -> GravityEstimate {
         GravityEstimate {
@@ -235,23 +235,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::builder()
         .filter_level(log::LevelFilter::Info)
         .init();
-    
+
     println!("\n=== Phase 8A: IMU-Aided Initialization ===\n");
-    
+
     // Load dataset
     let dataset_dir = "./datasets/tum_vi";
     let sequence_path = std::path::Path::new(dataset_dir).join("room1");
-    
+
     let load_start = Instant::now();
     let sequence = rs_vio::datasets::tum_vi::TumViSequence::load(&sequence_path)?;
-    println!("✓ Loaded TUM-VI sequence in {:.2}s", load_start.elapsed().as_secs_f64());
+    println!(
+        "✓ Loaded TUM-VI sequence in {:.2}s",
+        load_start.elapsed().as_secs_f64()
+    );
     println!("  - IMU samples: {}", sequence.imu_data.len());
-    
+
     // Initialize
     let mut initializer = ImuAidedInitializer::new(ImuInitConfig::default());
-    
-    println!("\nProcessing first {} IMU samples...", sequence.imu_data.len().min(2000));
-    
+
+    println!(
+        "\nProcessing first {} IMU samples...",
+        sequence.imu_data.len().min(2000)
+    );
+
     let process_start = Instant::now();
     for (i, imu_meas) in sequence.imu_data.iter().enumerate().take(2000) {
         let imu = ImuData {
@@ -259,37 +265,46 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             gyro: [imu_meas.gyro_x, imu_meas.gyro_y, imu_meas.gyro_z],
             accel: [imu_meas.accel_x, imu_meas.accel_y, imu_meas.accel_z],
         };
-        
+
         initializer.process_imu(&imu);
-        
+
         if initializer.is_gravity_converged() {
-            println!("\n✓ Gravity converged after {} samples ({:.2}s)",
+            println!(
+                "\n✓ Gravity converged after {} samples ({:.2}s)",
                 i + 1,
                 (imu.timestamp - sequence.imu_data[0].timestamp_ns as i64) as f64 / 1e9
             );
             break;
         }
     }
-    
-    println!("  Total processing time: {:.2}s\n", process_start.elapsed().as_secs_f64());
-    
+
+    println!(
+        "  Total processing time: {:.2}s\n",
+        process_start.elapsed().as_secs_f64()
+    );
+
     // Report results
     let report = initializer.report();
     println!("=== Initialization Results ===");
     println!("State: {:?}", initializer.state());
-    println!("Gravity vector: [{:.4}, {:.4}, {:.4}] (m/s²)", 
-        report.gravity.x, report.gravity.y, report.gravity.z);
+    println!(
+        "Gravity vector: [{:.4}, {:.4}, {:.4}] (m/s²)",
+        report.gravity.x, report.gravity.y, report.gravity.z
+    );
     println!("Gravity magnitude: {:.4} m/s²", report.gravity.norm());
     println!("Confidence: {:.1}%", report.confidence * 100.0);
-    println!("Accel bias: [{:.4}, {:.4}, {:.4}] (m/s²)",
-        report.accel_bias.x, report.accel_bias.y, report.accel_bias.z);
+    println!(
+        "Accel bias: [{:.4}, {:.4}, {:.4}] (m/s²)",
+        report.accel_bias.x, report.accel_bias.y, report.accel_bias.z
+    );
     println!("Samples used: {}", report.num_samples);
-    
+
     // Simulate metric scale recovery
     let depth_scale_visual = 0.001; // 1mm scale from monocular VO
     let imu_velocity_magnitude = 0.5; // ~0.5 m/s from gravity integration
-    let metric_scale = initializer.estimate_metric_scale(depth_scale_visual, imu_velocity_magnitude);
-    
+    let metric_scale =
+        initializer.estimate_metric_scale(depth_scale_visual, imu_velocity_magnitude);
+
     println!("\n=== Metric Scale Recovery ===");
     println!("Visual-only scale: {:.6}", depth_scale_visual);
     println!("IMU velocity magnitude: {:.3} m/s", imu_velocity_magnitude);
@@ -298,6 +313,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  - Depth map: multiply by {:.2}", metric_scale);
     println!("  - Trajectory: multiply by {:.2}", metric_scale);
     println!("  - Point positions: multiply by {:.2}", metric_scale);
-    
+
     Ok(())
 }

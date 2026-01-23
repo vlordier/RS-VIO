@@ -7,10 +7,10 @@
 //! - Queue depth and backpressure
 //! - Error counts and recovery statistics
 
+use std::collections::VecDeque;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use std::collections::VecDeque;
 
 /// Metrics for a single pipeline stage
 #[derive(Debug, Clone)]
@@ -86,11 +86,11 @@ struct PipelineMetricsInner {
     // Per-stage metrics
     detection_stage: std::sync::Mutex<StageMetrics>,
     optimization_stage: std::sync::Mutex<StageMetrics>,
-    
+
     // Frame history (circular buffer)
     frame_history: std::sync::Mutex<VecDeque<FrameMetrics>>,
     max_history_size: usize,
-    
+
     // Atomic counters (for fast, lock-free access)
     total_frames: AtomicU64,
     total_errors: AtomicU64,
@@ -162,8 +162,10 @@ impl PipelineMetrics {
 
     // Queue depth tracking
     pub fn set_queue_depth(&self, depth: usize) {
-        self.inner.current_queue_depth.store(depth, Ordering::Relaxed);
-        
+        self.inner
+            .current_queue_depth
+            .store(depth, Ordering::Relaxed);
+
         // Update max if needed
         let current_max = self.inner.max_queue_depth.load(Ordering::Relaxed);
         if depth > current_max {
@@ -237,7 +239,11 @@ impl PipelineMetrics {
                 └─ Errors: {}",
             total,
             errors,
-            if total > 0 { (errors as f64 / total as f64) * 100.0 } else { 0.0 },
+            if total > 0 {
+                (errors as f64 / total as f64) * 100.0
+            } else {
+                0.0
+            },
             recovered,
             self.queue_depth(),
             self.max_queue_depth(),
@@ -255,13 +261,13 @@ impl PipelineMetrics {
     pub fn reset(&self) {
         let mut history = self.inner.frame_history.lock().unwrap();
         history.clear();
-        
+
         let mut detection = self.inner.detection_stage.lock().unwrap();
         *detection = StageMetrics::new();
-        
+
         let mut optimization = self.inner.optimization_stage.lock().unwrap();
         *optimization = StageMetrics::new();
-        
+
         self.inner.total_frames.store(0, Ordering::Relaxed);
         self.inner.total_errors.store(0, Ordering::Relaxed);
         self.inner.recovered_errors.store(0, Ordering::Relaxed);
@@ -330,7 +336,7 @@ mod tests {
     #[test]
     fn test_pipeline_metrics() {
         let metrics = PipelineMetrics::new();
-        
+
         metrics.record_detection(150, false);
         metrics.record_detection(200, false);
         metrics.record_optimization(500, false);
@@ -355,10 +361,10 @@ mod tests {
     #[test]
     fn test_error_rate() {
         let metrics = PipelineMetrics::new();
-        
+
         // Record 6 frames with errors and 4 frames with success (60% error rate)
         for i in 0..10 {
-            let is_error = i < 6;  // First 6 are errors, last 4 are successes
+            let is_error = i < 6; // First 6 are errors, last 4 are successes
             let frame_metrics = FrameMetrics {
                 frame_id: i,
                 timestamp_ns: (i as i64) * 1000,
@@ -367,11 +373,15 @@ mod tests {
                 e2e_time_us: 300,
                 queue_depth: 1,
                 success: !is_error,
-                error_message: if is_error { Some("test error".to_string()) } else { None },
+                error_message: if is_error {
+                    Some("test error".to_string())
+                } else {
+                    None
+                },
             };
             metrics.record_frame(frame_metrics);
         }
-        
+
         // 6 errors out of 10 = 0.6 error rate
         let rate = metrics.error_rate();
         assert!((rate - 0.6).abs() < 0.001, "Expected 0.6, got {}", rate);
@@ -385,7 +395,7 @@ mod tests {
             std::thread::sleep(Duration::from_millis(1));
             timer.stop(false);
         }
-        
+
         let stage = metrics.detection_metrics();
         assert_eq!(stage.frame_count, 1);
         assert!(stage.total_time_us >= 1000); // At least 1ms

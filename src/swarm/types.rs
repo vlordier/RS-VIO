@@ -98,7 +98,11 @@ pub struct MessageVersion {
 impl MessageVersion {
     /// Create a new message version.
     pub fn new(major: u16, minor: u16, patch: u16) -> Self {
-        Self { major, minor, patch }
+        Self {
+            major,
+            minor,
+            patch,
+        }
     }
 
     /// Current protocol version (should match package version)
@@ -202,7 +206,7 @@ impl fmt::Display for NetworkPartitionState {
                     write!(f, "{}", drone.value())?;
                 }
                 write!(f, ")")
-            }
+            },
             Self::Isolated => write!(f, "Isolated"),
         }
     }

@@ -235,7 +235,11 @@ impl Frame {
 
     /// Set/own the left image plane (cloned or transferred by caller).
     pub fn set_left_image_plane(&mut self, data: Vec<u8>, width: u32, height: u32) {
-        self.left_image_plane = Some(ImagePlane { data, width, height });
+        self.left_image_plane = Some(ImagePlane {
+            data,
+            width,
+            height,
+        });
     }
 
     /// Append a new feature to the left image.

@@ -13,8 +13,11 @@ use crate::{
     estimator::{FrameWorkspace, WorkspaceConfig},
     traits::ResourcePool,
 };
-use std::sync::{atomic::{AtomicBool, Ordering}, Arc, Mutex};
 use std::cell::UnsafeCell;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, Mutex,
+};
 
 /// Configuration for `WorkspacePool` used by the generic `ResourcePool` trait.
 #[derive(Debug, Clone)]
@@ -61,12 +64,11 @@ impl PoolSlot {
     /// Try to acquire this slot's workspace (lock-free)
     fn try_acquire(&self) -> Option<FrameWorkspace> {
         // Try to atomically claim this slot
-        if self.available.compare_exchange(
-            true,
-            false,
-            Ordering::Acquire,
-            Ordering::Relaxed,
-        ).is_ok() {
+        if self
+            .available
+            .compare_exchange(true, false, Ordering::Acquire, Ordering::Relaxed)
+            .is_ok()
+        {
             // We successfully claimed it, extract the workspace
             #[allow(unsafe_code)]
             unsafe {
@@ -81,12 +83,16 @@ impl PoolSlot {
     #[allow(clippy::result_large_err)]
     fn try_release(&self, workspace: FrameWorkspace) -> Result<(), FrameWorkspace> {
         // Try to atomically claim this slot for release
-        if self.available.compare_exchange(
-            false, // Slot must be empty (not available)
-            true,  // Mark as available after filling
-            Ordering::Release,
-            Ordering::Relaxed,
-        ).is_ok() {
+        if self
+            .available
+            .compare_exchange(
+                false, // Slot must be empty (not available)
+                true,  // Mark as available after filling
+                Ordering::Release,
+                Ordering::Relaxed,
+            )
+            .is_ok()
+        {
             // We successfully claimed an empty slot, fill it
             #[allow(unsafe_code)]
             unsafe {
@@ -183,7 +189,7 @@ impl WorkspacePool {
         // Fast path: try to release to any empty lock-free slot
         for slot in &self.slots {
             match slot.try_release(workspace) {
-                Ok(()) => return, // Successfully released
+                Ok(()) => return,          // Successfully released
                 Err(ws) => workspace = ws, // Slot was full, try next
             }
         }
@@ -226,7 +232,7 @@ pub struct PooledFrameWorkspace<'a> {
 
 impl<'a> PooledFrameWorkspace<'a> {
     /// Get mutable reference to workspace
-    /// 
+    ///
     /// # Panics
     /// Panics if workspace is None. This should never happen because:
     /// 1. Workspace is guaranteed to be Some at construction
@@ -234,7 +240,8 @@ impl<'a> PooledFrameWorkspace<'a> {
     /// 3. Therefore, this method always succeeds for borrowed self
     #[inline]
     pub fn get_mut(&mut self) -> &mut FrameWorkspace {
-        self.workspace.as_mut()
+        self.workspace
+            .as_mut()
             .expect("Workspace is guaranteed Some during PooledFrameWorkspace lifetime")
     }
 
@@ -247,7 +254,8 @@ impl<'a> PooledFrameWorkspace<'a> {
     /// 3. Therefore, this method always succeeds for borrowed self
     #[inline]
     pub fn get(&self) -> &FrameWorkspace {
-        self.workspace.as_ref()
+        self.workspace
+            .as_ref()
             .expect("Workspace is guaranteed Some during PooledFrameWorkspace lifetime")
     }
 }

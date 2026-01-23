@@ -3,8 +3,8 @@
 //! Implements operator-guided calibration sequence with quality gates,
 //! persistence, and versioning as specified in the calibration strategy.
 
-use super::imu_calibration::{ImuCalibrationResult, ImuCalibrator};
 use super::camera_intrinsics::CameraIntrinsicsCalibrator;
+use super::imu_calibration::{ImuCalibrationResult, ImuCalibrator};
 use super::stereo_extrinsics::StereoExtrinsicsCalibrator;
 use super::time_offset::TimeOffsetEstimator;
 use serde::{Deserialize, Serialize};
@@ -150,11 +150,21 @@ impl Default for QualityGatesStatus {
 #[derive(Debug)]
 pub enum CalibrationWorkflowState {
     Idle,
-    ImuCalibration { calibrator: ImuCalibrator },
-    LeftCameraIntrinsics { calibrator: CameraIntrinsicsCalibrator },
-    RightCameraIntrinsics { calibrator: CameraIntrinsicsCalibrator },
-    StereoExtrinsics { calibrator: StereoExtrinsicsCalibrator },
-    TimeOffset { estimator: TimeOffsetEstimator },
+    ImuCalibration {
+        calibrator: ImuCalibrator,
+    },
+    LeftCameraIntrinsics {
+        calibrator: CameraIntrinsicsCalibrator,
+    },
+    RightCameraIntrinsics {
+        calibrator: CameraIntrinsicsCalibrator,
+    },
+    StereoExtrinsics {
+        calibrator: StereoExtrinsicsCalibrator,
+    },
+    TimeOffset {
+        estimator: TimeOffsetEstimator,
+    },
     Complete(CalibrationSession),
     Failed(String),
 }
@@ -249,7 +259,10 @@ impl ManualCalibrationWorkflow {
         if self.config.enable_imu {
             let calibrator = ImuCalibrator::new();
             self.state = CalibrationWorkflowState::ImuCalibration { calibrator };
-            Ok("Starting IMU calibration. Follow prompts to place drone in required poses.".to_string())
+            Ok(
+                "Starting IMU calibration. Follow prompts to place drone in required poses."
+                    .to_string(),
+            )
         } else {
             Err("No calibrations enabled in workflow config".to_string())
         }
@@ -265,9 +278,8 @@ impl ManualCalibrationWorkflow {
         match &self.state {
             CalibrationWorkflowState::Idle => {
                 "Ready to start calibration. Call start() to begin.".to_string()
-            }
-            CalibrationWorkflowState::ImuCalibration { .. } => {
-                "IMU Calibration:\n\
+            },
+            CalibrationWorkflowState::ImuCalibration { .. } => "IMU Calibration:\n\
                  1. Place drone on level surface\n\
                  2. Ensure no vibration or movement\n\
                  3. Follow pose sequence:\n\
@@ -279,44 +291,35 @@ impl ManualCalibrationWorkflow {
                     - Pose 5: 90° pitch down\n\
                  4. Hold each pose for ~10 seconds\n\
                  5. Call begin_pose(N) then add IMU samples"
-                    .to_string()
-            }
-            CalibrationWorkflowState::LeftCameraIntrinsics { .. } => {
-                "Left Camera Intrinsics:\n\
+                .to_string(),
+            CalibrationWorkflowState::LeftCameraIntrinsics { .. } => "Left Camera Intrinsics:\n\
                  1. Print checkerboard pattern (or use AprilGrid)\n\
                  2. Move drone in front of target with gentle motion\n\
                  3. Vary distance: 0.5m to 5m\n\
                  4. Capture 20-30 images from different angles\n\
                  5. Ensure target visible in all frames\n\
                  6. Call add_observation() for each detected corner"
-                    .to_string()
-            }
-            CalibrationWorkflowState::RightCameraIntrinsics { .. } => {
-                "Right Camera Intrinsics:\n\
+                .to_string(),
+            CalibrationWorkflowState::RightCameraIntrinsics { .. } => "Right Camera Intrinsics:\n\
                  (Same as left camera, but for right sensor)"
-                    .to_string()
-            }
-            CalibrationWorkflowState::StereoExtrinsics { .. } => {
-                "Stereo Extrinsics:\n\
+                .to_string(),
+            CalibrationWorkflowState::StereoExtrinsics { .. } => "Stereo Extrinsics:\n\
                  1. Perform figure-8 or small translation motions\n\
                  2. Include near (0.5m) and far (5m) planes\n\
                  3. Track features in both cameras simultaneously\n\
                  4. Ensure good epipolar geometry coverage\n\
                  5. Call add_stereo_observation() for each match"
-                    .to_string()
-            }
-            CalibrationWorkflowState::TimeOffset { .. } => {
-                "Camera-IMU Time Offset:\n\
+                .to_string(),
+            CalibrationWorkflowState::TimeOffset { .. } => "Camera-IMU Time Offset:\n\
                  1. Perform slow pan/tilt motion (~30°/sec)\n\
                  2. Maintain steady angular velocity for 5 seconds per direction\n\
                  3. System will cross-correlate optical flow with gyro\n\
                  4. Call add_imu_measurement() and add_camera_measurement()"
-                    .to_string()
-            }
+                .to_string(),
             CalibrationWorkflowState::Complete(_) => "Calibration complete.".to_string(),
             CalibrationWorkflowState::Failed(reason) => {
                 format!("Calibration failed: {}", reason)
-            }
+            },
         }
     }
 
@@ -325,8 +328,8 @@ impl ManualCalibrationWorkflow {
         // Compute integrity hash
         let serialized = serde_yaml::to_string(&self.session)
             .map_err(|e| format!("Serialization error: {}", e))?;
-        
-        use sha2::{Sha256, Digest};
+
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(serialized.as_bytes());
         self.session.integrity_hash = format!("{:x}", hasher.finalize());
@@ -345,28 +348,27 @@ impl ManualCalibrationWorkflow {
             .map_err(|e| format!("Failed to create directory: {}", e))?;
 
         // Write to file
-        std::fs::write(&path, serialized)
-            .map_err(|e| format!("Failed to write file: {}", e))?;
+        std::fs::write(&path, serialized).map_err(|e| format!("Failed to write file: {}", e))?;
 
         Ok(path)
     }
 
     /// Load calibration session from disk
     pub fn load(path: &Path) -> Result<CalibrationSession, String> {
-        let contents = std::fs::read_to_string(path)
-            .map_err(|e| format!("Failed to read file: {}", e))?;
+        let contents =
+            std::fs::read_to_string(path).map_err(|e| format!("Failed to read file: {}", e))?;
 
-        let mut session: CalibrationSession = serde_yaml::from_str(&contents)
-            .map_err(|e| format!("Deserialization error: {}", e))?;
+        let mut session: CalibrationSession =
+            serde_yaml::from_str(&contents).map_err(|e| format!("Deserialization error: {}", e))?;
 
         // Verify integrity hash
         let stored_hash = session.integrity_hash.clone();
         session.integrity_hash = String::new();
 
-        let serialized = serde_yaml::to_string(&session)
-            .map_err(|e| format!("Serialization error: {}", e))?;
+        let serialized =
+            serde_yaml::to_string(&session).map_err(|e| format!("Serialization error: {}", e))?;
 
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(serialized.as_bytes());
         let computed_hash = format!("{:x}", hasher.finalize());
@@ -383,8 +385,8 @@ impl ManualCalibrationWorkflow {
     pub fn list_sessions(platform_id: &str, save_dir: &Path) -> Result<Vec<PathBuf>, String> {
         let mut sessions = Vec::new();
 
-        let entries = std::fs::read_dir(save_dir)
-            .map_err(|e| format!("Failed to read directory: {}", e))?;
+        let entries =
+            std::fs::read_dir(save_dir).map_err(|e| format!("Failed to read directory: {}", e))?;
 
         for entry in entries.flatten() {
             if let Some(filename) = entry.file_name().to_str() {
@@ -420,7 +422,7 @@ mod tests {
         gates.stereo_passed = true;
         gates.time_offset_passed = true;
         gates.update_overall();
-        
+
         assert!(gates.overall_passed);
     }
 
@@ -428,7 +430,7 @@ mod tests {
     fn test_session_serialization() {
         let workflow = ManualCalibrationWorkflow::new("test_drone_002".to_string());
         let serialized = serde_yaml::to_string(&workflow.session).unwrap();
-        
+
         assert!(serialized.contains("platform_id"));
         assert!(serialized.contains("test_drone_002"));
     }

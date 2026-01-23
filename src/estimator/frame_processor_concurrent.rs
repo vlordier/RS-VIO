@@ -6,9 +6,9 @@
 use crate::datasets::ImuData;
 use crate::estimator::Frame;
 use crate::{Result, VIOError};
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use std::collections::BTreeMap;
 
 /// Configuration for concurrent processor
 #[derive(Clone, Debug)]
@@ -160,10 +160,10 @@ impl ConcurrentFrameProcessor {
                         // Out of order: buffer it
                         self.reorder_buffer.insert(result.frame_id, result);
                     }
-                }
+                },
                 None => {
                     return Err(VIOError::Transient("Result channel closed".to_string()));
-                }
+                },
             }
         }
     }
@@ -222,29 +222,30 @@ impl ProcessingHandle {
                 let mut rx = frame_rx.lock().await;
                 rx.recv().await
             };
-            
+
             match frame {
                 Some(frame) => {
                     if let Some(delay_ms) = config.simulated_work_ms {
                         let jitter = if let Some(jitter_ms) = config.simulated_jitter_ms {
-                            if frame.id % 2 == 0 { jitter_ms } else { 0 }
+                            if frame.id % 2 == 0 {
+                                jitter_ms
+                            } else {
+                                0
+                            }
                         } else {
                             0
                         };
-                        tokio::time::sleep(std::time::Duration::from_millis(delay_ms + jitter)).await;
+                        tokio::time::sleep(std::time::Duration::from_millis(delay_ms + jitter))
+                            .await;
                     }
 
                     let feature_count = frame.frame.left_features.len();
 
                     // TODO: Implement actual feature detection
-                    if detected_tx
-                        .send((frame, feature_count))
-                        .await
-                        .is_err()
-                    {
+                    if detected_tx.send((frame, feature_count)).await.is_err() {
                         break;
                     }
-                }
+                },
                 None => break,
             }
         }
@@ -275,11 +276,16 @@ impl ProcessingHandle {
                     // Real optimization would go here if Backend were Send+Sync
                     if let Some(delay_ms) = config.simulated_work_ms {
                         let jitter = if let Some(jitter_ms) = config.simulated_jitter_ms {
-                            if frame.id % 2 == 0 { jitter_ms } else { 0 }
+                            if frame.id % 2 == 0 {
+                                jitter_ms
+                            } else {
+                                0
+                            }
                         } else {
                             0
                         };
-                        tokio::time::sleep(std::time::Duration::from_millis(delay_ms + jitter)).await;
+                        tokio::time::sleep(std::time::Duration::from_millis(delay_ms + jitter))
+                            .await;
                     }
 
                     let processed_at_ns = frame.timestamp_ns + start.elapsed().as_nanos() as i64;
@@ -296,7 +302,7 @@ impl ProcessingHandle {
                     if result_tx.send(result).await.is_err() {
                         break;
                     }
-                }
+                },
                 None => break,
             }
         }

@@ -207,13 +207,13 @@ impl SwarmMessage {
         // Rough estimate: header ~50 bytes + payload ~100-3000 bytes
         // All fixed-size payloads: position (24B) + quaternion (32B) + overhead
         match &self.payload {
-            MessagePayload::LocalizationUpdate { .. } => 180,      // 24 + 32 + 48 + overhead
-            MessagePayload::LoopClosureCandidate { .. } => 120,     // 24 + 32 + overhead
+            MessagePayload::LocalizationUpdate { .. } => 180, // 24 + 32 + 48 + overhead
+            MessagePayload::LoopClosureCandidate { .. } => 120, // 24 + 32 + overhead
             MessagePayload::MapMergingRequest { graph_data, .. } => 100 + graph_data.len(),
-            MessagePayload::MapMergingResponse { .. } => 100,       // conditional 56B
+            MessagePayload::MapMergingResponse { .. } => 100, // conditional 56B
             MessagePayload::Heartbeat { .. } => 50,
             MessagePayload::PoseQuery { .. } => 40,
-            MessagePayload::PoseQueryResponse { .. } => 100,        // conditional 56B
+            MessagePayload::PoseQueryResponse { .. } => 100, // conditional 56B
         }
     }
 }
@@ -312,8 +312,8 @@ impl LoopClosureConsensus {
             .filter(|v| v.is_affirmative(self.confidence_threshold))
             .count();
 
-        let avg_confidence = self.votes.iter().map(|v| v.confidence).sum::<f64>()
-            / self.votes.len() as f64;
+        let avg_confidence =
+            self.votes.iter().map(|v| v.confidence).sum::<f64>() / self.votes.len() as f64;
 
         ConsensusStats {
             total_votes: self.votes.len(),

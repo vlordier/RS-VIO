@@ -69,18 +69,16 @@ impl MetricDataPoint {
 
     /// Format as OTLP JSON
     pub fn to_otlp_json(&self) -> String {
-        let attrs = self.attributes.iter()
+        let attrs = self
+            .attributes
+            .iter()
             .map(|a| format!(r#""{}":"{}""#, a.key, a.value))
             .collect::<Vec<_>>()
             .join(",");
-        
+
         format!(
             r#"{{"name":"{}","value":{},"unit":"{}","attributes"{{{}}},"timestamp_ns":{}}}"#,
-            self.name,
-            self.value,
-            self.unit,
-            attrs,
-            self.timestamp_ns
+            self.name, self.value, self.unit, attrs, self.timestamp_ns
         )
     }
 }
@@ -118,80 +116,81 @@ impl OtelMetricsBatch {
 
     /// Convert to OTLP JSON array
     pub fn to_otlp_json(&self) -> String {
-        let points = self.data_points.iter()
+        let points = self
+            .data_points
+            .iter()
             .map(|p| p.to_otlp_json())
             .collect::<Vec<_>>()
             .join(",");
-        
-        let resources = self.resource_attributes.iter()
+
+        let resources = self
+            .resource_attributes
+            .iter()
             .map(|(k, v)| format!(r#""{}":"{}""#, k, v))
             .collect::<Vec<_>>()
             .join(",");
 
         format!(
             r#"{{"resource"{{{}}},"scope_name":"{}","metrics":[{}]}}"#,
-            resources,
-            self.scope_name,
-            points
+            resources, self.scope_name, points
         )
     }
 
     /// Convert pipeline metrics to OTLP batch
     pub fn from_pipeline(metrics: &PipelineMetrics) -> Self {
         let mut batch = OtelMetricsBatch::new();
-        
+
         // Set resource attributes
         batch.set_resource_attribute("service.name", "rs-vio-pipeline");
         batch.set_resource_attribute("service.version", env!("CARGO_PKG_VERSION"));
-        
+
         let det = metrics.detection_metrics();
         let opt = metrics.optimization_metrics();
-        
+
         // Add detection metrics
         batch.add_point(
             MetricDataPoint::new("vio.detection.latency", det.avg_time_us() as f64)
                 .with_attribute("stage", "detection")
-                .with_unit("us")
+                .with_unit("us"),
         );
 
         // Add optimization metrics
         batch.add_point(
             MetricDataPoint::new("vio.optimization.latency", opt.avg_time_us() as f64)
                 .with_attribute("stage", "optimization")
-                .with_unit("us")
+                .with_unit("us"),
         );
 
         // Add queue metrics
         batch.add_point(
             MetricDataPoint::new("vio.queue.depth", metrics.queue_depth() as f64)
-                .with_attribute("type", "current")
+                .with_attribute("type", "current"),
         );
 
         batch.add_point(
             MetricDataPoint::new("vio.queue.depth_max", metrics.max_queue_depth() as f64)
-                .with_attribute("type", "maximum")
+                .with_attribute("type", "maximum"),
         );
 
         // Add frame metrics
         batch.add_point(
             MetricDataPoint::new("vio.frames.total", metrics.total_frames_processed() as f64)
-                .with_unit("frames")
+                .with_unit("frames"),
         );
 
         // Add error metrics
         batch.add_point(
             MetricDataPoint::new("vio.errors.total", metrics.total_errors() as f64)
-                .with_unit("count")
+                .with_unit("count"),
         );
 
         batch.add_point(
             MetricDataPoint::new("vio.errors.recovered", metrics.recovered_errors() as f64)
-                .with_unit("count")
+                .with_unit("count"),
         );
 
         batch.add_point(
-            MetricDataPoint::new("vio.error.rate", metrics.error_rate())
-                .with_unit("ratio")
+            MetricDataPoint::new("vio.error.rate", metrics.error_rate()).with_unit("ratio"),
         );
 
         batch
@@ -220,20 +219,29 @@ impl OtelMetricsExporter {
     /// Export metrics from pipeline
     pub fn export(&self, metrics: &PipelineMetrics) -> Result<(), OtelError> {
         let batch = OtelMetricsBatch::from_pipeline(metrics);
-        let mut guard = self.batch.lock().map_err(|_| OtelError::ExportFailed("Lock failed".to_string()))?;
+        let mut guard = self
+            .batch
+            .lock()
+            .map_err(|_| OtelError::ExportFailed("Lock failed".to_string()))?;
         *guard = batch;
         Ok(())
     }
 
     /// Get current batch as OTLP JSON
     pub fn get_otlp_json(&self) -> Result<String, OtelError> {
-        let batch = self.batch.lock().map_err(|_| OtelError::ExportFailed("Lock failed".to_string()))?;
+        let batch = self
+            .batch
+            .lock()
+            .map_err(|_| OtelError::ExportFailed("Lock failed".to_string()))?;
         Ok(batch.to_otlp_json())
     }
 
     /// Get metrics as formatted string for stdout
     pub fn to_string(&self) -> Result<String, OtelError> {
-        let batch = self.batch.lock().map_err(|_| OtelError::ExportFailed("Lock failed".to_string()))?;
+        let batch = self
+            .batch
+            .lock()
+            .map_err(|_| OtelError::ExportFailed("Lock failed".to_string()))?;
         Ok(format!("{:#?}", batch))
     }
 }
@@ -301,8 +309,7 @@ mod tests {
 
     #[test]
     fn test_metric_data_point_otlp_json() {
-        let point = MetricDataPoint::new("vio.latency", 100.5)
-            .with_unit("us");
+        let point = MetricDataPoint::new("vio.latency", 100.5).with_unit("us");
 
         let json = point.to_otlp_json();
         assert!(json.contains("vio.latency"));
@@ -313,7 +320,7 @@ mod tests {
     #[test]
     fn test_otel_batch_creation() {
         let mut batch = OtelMetricsBatch::new();
-        
+
         batch.set_resource_attribute("service.name", "test-service");
         batch.add_point(MetricDataPoint::new("test.metric", 42.0));
 
@@ -324,7 +331,7 @@ mod tests {
     #[test]
     fn test_otel_batch_json() {
         let mut batch = OtelMetricsBatch::new();
-        
+
         batch.set_resource_attribute("service.name", "test-service");
         batch.add_point(MetricDataPoint::new("test.metric", 42.0));
 
@@ -337,11 +344,11 @@ mod tests {
     #[test]
     fn test_otel_batch_from_pipeline() {
         let pipeline = PipelineMetrics::new();
-        
+
         // Record some metrics
         pipeline.record_detection(100, false);
         pipeline.record_optimization(200, false);
-        
+
         let frame = FrameMetrics {
             frame_id: 0,
             timestamp_ns: 0,
@@ -355,7 +362,7 @@ mod tests {
         pipeline.record_frame(frame);
 
         let batch = OtelMetricsBatch::from_pipeline(&pipeline);
-        
+
         assert!(batch.resource_attributes.contains_key("service.name"));
         assert!(!batch.data_points.is_empty());
     }
@@ -364,7 +371,7 @@ mod tests {
     fn test_otel_exporter() {
         let exporter = OtelMetricsExporter::new();
         let pipeline = PipelineMetrics::new();
-        
+
         assert!(exporter.export(&pipeline).is_ok());
         let json = exporter.get_otlp_json().unwrap();
         assert!(json.contains("vio."));

@@ -3,9 +3,11 @@
 //! Provides `/metrics` endpoint for Prometheus scraping and OpenTelemetry collection
 //! Supports both text and JSON formats based on content-type negotiation
 
-use crate::estimator::{PipelineMetrics, metrics_export::MetricsExporter, otel_exporter::OtelMetricsExporter};
-use std::sync::Arc;
+use crate::estimator::{
+    metrics_export::MetricsExporter, otel_exporter::OtelMetricsExporter, PipelineMetrics,
+};
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 /// HTTP metrics server configuration
 #[derive(Debug, Clone)]
@@ -49,7 +51,9 @@ impl MetricsServerConfig {
 
     /// Get socket address
     pub fn socket_addr(&self) -> Result<SocketAddr, Box<dyn std::error::Error>> {
-        format!("{}:{}", self.host, self.port).parse().map_err(|e| Box::new(e) as _)
+        format!("{}:{}", self.host, self.port)
+            .parse()
+            .map_err(|e| Box::new(e) as _)
     }
 }
 
@@ -63,10 +67,7 @@ pub struct MetricsServer {
 
 impl MetricsServer {
     /// Create new metrics server
-    pub fn new(
-        config: MetricsServerConfig,
-        pipeline_metrics: Arc<PipelineMetrics>,
-    ) -> Self {
+    pub fn new(config: MetricsServerConfig, pipeline_metrics: Arc<PipelineMetrics>) -> Self {
         Self {
             config,
             prometheus_exporter: MetricsExporter::new(),
@@ -100,11 +101,11 @@ impl MetricsServer {
         self.prometheus_exporter
             .export(&self.pipeline_metrics)
             .map_err(|e| e.to_string())?;
-        
+
         self.otel_exporter
             .export(&self.pipeline_metrics)
             .map_err(|e| e.to_string())?;
-        
+
         Ok(())
     }
 
@@ -149,7 +150,10 @@ impl MetricsResponse {
 }
 
 /// Determine response format based on accept header
-pub fn negotiate_metrics_format(accept_header: Option<&str>, metrics_server: &MetricsServer) -> Result<MetricsResponse, String> {
+pub fn negotiate_metrics_format(
+    accept_header: Option<&str>,
+    metrics_server: &MetricsServer,
+) -> Result<MetricsResponse, String> {
     if let Some(accept) = accept_header {
         if accept.contains("application/json") {
             let json = metrics_server.otel_metrics()?;
@@ -159,7 +163,7 @@ pub fn negotiate_metrics_format(accept_header: Option<&str>, metrics_server: &Me
             return Ok(MetricsResponse::OpenMetricsText(text));
         }
     }
-    
+
     // Default to Prometheus format
     let text = metrics_server.prometheus_metrics()?;
     Ok(MetricsResponse::PrometheusText(text))
@@ -201,7 +205,7 @@ mod tests {
     fn test_metrics_server_creation() {
         let metrics = Arc::new(PipelineMetrics::new());
         let server = MetricsServer::with_default_config(metrics);
-        
+
         assert_eq!(server.config.port, 9090);
         assert_eq!(server.metrics_url(), "http://127.0.0.1:9090/metrics");
     }
@@ -210,10 +214,10 @@ mod tests {
     fn test_prometheus_metrics() {
         let metrics = Arc::new(PipelineMetrics::new());
         let server = MetricsServer::with_default_config(metrics);
-        
+
         server.refresh_metrics().unwrap();
         let prom = server.prometheus_metrics().unwrap();
-        
+
         assert!(prom.contains("vio_"));
     }
 
@@ -221,10 +225,10 @@ mod tests {
     fn test_otel_metrics() {
         let metrics = Arc::new(PipelineMetrics::new());
         let server = MetricsServer::with_default_config(metrics);
-        
+
         server.refresh_metrics().unwrap();
         let otel = server.otel_metrics().unwrap();
-        
+
         assert!(otel.contains("vio."));
     }
 
@@ -232,7 +236,7 @@ mod tests {
     fn test_metrics_response_content_type() {
         let resp = MetricsResponse::PrometheusText("test".to_string());
         assert!(resp.content_type().contains("text/plain"));
-        
+
         let resp = MetricsResponse::OtelJson("{}".to_string());
         assert!(resp.content_type().contains("application/json"));
     }
@@ -242,7 +246,7 @@ mod tests {
         let metrics = Arc::new(PipelineMetrics::new());
         let server = MetricsServer::with_default_config(metrics);
         server.refresh_metrics().unwrap();
-        
+
         let resp = negotiate_metrics_format(None, &server).unwrap();
         assert!(resp.content_type().contains("text/plain"));
     }
@@ -252,7 +256,7 @@ mod tests {
         let metrics = Arc::new(PipelineMetrics::new());
         let server = MetricsServer::with_default_config(metrics);
         server.refresh_metrics().unwrap();
-        
+
         let resp = negotiate_metrics_format(Some("application/json"), &server).unwrap();
         assert!(resp.content_type().contains("application/json"));
     }
@@ -262,7 +266,7 @@ mod tests {
         let metrics = Arc::new(PipelineMetrics::new());
         let server = MetricsServer::with_default_config(metrics);
         server.refresh_metrics().unwrap();
-        
+
         let resp = negotiate_metrics_format(Some("openmetrics"), &server).unwrap();
         assert!(resp.content_type().contains("openmetrics"));
     }

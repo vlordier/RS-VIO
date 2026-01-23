@@ -9,7 +9,7 @@
 //! - Compute uncertainty from tracking residuals
 //! - Grid-based spatial distribution enforcement
 
-use super::{Keypoint, FeatureTrack, FeatureTracker, FeatureResult, FeatureError};
+use super::{FeatureError, FeatureResult, FeatureTrack, FeatureTracker, Keypoint};
 use crate::types::Float;
 use std::collections::VecDeque;
 
@@ -67,12 +67,7 @@ impl GFTTDetector {
     }
 
     /// Compute Harris corner response
-    fn compute_harris_response(
-        &self,
-        image: &[u8],
-        width: u32,
-        height: u32,
-    ) -> Vec<Float> {
+    fn compute_harris_response(&self, image: &[u8], width: u32, height: u32) -> Vec<Float> {
         let w = width as usize;
         let h = height as usize;
         let mut dx = vec![0.0; w * h];
@@ -192,12 +187,7 @@ impl GFTTDetector {
 }
 
 impl super::KeypointDetector for GFTTDetector {
-    fn detect(
-        &self,
-        image: &[u8],
-        width: u32,
-        height: u32,
-    ) -> FeatureResult<Vec<Keypoint>> {
+    fn detect(&self, image: &[u8], width: u32, height: u32) -> FeatureResult<Vec<Keypoint>> {
         if image.is_empty() {
             return Err(FeatureError::InvalidImage("Empty image data".to_string()));
         }
@@ -259,7 +249,9 @@ impl PyramidalKLTTracker {
             let _dy = y - iy as Float;
 
             if ix < ws || ix + ws >= width as i32 || iy < ws || iy + ws >= height as i32 {
-                return Err(FeatureError::TrackingError("Point out of bounds".to_string()));
+                return Err(FeatureError::TrackingError(
+                    "Point out of bounds".to_string(),
+                ));
             }
 
             // Simplified Lucas-Kanade: just shift by median optical flow
@@ -351,10 +343,10 @@ impl FeatureTracker for PyramidalKLTTracker {
                         uncertainty,
                     });
                     tracked_ids.insert(*track_id);
-                }
+                },
                 Err(_) => {
                     // Lost track, remove from buffer
-                }
+                },
             }
         }
 
@@ -385,7 +377,8 @@ impl FeatureTracker for PyramidalKLTTracker {
         // Update buffer for next frame
         self.track_buffer.clear();
         for track in &tracks {
-            self.track_buffer.push_back((track.track_id, track.keypoint));
+            self.track_buffer
+                .push_back((track.track_id, track.keypoint));
         }
 
         self.prev_image = Some(image.to_vec());

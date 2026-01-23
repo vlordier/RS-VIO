@@ -1,9 +1,9 @@
 //! Configuration types for marginalization
 
+use crate::clamp_or;
 use na::DVector;
 use nalgebra as na;
 use serde::{Deserialize, Serialize};
-use crate::clamp_or;
 
 /// Result of marginalization operation
 #[derive(Debug, Clone)]

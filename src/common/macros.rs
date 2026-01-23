@@ -32,7 +32,7 @@ macro_rules! bail {
 #[macro_export]
 macro_rules! defer {
     ($body:expr) => {
-        let _guard = $crate::common::macros::Defer::new(|| { $body });
+        let _guard = $crate::common::macros::Defer::new(|| $body);
         _guard
     };
 }

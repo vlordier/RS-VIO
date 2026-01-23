@@ -4,7 +4,7 @@ use crate::datasets::{
 };
 use crate::debug_log;
 use crate::estimator::Estimator;
-use crate::{Result, VIOError, ok_or_log};
+use crate::{ok_or_log, Result, VIOError};
 use image::ImageReader;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -227,7 +227,10 @@ impl DatasetPlayer for EurocPlayer {
                     .collect()
             })
             .unwrap_or_else(|e| {
-                log::warn!("EuRoC IMU cache poisoned while fetching between frames: {}", e);
+                log::warn!(
+                    "EuRoC IMU cache poisoned while fetching between frames: {}",
+                    e
+                );
                 Vec::new()
             })
     }

@@ -172,7 +172,7 @@ impl SubPixelDisparityRefiner {
                 None => {
                     log::error!("Pyramid level {} out of bounds", level);
                     break;
-                }
+                },
             };
             let scale = 2_f64.powi(level as i32);
             let level_x = (x as f64 / scale) as u32;
@@ -185,14 +185,14 @@ impl SubPixelDisparityRefiner {
                 None => {
                     log::error!("Failed to get left pyramid level {}", level);
                     break;
-                }
+                },
             };
             let right_level = match right_pyr.get_level(level) {
                 Some(img) => img,
                 None => {
                     log::error!("Failed to get right pyramid level {}", level);
                     break;
-                }
+                },
             };
 
             let (refined_disp, iter_count, converged) = self.gauss_newton_refinement(

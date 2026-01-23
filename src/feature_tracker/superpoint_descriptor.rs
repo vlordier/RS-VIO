@@ -137,7 +137,7 @@ impl SuperPointDescriptor {
 
         // TODO: Implement ONNX model loading and inference
         // For now, return empty (will be implemented with ort crate)
-        
+
         Ok(Vec::new())
     }
 
@@ -178,7 +178,10 @@ impl SuperPointDescriptor {
             avg_confidence: if self.keypoints.is_empty() {
                 0.0
             } else {
-                self.keypoints.iter().map(|k| k.confidence as f64).sum::<f64>()
+                self.keypoints
+                    .iter()
+                    .map(|k| k.confidence as f64)
+                    .sum::<f64>()
                     / self.keypoints.len() as f64
             },
             descriptor_size: self.config.descriptor_size as u32,

@@ -7,7 +7,7 @@ use crate::datasets::ImuData;
 use crate::{Result, VIOError};
 
 /// Async wrapper around sequential Estimator
-/// 
+///
 /// Spawns blocking Estimator operations on dedicated tokio blocking threads
 /// to prevent starving other async tasks.
 pub struct AsyncEstimator {
@@ -18,7 +18,7 @@ pub struct AsyncEstimator {
 
 impl AsyncEstimator {
     /// Create new async estimator (placeholder for future implementation)
-    /// 
+    ///
     /// Currently returns a stub. Full async support requires redesigning
     /// Estimator to support Send+Sync or using external process communication.
     pub fn new() -> Self {
@@ -41,13 +41,17 @@ impl AsyncEstimator {
         // 1. Redesign Estimator to use Send-safe trait objects
         // 2. Use external process with IPC
         // 3. Spawn multiple Estimator instances, one per async task
-        Err(VIOError::Degraded("Async processing not yet implemented".to_string()))
+        Err(VIOError::Degraded(
+            "Async processing not yet implemented".to_string(),
+        ))
     }
 
     /// Get current state asynchronously (placeholder)
     pub async fn get_pose(&self) -> Result<nalgebra::Isometry3<f32>> {
         // TODO: Implement pose retrieval
-        Err(VIOError::Degraded("Pose retrieval not yet implemented".to_string()))
+        Err(VIOError::Degraded(
+            "Pose retrieval not yet implemented".to_string(),
+        ))
     }
 
     /// Shutdown the async estimator gracefully

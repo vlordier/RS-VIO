@@ -38,12 +38,6 @@ pub mod mesh_extraction;
 pub mod point_cloud;
 pub mod tsdf_volume;
 
-pub use mesh_extraction::{
-    MarchingCubes, Mesh, MeshExtractionConfig, Normal, Triangle, Vertex,
-};
-pub use point_cloud::{
-    Color, GrayImage, PointCloud, PointCloudConfig, PointCloudGenerator,
-};
-pub use tsdf_volume::{
-    CameraPose, DepthMap, Point3D, TSDFConfig, TSDFVolume, Voxel,
-};
+pub use mesh_extraction::{MarchingCubes, Mesh, MeshExtractionConfig, Normal, Triangle, Vertex};
+pub use point_cloud::{Color, GrayImage, PointCloud, PointCloudConfig, PointCloudGenerator};
+pub use tsdf_volume::{CameraPose, DepthMap, Point3D, TSDFConfig, TSDFVolume, Voxel};

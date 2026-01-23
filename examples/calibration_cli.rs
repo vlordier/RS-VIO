@@ -3,9 +3,7 @@
 //! This example demonstrates how to perform a complete calibration session
 //! with operator guidance and quality gates.
 
-use rs_vio::calibration::manual_workflow::{
-    ManualCalibrationWorkflow,
-};
+use rs_vio::calibration::manual_workflow::ManualCalibrationWorkflow;
 use std::io::{self, Write};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -50,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Simulation: Perform IMU calibration
     println!("\n--- Simulating IMU Calibration ---");
     println!("(In production, this would read real IMU data)");
-    
+
     // Simulate collecting samples for each pose
     for pose_idx in 0..6 {
         println!("\nPose {}: Ready? (press Enter)", pose_idx);
@@ -62,7 +60,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         for i in 0..100 {
             // Simulated IMU data (in reality, this comes from sensors)
             // In real implementation: workflow.add_imu_sample(sample)?;
-            
+
             if i % 20 == 0 {
                 print!(".");
                 io::stdout().flush()?;
@@ -108,13 +106,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("No previous sessions found.");
             } else {
                 for (i, session_path) in sessions.iter().enumerate() {
-                    let file_name = session_path.file_name()
+                    let file_name = session_path
+                        .file_name()
                         .map(|n| n.to_string_lossy())
                         .unwrap_or_else(|| "unknown".into());
                     println!("{}. {}", i + 1, file_name);
                 }
             }
-        }
+        },
         Err(e) => println!("Could not list sessions: {}", e),
     }
 

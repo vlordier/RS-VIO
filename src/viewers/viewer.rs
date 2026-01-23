@@ -63,7 +63,6 @@ pub trait Viewer: Send {
     /// trajectory: vector of 4x4 transformation matrices, extracts translation (position) from each
     fn log_trajectory(&mut self, trajectory: &[Matrix4x4], entity_path: &str);
 
-
     /// Visualize loop closure constraints
     fn log_loop_closure(
         &mut self,

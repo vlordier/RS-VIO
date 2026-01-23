@@ -88,14 +88,14 @@ pub mod subpixel_stereo;
 pub mod superpoint_descriptor;
 pub mod track_first_detector;
 
-pub use feature_tracker::*;
 pub use feature_distributor::{
     CellStatus, DistributionConfig, DistributionStats, FeatureDistributor,
 };
+pub use feature_tracker::*;
 pub use frame_skip::AdaptiveFrameSkipper;
 pub use frame_stabilizer::{FrameStabilizer, StabilizerConfig};
 pub use gpu_accel::{GpuAccelerator, GpuBackend, GpuConfig, GpuDeviceInfo};
-pub use lightglue_matcher::{FeatureMatch, LightGlueMatcher, LightGlueConfig};
+pub use lightglue_matcher::{FeatureMatch, LightGlueConfig, LightGlueMatcher};
 #[cfg(feature = "matching-basic-ransac")]
 pub use matching_strategy::BasicRANSACStrategy;
 #[cfg(feature = "matching-hybrid-of")]
@@ -121,7 +121,5 @@ pub use pipeline_config::{
 };
 pub use ransac_essential::{EssentialMatrixRansac, RansacConfig};
 pub use subpixel_stereo::{StereoMatchResult, SubpixelStereoRefinement};
-pub use superpoint_descriptor::{
-    KeypointDescriptor, SuperPointConfig, SuperPointDescriptor,
-};
+pub use superpoint_descriptor::{KeypointDescriptor, SuperPointConfig, SuperPointDescriptor};
 pub use track_first_detector::{TrackFirstConfig, TrackFirstDetector, TrackedFeature};

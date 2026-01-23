@@ -76,7 +76,12 @@ impl Pose {
     /// Pose inverse
     pub fn inverse(&self) -> Self {
         // Quaternion conjugate for rotation inverse
-        let q_inv = [self.quaternion[0], -self.quaternion[1], -self.quaternion[2], -self.quaternion[3]];
+        let q_inv = [
+            self.quaternion[0],
+            -self.quaternion[1],
+            -self.quaternion[2],
+            -self.quaternion[3],
+        ];
 
         // Inverse position: -R^T * t
         let neg_pos = [-self.position[0], -self.position[1], -self.position[2]];
@@ -189,7 +194,7 @@ impl LocalPoseGraph {
 
         // Residual: || relative_pose - measurement ||
         let relative = from.inverse().compose(to);
-        
+
         // Simplified: position difference only
         let dx = relative.position[0] - constraint.measurement.position[0];
         let dy = relative.position[1] - constraint.measurement.position[1];
@@ -206,7 +211,7 @@ impl LocalPoseGraph {
 
             for constraint in &self.constraints {
                 let residual = self.compute_residual(constraint);
-                
+
                 if residual < config.convergence_threshold {
                     continue;
                 }
@@ -236,13 +241,18 @@ impl LocalPoseGraph {
     }
 
     /// ADMM consensus step
-    pub fn consensus_step(&mut self, neighbor_poses: &HashMap<usize, Pose>, _config: &DistributedOptimizationConfig) {
+    pub fn consensus_step(
+        &mut self,
+        neighbor_poses: &HashMap<usize, Pose>,
+        _config: &DistributedOptimizationConfig,
+    ) {
         // Update consensus variables (average with neighbors)
         for (pose_id, neighbor_pose) in neighbor_poses {
             if let Some(local_pose) = self.poses.get_mut(pose_id) {
                 // Average position
                 for i in 0..3 {
-                    local_pose.position[i] = 0.5 * (local_pose.position[i] + neighbor_pose.position[i]);
+                    local_pose.position[i] =
+                        0.5 * (local_pose.position[i] + neighbor_pose.position[i]);
                 }
 
                 // Store consensus
@@ -298,7 +308,7 @@ impl DistributedOptimizer {
 
         // Step 2: Consensus (share poses between drones)
         let shared_poses = self.collect_shared_poses();
-        
+
         for graph in self.local_graphs.values_mut() {
             if let Some(neighbor_poses) = shared_poses.get(&graph.drone_id) {
                 graph.consensus_step(neighbor_poses, &self.config);
@@ -377,7 +387,7 @@ mod tests {
     fn test_pose_compose_identity() {
         let p1 = Pose::identity();
         let p2 = Pose::new([1.0, 2.0, 3.0], [1.0, 0.0, 0.0, 0.0]);
-        
+
         let composed = p1.compose(&p2);
         assert!((composed.position[0] - 1.0).abs() < 0.001);
         assert!((composed.position[1] - 2.0).abs() < 0.001);
@@ -389,7 +399,7 @@ mod tests {
         let pose = Pose::new([1.0, 2.0, 3.0], [1.0, 0.0, 0.0, 0.0]);
         let inv = pose.inverse();
         let composed = pose.compose(&inv);
-        
+
         // Should be close to identity
         assert!(composed.position[0].abs() < 0.001);
         assert!(composed.position[1].abs() < 0.001);
@@ -405,7 +415,7 @@ mod tests {
             information: 1.0,
             inter_drone: false,
         };
-        
+
         assert_eq!(constraint.from_id, 0);
         assert_eq!(constraint.to_id, 1);
         assert!(!constraint.inter_drone);
@@ -443,7 +453,7 @@ mod tests {
             information: 1.0,
             inter_drone: false,
         };
-        
+
         graph.add_constraint(constraint);
         assert_eq!(graph.num_constraints(), 1);
     }
@@ -453,7 +463,7 @@ mod tests {
         let mut graph = LocalPoseGraph::new(0);
         graph.add_pose(0, Pose::identity());
         graph.add_pose(1, Pose::new([1.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]));
-        
+
         let constraint = Constraint {
             from_id: 0,
             to_id: 1,
@@ -462,10 +472,10 @@ mod tests {
             inter_drone: false,
         };
         graph.add_constraint(constraint);
-        
+
         let config = DistributedOptimizationConfig::default();
         graph.local_optimize(&config);
-        
+
         // Poses should be optimized
         assert_eq!(graph.num_poses(), 2);
     }
@@ -481,7 +491,7 @@ mod tests {
         let mut optimizer = DistributedOptimizer::new(DistributedOptimizationConfig::default());
         let graph = LocalPoseGraph::new(0);
         optimizer.add_local_graph(graph);
-        
+
         assert_eq!(optimizer.num_graphs(), 1);
     }
 
@@ -490,7 +500,7 @@ mod tests {
         let mut optimizer = DistributedOptimizer::new(DistributedOptimizationConfig::default());
         let graph = LocalPoseGraph::new(0);
         optimizer.add_local_graph(graph);
-        
+
         let result = optimizer.optimize();
         assert!(result);
     }
@@ -500,7 +510,7 @@ mod tests {
         let mut optimizer = DistributedOptimizer::new(DistributedOptimizationConfig::default());
         let graph = LocalPoseGraph::new(0);
         optimizer.add_local_graph(graph);
-        
+
         let retrieved = optimizer.get_graph(0);
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().drone_id, 0);
