@@ -121,7 +121,7 @@ impl Estimator {
             frames_since_last_keyframe: 0,
             enable_debug_output: true,
             config: config.clone(),
-            frontend: Frontend::new(&feature_config),
+            frontend: Frontend::new(feature_config),
             backend: Backend::new(&config),
             imu_processor: ImuProcessor::new(&config, T_B_Cl),
             loop_closure_detector,

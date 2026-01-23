@@ -1,9 +1,10 @@
 /// Build script for RS-VIO
 /// 
 /// Validates feature flag combinations at compile time to prevent invalid configurations
+#[allow(clippy::panic)]
 fn main() {
     // Mutually exclusive matching strategy features
-    let matching_strategies = vec![
+    let matching_strategies = [
         "matching-basic-ransac",
         "matching-imu-guided",
         "matching-temporal",

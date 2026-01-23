@@ -26,6 +26,7 @@ pub struct AsyncOptimizer {
 
 impl AsyncOptimizer {
     /// Create a new async optimizer from config
+    #[allow(clippy::arc_with_non_send_sync)]
     pub fn new(config: &Config) -> Self {
         Self {
             backend: Arc::new(Mutex::new(Backend::new(config))),

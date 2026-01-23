@@ -337,7 +337,6 @@ mod tests {
     #[test]
     fn test_reorder_buffer_ordering() {
         let mut buffer = BTreeMap::new();
-        let mut next_id = 0;
 
         // Simulate out-of-order insertion
         buffer.insert(1, 11);
@@ -347,11 +346,10 @@ mod tests {
 
         // Verify ordering on retrieval
         let ids: Vec<_> = buffer.keys().copied().collect();
-        for id in ids {
+        for (idx, id) in ids.into_iter().enumerate() {
             let val = buffer.remove(&id).unwrap();
-            assert_eq!(id, next_id);
-            assert_eq!(val, 10 + next_id as i32);
-            next_id += 1;
+            assert_eq!(id, idx as usize);
+            assert_eq!(val, 10 + idx as i32);
         }
     }
 }
