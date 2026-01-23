@@ -274,3 +274,7 @@ harness = false
 [[bench]]
 name = "strategy_comparison"
 harness = false
+
+[[bench]]
+name = "concurrent_pipeline"
+harness = false
