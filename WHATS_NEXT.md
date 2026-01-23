@@ -1,7 +1,7 @@
 # What's Next for RS-VIO? 🚀
 
 **Current Status**: Phase 6 Complete ✅ (All 3 options delivered)  
-**Date**: 23 January 2026  
+**Date**: 23 January 2026 (Updated: Phase 7A infrastructure complete)
 **Branch**: develop  
 
 ---
@@ -20,9 +20,12 @@
 | **Hardware Profiling** | ✅ Complete | 16 tests | 5 platform profiles |
 | **Circuit Breaker** | ✅ Complete | 20 tests | Swarm resilience |
 | **Integration Tests** | ✅ Complete | 21 tests | Full stack validation |
+| **Dataset Infrastructure** | ✅ Complete | 4 tests | TUM-VI loader + ATE/RPE metrics |
 | **Documentation** | ✅ Complete | 2,800+ LOC | Comprehensive guides |
 
-**Total**: 796 tests passing (100% success rate)
+**Total**: 786 tests passing (100% success rate)
+	- 782 lib tests (includes 4 new trajectory_eval tests)
+	- 4 integration tests
 
 ### 📊 Quality Metrics
 
@@ -44,30 +47,33 @@
 ### High-Value Additions (Priority Order)
 
 #### 1. Real-World Dataset Validation ⭐⭐⭐⭐⭐ (HIGHEST ROI)
-**Status**: ⚠️ Benchmarks use synthetic data  
-**Why**: Validate performance claims with real TUM-VI/EuRoC datasets  
-**Effort**: 8-12 hours  
+**Status**: 🔄 Infrastructure complete, awaiting dataset download
+**Why**: Validate performance claims with real TUM-VI dataset images
+**Effort**: 4-6 hours remaining (infrastructure done)
 **Impact**: HIGH - Proves production viability
 
 **What's needed**:
-- [ ] TUM-VI dataset integration (real stereo images)
-- [ ] Measure actual feature detection latency (not synthetic)
-- [ ] Benchmark bundle adjustment with real point clouds
-- [ ] Compare against ground truth trajectories
-- [ ] Document real-world throughput (fps, latency P50/P95/P99)
+- [x] TUM-VI dataset loader (EuRoC format) - **DONE**
+- [x] Trajectory evaluation metrics (ATE/RPE) - **DONE**
+- [x] Benchmark infrastructure - **DONE**
+- [ ] Download TUM-VI dataset manually (~12GB, see REAL_WORLD_VALIDATION.md)
+- [ ] Run benchmarks on real images (`cargo bench --bench tum_vi_real_pipeline`)
+- [ ] Measure actual accuracy vs ground truth
+- [ ] Document real-world performance numbers
 
 **Deliverables**:
-- `benches/tum_vi_real_pipeline.rs` - Real dataset benchmarks
-- Performance comparison report (synthetic vs real)
-- Accuracy metrics (ATE, RPE) vs ground truth
-- Production deployment guide with real numbers
+- [x] `benches/tum_vi_real_pipeline.rs` - Real dataset benchmarks
+- [x] `src/datasets/tum_vi.rs` - TUM-VI loader (310 LOC)
+- [x] `src/datasets/trajectory_eval.rs` - ATE/RPE metrics (215 LOC)
+- [x] `REAL_WORLD_VALIDATION.md` - Complete validation guide
+- [ ] Performance comparison report (pending dataset download)
+- [ ] Accuracy metrics vs ground truth (pending dataset download)
 
-**Files to create**:
-```
-benches/tum_vi_real_pipeline.rs
-REAL_WORLD_VALIDATION.md
-scripts/download_tum_vi.sh
-```
+**Dataset Download**:
+- TUM-VI must be downloaded manually (see [REAL_WORLD_VALIDATION.md](REAL_WORLD_VALIDATION.md))
+- Official source: https://vision.in.tum.de/data/datasets/visual-inertial-dataset
+- Extract room sequences to `./data/tum_vi/` or set `TUM_VI_DIR` env var
+- **Note**: Existing `scripts/download_datasets.sh` downloads TUM RGB-D (different format)
 
 ---
 
