@@ -187,3 +187,35 @@ Recommended Order: 1 → 5 → 2 → 3 → 4 (highest ROI → foundation for con
 - **PHASE2_BENCHMARK_RESULTS.md**: Detailed benchmark validation (689/689 tests, 78s execution)
 - **UPGRADE_STATUS.md**: Detailed roadmap, metrics, and integration schedule
 - **ARENA_INTEGRATION_QUICKSTART.sh**: Code patterns and integration guide
+
+## Phase 4: Async/Concurrent Architecture (In Progress)
+
+✅ **Phase 4.1: Async Foundation Complete** (4.5h)
+- Tokio 1.35 integration with full feature set
+- MPSC channels for task communication
+- Structured concurrency with JoinSet
+- AsyncEstimator skeleton with placeholder
+
+✅ **Phase 4.2: Concurrent Pipeline + Tests Complete** (2h)
+- ConcurrentFrameProcessor with two-stage pipeline
+- feature_detection_worker and optimization_worker tasks
+- Reordering buffer for deterministic output ordering
+- Comprehensive test suite (6 integration tests, 3 unit tests)
+- 695/695 tests passing, zero timeouts
+
+✅ **Phase 4.3.1: Async Feature Detection Integration Complete** (1.5h)
+- AsyncFeatureDetector<LEVELS> wrapping Frontend in Arc<Mutex<>>
+- Async methods: detect_features(), detect_features_from_dynamic()
+- Safe concurrent access patterns for shared state
+- Integration tests (3 new): concurrent access, state sharing, latency
+- 698/698 tests passing (695 original + 3 new async tests)
+
+**Phase 4.3 Remaining** (23-25 hours estimated):
+- Task 4.3.2: Optimization Integration (15-20h) - AsyncOptimizer wrapper
+- Task 4.3.3: Full Pipeline Validation (3-5h) - End-to-end testing
+- Target: 60 Hz throughput, <50ms P99 latency, 85% CPU util
+
+**Phase 4 Documentation**:
+- **PHASE4_2_IMPLEMENTATION.md**: Concurrent pipeline architecture
+- **PHASE4_3_PLANNING.md**: Task breakdown and success criteria
+- **PHASE4_3_1_IMPLEMENTATION.md**: Async feature detection details
