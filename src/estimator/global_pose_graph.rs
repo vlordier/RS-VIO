@@ -47,6 +47,11 @@ pub struct GlobalKeyframe {
     pub covariance: Matrix6,
     pub timestamp_ns: i64,
     pub is_marginalized: bool,
+    /// Feature observations in left camera (2D normalized coordinates)
+    /// Key: feature_id, Value: (x, y) in normalized coordinates
+    pub left_feature_observations: Vec<(usize, (f64, f64))>,
+    /// Feature observations in right camera
+    pub right_feature_observations: Vec<(usize, (f64, f64))>,
 }
 
 /// Loop closure edge between two keyframes
@@ -137,12 +142,33 @@ impl GlobalPoseGraph {
         // Create identity covariance for now (will be updated by optimization)
         let covariance = Matrix6::identity() * 1e-2;
 
+        // Extract feature observations from left and right cameras
+        // Use undistorted coordinates (normalized by camera intrinsics during optimization)
+        let left_feature_observations: Vec<(usize, (f64, f64))> = frame
+            .left_features
+            .iter()
+            .map(|feat| {
+                // Use undistorted coordinates
+                (feat.feature_id, (feat.undistorted_coord[0] as f64, feat.undistorted_coord[1] as f64))
+            })
+            .collect();
+
+        let right_feature_observations: Vec<(usize, (f64, f64))> = frame
+            .right_features
+            .iter()
+            .map(|feat| {
+                (feat.feature_id, (feat.undistorted_coord[0] as f64, feat.undistorted_coord[1] as f64))
+            })
+            .collect();
+
         let keyframe = GlobalKeyframe {
             id: keyframe_id,
             T_W_B: frame.state.T_W_B,
             covariance,
             timestamp_ns: frame.timestamp_ns,
             is_marginalized: false,
+            left_feature_observations,
+            right_feature_observations,
         };
 
         self.keyframe_poses.insert(keyframe_id, keyframe);
@@ -372,6 +398,8 @@ mod tests {
                 covariance: Matrix6::identity(),
                 timestamp_ns: i as i64,
                 is_marginalized: false,
+                left_feature_observations: Vec::new(),
+                right_feature_observations: Vec::new(),
             };
             graph.keyframe_poses.insert(i as u64, keyframe);
             graph.stats.num_poses += 1;
@@ -413,6 +441,8 @@ mod tests {
                 covariance: Matrix6::identity(),
                 timestamp_ns: i as i64,
                 is_marginalized: false,
+                left_feature_observations: Vec::new(),
+                right_feature_observations: Vec::new(),
             };
             graph.keyframe_poses.insert(i as u64, keyframe);
         }
@@ -453,6 +483,8 @@ mod tests {
             covariance: Matrix6::identity(),
             timestamp_ns: 0,
             is_marginalized: false,
+            left_feature_observations: Vec::new(),
+            right_feature_observations: Vec::new(),
         };
 
         graph.keyframe_poses.insert(0, keyframe);
