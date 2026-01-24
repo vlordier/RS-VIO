@@ -72,6 +72,7 @@
 //! - [feature_tracker](crate::feature_tracker) - Feature observations
 
 pub mod factors;
+pub mod global_optimizer;
 pub mod loop_closure;
 pub mod marginalization;
 pub mod observer;
