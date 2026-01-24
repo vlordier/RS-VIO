@@ -44,6 +44,7 @@ pub struct GlobalPoseGraph {
 pub struct GlobalKeyframe {
     pub id: u64,
     pub T_W_B: Matrix4x4,
+    pub velocity: Vector3,  // Body velocity in world frame (NEW)
     pub covariance: Matrix6,
     pub timestamp_ns: i64,
     pub is_marginalized: bool,
@@ -168,6 +169,7 @@ impl GlobalPoseGraph {
         let keyframe = GlobalKeyframe {
             id: keyframe_id,
             T_W_B: frame.state.T_W_B,
+            velocity: frame.state.velocity,  // NEW: Store velocity
             covariance,
             timestamp_ns: frame.timestamp_ns,
             is_marginalized: false,
@@ -401,6 +403,7 @@ mod tests {
             let keyframe = GlobalKeyframe {
                 id: i as u64,
                 T_W_B: Matrix4x4::identity(),
+                velocity: Vector3::zeros(),  // NEW
                 covariance: Matrix6::identity(),
                 timestamp_ns: i as i64,
                 is_marginalized: false,
@@ -446,6 +449,7 @@ mod tests {
             let keyframe = GlobalKeyframe {
                 id: i as u64,
                 T_W_B: Matrix4x4::identity(),
+                velocity: Vector3::zeros(),  // NEW
                 covariance: Matrix6::identity(),
                 timestamp_ns: i as i64,
                 is_marginalized: false,
@@ -490,6 +494,7 @@ mod tests {
         let keyframe = GlobalKeyframe {
             id: 0,
             T_W_B: Matrix4x4::identity(),
+            velocity: Vector3::zeros(),  // NEW
             covariance: Matrix6::identity(),
             timestamp_ns: 0,
             is_marginalized: false,
