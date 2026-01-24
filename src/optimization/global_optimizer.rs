@@ -116,38 +116,61 @@ impl GlobalPoseGraph {
         // Phase 3: Add visual reprojection factors (Phase 2A)
         // These factors constrain both pose and landmark variables using feature observations
         let mut num_visual_factors = 0;
-        for (keyframe_id, _keyframe) in self.keyframe_poses.iter() {
+        for (keyframe_id, keyframe) in self.keyframe_poses.iter() {
             let kf_var = match id_to_var.get(keyframe_id) {
                 Some(v) => v.clone(),
                 None => continue,
             };
 
-            // For visual factors, we need feature observations
-            // These would come from the Frame objects passed when add_keyframe_pose was called
-            // For now, we collect observations from the map_points structure
-            // In a full implementation, these would be extracted from Frame.left_features and Frame.right_features
-            
-            for (point_id, point) in self.map_points.iter() {
-                // Check if this keyframe observes this map point
-                let observed = point.observations.iter().any(|(obs_kf_id, _)| obs_kf_id == keyframe_id);
-                if !observed {
+            // Get camera calibration transforms (inverted: T_C_B not T_B_C)
+            let T_Cl_B = match keyframe.T_B_Cl.try_inverse() {
+                Some(inv) => inv.cast::<f64>(),
+                None => {
+                    log::warn!("[GlobalOptimizer] T_B_Cl inversion failed for keyframe {}", keyframe_id);
                     continue;
                 }
+            };
 
-                let mp_var = format!("MP_{}", point_id);
+            let T_Cr_B = match keyframe.T_B_Cr.try_inverse() {
+                Some(inv) => inv.cast::<f64>(),
+                None => {
+                    log::warn!("[GlobalOptimizer] T_B_Cr inversion failed for keyframe {}", keyframe_id);
+                    continue;
+                }
+            };
+
+            // Process left camera observations
+            for (feature_id, obs_coord) in &keyframe.left_feature_observations {
+                // Find the corresponding map point
+                let mp_var = format!("MP_{}", feature_id);
+                if !initial_values.contains_key(&mp_var) {
+                    continue;  // Map point not in optimization
+                }
+
+                // Create observation as 2D normalized coordinates
+                let observation = na::Vector2::new(obs_coord.0, obs_coord.1);
+                
+                let factor = BundleAdjustmentFactor::new(observation, T_Cl_B.clone())
+                    .with_weight(1.0);
+
+                let loss = HuberLoss::new(1.0)
+                    .ok()
+                    .map(|l| Box::new(l) as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>);
+
+                problem.add_residual_block(&[&kf_var, &mp_var], Box::new(factor), loss);
+                num_visual_factors += 1;
+            }
+
+            // Process right camera observations
+            for (feature_id, obs_coord) in &keyframe.right_feature_observations {
+                let mp_var = format!("MP_{}", feature_id);
                 if !initial_values.contains_key(&mp_var) {
                     continue;
                 }
 
-                // For each observation, create a visual factor
-                // Note: This is a simplified version - in practice, we'd extract the exact feature coordinates
-                // For now, we create a nominal observation at [0, 0] in normalized coordinates
-                let observation = na::Vector2::new(0.0, 0.0);
-                
-                // Use the body-to-camera transform (identity for simplicity, would come from calibration)
-                let T_C_B = Matrix4x4::identity().cast::<f64>();
+                let observation = na::Vector2::new(obs_coord.0, obs_coord.1);
 
-                let factor = BundleAdjustmentFactor::new(observation, T_C_B)
+                let factor = BundleAdjustmentFactor::new(observation, T_Cr_B.clone())
                     .with_weight(1.0);
 
                 let loss = HuberLoss::new(1.0)

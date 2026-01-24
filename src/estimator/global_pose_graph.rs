@@ -52,6 +52,10 @@ pub struct GlobalKeyframe {
     pub left_feature_observations: Vec<(usize, (f64, f64))>,
     /// Feature observations in right camera
     pub right_feature_observations: Vec<(usize, (f64, f64))>,
+    /// Body-to-left-camera calibration transform (T_C_B)
+    pub T_B_Cl: Matrix4x4,
+    /// Body-to-right-camera calibration transform (T_C_B)
+    pub T_B_Cr: Matrix4x4,
 }
 
 /// Loop closure edge between two keyframes
@@ -169,6 +173,8 @@ impl GlobalPoseGraph {
             is_marginalized: false,
             left_feature_observations,
             right_feature_observations,
+            T_B_Cl: frame.state.T_B_Cl,
+            T_B_Cr: frame.state.T_B_Cr,
         };
 
         self.keyframe_poses.insert(keyframe_id, keyframe);
@@ -400,6 +406,8 @@ mod tests {
                 is_marginalized: false,
                 left_feature_observations: Vec::new(),
                 right_feature_observations: Vec::new(),
+                T_B_Cl: Matrix4x4::identity(),
+                T_B_Cr: Matrix4x4::identity(),
             };
             graph.keyframe_poses.insert(i as u64, keyframe);
             graph.stats.num_poses += 1;
@@ -443,6 +451,8 @@ mod tests {
                 is_marginalized: false,
                 left_feature_observations: Vec::new(),
                 right_feature_observations: Vec::new(),
+                T_B_Cl: Matrix4x4::identity(),
+                T_B_Cr: Matrix4x4::identity(),
             };
             graph.keyframe_poses.insert(i as u64, keyframe);
         }
@@ -485,6 +495,8 @@ mod tests {
             is_marginalized: false,
             left_feature_observations: Vec::new(),
             right_feature_observations: Vec::new(),
+            T_B_Cl: Matrix4x4::identity(),
+            T_B_Cr: Matrix4x4::identity(),
         };
 
         graph.keyframe_poses.insert(0, keyframe);
