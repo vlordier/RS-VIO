@@ -758,13 +758,18 @@ impl Estimator {
                     );
                     self.backend
                         .sliding_window
-                        .add_loop_closure_constraints(constraints);
+                        .add_loop_closure_constraints(constraints.clone());
+                    // Also add to global pose graph for full SLAM optimization
+                    self.global_pose_graph.add_loop_closure_constraints(constraints);
                 },
                 Ok(_) => {},
                 Err(e) => {
                     log::warn!("[Estimator] Loop closure detection failed: {:?}", e);
                 },
             }
+
+            // Add keyframe to global pose graph
+            self.global_pose_graph.add_keyframe_pose(&current_frame);
 
             self.backend.sliding_window.add_frame(current_frame.clone());
 
@@ -845,6 +850,24 @@ impl Estimator {
 
             // Update extrinsics from calibrator periodically
             self.update_extrinsics_from_calibrator();
+
+            // Check if global pose graph should run optimization
+            let (should_opt, reason) = self.global_pose_graph.should_optimize();
+            if should_opt {
+                log::info!("[Estimator] Triggering global optimization: {}", reason);
+                match self.global_pose_graph.optimize() {
+                    Ok(result) => {
+                        log::info!(
+                            "[Estimator] Global optimization completed: {:.1}ms, {} iterations",
+                            result.optimization_time_ms, result.iterations
+                        );
+                    },
+                    Err(e) => {
+                        log::warn!("[Estimator] Global optimization failed: {}", e);
+                        // Continue execution even if global optimization fails
+                    }
+                }
+            }
 
             _optimization_time_ms = optimization_start.elapsed().as_secs_f64() * 1000.0;
             self.view_optimization_results(frame_timestamp);

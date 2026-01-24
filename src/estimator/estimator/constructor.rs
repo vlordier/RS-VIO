@@ -3,6 +3,7 @@ use crate::calibration::online_intrinsics::OnlineIntrinsicsRefiner;
 use crate::datasets::config::Config;
 use crate::datasets::CameraModelType;
 use crate::estimator::frame_processor::Frontend;
+use crate::estimator::global_pose_graph::{GlobalPoseGraph, GlobalPoseGraphConfig};
 use crate::estimator::imu_processor::ImuProcessor;
 use crate::estimator::keyframe_culler::AggressiveCullingConfig;
 use crate::estimator::point_quality::PointQualityConfig;
@@ -114,6 +115,7 @@ impl Estimator {
         // Initialize IMU components
         let _imu_config = ImuConfig::default();
         let loop_closure_detector = LoopClosureDetector::new(config.loop_closure.clone());
+        let global_pose_graph = GlobalPoseGraph::new(GlobalPoseGraphConfig::default());
         Estimator {
             frame_id_counter: 0,
             frames_since_last_keyframe: 0,
@@ -121,6 +123,7 @@ impl Estimator {
             config: config.clone(),
             frontend: Frontend::new(feature_config),
             backend: Backend::new(&config),
+            global_pose_graph,
             imu_processor: ImuProcessor::new(&config, T_B_Cl),
             loop_closure_detector,
             viewer,

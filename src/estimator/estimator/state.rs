@@ -2,6 +2,7 @@ use crate::calibration::online_intrinsics::OnlineIntrinsicsRefiner;
 use crate::datasets::config::Config;
 use crate::datasets::CameraModelType;
 use crate::estimator::frame_processor::Frontend;
+use crate::estimator::global_pose_graph::GlobalPoseGraph;
 use crate::estimator::imu_processor::ImuProcessor;
 use crate::estimator::sliding_window::Backend;
 use crate::estimator::FrameWorkspace;
@@ -19,6 +20,7 @@ pub struct Estimator {
     pub(crate) config: Config,
     pub frontend: Frontend<6>,
     pub backend: Backend,
+    pub global_pose_graph: GlobalPoseGraph,
     pub imu_processor: ImuProcessor,
     pub loop_closure_detector: LoopClosureDetector,
     pub viewer: Option<Box<dyn Viewer>>,
