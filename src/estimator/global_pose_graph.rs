@@ -1,8 +1,8 @@
-use std::collections::{BTreeMap, HashMap};
-use crate::types::{Matrix3x3, Matrix4x4, Matrix6, Vector3, Isometry3};
 use crate::estimator::Frame;
 use crate::optimization::loop_closure::LoopClosureConstraint;
 use crate::optimization::tight_coupling::ImuPreintegration;
+use crate::types::{Isometry3, Matrix3x3, Matrix4x4, Matrix6, Vector3};
+use std::collections::{BTreeMap, HashMap};
 use std::time::Instant;
 
 /// Global pose graph backend for full SLAM.
@@ -44,7 +44,7 @@ pub struct GlobalPoseGraph {
 pub struct GlobalKeyframe {
     pub id: u64,
     pub T_W_B: Matrix4x4,
-    pub velocity: Vector3,  // Body velocity in world frame (NEW)
+    pub velocity: Vector3, // Body velocity in world frame (NEW)
     pub covariance: Matrix6,
     pub timestamp_ns: i64,
     pub is_marginalized: bool,
@@ -64,9 +64,9 @@ pub struct GlobalKeyframe {
 pub struct LoopClosureEdge {
     pub from_id: u64,
     pub to_id: u64,
-    pub T_from_to: Isometry3,  // Relative transform from->to
+    pub T_from_to: Isometry3, // Relative transform from->to
     pub covariance: Matrix6,
-    pub strength: f32,  // Quality metric from descriptor matching
+    pub strength: f32, // Quality metric from descriptor matching
 }
 
 /// IMU preintegration edge
@@ -83,7 +83,7 @@ pub struct GlobalMapPoint {
     pub id: usize,
     pub position: Vector3,
     pub descriptor: Vec<u8>,
-    pub observations: Vec<(u64, usize)>,  // (keyframe_id, feature_id)
+    pub observations: Vec<(u64, usize)>, // (keyframe_id, feature_id)
     pub covariance: Matrix3x3,
 }
 
@@ -143,7 +143,7 @@ impl GlobalPoseGraph {
     /// Add a new keyframe pose from the sliding window
     pub fn add_keyframe_pose(&mut self, frame: &Frame) {
         let keyframe_id = frame.frame_id as u64;
-        
+
         // Create identity covariance for now (will be updated by optimization)
         let covariance = Matrix6::identity() * 1e-2;
 
@@ -154,7 +154,13 @@ impl GlobalPoseGraph {
             .iter()
             .map(|feat| {
                 // Use undistorted coordinates
-                (feat.feature_id, (feat.undistorted_coord[0] as f64, feat.undistorted_coord[1] as f64))
+                (
+                    feat.feature_id,
+                    (
+                        feat.undistorted_coord[0] as f64,
+                        feat.undistorted_coord[1] as f64,
+                    ),
+                )
             })
             .collect();
 
@@ -162,14 +168,20 @@ impl GlobalPoseGraph {
             .right_features
             .iter()
             .map(|feat| {
-                (feat.feature_id, (feat.undistorted_coord[0] as f64, feat.undistorted_coord[1] as f64))
+                (
+                    feat.feature_id,
+                    (
+                        feat.undistorted_coord[0] as f64,
+                        feat.undistorted_coord[1] as f64,
+                    ),
+                )
             })
             .collect();
 
         let keyframe = GlobalKeyframe {
             id: keyframe_id,
             T_W_B: frame.state.T_W_B,
-            velocity: frame.state.velocity,  // NEW: Store velocity
+            velocity: frame.state.velocity, // NEW: Store velocity
             covariance,
             timestamp_ns: frame.timestamp_ns,
             is_marginalized: false,
@@ -183,8 +195,11 @@ impl GlobalPoseGraph {
         self.stats.num_poses = self.keyframe_poses.len();
 
         if self.config.enable_logging {
-            log::debug!("[GlobalPoseGraph] Added keyframe {} (total: {})", 
-                keyframe_id, self.stats.num_poses);
+            log::debug!(
+                "[GlobalPoseGraph] Added keyframe {} (total: {})",
+                keyframe_id,
+                self.stats.num_poses
+            );
         }
     }
 
@@ -194,9 +209,11 @@ impl GlobalPoseGraph {
             from_id: constraint.keyframe_id_1,
             to_id: constraint.keyframe_id_2,
             T_from_to: constraint.relative_pose,
-            covariance: constraint.information_matrix.try_inverse()
+            covariance: constraint
+                .information_matrix
+                .try_inverse()
                 .unwrap_or_else(|| Matrix6::identity() * 1e-1),
-            strength: 0.9,  // TODO: Use from constraint
+            strength: 0.9, // TODO: Use from constraint
         };
 
         self.loop_closure_edges.push(edge);
@@ -204,9 +221,12 @@ impl GlobalPoseGraph {
         self.stats.num_loop_closures = self.loop_closure_edges.len();
 
         if self.config.enable_logging {
-            log::debug!("[GlobalPoseGraph] Added loop closure {} -> {} (total: {})",
-                constraint.keyframe_id_1, constraint.keyframe_id_2,
-                self.stats.num_loop_closures);
+            log::debug!(
+                "[GlobalPoseGraph] Added loop closure {} -> {} (total: {})",
+                constraint.keyframe_id_1,
+                constraint.keyframe_id_2,
+                self.stats.num_loop_closures
+            );
         }
     }
 
@@ -228,12 +248,7 @@ impl GlobalPoseGraph {
     }
 
     /// Add a map point observation
-    pub fn add_map_point(
-        &mut self,
-        point_id: usize,
-        position: Vector3,
-        descriptor: Vec<u8>,
-    ) {
+    pub fn add_map_point(&mut self, point_id: usize, position: Vector3, descriptor: Vec<u8>) {
         let point = GlobalMapPoint {
             id: point_id,
             position,
@@ -332,7 +347,7 @@ impl GlobalPoseGraph {
     /// Marginalize oldest poses when memory pressure exists
     pub fn marginalize_oldest(&mut self, num_to_marginalize: usize) {
         let num_to_remove = num_to_marginalize.min(self.keyframe_poses.len());
-        
+
         if num_to_remove == 0 {
             return;
         }
@@ -403,7 +418,7 @@ mod tests {
             let keyframe = GlobalKeyframe {
                 id: i as u64,
                 T_W_B: Matrix4x4::identity(),
-                velocity: Vector3::zeros(),  // NEW
+                velocity: Vector3::zeros(), // NEW
                 covariance: Matrix6::identity(),
                 timestamp_ns: i as i64,
                 is_marginalized: false,
@@ -449,7 +464,7 @@ mod tests {
             let keyframe = GlobalKeyframe {
                 id: i as u64,
                 T_W_B: Matrix4x4::identity(),
-                velocity: Vector3::zeros(),  // NEW
+                velocity: Vector3::zeros(), // NEW
                 covariance: Matrix6::identity(),
                 timestamp_ns: i as i64,
                 is_marginalized: false,
@@ -494,7 +509,7 @@ mod tests {
         let keyframe = GlobalKeyframe {
             id: 0,
             T_W_B: Matrix4x4::identity(),
-            velocity: Vector3::zeros(),  // NEW
+            velocity: Vector3::zeros(), // NEW
             covariance: Matrix6::identity(),
             timestamp_ns: 0,
             is_marginalized: false,

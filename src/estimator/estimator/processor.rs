@@ -760,7 +760,8 @@ impl Estimator {
                         .sliding_window
                         .add_loop_closure_constraints(constraints.clone());
                     // Also add to global pose graph for full SLAM optimization
-                    self.global_pose_graph.add_loop_closure_constraints(constraints);
+                    self.global_pose_graph
+                        .add_loop_closure_constraints(constraints);
                 },
                 Ok(_) => {},
                 Err(e) => {
@@ -859,13 +860,14 @@ impl Estimator {
                     Ok(result) => {
                         log::info!(
                             "[Estimator] Global optimization completed: {:.1}ms, {} iterations",
-                            result.optimization_time_ms, result.iterations
+                            result.optimization_time_ms,
+                            result.iterations
                         );
                     },
                     Err(e) => {
                         log::warn!("[Estimator] Global optimization failed: {}", e);
                         // Continue execution even if global optimization fails
-                    }
+                    },
                 }
             }
 

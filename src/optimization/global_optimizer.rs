@@ -7,10 +7,9 @@
 /// - Loop closure constraints (Phase 1)
 /// - Visual reprojection factors (Phase 2A)
 /// - IMU preintegration factors (Phase 2B)
-
 use crate::estimator::global_pose_graph::GlobalPoseGraph;
-use crate::optimization::factors::{LoopClosurePoseFactor, BundleAdjustmentFactor};
-use crate::optimization::tight_coupling::{InterKeyframeImuFactor, GravityModel};
+use crate::optimization::factors::{BundleAdjustmentFactor, LoopClosurePoseFactor};
+use crate::optimization::tight_coupling::{GravityModel, InterKeyframeImuFactor};
 use crate::types::{Float, Matrix3x3, Matrix4x4, Vector3};
 use apex_solver::core::loss_functions::HuberLoss;
 use apex_solver::core::problem::Problem;
@@ -70,9 +69,12 @@ impl GlobalPoseGraph {
             let T_B_W = match keyframe.T_W_B.clone().try_inverse() {
                 Some(inv) => inv,
                 None => {
-                    log::warn!("[GlobalOptimizer] T_W_B inversion failed for keyframe {}", id);
+                    log::warn!(
+                        "[GlobalOptimizer] T_W_B inversion failed for keyframe {}",
+                        id
+                    );
                     continue;
-                }
+                },
             };
 
             let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
@@ -93,7 +95,10 @@ impl GlobalPoseGraph {
         }
 
         if self.config.enable_logging {
-            log::debug!("[GlobalOptimizer] Added {} keyframe pose variables", initial_values.len());
+            log::debug!(
+                "[GlobalOptimizer] Added {} keyframe pose variables",
+                initial_values.len()
+            );
         }
 
         // Phase 2: Add map point variables from observations
@@ -111,7 +116,10 @@ impl GlobalPoseGraph {
         }
 
         if self.config.enable_logging {
-            log::debug!("[GlobalOptimizer] Added {} map point variables", map_point_ids.len());
+            log::debug!(
+                "[GlobalOptimizer] Added {} map point variables",
+                map_point_ids.len()
+            );
         }
 
         // Phase 3: Add visual reprojection factors (Phase 2A)
@@ -127,17 +135,23 @@ impl GlobalPoseGraph {
             let T_Cl_B = match keyframe.T_B_Cl.try_inverse() {
                 Some(inv) => inv.cast::<f64>(),
                 None => {
-                    log::warn!("[GlobalOptimizer] T_B_Cl inversion failed for keyframe {}", keyframe_id);
+                    log::warn!(
+                        "[GlobalOptimizer] T_B_Cl inversion failed for keyframe {}",
+                        keyframe_id
+                    );
                     continue;
-                }
+                },
             };
 
             let T_Cr_B = match keyframe.T_B_Cr.try_inverse() {
                 Some(inv) => inv.cast::<f64>(),
                 None => {
-                    log::warn!("[GlobalOptimizer] T_B_Cr inversion failed for keyframe {}", keyframe_id);
+                    log::warn!(
+                        "[GlobalOptimizer] T_B_Cr inversion failed for keyframe {}",
+                        keyframe_id
+                    );
                     continue;
-                }
+                },
             };
 
             // Process left camera observations
@@ -145,18 +159,18 @@ impl GlobalPoseGraph {
                 // Find the corresponding map point
                 let mp_var = format!("MP_{}", feature_id);
                 if !initial_values.contains_key(&mp_var) {
-                    continue;  // Map point not in optimization
+                    continue; // Map point not in optimization
                 }
 
                 // Create observation as 2D normalized coordinates
                 let observation = na::Vector2::new(obs_coord.0, obs_coord.1);
-                
-                let factor = BundleAdjustmentFactor::new(observation, T_Cl_B.clone())
-                    .with_weight(1.0);
 
-                let loss = HuberLoss::new(1.0)
-                    .ok()
-                    .map(|l| Box::new(l) as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>);
+                let factor =
+                    BundleAdjustmentFactor::new(observation, T_Cl_B.clone()).with_weight(1.0);
+
+                let loss = HuberLoss::new(1.0).ok().map(|l| {
+                    Box::new(l) as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>
+                });
 
                 problem.add_residual_block(&[&kf_var, &mp_var], Box::new(factor), loss);
                 num_visual_factors += 1;
@@ -171,12 +185,12 @@ impl GlobalPoseGraph {
 
                 let observation = na::Vector2::new(obs_coord.0, obs_coord.1);
 
-                let factor = BundleAdjustmentFactor::new(observation, T_Cr_B.clone())
-                    .with_weight(1.0);
+                let factor =
+                    BundleAdjustmentFactor::new(observation, T_Cr_B.clone()).with_weight(1.0);
 
-                let loss = HuberLoss::new(1.0)
-                    .ok()
-                    .map(|l| Box::new(l) as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>);
+                let loss = HuberLoss::new(1.0).ok().map(|l| {
+                    Box::new(l) as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>
+                });
 
                 problem.add_residual_block(&[&kf_var, &mp_var], Box::new(factor), loss);
                 num_visual_factors += 1;
@@ -184,7 +198,10 @@ impl GlobalPoseGraph {
         }
 
         if self.config.enable_logging {
-            log::debug!("[GlobalOptimizer] Added {} visual reprojection factors", num_visual_factors);
+            log::debug!(
+                "[GlobalOptimizer] Added {} visual reprojection factors",
+                num_visual_factors
+            );
         }
 
         // Phase 4: Add loop closure factors
@@ -208,16 +225,19 @@ impl GlobalPoseGraph {
                 edge.covariance.cast::<f64>(),
             );
 
-            let loss = HuberLoss::new(1.0)
-                .ok()
-                .map(|l| Box::new(l) as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>);
+            let loss = HuberLoss::new(1.0).ok().map(|l| {
+                Box::new(l) as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>
+            });
 
             problem.add_residual_block(&[&var1, &var2], Box::new(factor), loss);
             num_closure_factors += 1;
         }
 
         if self.config.enable_logging {
-            log::debug!("[GlobalOptimizer] Added {} loop closure factors", num_closure_factors);
+            log::debug!(
+                "[GlobalOptimizer] Added {} loop closure factors",
+                num_closure_factors
+            );
         }
 
         // Phase 5: Add velocity variables for each keyframe (Phase 2B)
@@ -237,7 +257,10 @@ impl GlobalPoseGraph {
         }
 
         if self.config.enable_logging {
-            log::debug!("[GlobalOptimizer] Added {} velocity variables", velocity_var_map.len());
+            log::debug!(
+                "[GlobalOptimizer] Added {} velocity variables",
+                velocity_var_map.len()
+            );
         }
 
         // Phase 5.1: Add IMU preintegration factors
@@ -271,20 +294,19 @@ impl GlobalPoseGraph {
                 gravity.clone(),
             );
 
-            let loss = HuberLoss::new(1.0)
-                .ok()
-                .map(|l| Box::new(l) as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>);
+            let loss = HuberLoss::new(1.0).ok().map(|l| {
+                Box::new(l) as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>
+            });
 
-            problem.add_residual_block(
-                &[&var_i, &vel_i, &var_j, &vel_j],
-                Box::new(factor),
-                loss,
-            );
+            problem.add_residual_block(&[&var_i, &vel_i, &var_j, &vel_j], Box::new(factor), loss);
             num_imu_factors += 1;
         }
 
         if self.config.enable_logging {
-            log::debug!("[GlobalOptimizer] Added {} IMU preintegration factors", num_imu_factors);
+            log::debug!(
+                "[GlobalOptimizer] Added {} IMU preintegration factors",
+                num_imu_factors
+            );
         }
 
         // Phase 6: Solver configuration
@@ -316,7 +338,7 @@ impl GlobalPoseGraph {
                     converged: false,
                     optimization_time_ms: optimization_time,
                 });
-            }
+            },
         };
 
         // Phase 8: Extract optimized poses
@@ -331,7 +353,8 @@ impl GlobalPoseGraph {
         for (id, var_name) in id_to_var.iter() {
             if let Some(var_enum) = result.parameters.get(var_name) {
                 // Convert VariableEnum to SE3 vector and back to matrix
-                let T_B_W_opt = apex_solver::manifold::se3::SE3::from(var_enum.to_vector()).matrix();
+                let T_B_W_opt =
+                    apex_solver::manifold::se3::SE3::from(var_enum.to_vector()).matrix();
                 if let Some(T_W_B) = T_B_W_opt.try_inverse() {
                     // Update pose in graph
                     if let Some(keyframe) = self.keyframe_poses.get_mut(id) {
@@ -348,11 +371,8 @@ impl GlobalPoseGraph {
                 let vec = var_enum.to_vector();
                 if vec.len() >= 3 {
                     if let Some(point) = self.map_points.get_mut(&point_id) {
-                        point.position = Vector3::new(
-                            vec[0] as Float,
-                            vec[1] as Float,
-                            vec[2] as Float,
-                        );
+                        point.position =
+                            Vector3::new(vec[0] as Float, vec[1] as Float, vec[2] as Float);
                     }
                 }
             }
@@ -364,11 +384,8 @@ impl GlobalPoseGraph {
                 let vec = var_enum.to_vector();
                 if vec.len() >= 3 {
                     if let Some(keyframe) = self.keyframe_poses.get_mut(id) {
-                        keyframe.velocity = Vector3::new(
-                            vec[0] as Float,
-                            vec[1] as Float,
-                            vec[2] as Float,
-                        );
+                        keyframe.velocity =
+                            Vector3::new(vec[0] as Float, vec[1] as Float, vec[2] as Float);
                     }
                 }
             }
@@ -386,7 +403,9 @@ impl GlobalPoseGraph {
         if self.config.enable_logging {
             log::info!(
                 "[GlobalOptimizer] Completed: {:.1}ms, {} iterations, converged={}",
-                optimization_time, num_iterations, converged
+                optimization_time,
+                num_iterations,
+                converged
             );
         }
 

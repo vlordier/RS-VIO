@@ -136,8 +136,8 @@ pub use frame_processor::{
 pub use frame_processor_concurrent::{ConcurrentConfig, ConcurrentFrameProcessor};
 pub use frame_workspace::{FrameWorkspace, WorkspaceConfig};
 pub use global_pose_graph::{
-    GlobalPoseGraph, GlobalPoseGraphConfig, GlobalKeyframe, LoopClosureEdge, ImuEdge,
-    GlobalMapPoint, OptimizationResult,
+    GlobalKeyframe, GlobalMapPoint, GlobalPoseGraph, GlobalPoseGraphConfig, ImuEdge,
+    LoopClosureEdge, OptimizationResult,
 };
 pub use hardware_profile::{HardwareProfile, TimeoutAutoTuner};
 pub use imu_processor::{ImuProcessingResult, ImuProcessor, ImuStatistics};

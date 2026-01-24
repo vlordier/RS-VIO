@@ -7,7 +7,7 @@
 )]
 
 //! Phase 2C SLAM Benchmarking Test
-//! 
+//!
 //! This test compares VIO (sliding window) vs SLAM (sliding window + global) pipelines
 //! on the TUM VI dataset, measuring:
 //! - Absolute Trajectory Error (ATE)
@@ -21,7 +21,7 @@
 use nalgebra as na;
 use rs_vio::datasets::config::Config;
 use rs_vio::datasets::player_trait::DatasetPlayer;
-use rs_vio::datasets::{TUMVIPlayer, FrameContext, ImageData};
+use rs_vio::datasets::{FrameContext, ImageData, TUMVIPlayer};
 use rs_vio::estimator::Estimator;
 use rs_vio::types::{Matrix4x4, Vector3};
 use std::time::Instant;
@@ -83,8 +83,16 @@ struct RelativePoseError {
 
 impl RelativePoseError {
     fn from_errors(trans_errors: Vec<f64>, rot_errors: Vec<f64>) -> Self {
-        let n_trans = if trans_errors.is_empty() { 1.0 } else { trans_errors.len() as f64 };
-        let n_rot = if rot_errors.is_empty() { 1.0 } else { rot_errors.len() as f64 };
+        let n_trans = if trans_errors.is_empty() {
+            1.0
+        } else {
+            trans_errors.len() as f64
+        };
+        let n_rot = if rot_errors.is_empty() {
+            1.0
+        } else {
+            rot_errors.len() as f64
+        };
 
         let trans_rmse = if trans_errors.is_empty() {
             0.0
@@ -134,18 +142,20 @@ impl BenchmarkResults {
         println!("\n╔════════════════════════════════════════════════════════════════╗");
         println!("║           SLAM PHASE 2C BENCHMARKING RESULTS                  ║");
         println!("╚════════════════════════════════════════════════════════════════╝");
-        
+
         println!("\n📊 DATASET STATISTICS");
         println!("  • Frames processed: {}", self.num_frames);
         println!("  • Loop closures detected: {}", self.num_loop_closures);
-        
+
         println!("\n⏱️  PROCESSING TIME");
         println!("  • VIO only:  {:.2} seconds", self.vio_time);
         println!("  • SLAM:      {:.2} seconds", self.slam_time);
-        println!("  • Overhead:  {:.2}% ({:.2}s)", 
+        println!(
+            "  • Overhead:  {:.2}% ({:.2}s)",
             ((self.slam_time - self.vio_time) / self.vio_time) * 100.0,
-            self.slam_time - self.vio_time);
-        
+            self.slam_time - self.vio_time
+        );
+
         println!("\n📍 ABSOLUTE TRAJECTORY ERROR (ATE)");
         println!("  VIO Performance:");
         println!("    • RMSE: {:.6} m", self.vio_ate.rmse);
@@ -155,21 +165,34 @@ impl BenchmarkResults {
         println!("    • RMSE: {:.6} m", self.slam_ate.rmse);
         println!("    • MAE:  {:.6} m", self.slam_ate.mae);
         println!("    • Max:  {:.6} m", self.slam_ate.max_error);
-        
+
         let ate_improvement = (1.0 - (self.slam_ate.rmse / self.vio_ate.rmse.max(1e-9))) * 100.0;
         println!("  📈 SLAM Improvement: {:.1}%", ate_improvement);
-        
+
         println!("\n🔄 RELATIVE POSE ERROR (RPE)");
         println!("  VIO Performance:");
-        println!("    • Translation RMSE: {:.6} m", self.vio_rpe.translation_rmse);
+        println!(
+            "    • Translation RMSE: {:.6} m",
+            self.vio_rpe.translation_rmse
+        );
         println!("    • Rotation RMSE:    {:.4}°", self.vio_rpe.rotation_rmse);
         println!("  SLAM Performance:");
-        println!("    • Translation RMSE: {:.6} m", self.slam_rpe.translation_rmse);
-        println!("    • Rotation RMSE:    {:.4}°", self.slam_rpe.rotation_rmse);
-        
-        let trans_improvement = (1.0 - (self.slam_rpe.translation_rmse / 
-            self.vio_rpe.translation_rmse.max(1e-9))) * 100.0;
-        println!("  📈 SLAM Translation Improvement: {:.1}%", trans_improvement);
+        println!(
+            "    • Translation RMSE: {:.6} m",
+            self.slam_rpe.translation_rmse
+        );
+        println!(
+            "    • Rotation RMSE:    {:.4}°",
+            self.slam_rpe.rotation_rmse
+        );
+
+        let trans_improvement = (1.0
+            - (self.slam_rpe.translation_rmse / self.vio_rpe.translation_rmse.max(1e-9)))
+            * 100.0;
+        println!(
+            "  📈 SLAM Translation Improvement: {:.1}%",
+            trans_improvement
+        );
     }
 }
 
@@ -187,7 +210,7 @@ fn get_rotation_angle(pose: &Matrix4x4) -> f64 {
     let r22 = pose.m22 as f64;
     let r33 = pose.m33 as f64;
     let trace = r11 + r22 + r33;
-    
+
     // Clamp to avoid numerical errors
     let cos_angle = ((trace - 1.0) / 2.0).max(-1.0).min(1.0);
     cos_angle.acos()
@@ -217,7 +240,9 @@ fn get_env_path(var: &str) -> Option<String> {
 #[test]
 fn test_slam_vs_vio_benchmarking() {
     let Some(ds_path) = get_env_path("RS_VIO_TUMVI_PATH") else {
-        println!("⏭️  Skipping test_slam_vs_vio_benchmarking: RS_VIO_TUMVI_PATH not set or invalid");
+        println!(
+            "⏭️  Skipping test_slam_vs_vio_benchmarking: RS_VIO_TUMVI_PATH not set or invalid"
+        );
         return;
     };
 
@@ -225,8 +250,7 @@ fn test_slam_vs_vio_benchmarking() {
     println!("📂 Dataset path: {}", ds_path);
 
     // Load configuration
-    let config = Config::load("config/tum_vi.yaml")
-        .expect("config/tum_vi.yaml should exist");
+    let config = Config::load("config/tum_vi.yaml").expect("config/tum_vi.yaml should exist");
     let (w, h) = (config.camera.image_width, config.camera.image_height);
 
     // Load dataset
@@ -234,12 +258,16 @@ fn test_slam_vs_vio_benchmarking() {
     let images = player
         .load_image_timestamps(&ds_path)
         .expect("should load TUM-VI cam0 timestamps");
-    
+
     let imu_data = player
         .load_imu_data(&ds_path)
         .expect("should load TUM-VI IMU data");
 
-    println!("✅ Loaded {} images, {} IMU samples", images.len(), imu_data.len());
+    println!(
+        "✅ Loaded {} images, {} IMU samples",
+        images.len(),
+        imu_data.len()
+    );
 
     // Limit to first 300 frames for reasonable benchmarking time
     let max_frames = 300.min(images.len());
@@ -254,14 +282,17 @@ fn test_slam_vs_vio_benchmarking() {
     let mut vio_poses = Vec::new();
 
     for (frame_idx, img_data) in images.iter().enumerate() {
-        let ImageData { filename, timestamp } = img_data;
-        
+        let ImageData {
+            filename,
+            timestamp,
+        } = img_data;
+
         let bytes = match player.load_image(&ds_path, filename, 0) {
             Ok(b) => b,
             Err(_) => {
                 println!("⚠️  Failed to load image {}", filename);
                 continue;
-            }
+            },
         };
 
         let gray = match gray_from_bytes(w, h, bytes) {
@@ -269,7 +300,7 @@ fn test_slam_vs_vio_benchmarking() {
             None => {
                 println!("⚠️  Failed to convert image {}", filename);
                 continue;
-            }
+            },
         };
 
         // Get IMU data for this frame
@@ -296,9 +327,11 @@ fn test_slam_vs_vio_benchmarking() {
     }
 
     let vio_duration = vio_start.elapsed().as_secs_f64();
-    println!("✅ VIO completed in {:.2}s ({:.1} fps)", 
-        vio_duration, 
-        images.len() as f64 / vio_duration);
+    println!(
+        "✅ VIO completed in {:.2}s ({:.1} fps)",
+        vio_duration,
+        images.len() as f64 / vio_duration
+    );
 
     // SLAM Pipeline (Sliding Window + Global Optimization)
     println!("\n🟣 Running SLAM Pipeline (with Global Optimization)...");
@@ -308,8 +341,11 @@ fn test_slam_vs_vio_benchmarking() {
     let mut global_opt_count = 0;
 
     for (frame_idx, img_data) in images.iter().enumerate() {
-        let ImageData { filename, timestamp } = img_data;
-        
+        let ImageData {
+            filename,
+            timestamp,
+        } = img_data;
+
         let bytes = match player.load_image(&ds_path, filename, 0) {
             Ok(b) => b,
             Err(_) => continue,
@@ -338,10 +374,10 @@ fn test_slam_vs_vio_benchmarking() {
                     if let Ok(result) = gpg.optimize() {
                         if result.converged {
                             global_opt_count += 1;
-                            println!("  💾 Global optimization #{}: {:.1}ms, {} iterations", 
-                                global_opt_count, 
-                                result.optimization_time_ms, 
-                                result.iterations);
+                            println!(
+                                "  💾 Global optimization #{}: {:.1}ms, {} iterations",
+                                global_opt_count, result.optimization_time_ms, result.iterations
+                            );
                         }
                     }
                 }
@@ -354,13 +390,15 @@ fn test_slam_vs_vio_benchmarking() {
     }
 
     let slam_duration = slam_start.elapsed().as_secs_f64();
-    println!("✅ SLAM completed in {:.2}s ({:.1} fps)", 
-        slam_duration, 
-        images.len() as f64 / slam_duration);
+    println!(
+        "✅ SLAM completed in {:.2}s ({:.1} fps)",
+        slam_duration,
+        images.len() as f64 / slam_duration
+    );
 
     // Evaluate trajectories
     println!("\n📊 Evaluating trajectories...");
-    
+
     // For now, create placeholder metrics since we don't have ground truth
     // In production, load ground truth from TUM VI dataset
     let vio_ate = TrajectoryError {
@@ -403,14 +441,8 @@ fn test_slam_vs_vio_benchmarking() {
     results.print_summary();
 
     // Verify both pipelines produced trajectories
-    assert!(
-        !vio_poses.is_empty(),
-        "VIO should produce valid poses"
-    );
-    assert!(
-        !slam_poses.is_empty(),
-        "SLAM should produce valid poses"
-    );
+    assert!(!vio_poses.is_empty(), "VIO should produce valid poses");
+    assert!(!slam_poses.is_empty(), "SLAM should produce valid poses");
 
     println!("\n✅ SLAM Phase 2C Benchmarking Complete!");
 }
@@ -418,7 +450,9 @@ fn test_slam_vs_vio_benchmarking() {
 #[test]
 fn test_slam_convergence_with_loop_closures() {
     let Some(ds_path) = get_env_path("RS_VIO_TUMVI_PATH") else {
-        println!("⏭️  Skipping test_slam_convergence_with_loop_closures: RS_VIO_TUMVI_PATH not set");
+        println!(
+            "⏭️  Skipping test_slam_convergence_with_loop_closures: RS_VIO_TUMVI_PATH not set"
+        );
         return;
     };
 
@@ -440,7 +474,10 @@ fn test_slam_convergence_with_loop_closures() {
     let mut total_optimization_time = 0.0;
     let mut total_iterations = 0;
 
-    println!("📊 Processing {} frames with global optimization tracking...", images.len());
+    println!(
+        "📊 Processing {} frames with global optimization tracking...",
+        images.len()
+    );
 
     for (frame_idx, img_data) in images.iter().enumerate() {
         let ImageData { filename, .. } = img_data;
@@ -468,19 +505,24 @@ fn test_slam_convergence_with_loop_closures() {
         if frame_idx % 15 == 0 && frame_idx > 10 {
             let gpg = &mut estimator.global_pose_graph;
             let (should_opt, reason) = gpg.should_optimize();
-            
+
             if should_opt {
-                println!("🔧 Frame {}: Triggering optimization ({})", frame_idx, reason);
+                println!(
+                    "🔧 Frame {}: Triggering optimization ({})",
+                    frame_idx, reason
+                );
                 if let Ok(result) = gpg.optimize() {
                     optimization_count += 1;
                     total_optimization_time += result.optimization_time_ms / 1000.0;
                     total_iterations += result.iterations;
-                    
-                    println!("   ✅ Optimization #{}: {}ms, {} iterations, converged={}",
+
+                    println!(
+                        "   ✅ Optimization #{}: {}ms, {} iterations, converged={}",
                         optimization_count,
                         result.optimization_time_ms as u32,
                         result.iterations,
-                        result.converged);
+                        result.converged
+                    );
                 }
             }
         }
@@ -490,9 +532,14 @@ fn test_slam_convergence_with_loop_closures() {
     println!("  • Optimizations run: {}", optimization_count);
     println!("  • Total time: {:.2}s", total_optimization_time);
     if optimization_count > 0 {
-        println!("  • Average time per optimization: {:.2}ms", 
-            (total_optimization_time * 1000.0) / optimization_count as f64);
-        println!("  • Average iterations: {}", total_iterations / optimization_count);
+        println!(
+            "  • Average time per optimization: {:.2}ms",
+            (total_optimization_time * 1000.0) / optimization_count as f64
+        );
+        println!(
+            "  • Average iterations: {}",
+            total_iterations / optimization_count
+        );
     }
 
     println!("\n✅ Convergence test complete!");
