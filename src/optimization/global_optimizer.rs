@@ -10,6 +10,7 @@
 
 use crate::estimator::global_pose_graph::GlobalPoseGraph;
 use crate::optimization::factors::{LoopClosurePoseFactor, BundleAdjustmentFactor};
+use crate::optimization::tight_coupling::{InterKeyframeImuFactor, GravityModel};
 use crate::types::{Float, Matrix3x3, Matrix4x4, Vector3};
 use apex_solver::core::loss_functions::HuberLoss;
 use apex_solver::core::problem::Problem;
@@ -219,10 +220,72 @@ impl GlobalPoseGraph {
             log::debug!("[GlobalOptimizer] Added {} loop closure factors", num_closure_factors);
         }
 
-        // Phase 5: IMU factors (Phase 2B) would go here
-        // - Extract IMU preintegration from imu_edges
-        // - Add InterKeyframeImuFactors for gravity constraints
-        // - Add velocity and bias variables
+        // Phase 5: Add velocity variables for each keyframe (Phase 2B)
+        let mut velocity_var_map: HashMap<u64, String> = HashMap::new();
+        for (idx, (&id, keyframe)) in self.keyframe_poses.iter().enumerate() {
+            let vel_var = format!("VEL_{}", idx);
+            velocity_var_map.insert(id, vel_var.clone());
+
+            // Store velocity as R3 (3D vector)
+            let vel_data = DVector::from_vec(vec![
+                keyframe.velocity.x as f64,
+                keyframe.velocity.y as f64,
+                keyframe.velocity.z as f64,
+            ]);
+
+            initial_values.insert(vel_var, (ManifoldType::RN, vel_data));
+        }
+
+        if self.config.enable_logging {
+            log::debug!("[GlobalOptimizer] Added {} velocity variables", velocity_var_map.len());
+        }
+
+        // Phase 5.1: Add IMU preintegration factors
+        // These factors constrain consecutive poses and velocities using IMU measurements
+        let mut num_imu_factors = 0;
+        let gravity = GravityModel::earth();
+
+        for edge in self.imu_edges.iter() {
+            let var_i = match id_to_var.get(&edge.from_id) {
+                Some(v) => v.clone(),
+                None => continue,
+            };
+            let var_j = match id_to_var.get(&edge.to_id) {
+                Some(v) => v.clone(),
+                None => continue,
+            };
+
+            let vel_i = match velocity_var_map.get(&edge.from_id) {
+                Some(v) => v.clone(),
+                None => continue,
+            };
+            let vel_j = match velocity_var_map.get(&edge.to_id) {
+                Some(v) => v.clone(),
+                None => continue,
+            };
+
+            // Create IMU factor with 4 variables: pose_i, vel_i, pose_j, vel_j
+            let factor = InterKeyframeImuFactor::new(
+                edge.preintegration.dt,
+                edge.preintegration.clone(),
+                gravity.clone(),
+            );
+
+            let loss = HuberLoss::new(1.0)
+                .ok()
+                .map(|l| Box::new(l) as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>);
+
+            problem.add_residual_block(
+                &[&var_i, &vel_i, &var_j, &vel_j],
+                Box::new(factor),
+                loss,
+            );
+            num_imu_factors += 1;
+        }
+
+        if self.config.enable_logging {
+            log::debug!("[GlobalOptimizer] Added {} IMU preintegration factors", num_imu_factors);
+        }
 
         // Phase 6: Solver configuration
         let config = LevenbergMarquardtConfig::new()
@@ -286,6 +349,22 @@ impl GlobalPoseGraph {
                 if vec.len() >= 3 {
                     if let Some(point) = self.map_points.get_mut(&point_id) {
                         point.position = Vector3::new(
+                            vec[0] as Float,
+                            vec[1] as Float,
+                            vec[2] as Float,
+                        );
+                    }
+                }
+            }
+        }
+
+        // Phase 10: Extract optimized velocities (Phase 2B)
+        for (id, vel_var) in velocity_var_map.iter() {
+            if let Some(var_enum) = result.parameters.get(vel_var) {
+                let vec = var_enum.to_vector();
+                if vec.len() >= 3 {
+                    if let Some(keyframe) = self.keyframe_poses.get_mut(id) {
+                        keyframe.velocity = Vector3::new(
                             vec[0] as Float,
                             vec[1] as Float,
                             vec[2] as Float,
