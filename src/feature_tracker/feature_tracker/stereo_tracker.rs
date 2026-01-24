@@ -31,6 +31,8 @@ pub struct StereoPatchTracker<const N: u32> {
     grid_size: u32,
     optical_flow_max_iterations: usize,
     optical_flow_convergence_threshold: f32,
+    /// Maximum features to detect per grid cell
+    max_features_per_grid: u32,
     subpixel_enable: bool,
     subpixel_iterations: usize,
     subpixel_threshold: f32,
@@ -106,6 +108,7 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             grid_size,
             optical_flow_max_iterations: optical_flow_max_iterations as usize,
             optical_flow_convergence_threshold: optical_flow_convergence_threshold as f32,
+            max_features_per_grid: 1,
             subpixel_enable: true,
             subpixel_iterations: 15,
             subpixel_threshold: 0.0005,
@@ -141,6 +144,7 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             config.optical_flow_max_iterations,
             config.optical_flow_convergence_threshold,
         );
+        tracker.max_features_per_grid = config.max_features_per_grid;
         tracker.subpixel_enable = config.subpixel_enable;
         tracker.subpixel_iterations = config.subpixel_iterations as usize;
         tracker.subpixel_threshold = config.subpixel_threshold as f32;
@@ -148,8 +152,8 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             max_iterations: config.subpixel_iterations as usize,
             convergence_tolerance: config.subpixel_threshold,
             ..PatchMatchingConfig::default()
-        })
-        .with_quality_gates(30.0, 0.05);
+        });
+        // Use default quality gates from SubpixelStereoRefinement::new() which are already relaxed
         tracker.max_lost_frames = 5;
         tracker.feature_velocities = HashMap::new();
         tracker
@@ -303,7 +307,7 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
     ) {
         let frame_start = Instant::now();
         self.frame_count += 1;
-        let should_log = self.frame_count % 30 == 0; // Log every 30 frames (~1 Hz @ 30 FPS)
+        let should_log = self.frame_count % 30 == 0 || self.frame_count <= 5; // Log first 5 frames and every 30th
 
         // Adaptive frame skipping: check if we should process this frame
         let estimated_motion = self.estimate_frame_motion();
@@ -433,16 +437,28 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
                     &self.tracked_points_map_cam0,
                     &processed_image0,
                     self.grid_size,
+                    self.max_features_per_grid,
                 )
             } else {
                 Vec::new()
             }
         } else {
-            add_points(
+            let new_pts = add_points(
                 &self.tracked_points_map_cam0,
                 &processed_image0,
                 self.grid_size,
-            )
+                self.max_features_per_grid,
+            );
+            if should_log {
+                log::info!(
+                    "[FeatureTracker] Frame {}: Detected {} new left features (grid={}, max_per_grid={})",
+                    self.frame_count,
+                    new_pts.len(),
+                    self.grid_size,
+                    self.max_features_per_grid
+                );
+            }
+            new_pts
         };
 
         let tmp_tracked_points0: HashMap<usize, _> = new_points0
@@ -464,6 +480,15 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             self.optical_flow_convergence_threshold,
         );
 
+        if should_log {
+            log::info!(
+                "[FeatureTracker] Frame {}: Tracked {} of {} new features to right image",
+                self.frame_count,
+                tmp_tracked_points1.len(),
+                tmp_tracked_points0.len()
+            );
+        }
+
         // Collect NEW feature IDs (from stereo matching this frame)
         let new_ids: HashSet<usize> = tmp_tracked_points0.keys().copied().collect();
 
@@ -481,16 +506,18 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
         self.update_lost_features();
         self.update_temporal_consistency();
 
-        // Find valid stereo pairs
+        // Find valid stereo pairs (features visible in both cameras)
         let left_ids: HashSet<usize> = self.tracked_points_map_cam0.keys().copied().collect();
         let right_ids: HashSet<usize> = self.tracked_points_map_cam1.keys().copied().collect();
         let common_ids: HashSet<usize> = left_ids.intersection(&right_ids).copied().collect();
-        let valid_ids: HashSet<usize> = common_ids.intersection(&new_ids).copied().collect();
+        // Use all common stereo pairs, not just new ones
+        let valid_ids: HashSet<usize> = common_ids.clone();
 
         if should_log {
-            debug_log!(
-                "[FeatureTracker] Frame {}: Left={}, Right={}, Common={}, Valid={}",
+            log::info!(
+                "[FeatureTracker] Frame {}: new_ids={}, Left={}, Right={}, Common={}, Valid={}",
                 self.frame_count,
+                new_ids.len(),
                 left_ids.len(),
                 right_ids.len(),
                 common_ids.len(),
@@ -583,45 +610,55 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             .map(|m| (m.id, m.disparity))
             .collect();
 
-        // Extract features in format expected by strategy
-        let features: Vec<(usize, f32, f32)> = refined_matches
-            .iter()
-            .map(|m| (m.id, m.left_pos.matrix().m13, m.left_pos.matrix().m23))
-            .collect();
+        // Since refined_matches already contain validated stereo correspondences from
+        // optical flow + subpixel refinement, use them directly instead of re-matching
+        let use_refined_directly = true;
 
-        // Call stereo matching strategy
-        let strategy_result = self.matching_strategy.match_stereo(
-            greyscale_image0.as_raw(),
-            greyscale_image1.as_raw(),
-            w0 as usize,
-            h0 as usize,
-            &features,
-            &camera_matrix,
-            imu_state.as_ref(),
-            if previous_depth.is_empty() {
-                None
-            } else {
-                Some(&previous_depth)
-            },
-        );
+        let final_matches = if use_refined_directly {
+            // Use refined matches directly - already geometrically consistent
+            refined_matches.clone()
+        } else {
+            // Extract left features for re-matching (discards refined data - not recommended)
+            let features: Vec<(usize, f32, f32)> = refined_matches
+                .iter()
+                .map(|m| (m.id, m.left_pos.matrix().m13, m.left_pos.matrix().m23))
+                .collect();
+
+            let strategy_result = self.matching_strategy.match_stereo(
+                greyscale_image0.as_raw(),
+                greyscale_image1.as_raw(),
+                w0 as usize,
+                h0 as usize,
+                &features,
+                &camera_matrix,
+                imu_state.as_ref(),
+                if previous_depth.is_empty() {
+                    None
+                } else {
+                    Some(&previous_depth)
+                },
+            );
+            strategy_result.matches
+        };
 
         // Log strategy metrics
         if should_log {
-            debug_log!(
-                "[FeatureTracker] Frame {}: Strategy='{}' inliers={}/{} time={:.3}ms",
+            log::info!(
+                "[FeatureTracker] Frame {}: Strategy='{}' input={} → output={} (retention={:.1}%)",
                 self.frame_count,
-                self.matching_strategy.name(),
-                strategy_result.metrics.inliers_final,
-                strategy_result.metrics.candidates_initial,
-                strategy_result.metrics.time_total_ms
+                if use_refined_directly {
+                    "DirectRefined"
+                } else {
+                    self.matching_strategy.name()
+                },
+                refined_matches.len(),
+                final_matches.len(),
+                100.0 * final_matches.len() as f32 / refined_matches.len().max(1) as f32
             );
         }
 
         // Store results for next frame (temporal consistency)
-        self.previous_match_results = strategy_result.matches.clone();
-
-        // Use strategy-filtered matches directly
-        let final_matches = strategy_result.matches;
+        self.previous_match_results = final_matches.clone();
 
         let retained_ids: HashSet<usize> = final_matches.iter().map(|m| m.id).collect();
         self.tracked_points_map_cam0

@@ -109,7 +109,7 @@ impl Estimator {
         );
 
         let mut processed_accel: Option<Vec<[f32; 3]>> = None;
-        let mut processed_gyro: Option<Vec<[f32; 3]>> = None;
+        let mut _processed_gyro: Option<Vec<[f32; 3]>> = None;
 
         // Process IMU measurements
         if let Some(imu) = imu_data {
@@ -258,7 +258,7 @@ impl Estimator {
                 // Attach filtered IMU measurements to frame (clone from workspace)
                 current_frame.imu_from_last_frame = self.frame_workspace.imu_samples().to_vec();
                 processed_accel = Some(accel_filtered);
-                processed_gyro = Some(gyro_filtered);
+                _processed_gyro = Some(gyro_filtered);
 
                 // Use motion predictor for feature tracking
                 let focal_length = self.config.camera.left_intrinsics[0] as f64;
@@ -327,41 +327,8 @@ impl Estimator {
 
         _frame_creation_time_ms = frame_creation_start.elapsed().as_secs_f64() * 1000.0;
 
-        // Visualize IMU data (before and after processing)
-        if let Some(imu) = imu_data {
-            eprintln!(
-                "[IMU_VIZ] Frame {}: Received {} IMU samples, use_imu={}",
-                self.frame_count,
-                imu.len(),
-                self.config.debug.use_imu
-            );
-            if self.config.debug.use_imu {
-                if let (Some(accel), Some(gyro)) =
-                    (processed_accel.as_ref(), processed_gyro.as_ref())
-                {
-                    eprintln!(
-                        "[IMU_VIZ] Frame {}: Calling view_imu_results() with {} samples",
-                        self.frame_count,
-                        imu.len()
-                    );
-                    self.view_imu_results(imu, accel, gyro, timestamp_ns);
-                    eprintln!(
-                        "[IMU_VIZ] Frame {}: Finished IMU visualization",
-                        self.frame_count
-                    );
-                } else {
-                    eprintln!(
-                        "[IMU_VIZ] Frame {}: Skipping visualization (no processed IMU data available)",
-                        self.frame_count
-                    );
-                }
-            }
-        } else {
-            eprintln!(
-                "[IMU_VIZ] Frame {}: NO IMU DATA RECEIVED (imu_data is None)",
-                self.frame_count
-            );
-        }
+        // Note: IMU visualization disabled to reduce frame processing overhead
+        // Re-enable by uncommenting the view_imu_results call if needed for debugging
 
         // Patch tracking
         if let Some(imu) = imu_data {
@@ -609,13 +576,21 @@ impl Estimator {
             ));
         }
 
-        // Motion tracking - only if the sliding window is full (has initialized keyframes)
-        if self.backend.sliding_window.is_full() {
-            // DEBUG
+        // Motion tracking - only need a few keyframes to start
+        let num_kfs = self.backend.sliding_window.len();
+        if self.backend.sliding_window.has_enough_for_tracking() {
+            log::debug!(
+                "[Estimator] Running motion tracking with {} keyframes",
+                num_kfs
+            );
             let motion_tracking_start = Instant::now();
             let motion_tracking_result = self.backend.sliding_window.track_motion(&current_frame);
             match motion_tracking_result {
                 Ok(Some(T_W_B)) => {
+                    log::info!(
+                        "[Estimator] Frame {}: Motion tracking SUCCESS, updating pose",
+                        self.frame_count
+                    );
                     // Apply the optimized pose to the current frame
                     current_frame.state.T_W_B = T_W_B;
 
@@ -669,6 +644,7 @@ impl Estimator {
                         crate::types::Float,
                     ) = rotmat.euler_angles();
                     let rotation_norm = (euler.0.abs() + euler.1.abs() + euler.2.abs()).abs();
+                    let t_norm = t_rel.norm();
 
                     // Keyframe if either visual or IMU criteria met
                     let translation_threshold =
@@ -676,44 +652,89 @@ impl Estimator {
                     let rotation_threshold =
                         crate::fl!(self.config.keyframe_management.rotation_threshold);
                     let visual_keyframe =
-                        t_rel.norm() > translation_threshold || rotation_norm > rotation_threshold;
+                        t_norm > translation_threshold || rotation_norm > rotation_threshold;
 
-                    let is_keyframe = is_imu_keyframe || visual_keyframe;
+                    // Bootstrap: force keyframes for initialization even with low motion
+                    let num_kfs = self.backend.sliding_window.len();
+                    let bootstrap_keyframe = num_kfs < 5; // Force first 5 keyframes
+
+                    let is_keyframe = is_imu_keyframe || visual_keyframe || bootstrap_keyframe;
+
+                    let reason = if bootstrap_keyframe && !is_imu_keyframe && !visual_keyframe {
+                        format!("Bootstrap: {} keyframes", num_kfs)
+                    } else if is_imu_keyframe && !visual_keyframe {
+                        format!("IMU-aided: {}", keyframe_reason)
+                    } else if visual_keyframe {
+                        format!("Visual: trans={:.3}m, rot={:.3}rad", t_norm, rotation_norm)
+                    } else {
+                        keyframe_reason.clone()
+                    };
+
+                    log::info!(
+                        "[Estimator] KF decision: is_kf={}, imu_kf={}, visual_kf={}, t_norm={:.3}m, rot_norm={:.3}rad, reason={}",
+                        is_keyframe,
+                        is_imu_keyframe,
+                        visual_keyframe,
+                        t_norm,
+                        rotation_norm,
+                        reason
+                    );
 
                     if is_keyframe {
-                        let _reason = if is_imu_keyframe && !visual_keyframe {
-                            format!("IMU-aided: {}", keyframe_reason)
-                        } else if visual_keyframe {
-                            let t_norm = t_rel.norm();
-                            format!("Visual: trans={:.3}m, rot={:.3}rad", t_norm, rotation_norm)
-                        } else {
-                            keyframe_reason
-                        };
-                        debug_log!("[Estimator] Keyframe triggered: {}", _reason);
-
+                        debug_log!("[Estimator] Keyframe triggered: {}", reason);
                         current_frame.is_keyframe = true;
+                        log::debug!(
+                            "[Estimator] Frame {} set as KEYFRAME: {}",
+                            self.frame_count,
+                            reason
+                        );
                     } else {
                         current_frame.is_keyframe = false;
+                        if self.frame_count % 50 == 0 {
+                            log::debug!(
+                                "[Estimator] Frame {} NOT keyframe: t={:.3}m, r={:.3}rad (need >{:.3}m or >{:.3}rad)",
+                                self.frame_count,
+                                t_norm,
+                                rotation_norm,
+                                translation_threshold,
+                                rotation_threshold
+                            );
+                        }
                     }
                     self.view_motion_tracking_results(&T_W_B);
                 },
                 Ok(None) => {
                     log::warn!(
-                        "[Estimator] Motion tracking failed (optimization did not converge)"
+                        "[Estimator] Frame {}: Motion tracking failed (optimization did not converge), pose not updated",
+                        self.frame_count
                     );
                 },
                 Err(e) => {
-                    log::error!("[Estimator] Motion tracking error: {:?}", e);
+                    log::error!(
+                        "[Estimator] Frame {}: Motion tracking error: {:?}",
+                        self.frame_count,
+                        e
+                    );
                 },
             }
             _motion_tracking_time_ms = motion_tracking_start.elapsed().as_secs_f64() * 1000.0;
-        } else {
-            debug_log!("[Estimator] Sliding window is not full, skipping motion tracking");
+        } else if self.frame_count % 50 == 0 {
+            log::debug!(
+                "[Estimator] Frame {}: Motion tracking skipped - only {} keyframes (need 3 for tracking)",
+                self.frame_count,
+                num_kfs
+            );
         }
 
         // View map points and keyframe poses
         // Bundle adjustment
         if current_frame.is_keyframe {
+            log::info!(
+                "[Estimator] Adding keyframe {}: left_features={}, right_features={}",
+                self.frame_count,
+                current_frame.left_features.len(),
+                current_frame.right_features.len()
+            );
             let optimization_start = Instant::now();
             // Save timestamp and pose before frame is moved
             let frame_timestamp = current_frame.timestamp_ns;
@@ -793,6 +814,10 @@ impl Estimator {
                 }
             }
 
+            // Early map initialization: triangulate features once we have 3+ keyframes
+            // This enables PnP factors for motion tracking before full bundle adjustment
+            self.backend.sliding_window.triangulate_early_map();
+
             if let Err(e) = self.backend.sliding_window.optimize_with_imu(
                 imu_prior,
                 imu_weights,
@@ -801,6 +826,14 @@ impl Estimator {
                 log::error!("[Estimator] Bundle adjustment optimization failed: {:?}", e);
                 // Continue execution even if optimization fails
             }
+
+            // Report created map points after optimization
+            let mp_len = self.backend.sliding_window.map_points_len();
+            log::info!(
+                "[Estimator] Post-optimization: map_points={}, keyframes={}",
+                mp_len,
+                self.backend.sliding_window.len()
+            );
 
             // Reset IMU preintegrator after optimization for next interval
             if self.config.optimization.imu_prior_enable {

@@ -37,8 +37,8 @@ impl SubpixelStereoRefinement {
     pub fn new(patch_config: PatchMatchingConfig) -> Self {
         Self {
             refiner: SubPixelDisparityRefiner::new(patch_config.clone()),
-            max_photometric_error: 35.0,
-            min_peak_sharpness: 0.02,
+            max_photometric_error: 200.0, // Very relaxed - accept most matches
+            min_peak_sharpness: 0.001,    // Very relaxed - minimal quality requirement
         }
     }
 
@@ -68,7 +68,13 @@ impl SubpixelStereoRefinement {
         let left_f32 = Self::image_to_f32(left_image);
         let right_f32 = Self::image_to_f32(right_image);
 
-        matches
+        let mut filtered_count = 0;
+        let mut bounds_fail = 0;
+        let mut disparity_fail = 0;
+        let mut convergence_fail = 0;
+        let mut quality_fail = 0;
+
+        let results: Vec<_> = matches
             .iter()
             .filter_map(|(id, left_pos, right_pos)| {
                 let lx = left_pos.matrix().m13;
@@ -79,12 +85,14 @@ impl SubpixelStereoRefinement {
                 if !Self::in_bounds(width, height, lx, ly)
                     || !Self::in_bounds(width, height, rx, ry)
                 {
+                    bounds_fail += 1;
                     return None;
                 }
 
                 // Integer disparity seed from patch LK
                 let initial_disparity = (lx - rx) as f64;
                 if initial_disparity.abs() < 0.05 {
+                    disparity_fail += 1;
                     return None;
                 }
 
@@ -104,18 +112,26 @@ impl SubpixelStereoRefinement {
                 if !refinement.converged
                     || !photometric_error.is_finite()
                     || !peak_sharpness.is_finite()
-                    || photometric_error > self.max_photometric_error
+                {
+                    convergence_fail += 1;
+                    return None;
+                }
+
+                if photometric_error > self.max_photometric_error
                     || peak_sharpness < self.min_peak_sharpness
                 {
+                    quality_fail += 1;
                     return None;
                 }
 
                 let refined_disparity = refinement.disparity as f32;
                 let refined_right_x = lx - refined_disparity;
                 if !Self::in_bounds(width, height, refined_right_x, ry) {
+                    bounds_fail += 1;
                     return None;
                 }
 
+                filtered_count += 1;
                 let mut refined_right = *right_pos;
                 refined_right.matrix_mut_unchecked().m13 = refined_right_x;
                 refined_right.matrix_mut_unchecked().m23 = ry;
@@ -130,7 +146,20 @@ impl SubpixelStereoRefinement {
                     peak_sharpness,
                 })
             })
-            .collect()
+            .collect();
+
+        let input_count = matches.len();
+        let output_count = results.len();
+        if input_count > 0 {
+            log::info!(
+                "Subpixel refinement: {}/{} features passed ({:.1}% retained) - failures: bounds={}, disparity={}, convergence={}, quality={}",
+                output_count, input_count,
+                100.0 * output_count as f32 / input_count as f32,
+                bounds_fail, disparity_fail, convergence_fail, quality_fail
+            );
+        }
+
+        results
     }
 
     /// Convert `GrayImage` to a flat f32 buffer.

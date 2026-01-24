@@ -258,6 +258,11 @@ impl SlidingWindow {
         self.keyframes.len() >= self.max_frames
     }
 
+    /// Check if we have enough keyframes for motion tracking (need at least 3)
+    pub fn has_enough_for_tracking(&self) -> bool {
+        self.keyframes.len() >= 3
+    }
+
     /// Get a reference to a specific keyframe by index.
     pub fn get_frame(&self, index: usize) -> Option<&Frame> {
         self.keyframes.get(index)

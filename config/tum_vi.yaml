@@ -2,12 +2,12 @@
 # Debug / Feature Toggle Flags
 # Set to false to disable features for debugging
 debug:
-  use_imu: false                   # Enable IMU integration (try false if having issues)
+  use_imu: true                    # Enable IMU integration (try false if having issues)
   use_feature_tracking: true       # Enable stereo feature tracking
   use_triangulation: true          # Enable stereo triangulation
-  use_fallback_depth: false        # Use fallback depth when triangulation fails
-  min_stereo_matches: 2            # Minimum matching features for triangulation
-  log_stereo_undistorted: true     # Log undistorted coordinates for debugging
+  use_fallback_depth: true         # ENABLED: Use fallback depth to seed map when triangulation fails
+  min_stereo_matches: 1            # RELAXED: Minimum matching features for triangulation (was 2)
+  log_stereo_undistorted: false    # Disabled to reduce logging overhead
 
 # Camera Parameters (TUM-VI dataset - from dso/camchain.yaml)
 # TUM-VI uses pinhole camera model with equidistant distortion
@@ -36,24 +36,24 @@ camera:
 # Keyframe and Windowing Parameters
 # Controls keyframe selection and sliding window management
 keyframe_management:
-  keyframe_window_size: 10
-  translation_threshold: 0.4  # Minimum translation (meters) since last keyframe to trigger new keyframe
-  rotation_threshold: 0.25  # Minimum rotation (radians) since last keyframe to trigger new keyframe
-  processing_timeout_ms: 100
+  keyframe_window_size: 20
+  translation_threshold: 0.03  # Minimum translation (meters) since last keyframe to trigger new keyframe (more aggressive to densify keyframes)
+  rotation_threshold: 0.03  # Minimum rotation (radians) since last keyframe to trigger new keyframe (more aggressive to densify keyframes)
+  processing_timeout_ms: 20000
 
 # Feature Detection Parameters
 # Controls how corner features are detected using goodFeaturesToTrack
 feature_detection:
-  grid_size: 30
-  max_features_per_grid: 1   # Maximum features allowed per grid cell
-  optical_flow_max_iterations: 10
-  optical_flow_convergence_threshold: 0.01
+  grid_size: 20               # REDUCED: Smaller grid for more uniform coverage (was 24)
+  max_features_per_grid: 6    # BALANCED: Features per cell to avoid timeout (was 8)
+  optical_flow_max_iterations: 15  # INCREASED: More iterations for better tracking (was 10)
+  optical_flow_convergence_threshold: 0.015  # RELAXED: Allow slightly less precise tracking (was 0.01)
 
 # Global Depth Parameters
 # Controls depth validation throughout the entire VIO system
 depth:
-  min_depth: 0.1              # Minimum depth for valid 3D points (meters) - used in all depth validation
-  max_depth: 100.0            # Maximum depth for valid 3D points (meters) - used in all depth validation
+  min_depth: 0.05             # RELAXED: Minimum depth for valid 3D points (was 0.1m)
+  max_depth: 50.0             # TIGHTENED: Maximum depth to reject far outliers (was 100m)
 
 optimization:
   pnp_max_iterations: 10
@@ -67,7 +67,7 @@ optimization:
 # Marginalization settings for sliding window VIO
 marginalization:
   enabled: true                     # Enable marginalization of old states
-  max_keyframes: 10                 # Maximum number of keyframes in sliding window
+  max_keyframes: 20                 # Maximum number of keyframes in sliding window
   num_marginalize_per_step: 1       # Number of keyframes to marginalize when window is full
   min_landmark_observations: 3      # Minimum observations to keep a landmark
   landmark_age_limit: 50            # Maximum frames without observation before marginalizing

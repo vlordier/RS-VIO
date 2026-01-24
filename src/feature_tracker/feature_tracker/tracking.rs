@@ -12,8 +12,10 @@ pub fn add_points(
     tracked_points_map: &HashMap<usize, na::Affine2<f32>>,
     grayscale_image: &GrayImage,
     grid_size: u32,
+    num_points_in_cell: u32,
 ) -> Vec<(f32, f32, f32)> {
-    let num_points_in_cell = 1;
+    // Ensure at least one point per cell
+    let num_points_in_cell = num_points_in_cell.max(1);
     let current_corners: Vec<Corner> = tracked_points_map
         .values()
         .map(|v| {

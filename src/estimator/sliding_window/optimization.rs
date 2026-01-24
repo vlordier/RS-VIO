@@ -918,6 +918,70 @@ impl SlidingWindow {
         }
     }
 
+    /// Early map initialization: triangulate features once we have 3-4 keyframes
+    /// This enables PnP factors for motion tracking before full bundle adjustment
+    pub fn triangulate_early_map(&mut self) {
+        if self.keyframes.len() < 3 {
+            return; // Need at least 3 keyframes for stereo triangulation
+        }
+
+        if !self.map_points.is_empty() {
+            return; // Map already initialized
+        }
+
+        let mut triangulated_count = 0;
+
+        // Use the first keyframe's features to triangulate
+        if let Some(first_kf) = self.keyframes.front() {
+            for left_feat in first_kf.left_features.iter() {
+                let feature_id = left_feat.feature_id;
+
+                // Skip if already triangulated
+                if self.map_points.contains_key(&feature_id) {
+                    continue;
+                }
+
+                // Find right feature observation
+                if let Some(right_feat) = first_kf
+                    .right_features
+                    .iter()
+                    .find(|f| f.feature_id == feature_id)
+                {
+                    let left_obs = Vector3::new(
+                        left_feat.undistorted_coord[0] as Float,
+                        left_feat.undistorted_coord[1] as Float,
+                        fl!(1.0),
+                    );
+                    let right_obs = Vector3::new(
+                        right_feat.undistorted_coord[0] as Float,
+                        right_feat.undistorted_coord[1] as Float,
+                        fl!(1.0),
+                    );
+
+                    if let Some(p_W) = Self::triangulate_stereo(
+                        left_obs,
+                        right_obs,
+                        first_kf.state.T_W_B,
+                        first_kf.state.T_B_Cl,
+                        first_kf.state.T_B_Cr,
+                    ) {
+                        self.map_points
+                            .insert(feature_id, [p_W.x as f32, p_W.y as f32, p_W.z as f32]);
+                        triangulated_count += 1;
+                    }
+                }
+            }
+        }
+
+        if triangulated_count > 0 {
+            log::info!(
+                "[SlidingWindow] Early map initialization: created {} map points with {} keyframes",
+                triangulated_count,
+                self.keyframes.len()
+            );
+        }
+    }
+
     pub fn optimize_with_imu(
         &mut self,
         imu_prior: Option<ImuMotionPrior>,
@@ -1285,6 +1349,7 @@ impl SlidingWindow {
             (&frame.left_features, T_Cl_B),
             (&frame.right_features, T_Cr_B),
         ];
+        let mut num_factors = 0;
         for (features, T_C_B) in camera_features.iter() {
             for feat in features.iter() {
                 let feature_id = feat.feature_id;
@@ -1305,9 +1370,19 @@ impl SlidingWindow {
                         Box::new(factor),
                         Some(Box::new(huber_loss)),
                     );
+                    num_factors += 1;
                 }
             }
         }
+
+        if num_factors == 0 {
+            log::warn!("[SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)");
+            return Ok(None);
+        }
+        log::debug!(
+            "[SlidingWindow] Motion tracking: created {} PnP factors",
+            num_factors
+        );
 
         problem.initialize_variables(&initial_values);
 

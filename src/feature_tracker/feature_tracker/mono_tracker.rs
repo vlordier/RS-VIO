@@ -14,6 +14,7 @@ pub struct PatchTracker<const N: u32> {
     tracked_points_map: HashMap<usize, na::Affine2<f32>>,
     previous_image_pyramid: Vec<GrayImage>,
     grid_cols: u32,
+    max_features_per_grid: u32,
 }
 
 impl<const LEVELS: u32> PatchTracker<LEVELS> {
@@ -24,6 +25,7 @@ impl<const LEVELS: u32> PatchTracker<LEVELS> {
             tracked_points_map: HashMap::new(),
             previous_image_pyramid: Vec::new(),
             grid_cols: config.grid_cols,
+            max_features_per_grid: config.max_features_per_grid,
         }
     }
 
@@ -53,7 +55,12 @@ impl<const LEVELS: u32> PatchTracker<LEVELS> {
             log::info!("tracked old points {}", self.tracked_points_map.len());
         }
         // add new points
-        let new_points = add_points(&self.tracked_points_map, greyscale_image, self.grid_cols);
+        let new_points = add_points(
+            &self.tracked_points_map,
+            greyscale_image,
+            self.grid_cols,
+            self.max_features_per_grid,
+        );
         for (x, y, _score) in &new_points {
             let mut v = na::Affine2::<f32>::identity();
 
@@ -94,6 +101,7 @@ pub struct ArenaPatchTracker<const N: u32> {
     tracked_points: HashMap<usize, ([f32; 2], Option<[f32; 2]>, u32, f32)>,
     previous_image_pyramid: Vec<GrayImage>,
     grid_cols: u32,
+    max_features_per_grid: u32,
     /// Arena allocator for feature track data (for future optimization)
     _arena: FeatureTrackingArena,
 }
@@ -110,6 +118,7 @@ impl<const LEVELS: u32> ArenaPatchTracker<LEVELS> {
             tracked_points: HashMap::new(),
             previous_image_pyramid: Vec::new(),
             grid_cols: config.grid_cols,
+            max_features_per_grid: config.max_features_per_grid,
             _arena: FeatureTrackingArena::new(estimated_features),
         }
     }
@@ -176,7 +185,12 @@ impl<const LEVELS: u32> ArenaPatchTracker<LEVELS> {
             affine_map.insert(*id, v);
         }
 
-        let new_points = add_points(&affine_map, greyscale_image, self.grid_cols);
+        let new_points = add_points(
+            &affine_map,
+            greyscale_image,
+            self.grid_cols,
+            self.max_features_per_grid,
+        );
         for (x, y, _score) in &new_points {
             self.tracked_points
                 .insert(self.last_keypoint_id, ([*x, *y], None, 1, 0.5));

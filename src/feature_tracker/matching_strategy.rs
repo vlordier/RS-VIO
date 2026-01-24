@@ -101,10 +101,10 @@ pub struct BasicRANSACConfig {
 impl Default for BasicRANSACConfig {
     fn default() -> Self {
         Self {
-            max_iterations: 1000,
-            inlier_threshold: 1.0,
-            min_inliers: 20,
-            confidence: 0.99,
+            max_iterations: 500,   // Reduced iterations for speed
+            inlier_threshold: 2.0, // RELAXED: More permissive matching (was 1.0)
+            min_inliers: 8,        // LOWERED: Accept with fewer inliers (was 20)
+            confidence: 0.95,      // Slightly relaxed confidence (was 0.99)
         }
     }
 }
@@ -191,21 +191,30 @@ impl StereoMatchingStrategy for BasicRANSACStrategy {
             }
 
             // Only keep matches with reasonable error
-            if best_error < 30.0 && best_match_x >= 0.0 {
+            // RELAXED threshold to retain more candidates for RANSAC filtering
+            if best_error < 50.0 && best_match_x >= 0.0 {
                 candidate_matches.push((id, left_x, left_y, best_match_x, left_y, best_error));
             }
         }
 
         // Step 2: RANSAC on essential matrix for geometric validation
-        let inliers = if candidate_matches.len() >= 8 {
-            Self::ransac_essential_matrix(
+        // RELAXED: Lower threshold from 8 to 5 matches to enable RANSAC earlier
+        let inliers = if candidate_matches.len() >= 5 {
+            let ransac_inliers = Self::ransac_essential_matrix(
                 &candidate_matches,
                 camera_matrix,
                 self.ransac_config.max_iterations,
                 self.ransac_config.inlier_threshold,
-            )
+            );
+            // Accept RANSAC result if we get enough inliers, otherwise keep all candidates
+            if ransac_inliers.len() >= self.ransac_config.min_inliers {
+                ransac_inliers
+            } else {
+                // Not enough RANSAC inliers, but accept all candidates anyway
+                (0..candidate_matches.len()).collect()
+            }
         } else {
-            // Accept all if too few matches
+            // Accept all if too few matches for RANSAC
             (0..candidate_matches.len()).collect()
         };
 

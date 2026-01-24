@@ -31,7 +31,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let max_frames: usize = args
         .get(2)
         .and_then(|s| s.parse::<usize>().ok())
-        .unwrap_or(300);
+        .unwrap_or(1200);
+    let skip_frames: usize = args
+        .get(3)
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(0);
 
     let dataset_dir = env::var("TUM_VI_DIR").unwrap_or_else(|_| {
         if Path::new("./datasets/tum_vi").exists() {
@@ -72,13 +76,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✓ Estimator created\n");
 
     // Process frames with IMU windows
-    let frames_to_process = max_frames.min(sequence.num_frames());
-    println!("Processing {} frames...\n", frames_to_process);
+    let frames_to_process = max_frames.min(sequence.num_frames() - skip_frames);
+    println!(
+        "Skipping {} frames, processing {} frames...\n",
+        skip_frames, frames_to_process
+    );
 
     let mut imu_index = 0usize;
     let process_start = Instant::now();
 
-    for i in 0..frames_to_process {
+    for i in skip_frames..(skip_frames + frames_to_process) {
         let left_ts = sequence.cam0_timestamps[i];
         let left_path = &sequence.cam0_images[i];
         let right_path = &sequence.cam1_images[i];

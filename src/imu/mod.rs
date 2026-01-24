@@ -938,6 +938,19 @@ impl ImuAidedKeyframeSelector {
                     reason = format!("IMU-visual disagreement: {:.3}rad", imu_rotation_deviation);
                 }
             }
+
+            log::info!(
+                "[IMU KF] decision: is_kf={}, visual_trig={}, imu_trig={}, disagree={}, t={:.3}m, r={:.3}rad, imu_t={:.3}m, imu_r={:.3}rad, dev={:.3}rad",
+                is_keyframe,
+                visual_trigger,
+                imu_motion_trigger,
+                imu_visual_disagree,
+                translation_norm,
+                rotation_norm,
+                imu_translation_norm,
+                imu_rotation_angle.abs(),
+                imu_rotation_deviation
+            );
         } else {
             // First frame after initialization is always a keyframe
             is_keyframe = true;

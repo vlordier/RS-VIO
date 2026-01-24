@@ -375,7 +375,7 @@ macro_rules! assert_all_finite {
     ($coll:expr, $msg:expr) => {{
         #[cfg(debug_assertions)]
         {
-            if let Some(bad) = $coll.iter().find(|x| !x.is_finite()) {
+            if let Some(bad) = $coll.iter().find(|&x| !x.is_finite()) {
                 panic!("{}: {}", $msg, bad);
             }
         }

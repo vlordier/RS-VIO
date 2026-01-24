@@ -1,0 +1,1412 @@
+   Compiling rs-vio v0.2.0 (/Users/vincent/Work/RS-VIO)
+warning: rs-vio@0.2.0: Using matching strategy: matching-basic-ransac
+warning: rs-vio@0.2.0: RS-VIO feature validation passed
+    Finished `release` profile [optimized] target(s) in 34.81s
+     Running `target/release/examples/tum_vi_accuracy_validation room1 1200`
+
+=== Phase 10: TUM-VI Accuracy Validation ===
+
+Dataset: ./datasets/tum_vi
+Sequence: room1
+✓ Loaded sequence in 0.01s
+  - Frames: 2821 @ 20.0 Hz
+  - IMU: 28122 measurements @ 200 Hz
+  - Ground truth: 16541 poses
+
+✓ Loaded config: ./config/tum_vi.yaml
+
+[2026-01-23T22:06:42Z INFO  rs_vio::feature_tracker::gpu_accel] GPU support not enabled (compile with --features gpu)
+[2026-01-23T22:06:42Z INFO  rs_vio::feature_tracker::gpu_accel] GPU not available, using CPU fallback
+✓ Estimator created
+
+Processing 1200 frames...
+
+[IMU_VIZ] Frame 1: Received 4 IMU samples, use_imu=true
+[IMU_VIZ] Frame 1: Calling view_imu_results() with 4 samples
+[IMU_VIZ] Frame 1: Finished IMU visualization
+[2026-01-23T22:06:42Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 1
+[2026-01-23T22:06:42Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[IMU_VIZ] Frame 2: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 2: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 2: Finished IMU visualization
+[2026-01-23T22:06:42Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 2
+[2026-01-23T22:06:42Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[IMU_VIZ] Frame 3: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 3: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 3: Finished IMU visualization
+[2026-01-23T22:06:42Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 3
+[2026-01-23T22:06:42Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[IMU_VIZ] Frame 4: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 4: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 4: Finished IMU visualization
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=IMU-aided: Initial frame
+[2026-01-23T22:06:42Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 4
+[2026-01-23T22:06:42Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[IMU_VIZ] Frame 5: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 5: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 5: Finished IMU visualization
+[2026-01-23T22:06:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 6: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 6: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 6: Finished IMU visualization
+[2026-01-23T22:06:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 7: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 7: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 7: Finished IMU visualization
+[2026-01-23T22:06:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 8: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 8: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 8: Finished IMU visualization
+[2026-01-23T22:06:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 9: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 9: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 9: Finished IMU visualization
+[2026-01-23T22:06:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 10: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 10: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 10: Finished IMU visualization
+[2026-01-23T22:06:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] IMU initialization complete. Gyro bias: [-0.0029, 0.0031, -0.0453] rad/s, Accel bias: [-0.0725, 0.1620, 19.5728] m/s²
+[IMU_VIZ] Frame 11: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 11: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 11: Finished IMU visualization
+[2026-01-23T22:06:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 12: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 12: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 12: Finished IMU visualization
+[2026-01-23T22:06:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 13: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 13: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 13: Finished IMU visualization
+[2026-01-23T22:06:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 14: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 14: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 14: Finished IMU visualization
+[2026-01-23T22:06:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 15: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 15: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 15: Finished IMU visualization
+[2026-01-23T22:06:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 16: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 16: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 16: Finished IMU visualization
+[2026-01-23T22:06:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 17: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 17: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 17: Finished IMU visualization
+[2026-01-23T22:06:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 18: Received 9 IMU samples, use_imu=true
+[IMU_VIZ] Frame 18: Calling view_imu_results() with 9 samples
+[IMU_VIZ] Frame 18: Finished IMU visualization
+[2026-01-23T22:06:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 19: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 19: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 19: Finished IMU visualization
+[2026-01-23T22:06:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 20: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 20: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 20: Finished IMU visualization
+[2026-01-23T22:06:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 21: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 21: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 21: Finished IMU visualization
+[2026-01-23T22:06:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 22: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 22: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 22: Finished IMU visualization
+[2026-01-23T22:06:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 23: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 23: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 23: Finished IMU visualization
+[2026-01-23T22:06:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 24: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 24: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 24: Finished IMU visualization
+[2026-01-23T22:06:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 25: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 25: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 25: Finished IMU visualization
+[2026-01-23T22:06:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 26: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 26: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 26: Finished IMU visualization
+[2026-01-23T22:06:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 27: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 27: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 27: Finished IMU visualization
+[2026-01-23T22:06:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 28: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 28: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 28: Finished IMU visualization
+[2026-01-23T22:06:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 29: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 29: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 29: Finished IMU visualization
+[2026-01-23T22:06:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 30: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 30: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 30: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 31: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 31: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 31: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 32: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 32: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 32: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 33: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 33: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 33: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 34: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 34: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 34: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 35: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 35: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 35: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 36: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 36: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 36: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 37: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 37: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 37: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 38: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 38: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 38: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 39: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 39: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 39: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 40: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 40: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 40: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 41: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 41: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 41: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 42: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 42: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 42: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 43: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 43: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 43: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 44: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 44: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 44: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 45: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 45: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 45: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 46: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 46: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 46: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 47: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 47: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 47: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 48: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 48: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 48: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 49: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 49: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 49: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 50: Received 9 IMU samples, use_imu=true
+[IMU_VIZ] Frame 50: Calling view_imu_results() with 9 samples
+[IMU_VIZ] Frame 50: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+  Processed 50/1200 frames
+[IMU_VIZ] Frame 51: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 51: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 51: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 52: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 52: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 52: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 53: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 53: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 53: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 54: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 54: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 54: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 55: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 55: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 55: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 56: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 56: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 56: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 57: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 57: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 57: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 58: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 58: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 58: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 59: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 59: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 59: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 60: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 60: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 60: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 61: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 61: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 61: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 62: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 62: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 62: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 63: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 63: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 63: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 64: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 64: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 64: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 65: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 65: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 65: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 66: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 66: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 66: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 67: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 67: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 67: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 68: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 68: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 68: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 69: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 69: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 69: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 70: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 70: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 70: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 71: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 71: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 71: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 72: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 72: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 72: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 73: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 73: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 73: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 74: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 74: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 74: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 75: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 75: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 75: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 76: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 76: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 76: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 77: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 77: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 77: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 78: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 78: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 78: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 79: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 79: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 79: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 80: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 80: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 80: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 81: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 81: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 81: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 82: Received 9 IMU samples, use_imu=true
+[IMU_VIZ] Frame 82: Calling view_imu_results() with 9 samples
+[IMU_VIZ] Frame 82: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 83: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 83: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 83: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 84: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 84: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 84: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 85: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 85: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 85: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 86: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 86: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 86: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 87: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 87: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 87: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 88: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 88: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 88: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 89: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 89: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 89: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 90: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 90: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 90: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 91: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 91: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 91: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 92: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 92: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 92: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 93: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 93: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 93: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 94: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 94: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 94: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 95: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 95: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 95: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 96: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 96: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 96: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 97: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 97: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 97: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 98: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 98: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 98: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 99: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 99: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 99: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 100: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 100: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 100: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+  Processed 100/1200 frames
+[IMU_VIZ] Frame 101: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 101: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 101: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 102: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 102: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 102: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 103: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 103: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 103: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 104: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 104: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 104: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 105: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 105: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 105: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 106: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 106: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 106: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 107: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 107: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 107: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 108: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 108: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 108: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 109: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 109: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 109: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 110: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 110: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 110: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 111: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 111: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 111: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 112: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 112: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 112: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 113: Received 9 IMU samples, use_imu=true
+[IMU_VIZ] Frame 113: Calling view_imu_results() with 9 samples
+[IMU_VIZ] Frame 113: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 114: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 114: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 114: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 115: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 115: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 115: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 116: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 116: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 116: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 117: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 117: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 117: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 118: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 118: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 118: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 119: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 119: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 119: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 120: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 120: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 120: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 121: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 121: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 121: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 122: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 122: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 122: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 123: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 123: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 123: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 124: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 124: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 124: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 125: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 125: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 125: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 126: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 126: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 126: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 127: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 127: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 127: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 128: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 128: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 128: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 129: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 129: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 129: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 130: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 130: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 130: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 131: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 131: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 131: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 132: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 132: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 132: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 133: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 133: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 133: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 134: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 134: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 134: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 135: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 135: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 135: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 136: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 136: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 136: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 137: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 137: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 137: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 138: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 138: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 138: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 139: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 139: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 139: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 140: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 140: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 140: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 141: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 141: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 141: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 142: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 142: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 142: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 143: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 143: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 143: Finished IMU visualization
+[2026-01-23T22:06:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 144: Received 9 IMU samples, use_imu=true
+[IMU_VIZ] Frame 144: Calling view_imu_results() with 9 samples
+[IMU_VIZ] Frame 144: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 145: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 145: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 145: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 146: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 146: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 146: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 147: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 147: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 147: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 148: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 148: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 148: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 149: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 149: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 149: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 150: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 150: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 150: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+  Processed 150/1200 frames
+[IMU_VIZ] Frame 151: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 151: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 151: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 152: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 152: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 152: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 153: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 153: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 153: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 154: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 154: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 154: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 155: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 155: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 155: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 156: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 156: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 156: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 157: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 157: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 157: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 158: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 158: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 158: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 159: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 159: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 159: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 160: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 160: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 160: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 161: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 161: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 161: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 162: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 162: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 162: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 163: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 163: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 163: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 164: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 164: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 164: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 165: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 165: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 165: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 166: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 166: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 166: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 167: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 167: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 167: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 168: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 168: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 168: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 169: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 169: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 169: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 170: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 170: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 170: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 171: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 171: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 171: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 172: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 172: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 172: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 173: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 173: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 173: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 174: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 174: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 174: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 175: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 175: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 175: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 176: Received 9 IMU samples, use_imu=true
+[IMU_VIZ] Frame 176: Calling view_imu_results() with 9 samples
+[IMU_VIZ] Frame 176: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 177: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 177: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 177: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 178: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 178: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 178: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 179: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 179: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 179: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 180: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 180: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 180: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 181: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 181: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 181: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 182: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 182: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 182: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 183: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 183: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 183: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 184: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 184: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 184: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 185: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 185: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 185: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 186: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 186: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 186: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 187: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 187: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 187: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 188: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 188: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 188: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 189: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 189: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 189: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 190: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 190: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 190: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 191: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 191: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 191: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 192: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 192: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 192: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 193: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 193: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 193: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 194: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 194: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 194: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 195: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 195: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 195: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 196: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 196: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 196: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 197: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 197: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 197: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 198: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 198: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 198: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 199: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 199: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 199: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 200: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 200: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 200: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+  Processed 200/1200 frames
+[IMU_VIZ] Frame 201: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 201: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 201: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 202: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 202: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 202: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 203: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 203: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 203: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 204: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 204: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 204: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 205: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 205: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 205: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 206: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 206: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 206: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 207: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 207: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 207: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 208: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 208: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 208: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 209: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 209: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 209: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 210: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 210: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 210: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 211: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 211: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 211: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 212: Received 9 IMU samples, use_imu=true
+[IMU_VIZ] Frame 212: Calling view_imu_results() with 9 samples
+[IMU_VIZ] Frame 212: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 213: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 213: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 213: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 214: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 214: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 214: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 215: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 215: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 215: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 216: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 216: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 216: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 217: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 217: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 217: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 218: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 218: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 218: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 219: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 219: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 219: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 220: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 220: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 220: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 221: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 221: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 221: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 222: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 222: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 222: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 223: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 223: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 223: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 224: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 224: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 224: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 225: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 225: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 225: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 226: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 226: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 226: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 227: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 227: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 227: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 228: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 228: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 228: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 229: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 229: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 229: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 230: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 230: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 230: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 231: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 231: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 231: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 232: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 232: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 232: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 233: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 233: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 233: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 234: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 234: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 234: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 235: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 235: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 235: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 236: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 236: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 236: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 237: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 237: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 237: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 238: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 238: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 238: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 239: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 239: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 239: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 240: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 240: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 240: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 241: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 241: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 241: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 242: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 242: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 242: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 243: Received 9 IMU samples, use_imu=true
+[IMU_VIZ] Frame 243: Calling view_imu_results() with 9 samples
+[IMU_VIZ] Frame 243: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 244: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 244: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 244: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 245: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 245: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 245: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 246: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 246: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 246: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 247: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 247: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 247: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 248: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 248: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 248: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 249: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 249: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 249: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 250: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 250: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 250: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+  Processed 250/1200 frames
+[IMU_VIZ] Frame 251: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 251: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 251: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 252: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 252: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 252: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 253: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 253: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 253: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 254: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 254: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 254: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 255: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 255: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 255: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 256: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 256: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 256: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 257: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 257: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 257: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 258: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 258: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 258: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 259: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 259: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 259: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 260: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 260: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 260: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 261: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 261: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 261: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 262: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 262: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 262: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 263: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 263: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 263: Finished IMU visualization
+[2026-01-23T22:06:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 264: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 264: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 264: Finished IMU visualization
+[2026-01-23T22:06:45Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 265: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 265: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 265: Finished IMU visualization
+[2026-01-23T22:06:45Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 266: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 266: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 266: Finished IMU visualization
+[2026-01-23T22:06:45Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 267: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 267: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 267: Finished IMU visualization
+[2026-01-23T22:06:45Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 268: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 268: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 268: Finished IMU visualization
+[2026-01-23T22:06:45Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 269: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 269: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 269: Finished IMU visualization
+[2026-01-23T22:06:45Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 270: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 270: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 270: Finished IMU visualization
+[2026-01-23T22:06:45Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 271: Received 9 IMU samples, use_imu=true
+[IMU_VIZ] Frame 271: Calling view_imu_results() with 9 samples
+[IMU_VIZ] Frame 271: Finished IMU visualization
+[2026-01-23T22:06:45Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 272: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 272: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 272: Finished IMU visualization
+[2026-01-23T22:06:45Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 273: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 273: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 273: Finished IMU visualization
+[2026-01-23T22:06:45Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 274: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 274: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 274: Finished IMU visualization
+[2026-01-23T22:06:45Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 275: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 275: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 275: Finished IMU visualization
+[2026-01-23T22:06:45Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 276: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 276: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 276: Finished IMU visualization
+[2026-01-23T22:06:45Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:06:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 277: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 277: Calling view_imu_results() with 10 samples

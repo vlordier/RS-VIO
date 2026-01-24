@@ -380,7 +380,7 @@ mod tests {
 
     #[test]
     fn test_notch_filter_design() {
-        let _filter = NotchFilter::new(100.0, 1000.0, 10.0);
+        let filter = NotchFilter::new(100.0, 1000.0, 10.0);
 
         // Check coefficients are finite
         assert_all_finite!(filter.a, "Denominator coefficients must be finite");

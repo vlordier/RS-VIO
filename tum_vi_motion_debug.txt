@@ -1,0 +1,680 @@
+   Compiling rs-vio v0.2.0 (/Users/vincent/Work/RS-VIO)
+warning: rs-vio@0.2.0: Using matching strategy: matching-basic-ransac
+warning: rs-vio@0.2.0: RS-VIO feature validation passed
+    Finished `release` profile [optimized] target(s) in 35.98s
+     Running `target/release/examples/tum_vi_accuracy_validation room1 1200`
+
+=== Phase 10: TUM-VI Accuracy Validation ===
+
+Dataset: ./datasets/tum_vi
+Sequence: room1
+✓ Loaded sequence in 0.02s
+  - Frames: 2821 @ 20.0 Hz
+  - IMU: 28122 measurements @ 200 Hz
+  - Ground truth: 16541 poses
+
+✓ Loaded config: ./config/tum_vi.yaml
+
+[2026-01-23T22:13:14Z INFO  rs_vio::feature_tracker::gpu_accel] GPU support not enabled (compile with --features gpu)
+[2026-01-23T22:13:14Z INFO  rs_vio::feature_tracker::gpu_accel] GPU not available, using CPU fallback
+✓ Estimator created
+
+Processing 1200 frames...
+
+[IMU_VIZ] Frame 1: Received 4 IMU samples, use_imu=true
+[IMU_VIZ] Frame 1: Calling view_imu_results() with 4 samples
+[IMU_VIZ] Frame 1: Finished IMU visualization
+[2026-01-23T22:13:14Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 1
+[2026-01-23T22:13:14Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[IMU_VIZ] Frame 2: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 2: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 2: Finished IMU visualization
+[2026-01-23T22:13:14Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 2
+[2026-01-23T22:13:14Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[IMU_VIZ] Frame 3: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 3: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 3: Finished IMU visualization
+[2026-01-23T22:13:14Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 3
+[2026-01-23T22:13:14Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[IMU_VIZ] Frame 4: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 4: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 4: Finished IMU visualization
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 4: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=IMU-aided: Initial frame
+[2026-01-23T22:13:14Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 4
+[2026-01-23T22:13:14Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[IMU_VIZ] Frame 5: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 5: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 5: Finished IMU visualization
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 5: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:14Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 6: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 6: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 6: Finished IMU visualization
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 6: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:14Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 7: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 7: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 7: Finished IMU visualization
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 7: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:14Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 8: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 8: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 8: Finished IMU visualization
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 8: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:14Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 9: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 9: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 9: Finished IMU visualization
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 9: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:14Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 10: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 10: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 10: Finished IMU visualization
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 10: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:14Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] IMU initialization complete. Gyro bias: [-0.0029, 0.0031, -0.0453] rad/s, Accel bias: [-0.0725, 0.1620, 19.5728] m/s²
+[IMU_VIZ] Frame 11: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 11: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 11: Finished IMU visualization
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 11: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:14Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 12: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 12: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 12: Finished IMU visualization
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 12: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:14Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 13: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 13: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 13: Finished IMU visualization
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 13: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:14Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 14: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 14: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 14: Finished IMU visualization
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 14: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:14Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 15: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 15: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 15: Finished IMU visualization
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 15: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:14Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 16: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 16: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 16: Finished IMU visualization
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 16: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:14Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 17: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 17: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 17: Finished IMU visualization
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 17: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:14Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 18: Received 9 IMU samples, use_imu=true
+[IMU_VIZ] Frame 18: Calling view_imu_results() with 9 samples
+[IMU_VIZ] Frame 18: Finished IMU visualization
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 18: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:14Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 19: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 19: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 19: Finished IMU visualization
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 19: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:14Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 20: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 20: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 20: Finished IMU visualization
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 20: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:14Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 21: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 21: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 21: Finished IMU visualization
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 21: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:14Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:14Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 22: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 22: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 22: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 22: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 23: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 23: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 23: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 23: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 24: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 24: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 24: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 24: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 25: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 25: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 25: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 25: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 26: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 26: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 26: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 26: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 27: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 27: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 27: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 27: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 28: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 28: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 28: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 28: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 29: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 29: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 29: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 29: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 30: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 30: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 30: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 30: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 31: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 31: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 31: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 31: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 32: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 32: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 32: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 32: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 33: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 33: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 33: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 33: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 34: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 34: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 34: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 34: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 35: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 35: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 35: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 35: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 36: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 36: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 36: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 36: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 37: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 37: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 37: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 37: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 38: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 38: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 38: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 38: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 39: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 39: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 39: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 39: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 40: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 40: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 40: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 40: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 41: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 41: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 41: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 41: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 42: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 42: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 42: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 42: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 43: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 43: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 43: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 43: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 44: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 44: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 44: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 44: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 45: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 45: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 45: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 45: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 46: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 46: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 46: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 46: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 47: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 47: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 47: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 47: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 48: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 48: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 48: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 48: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 49: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 49: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 49: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 49: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 50: Received 9 IMU samples, use_imu=true
+[IMU_VIZ] Frame 50: Calling view_imu_results() with 9 samples
+[IMU_VIZ] Frame 50: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 50: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+  Processed 50/1200 frames
+[IMU_VIZ] Frame 51: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 51: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 51: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 51: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 52: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 52: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 52: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 52: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 53: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 53: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 53: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 53: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 54: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 54: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 54: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 54: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 55: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 55: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 55: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 55: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 56: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 56: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 56: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 56: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 57: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 57: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 57: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 57: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 58: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 58: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 58: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 58: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 59: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 59: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 59: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 59: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 60: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 60: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 60: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 60: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 61: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 61: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 61: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 61: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 62: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 62: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 62: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 62: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 63: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 63: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 63: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 63: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 64: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 64: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 64: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 64: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 65: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 65: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 65: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 65: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 66: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 66: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 66: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 66: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 67: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 67: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 67: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 67: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 68: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 68: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 68: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 68: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 69: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 69: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 69: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 69: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 70: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 70: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 70: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 70: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 71: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 71: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 71: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 71: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 72: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 72: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 72: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 72: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 73: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 73: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 73: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 73: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 74: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 74: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 74: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 74: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 75: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 75: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 75: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 75: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 76: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 76: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 76: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 76: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 77: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 77: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 77: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 77: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 78: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 78: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 78: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 78: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 79: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 79: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 79: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 79: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 80: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 80: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 80: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 80: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 81: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 81: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 81: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 81: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 82: Received 9 IMU samples, use_imu=true
+[IMU_VIZ] Frame 82: Calling view_imu_results() with 9 samples
+[IMU_VIZ] Frame 82: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 82: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 83: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 83: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 83: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 83: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 84: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 84: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 84: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 84: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 85: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 85: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 85: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 85: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 86: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 86: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 86: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 86: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 87: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 87: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 87: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 87: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 88: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 88: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 88: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 88: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 89: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 89: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 89: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 89: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 90: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 90: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 90: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 90: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 91: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 91: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 91: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 91: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 92: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 92: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 92: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 92: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 93: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 93: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 93: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 93: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 94: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 94: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 94: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 94: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 95: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 95: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 95: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 95: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 96: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 96: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 96: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 96: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 97: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 97: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 97: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 97: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 98: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 98: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 98: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 98: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 99: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 99: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 99: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 99: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 100: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 100: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 100: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 100: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+  Processed 100/1200 frames
+[IMU_VIZ] Frame 101: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 101: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 101: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 101: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 102: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 102: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 102: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 102: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 103: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 103: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 103: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 103: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 104: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 104: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 104: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 104: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 105: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 105: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 105: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 105: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 106: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 106: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 106: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 106: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 107: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 107: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 107: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 107: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 108: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 108: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 108: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 108: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 109: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 109: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 109: Finished IMU visualization
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 109: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:13:15Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.000m, r=0.000rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:13:15Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.000rad, reason=
+[IMU_VIZ] Frame 110: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 110: Calling view_imu_results() with 10 samples

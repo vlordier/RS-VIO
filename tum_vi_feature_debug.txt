@@ -1,0 +1,1039 @@
+   Compiling rs-vio v0.2.0 (/Users/vincent/Work/RS-VIO)
+warning: rs-vio@0.2.0: Using matching strategy: matching-basic-ransac
+warning: rs-vio@0.2.0: RS-VIO feature validation passed
+    Finished `release` profile [optimized] target(s) in 33.40s
+     Running `target/release/examples/tum_vi_accuracy_validation room1 120 0`
+
+=== Phase 10: TUM-VI Accuracy Validation ===
+
+Dataset: ./datasets/tum_vi
+Sequence: room1
+✓ Loaded sequence in 0.01s
+  - Frames: 2821 @ 20.0 Hz
+  - IMU: 28122 measurements @ 200 Hz
+  - Ground truth: 16541 poses
+
+✓ Loaded config: ./config/tum_vi.yaml
+
+[2026-01-23T22:30:36Z INFO  rs_vio::feature_tracker::gpu_accel] GPU support not enabled (compile with --features gpu)
+[2026-01-23T22:30:36Z INFO  rs_vio::feature_tracker::gpu_accel] GPU not available, using CPU fallback
+✓ Estimator created
+
+Skipping 0 frames, processing 120 frames...
+
+[IMU_VIZ] Frame 1: Received 4 IMU samples, use_imu=true
+[IMU_VIZ] Frame 1: Calling view_imu_results() with 4 samples
+[IMU_VIZ] Frame 1: Finished IMU visualization
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 1: left_features=2, right_features=1
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 1
+[2026-01-23T22:30:36Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=1
+[IMU_VIZ] Frame 2: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 2: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 2: Finished IMU visualization
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 2: left_features=2, right_features=1
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 2
+[2026-01-23T22:30:36Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=2
+[IMU_VIZ] Frame 3: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 3: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 3: Finished IMU visualization
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 3: left_features=2, right_features=1
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 3
+[2026-01-23T22:30:36Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=3
+[IMU_VIZ] Frame 4: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 4: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 4: Finished IMU visualization
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::estimator::processor] [Estimator] Frame 4: Motion tracking failed (optimization did not converge), pose not updated
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 4: left_features=2, right_features=1
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 4
+[2026-01-23T22:30:36Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=4
+[IMU_VIZ] Frame 5: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 5: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 5: Finished IMU visualization
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::estimator::processor] [Estimator] Frame 5: Motion tracking failed (optimization did not converge), pose not updated
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 5: left_features=2, right_features=1
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 5
+[2026-01-23T22:30:36Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=5
+[IMU_VIZ] Frame 6: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 6: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 6: Finished IMU visualization
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::estimator::processor] [Estimator] Frame 6: Motion tracking failed (optimization did not converge), pose not updated
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 6: left_features=2, right_features=1
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 6
+[2026-01-23T22:30:36Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=6
+[IMU_VIZ] Frame 7: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 7: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 7: Finished IMU visualization
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::estimator::processor] [Estimator] Frame 7: Motion tracking failed (optimization did not converge), pose not updated
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 7: left_features=2, right_features=1
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 7
+[2026-01-23T22:30:36Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=7
+[IMU_VIZ] Frame 8: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 8: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 8: Finished IMU visualization
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::estimator::processor] [Estimator] Frame 8: Motion tracking failed (optimization did not converge), pose not updated
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 8: left_features=2, right_features=1
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 8
+[2026-01-23T22:30:36Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=8
+[IMU_VIZ] Frame 9: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 9: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 9: Finished IMU visualization
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::estimator::processor] [Estimator] Frame 9: Motion tracking failed (optimization did not converge), pose not updated
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 9: left_features=2, right_features=1
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 9
+[2026-01-23T22:30:36Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=9
+[IMU_VIZ] Frame 10: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 10: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 10: Finished IMU visualization
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::estimator::processor] [Estimator] Frame 10: Motion tracking failed (optimization did not converge), pose not updated
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 10: left_features=2, right_features=1
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 10
+[2026-01-23T22:30:36Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=10
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] IMU initialization complete. Gyro bias: [-0.0029, 0.0031, -0.0453] rad/s, Accel bias: [-0.0725, 0.1620, 19.5728] m/s²
+[IMU_VIZ] Frame 11: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 11: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 11: Finished IMU visualization
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::estimator::processor] [Estimator] Frame 11: Motion tracking failed (optimization did not converge), pose not updated
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 11: left_features=2, right_features=1
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 11
+[2026-01-23T22:30:36Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=11
+[IMU_VIZ] Frame 12: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 12: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 12: Finished IMU visualization
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::estimator::processor] [Estimator] Frame 12: Motion tracking failed (optimization did not converge), pose not updated
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 12: left_features=2, right_features=1
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 12
+[2026-01-23T22:30:36Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=12
+[IMU_VIZ] Frame 13: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 13: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 13: Finished IMU visualization
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::estimator::processor] [Estimator] Frame 13: Motion tracking failed (optimization did not converge), pose not updated
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 13: left_features=2, right_features=1
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 13
+[2026-01-23T22:30:36Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=13
+[IMU_VIZ] Frame 14: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 14: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 14: Finished IMU visualization
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::estimator::processor] [Estimator] Frame 14: Motion tracking failed (optimization did not converge), pose not updated
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 14: left_features=2, right_features=1
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 14
+[2026-01-23T22:30:36Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=14
+[IMU_VIZ] Frame 15: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 15: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 15: Finished IMU visualization
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::estimator::processor] [Estimator] Frame 15: Motion tracking failed (optimization did not converge), pose not updated
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 15: left_features=2, right_features=1
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 15
+[2026-01-23T22:30:36Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=15
+[IMU_VIZ] Frame 16: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 16: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 16: Finished IMU visualization
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::estimator::processor] [Estimator] Frame 16: Motion tracking failed (optimization did not converge), pose not updated
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 16: left_features=2, right_features=1
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 16
+[2026-01-23T22:30:36Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=16
+[IMU_VIZ] Frame 17: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 17: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 17: Finished IMU visualization
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::estimator::processor] [Estimator] Frame 17: Motion tracking failed (optimization did not converge), pose not updated
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 17: left_features=2, right_features=1
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 17
+[2026-01-23T22:30:36Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=17
+[IMU_VIZ] Frame 18: Received 9 IMU samples, use_imu=true
+[IMU_VIZ] Frame 18: Calling view_imu_results() with 9 samples
+[IMU_VIZ] Frame 18: Finished IMU visualization
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::estimator::processor] [Estimator] Frame 18: Motion tracking failed (optimization did not converge), pose not updated
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 18: left_features=2, right_features=1
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 18
+[2026-01-23T22:30:36Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=18
+[IMU_VIZ] Frame 19: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 19: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 19: Finished IMU visualization
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::estimator::processor] [Estimator] Frame 19: Motion tracking failed (optimization did not converge), pose not updated
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 19: left_features=2, right_features=1
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Cannot optimize: need 20 keyframes, have 19
+[2026-01-23T22:30:36Z ERROR rs_vio::estimator::estimator::processor] [Estimator] Bundle adjustment optimization failed: Custom { kind: Other, error: "Need more keyframes" }
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=19
+[IMU_VIZ] Frame 20: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 20: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 20: Finished IMU visualization
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::estimator::processor] [Estimator] Frame 20: Motion tracking failed (optimization did not converge), pose not updated
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 20: left_features=2, right_features=1
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Rejecting invalid map point 13: [-0.05, -0.73, -0.44]
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=20
+[IMU_VIZ] Frame 21: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 21: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 21: Finished IMU visualization
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::estimator::processor] [Estimator] Frame 21: Motion tracking failed (optimization did not converge), pose not updated
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 21: left_features=2, right_features=1
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Rejecting invalid map point 13: [0.17, -0.66, -0.47]
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=20
+[IMU_VIZ] Frame 22: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 22: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 22: Finished IMU visualization
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::estimator::processor] [Estimator] Frame 22: Motion tracking failed (optimization did not converge), pose not updated
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 22: left_features=2, right_features=1
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Rejecting invalid map point 13: [0.41, -0.51, -0.46]
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=20
+[IMU_VIZ] Frame 23: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 23: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 23: Finished IMU visualization
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::estimator::processor] [Estimator] Frame 23: Motion tracking failed (optimization did not converge), pose not updated
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 23: left_features=2, right_features=1
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Rejecting invalid map point 13: [0.68, -0.25, -0.40]
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=20
+[IMU_VIZ] Frame 24: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 24: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 24: Finished IMU visualization
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::estimator::processor] [Estimator] Frame 24: Motion tracking failed (optimization did not converge), pose not updated
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 24: left_features=2, right_features=1
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Rejecting invalid map point 13: [0.71, -0.43, -0.56]
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=20
+[IMU_VIZ] Frame 25: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 25: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 25: Finished IMU visualization
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::estimator::processor] [Estimator] Frame 25: Motion tracking failed (optimization did not converge), pose not updated
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 25: left_features=2, right_features=1
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Rejecting invalid map point 13: [1.33, 0.04, -0.39]
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=20
+[IMU_VIZ] Frame 26: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 26: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 26: Finished IMU visualization
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)
+[2026-01-23T22:30:36Z WARN  rs_vio::estimator::estimator::processor] [Estimator] Frame 26: Motion tracking failed (optimization did not converge), pose not updated
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 26: left_features=2, right_features=1
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 27: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 27: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 27: Finished IMU visualization
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 27: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=true, t_norm=8.138m, rot_norm=0.312rad, reason=Visual: trans=8.138m, rot=0.312rad
+[2026-01-23T22:30:36Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 27: left_features=2, right_features=1
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 28: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 28: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 28: Finished IMU visualization
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 28: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:37Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=true, t=16.395m, r=1.728rad, imu_t=0.000m, imu_r=0.000rad, dev=0.839rad
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=true, t_norm=11.149m, rot_norm=1.169rad, reason=Visual: trans=11.149m, rot=1.169rad
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 28: left_features=2, right_features=1
+[2026-01-23T22:30:37Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Rejecting invalid map point 13: [98.40, -178.84, -350.37]
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=20
+[IMU_VIZ] Frame 29: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 29: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 29: Finished IMU visualization
+[2026-01-23T22:30:37Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)
+[2026-01-23T22:30:37Z WARN  rs_vio::estimator::estimator::processor] [Estimator] Frame 29: Motion tracking failed (optimization did not converge), pose not updated
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 29: left_features=2, right_features=1
+[2026-01-23T22:30:37Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Rejecting invalid map point 13: [-1098.61, 1122.24, -334.58]
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=20
+[IMU_VIZ] Frame 30: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 30: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 30: Finished IMU visualization
+[2026-01-23T22:30:37Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)
+[2026-01-23T22:30:37Z WARN  rs_vio::estimator::estimator::processor] [Estimator] Frame 30: Motion tracking failed (optimization did not converge), pose not updated
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 30: left_features=2, right_features=1
+[2026-01-23T22:30:37Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Rejecting invalid map point 13: [-7417.79, -14032.50, -5647.41]
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=0, keyframes=20
+[IMU_VIZ] Frame 31: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 31: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 31: Finished IMU visualization
+[2026-01-23T22:30:37Z WARN  rs_vio::estimator::sliding_window::optimization] [SlidingWindow] Motion tracking: no PnP factors (no 3D map points for tracked features)
+[2026-01-23T22:30:37Z WARN  rs_vio::estimator::estimator::processor] [Estimator] Frame 31: Motion tracking failed (optimization did not converge), pose not updated
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 31: left_features=2, right_features=1
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 32: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 32: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 32: Finished IMU visualization
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 32: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:37Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=true, t=46.681m, r=3.777rad, imu_t=0.000m, imu_r=0.000rad, dev=0.199rad
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=true, t_norm=0.000m, rot_norm=0.316rad, reason=Visual: trans=0.000m, rot=0.316rad
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 32: left_features=2, right_features=1
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 33: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 33: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 33: Finished IMU visualization
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 33: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:37Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.417m, r=0.012rad, imu_t=0.000m, imu_r=0.000rad, dev=0.008rad
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.012rad, reason=IMU-aided: Visual motion: trans=0.417m, rot=0.012rad
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 33: left_features=2, right_features=1
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 34: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 34: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 34: Finished IMU visualization
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 34: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:37Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=true, t=29.404m, r=1.635rad, imu_t=0.000m, imu_r=0.000rad, dev=0.139rad
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=true, t_norm=0.000m, rot_norm=0.225rad, reason=Visual: trans=0.000m, rot=0.225rad
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 34: left_features=2, right_features=1
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 35: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 35: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 35: Finished IMU visualization
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 35: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:37Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=true, t=44.114m, r=1.589rad, imu_t=0.000m, imu_r=0.000rad, dev=0.230rad
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=true, t_norm=0.000m, rot_norm=0.329rad, reason=Visual: trans=0.000m, rot=0.329rad
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 35: left_features=2, right_features=1
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 36: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 36: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 36: Finished IMU visualization
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 36: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:37Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.106m, r=0.011rad, imu_t=0.000m, imu_r=0.000rad, dev=0.007rad
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.011rad, reason=IMU-aided: Visual motion: trans=0.106m, rot=0.011rad
+[2026-01-23T22:30:37Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 36: left_features=2, right_features=1
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 37: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 37: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 37: Finished IMU visualization
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 37: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:38Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.504m, r=0.021rad, imu_t=0.000m, imu_r=0.000rad, dev=0.012rad
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.016rad, reason=IMU-aided: Visual motion: trans=0.504m, rot=0.021rad
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 37: left_features=2, right_features=1
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 38: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 38: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 38: Finished IMU visualization
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 38: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:38Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.355m, r=0.022rad, imu_t=0.000m, imu_r=0.000rad, dev=0.014rad
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.024rad, reason=IMU-aided: Visual motion: trans=0.355m, rot=0.022rad
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 38: left_features=2, right_features=1
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 39: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 39: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 39: Finished IMU visualization
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 39: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:38Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.394m, r=0.016rad, imu_t=0.000m, imu_r=0.000rad, dev=0.009rad
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.013rad, reason=IMU-aided: Visual motion: trans=0.394m, rot=0.016rad
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 39: left_features=2, right_features=1
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 40: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 40: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 40: Finished IMU visualization
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 40: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:38Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.406m, r=0.015rad, imu_t=0.000m, imu_r=0.000rad, dev=0.010rad
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.013rad, reason=IMU-aided: Visual motion: trans=0.406m, rot=0.015rad
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 40: left_features=2, right_features=1
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 41: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 41: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 41: Finished IMU visualization
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 41: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:38Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.582m, r=0.023rad, imu_t=0.000m, imu_r=0.000rad, dev=0.016rad
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.024rad, reason=IMU-aided: Visual motion: trans=0.582m, rot=0.023rad
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 41: left_features=2, right_features=1
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 42: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 42: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 42: Finished IMU visualization
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 42: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:38Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.161m, r=0.008rad, imu_t=0.000m, imu_r=0.000rad, dev=0.006rad
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.008rad, reason=IMU-aided: Visual motion: trans=0.161m, rot=0.008rad
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 42: left_features=2, right_features=1
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 43: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 43: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 43: Finished IMU visualization
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 43: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:38Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.310m, r=0.013rad, imu_t=0.000m, imu_r=0.000rad, dev=0.009rad
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.012rad, reason=IMU-aided: Visual motion: trans=0.310m, rot=0.013rad
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 43: left_features=2, right_features=1
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 44: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 44: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 44: Finished IMU visualization
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 44: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:38Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.214m, r=0.023rad, imu_t=0.000m, imu_r=0.000rad, dev=0.015rad
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.024rad, reason=IMU-aided: Visual motion: trans=0.214m, rot=0.023rad
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 44: left_features=2, right_features=1
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 45: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 45: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 45: Finished IMU visualization
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 45: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:38Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.359m, r=0.014rad, imu_t=0.000m, imu_r=0.000rad, dev=0.009rad
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.011rad, reason=IMU-aided: Visual motion: trans=0.359m, rot=0.014rad
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 45: left_features=2, right_features=1
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 46: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 46: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 46: Finished IMU visualization
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 46: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:38Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.146m, r=0.006rad, imu_t=0.000m, imu_r=0.000rad, dev=0.003rad
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.005rad, reason=IMU-aided: Visual motion: trans=0.146m, rot=0.006rad
+[2026-01-23T22:30:38Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 46: left_features=2, right_features=1
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 47: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 47: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 47: Finished IMU visualization
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 47: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:39Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.072m, r=0.011rad, imu_t=0.000m, imu_r=0.000rad, dev=0.007rad
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.011rad, reason=IMU-aided: Visual motion: trans=0.072m, rot=0.011rad
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 47: left_features=2, right_features=1
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 48: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 48: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 48: Finished IMU visualization
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 48: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:39Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.072m, r=0.007rad, imu_t=0.000m, imu_r=0.000rad, dev=0.005rad
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.006rad, reason=IMU-aided: Visual motion: trans=0.072m, rot=0.007rad
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 48: left_features=2, right_features=1
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 49: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 49: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 49: Finished IMU visualization
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 49: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:39Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.043m, r=0.005rad, imu_t=0.000m, imu_r=0.000rad, dev=0.003rad
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.005rad, reason=IMU-aided: Visual motion: trans=0.043m, rot=0.005rad
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 49: left_features=2, right_features=1
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 50: Received 9 IMU samples, use_imu=true
+[IMU_VIZ] Frame 50: Calling view_imu_results() with 9 samples
+[IMU_VIZ] Frame 50: Finished IMU visualization
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 50: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:39Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.010m, r=0.002rad, imu_t=0.000m, imu_r=0.000rad, dev=0.001rad
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.002rad, reason=
+  Processed 50/120 frames
+[IMU_VIZ] Frame 51: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 51: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 51: Finished IMU visualization
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 51: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:39Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.227m, r=0.009rad, imu_t=0.000m, imu_r=0.000rad, dev=0.006rad
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.008rad, reason=IMU-aided: Visual motion: trans=0.227m, rot=0.009rad
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 51: left_features=2, right_features=1
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 52: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 52: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 52: Finished IMU visualization
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 52: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:39Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.169m, r=0.007rad, imu_t=0.000m, imu_r=0.000rad, dev=0.005rad
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.007rad, reason=IMU-aided: Visual motion: trans=0.169m, rot=0.007rad
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 52: left_features=2, right_features=1
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 53: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 53: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 53: Finished IMU visualization
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 53: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:39Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.051m, r=0.009rad, imu_t=0.000m, imu_r=0.000rad, dev=0.006rad
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.009rad, reason=IMU-aided: Visual motion: trans=0.051m, rot=0.009rad
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 53: left_features=2, right_features=1
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 54: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 54: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 54: Finished IMU visualization
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 54: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:39Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.130m, r=0.005rad, imu_t=0.000m, imu_r=0.000rad, dev=0.004rad
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.005rad, reason=IMU-aided: Visual motion: trans=0.130m, rot=0.005rad
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 54: left_features=2, right_features=1
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 55: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 55: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 55: Finished IMU visualization
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 55: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:39Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.616m, r=0.024rad, imu_t=0.000m, imu_r=0.000rad, dev=0.018rad
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.028rad, reason=IMU-aided: Visual motion: trans=0.616m, rot=0.024rad
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 55: left_features=2, right_features=1
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 56: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 56: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 56: Finished IMU visualization
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 56: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:39Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=3.153m, r=0.111rad, imu_t=0.000m, imu_r=0.000rad, dev=0.022rad
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=true, t_norm=0.000m, rot_norm=0.031rad, reason=Visual: trans=0.000m, rot=0.031rad
+[2026-01-23T22:30:39Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 56: left_features=2, right_features=1
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 57: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 57: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 57: Finished IMU visualization
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 57: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:40Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.477m, r=0.019rad, imu_t=0.000m, imu_r=0.000rad, dev=0.011rad
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.015rad, reason=IMU-aided: Visual motion: trans=0.477m, rot=0.019rad
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 57: left_features=2, right_features=1
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 58: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 58: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 58: Finished IMU visualization
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 58: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:40Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.246m, r=0.018rad, imu_t=0.000m, imu_r=0.000rad, dev=0.012rad
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.019rad, reason=IMU-aided: Visual motion: trans=0.246m, rot=0.018rad
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 58: left_features=2, right_features=1
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 59: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 59: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 59: Finished IMU visualization
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 59: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:40Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.189m, r=0.006rad, imu_t=0.000m, imu_r=0.000rad, dev=0.002rad
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.003rad, reason=IMU-aided: Visual motion: trans=0.189m, rot=0.006rad
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 59: left_features=2, right_features=1
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 60: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 60: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 60: Finished IMU visualization
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 60: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:40Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.293m, r=0.011rad, imu_t=0.000m, imu_r=0.000rad, dev=0.010rad
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.013rad, reason=IMU-aided: Visual motion: trans=0.293m, rot=0.011rad
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 60: left_features=2, right_features=1
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 61: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 61: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 61: Finished IMU visualization
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 61: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:40Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.547m, r=0.032rad, imu_t=0.000m, imu_r=0.000rad, dev=0.023rad
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=true, t_norm=0.000m, rot_norm=0.030rad, reason=Visual: trans=0.000m, rot=0.030rad
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 61: left_features=2, right_features=1
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 62: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 62: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 62: Finished IMU visualization
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 62: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:40Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.567m, r=0.025rad, imu_t=0.000m, imu_r=0.000rad, dev=0.019rad
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.026rad, reason=IMU-aided: Visual motion: trans=0.567m, rot=0.025rad
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 62: left_features=2, right_features=1
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 63: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 63: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 63: Finished IMU visualization
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 63: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:40Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.294m, r=0.018rad, imu_t=0.000m, imu_r=0.000rad, dev=0.013rad
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.017rad, reason=IMU-aided: Visual motion: trans=0.294m, rot=0.018rad
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 63: left_features=2, right_features=1
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 64: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 64: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 64: Finished IMU visualization
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 64: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:40Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=false, visual_trig=false, imu_trig=false, disagree=false, t=0.008m, r=0.001rad, imu_t=0.000m, imu_r=0.000rad, dev=0.000rad
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=false, imu_kf=false, visual_kf=false, t_norm=0.000m, rot_norm=0.001rad, reason=
+[IMU_VIZ] Frame 65: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 65: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 65: Finished IMU visualization
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 65: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:40Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.134m, r=0.017rad, imu_t=0.000m, imu_r=0.000rad, dev=0.012rad
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.015rad, reason=IMU-aided: Visual motion: trans=0.134m, rot=0.017rad
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 65: left_features=2, right_features=1
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 66: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 66: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 66: Finished IMU visualization
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 66: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:40Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.728m, r=0.029rad, imu_t=0.000m, imu_r=0.000rad, dev=0.018rad
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.027rad, reason=IMU-aided: Visual motion: trans=0.728m, rot=0.029rad
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 66: left_features=2, right_features=1
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 67: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 67: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 67: Finished IMU visualization
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 67: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:40Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.630m, r=0.025rad, imu_t=0.000m, imu_r=0.000rad, dev=0.016rad
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.023rad, reason=IMU-aided: Visual motion: trans=0.630m, rot=0.025rad
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 67: left_features=2, right_features=1
+[2026-01-23T22:30:40Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 68: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 68: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 68: Finished IMU visualization
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 68: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:41Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.274m, r=0.012rad, imu_t=0.000m, imu_r=0.000rad, dev=0.009rad
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.014rad, reason=IMU-aided: Visual motion: trans=0.274m, rot=0.012rad
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 68: left_features=2, right_features=1
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 69: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 69: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 69: Finished IMU visualization
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 69: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:41Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.333m, r=0.023rad, imu_t=0.000m, imu_r=0.000rad, dev=0.015rad
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.024rad, reason=IMU-aided: Visual motion: trans=0.333m, rot=0.023rad
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 69: left_features=2, right_features=1
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 70: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 70: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 70: Finished IMU visualization
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 70: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:41Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.585m, r=0.023rad, imu_t=0.000m, imu_r=0.000rad, dev=0.013rad
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.019rad, reason=IMU-aided: Visual motion: trans=0.585m, rot=0.023rad
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 70: left_features=2, right_features=1
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 71: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 71: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 71: Finished IMU visualization
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 71: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:41Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.100m, r=0.014rad, imu_t=0.000m, imu_r=0.000rad, dev=0.009rad
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.015rad, reason=IMU-aided: Visual motion: trans=0.100m, rot=0.014rad
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 71: left_features=2, right_features=1
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 72: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 72: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 72: Finished IMU visualization
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 72: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:41Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.471m, r=0.018rad, imu_t=0.000m, imu_r=0.000rad, dev=0.014rad
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.021rad, reason=IMU-aided: Visual motion: trans=0.471m, rot=0.018rad
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 72: left_features=2, right_features=1
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 73: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 73: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 73: Finished IMU visualization
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 73: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:41Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.211m, r=0.010rad, imu_t=0.000m, imu_r=0.000rad, dev=0.007rad
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.010rad, reason=IMU-aided: Visual motion: trans=0.211m, rot=0.010rad
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 73: left_features=2, right_features=1
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 74: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 74: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 74: Finished IMU visualization
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 74: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:41Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.596m, r=0.024rad, imu_t=0.000m, imu_r=0.000rad, dev=0.014rad
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.020rad, reason=IMU-aided: Visual motion: trans=0.596m, rot=0.024rad
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 74: left_features=2, right_features=1
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 75: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 75: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 75: Finished IMU visualization
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 75: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:41Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.286m, r=0.011rad, imu_t=0.000m, imu_r=0.000rad, dev=0.007rad
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.010rad, reason=IMU-aided: Visual motion: trans=0.286m, rot=0.011rad
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 75: left_features=2, right_features=1
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 76: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 76: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 76: Finished IMU visualization
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 76: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:41Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.473m, r=0.023rad, imu_t=0.000m, imu_r=0.000rad, dev=0.016rad
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.026rad, reason=IMU-aided: Visual motion: trans=0.473m, rot=0.023rad
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 76: left_features=2, right_features=1
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 77: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 77: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 77: Finished IMU visualization
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 77: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:41Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.385m, r=0.015rad, imu_t=0.000m, imu_r=0.000rad, dev=0.009rad
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.012rad, reason=IMU-aided: Visual motion: trans=0.385m, rot=0.015rad
+[2026-01-23T22:30:41Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 77: left_features=2, right_features=1
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 78: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 78: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 78: Finished IMU visualization
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 78: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.080m, r=0.004rad, imu_t=0.000m, imu_r=0.000rad, dev=0.003rad
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.004rad, reason=IMU-aided: Visual motion: trans=0.080m, rot=0.004rad
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 78: left_features=2, right_features=1
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 79: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 79: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 79: Finished IMU visualization
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 79: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.581m, r=0.023rad, imu_t=0.000m, imu_r=0.000rad, dev=0.016rad
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.022rad, reason=IMU-aided: Visual motion: trans=0.581m, rot=0.023rad
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 79: left_features=2, right_features=1
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 80: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 80: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 80: Finished IMU visualization
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 80: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.651m, r=0.033rad, imu_t=0.000m, imu_r=0.000rad, dev=0.022rad
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=true, t_norm=0.000m, rot_norm=0.036rad, reason=Visual: trans=0.000m, rot=0.036rad
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 80: left_features=2, right_features=1
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 81: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 81: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 81: Finished IMU visualization
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 81: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.390m, r=0.015rad, imu_t=0.000m, imu_r=0.000rad, dev=0.009rad
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.012rad, reason=IMU-aided: Visual motion: trans=0.390m, rot=0.015rad
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 81: left_features=2, right_features=1
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 82: Received 9 IMU samples, use_imu=true
+[IMU_VIZ] Frame 82: Calling view_imu_results() with 9 samples
+[IMU_VIZ] Frame 82: Finished IMU visualization
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 82: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.219m, r=0.009rad, imu_t=0.000m, imu_r=0.000rad, dev=0.003rad
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.004rad, reason=IMU-aided: Visual motion: trans=0.219m, rot=0.009rad
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 82: left_features=2, right_features=1
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 83: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 83: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 83: Finished IMU visualization
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 83: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.185m, r=0.010rad, imu_t=0.000m, imu_r=0.000rad, dev=0.007rad
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.011rad, reason=IMU-aided: Visual motion: trans=0.185m, rot=0.010rad
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 83: left_features=2, right_features=1
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 84: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 84: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 84: Finished IMU visualization
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 84: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.045m, r=0.002rad, imu_t=0.000m, imu_r=0.000rad, dev=0.002rad
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.003rad, reason=IMU-aided: Visual motion: trans=0.045m, rot=0.002rad
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 84: left_features=2, right_features=1
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 85: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 85: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 85: Finished IMU visualization
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 85: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.230m, r=0.007rad, imu_t=0.000m, imu_r=0.000rad, dev=0.004rad
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.006rad, reason=IMU-aided: Visual motion: trans=0.230m, rot=0.007rad
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 85: left_features=2, right_features=1
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 86: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 86: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 86: Finished IMU visualization
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 86: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:42Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.539m, r=0.023rad, imu_t=0.000m, imu_r=0.000rad, dev=0.015rad
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.024rad, reason=IMU-aided: Visual motion: trans=0.539m, rot=0.023rad
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 86: left_features=2, right_features=1
+[2026-01-23T22:30:42Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 87: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 87: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 87: Finished IMU visualization
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 87: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.046m, r=0.007rad, imu_t=0.000m, imu_r=0.000rad, dev=0.005rad
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.008rad, reason=IMU-aided: Visual motion: trans=0.046m, rot=0.007rad
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 87: left_features=2, right_features=1
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 88: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 88: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 88: Finished IMU visualization
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 88: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.611m, r=0.024rad, imu_t=0.000m, imu_r=0.000rad, dev=0.016rad
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.023rad, reason=IMU-aided: Visual motion: trans=0.611m, rot=0.024rad
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 88: left_features=2, right_features=1
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 89: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 89: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 89: Finished IMU visualization
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 89: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.459m, r=0.018rad, imu_t=0.000m, imu_r=0.000rad, dev=0.013rad
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.019rad, reason=IMU-aided: Visual motion: trans=0.459m, rot=0.018rad
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 89: left_features=2, right_features=1
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 90: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 90: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 90: Finished IMU visualization
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 90: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.114m, r=0.009rad, imu_t=0.000m, imu_r=0.000rad, dev=0.006rad
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.010rad, reason=IMU-aided: Visual motion: trans=0.114m, rot=0.009rad
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 90: left_features=2, right_features=1
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 91: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 91: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 91: Finished IMU visualization
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 91: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.117m, r=0.013rad, imu_t=0.000m, imu_r=0.000rad, dev=0.008rad
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.014rad, reason=IMU-aided: Visual motion: trans=0.117m, rot=0.013rad
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 91: left_features=2, right_features=1
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 92: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 92: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 92: Finished IMU visualization
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 92: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.199m, r=0.008rad, imu_t=0.000m, imu_r=0.000rad, dev=0.005rad
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.007rad, reason=IMU-aided: Visual motion: trans=0.199m, rot=0.008rad
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 92: left_features=2, right_features=1
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 93: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 93: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 93: Finished IMU visualization
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 93: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.172m, r=0.007rad, imu_t=0.000m, imu_r=0.000rad, dev=0.005rad
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.008rad, reason=IMU-aided: Visual motion: trans=0.172m, rot=0.007rad
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 93: left_features=2, right_features=1
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 94: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 94: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 94: Finished IMU visualization
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 94: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.155m, r=0.011rad, imu_t=0.000m, imu_r=0.000rad, dev=0.007rad
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.012rad, reason=IMU-aided: Visual motion: trans=0.155m, rot=0.011rad
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 94: left_features=2, right_features=1
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 95: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 95: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 95: Finished IMU visualization
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 95: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.421m, r=0.017rad, imu_t=0.000m, imu_r=0.000rad, dev=0.010rad
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.013rad, reason=IMU-aided: Visual motion: trans=0.421m, rot=0.017rad
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 95: left_features=2, right_features=1
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 96: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 96: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 96: Finished IMU visualization
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 96: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:43Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.223m, r=0.016rad, imu_t=0.000m, imu_r=0.000rad, dev=0.010rad
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.017rad, reason=IMU-aided: Visual motion: trans=0.223m, rot=0.016rad
+[2026-01-23T22:30:43Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 96: left_features=2, right_features=1
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 97: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 97: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 97: Finished IMU visualization
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 97: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.584m, r=0.023rad, imu_t=0.000m, imu_r=0.000rad, dev=0.014rad
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.018rad, reason=IMU-aided: Visual motion: trans=0.584m, rot=0.023rad
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 97: left_features=2, right_features=1
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 98: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 98: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 98: Finished IMU visualization
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 98: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.714m, r=0.023rad, imu_t=0.000m, imu_r=0.000rad, dev=0.017rad
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.025rad, reason=IMU-aided: Visual motion: trans=0.714m, rot=0.023rad
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 98: left_features=2, right_features=1
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 99: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 99: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 99: Finished IMU visualization
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 99: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.195m, r=0.022rad, imu_t=0.000m, imu_r=0.000rad, dev=0.014rad
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.022rad, reason=IMU-aided: Visual motion: trans=0.195m, rot=0.022rad
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 99: left_features=2, right_features=1
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 100: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 100: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 100: Finished IMU visualization
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 100: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.167m, r=0.015rad, imu_t=0.000m, imu_r=0.000rad, dev=0.009rad
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.015rad, reason=IMU-aided: Visual motion: trans=0.167m, rot=0.015rad
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 100: left_features=2, right_features=1
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+  Processed 100/120 frames
+[IMU_VIZ] Frame 101: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 101: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 101: Finished IMU visualization
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 101: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.228m, r=0.009rad, imu_t=0.000m, imu_r=0.000rad, dev=0.006rad
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.008rad, reason=IMU-aided: Visual motion: trans=0.228m, rot=0.009rad
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 101: left_features=2, right_features=1
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 102: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 102: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 102: Finished IMU visualization
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 102: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.114m, r=0.010rad, imu_t=0.000m, imu_r=0.000rad, dev=0.006rad
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.010rad, reason=IMU-aided: Visual motion: trans=0.114m, rot=0.010rad
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 102: left_features=2, right_features=1
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 103: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 103: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 103: Finished IMU visualization
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 103: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.232m, r=0.006rad, imu_t=0.000m, imu_r=0.000rad, dev=0.002rad
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.003rad, reason=IMU-aided: Visual motion: trans=0.232m, rot=0.006rad
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 103: left_features=2, right_features=1
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 104: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 104: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 104: Finished IMU visualization
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 104: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.244m, r=0.008rad, imu_t=0.000m, imu_r=0.000rad, dev=0.004rad
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.006rad, reason=IMU-aided: Visual motion: trans=0.244m, rot=0.008rad
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 104: left_features=2, right_features=1
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 105: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 105: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 105: Finished IMU visualization
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 105: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.913m, r=0.037rad, imu_t=0.000m, imu_r=0.000rad, dev=0.027rad
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=true, t_norm=0.000m, rot_norm=0.040rad, reason=Visual: trans=0.000m, rot=0.040rad
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 105: left_features=2, right_features=1
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 106: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 106: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 106: Finished IMU visualization
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 106: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:44Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.757m, r=0.034rad, imu_t=0.000m, imu_r=0.000rad, dev=0.024rad
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=true, t_norm=0.000m, rot_norm=0.037rad, reason=Visual: trans=0.000m, rot=0.037rad
+[2026-01-23T22:30:44Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 106: left_features=2, right_features=1
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 107: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 107: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 107: Finished IMU visualization
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 107: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:45Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.128m, r=0.007rad, imu_t=0.000m, imu_r=0.000rad, dev=0.005rad
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.007rad, reason=IMU-aided: Visual motion: trans=0.128m, rot=0.007rad
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 107: left_features=2, right_features=1
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 108: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 108: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 108: Finished IMU visualization
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 108: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:45Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.035m, r=0.002rad, imu_t=0.000m, imu_r=0.000rad, dev=0.001rad
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.002rad, reason=IMU-aided: Visual motion: trans=0.035m, rot=0.002rad
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 108: left_features=2, right_features=1
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 109: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 109: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 109: Finished IMU visualization
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 109: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:45Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.295m, r=0.012rad, imu_t=0.000m, imu_r=0.000rad, dev=0.007rad
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.009rad, reason=IMU-aided: Visual motion: trans=0.295m, rot=0.012rad
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 109: left_features=2, right_features=1
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 110: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 110: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 110: Finished IMU visualization
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 110: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:45Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.422m, r=0.016rad, imu_t=0.000m, imu_r=0.000rad, dev=0.012rad
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.018rad, reason=IMU-aided: Visual motion: trans=0.422m, rot=0.016rad
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 110: left_features=2, right_features=1
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 111: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 111: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 111: Finished IMU visualization
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 111: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:45Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.167m, r=0.010rad, imu_t=0.000m, imu_r=0.000rad, dev=0.006rad
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.010rad, reason=IMU-aided: Visual motion: trans=0.167m, rot=0.010rad
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 111: left_features=2, right_features=1
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 112: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 112: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 112: Finished IMU visualization
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 112: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:45Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.248m, r=0.009rad, imu_t=0.000m, imu_r=0.000rad, dev=0.004rad
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.006rad, reason=IMU-aided: Visual motion: trans=0.248m, rot=0.009rad
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 112: left_features=2, right_features=1
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 113: Received 9 IMU samples, use_imu=true
+[IMU_VIZ] Frame 113: Calling view_imu_results() with 9 samples
+[IMU_VIZ] Frame 113: Finished IMU visualization
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 113: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:45Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.421m, r=0.021rad, imu_t=0.000m, imu_r=0.000rad, dev=0.014rad
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.022rad, reason=IMU-aided: Visual motion: trans=0.421m, rot=0.021rad
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 113: left_features=2, right_features=1
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 114: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 114: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 114: Finished IMU visualization
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 114: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:45Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.426m, r=0.021rad, imu_t=0.000m, imu_r=0.000rad, dev=0.014rad
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.023rad, reason=IMU-aided: Visual motion: trans=0.426m, rot=0.021rad
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 114: left_features=2, right_features=1
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 115: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 115: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 115: Finished IMU visualization
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 115: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:45Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.127m, r=0.006rad, imu_t=0.000m, imu_r=0.000rad, dev=0.004rad
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.006rad, reason=IMU-aided: Visual motion: trans=0.127m, rot=0.006rad
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 115: left_features=2, right_features=1
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 116: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 116: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 116: Finished IMU visualization
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 116: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:45Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.855m, r=0.028rad, imu_t=0.000m, imu_r=0.000rad, dev=0.018rad
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.022rad, reason=IMU-aided: Visual motion: trans=0.855m, rot=0.028rad
+[2026-01-23T22:30:45Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 116: left_features=2, right_features=1
+[2026-01-23T22:30:46Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 117: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 117: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 117: Finished IMU visualization
+[2026-01-23T22:30:46Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 117: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:46Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.546m, r=0.033rad, imu_t=0.000m, imu_r=0.000rad, dev=0.021rad
+[2026-01-23T22:30:46Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=true, t_norm=0.000m, rot_norm=0.035rad, reason=Visual: trans=0.000m, rot=0.035rad
+[2026-01-23T22:30:46Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 117: left_features=2, right_features=1
+[2026-01-23T22:30:46Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 118: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 118: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 118: Finished IMU visualization
+[2026-01-23T22:30:46Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 118: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:46Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.291m, r=0.005rad, imu_t=0.000m, imu_r=0.000rad, dev=0.002rad
+[2026-01-23T22:30:46Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.003rad, reason=IMU-aided: Visual motion: trans=0.291m, rot=0.005rad
+[2026-01-23T22:30:46Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 118: left_features=2, right_features=1
+[2026-01-23T22:30:46Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 119: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 119: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 119: Finished IMU visualization
+[2026-01-23T22:30:46Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 119: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:46Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.480m, r=0.019rad, imu_t=0.000m, imu_r=0.000rad, dev=0.014rad
+[2026-01-23T22:30:46Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.021rad, reason=IMU-aided: Visual motion: trans=0.480m, rot=0.019rad
+[2026-01-23T22:30:46Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 119: left_features=2, right_features=1
+[2026-01-23T22:30:46Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+[IMU_VIZ] Frame 120: Received 10 IMU samples, use_imu=true
+[IMU_VIZ] Frame 120: Calling view_imu_results() with 10 samples
+[IMU_VIZ] Frame 120: Finished IMU visualization
+[2026-01-23T22:30:46Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Frame 120: Motion tracking SUCCESS, updating pose
+[2026-01-23T22:30:46Z INFO  rs_vio::imu] [IMU KF] decision: is_kf=true, visual_trig=true, imu_trig=false, disagree=false, t=0.299m, r=0.012rad, imu_t=0.000m, imu_r=0.000rad, dev=0.007rad
+[2026-01-23T22:30:46Z INFO  rs_vio::estimator::estimator::processor] [Estimator] KF decision: is_kf=true, imu_kf=true, visual_kf=false, t_norm=0.000m, rot_norm=0.009rad, reason=IMU-aided: Visual motion: trans=0.299m, rot=0.012rad
+[2026-01-23T22:30:46Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Adding keyframe 120: left_features=2, right_features=1
+[2026-01-23T22:30:46Z INFO  rs_vio::estimator::estimator::processor] [Estimator] Post-optimization: map_points=1, keyframes=20
+
+✓ VIO processing complete in 10.33s
+  - Avg: 86.04ms per frame
+  - Estimated 118 poses
+
+Aligned 118 pose pairs for evaluation
+
+=== Absolute Trajectory Error (ATE) ===
+  RMSE:   37.4733 m
+  Mean:   33.1417 m
+  Median: 43.0291 m
+  Std:    17.4892 m
+  Min:    0.8672 m
+  Max:    44.3652 m
+
+=== Relative Pose Error (RPE) ===
+
+Interval: 1 frames (0.05s)
+  Translation RMSE: 8.5924 m
+  Translation Mean: 2.2547 m
+  Rotation RMSE:    13.8019°
+  Rotation Mean:    4.3129°
+
+Interval: 5 frames (0.25s)
+  Translation RMSE: 13.3404 m
+  Translation Mean: 4.4320 m
+  Rotation RMSE:    26.1590°
+  Rotation Mean:    9.1229°
+
+Interval: 10 frames (0.50s)
+  Translation RMSE: 16.1735 m
+  Translation Mean: 6.7074 m
+  Rotation RMSE:    35.3220°
+  Rotation Mean:    14.4885°
+
+Interval: 20 frames (1.00s)
+  Translation RMSE: 21.8585 m
+  Translation Mean: 12.2217 m
+  Rotation RMSE:    49.1725°
+  Rotation Mean:    26.4660°
+
+=== Summary ===
+✓ Evaluation complete
+  - Frames processed: 120
+  - Pose pairs: 118
+  - Trajectory span: 5.95s
