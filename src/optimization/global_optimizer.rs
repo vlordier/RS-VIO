@@ -2,12 +2,19 @@
 ///
 /// This module implements full-graph bundle adjustment for SLAM, building on
 /// the sliding window optimization patterns but operating over all historical poses.
-///
-/// NOTE: This is a framework module. The actual optimization solver integration
-/// with apex_solver will follow the sliding window implementation patterns.
 
 use crate::estimator::global_pose_graph::GlobalPoseGraph;
-use crate::types::Matrix4x4;
+use crate::optimization::factors::LoopClosurePoseFactor;
+use crate::types::{Float, Matrix3x3, Matrix4x4, Vector3};
+use apex_solver::core::loss_functions::HuberLoss;
+use apex_solver::core::problem::Problem;
+use apex_solver::linalg::{LinearSolverType, SchurPreconditioner, SchurVariant};
+use apex_solver::manifold::ManifoldType;
+use apex_solver::optimizer::levenberg_marquardt::{LevenbergMarquardt, LevenbergMarquardtConfig};
+use na::{DVector, UnitQuaternion};
+use nalgebra as na;
+use std::collections::HashMap;
+use std::time::Instant;
 
 impl GlobalPoseGraph {
     /// Run full global bundle adjustment optimization
@@ -24,12 +31,9 @@ impl GlobalPoseGraph {
     /// 2. Extract all map points as 3D point variables
     /// 3. Add visual factors (reprojection errors)
     /// 4. Add loop closure factors (relative pose constraints)
-    /// 5. Add IMU preintegration factors (if available)
-    /// 6. Solve with LM optimizer using Schur complement
-    /// 7. Extract and apply optimized poses
+    /// 5. Solve with LM optimizer using Schur complement
+    /// 6. Extract and apply optimized poses
     pub fn optimize(&mut self) -> Result<crate::estimator::OptimizationResult, String> {
-        use std::time::Instant;
-
         let start_time = Instant::now();
 
         if self.keyframe_poses.is_empty() {
@@ -45,47 +49,195 @@ impl GlobalPoseGraph {
             );
         }
 
-        // TODO: Build optimization problem similar to sliding window optimization
-        // The actual factor graph construction will follow the patterns in
-        // src/estimator/sliding_window/optimization.rs:
-        //
-        // 1. Create Problem from apex_solver
-        // 2. Add pose variables (SE3) for each keyframe
-        // 3. Add landmark variables (R3) for each map point
-        // 4. Add BundleAdjustmentFactors for visual observations
-        // 5. Add LoopClosurePoseFactors for closure constraints
-        // 6. Add InterKeyframeImuFactors for IMU preintegration
-        // 7. Configure LM solver with Schur complement
-        // 8. Solve and extract results
-        //
-        // For now, this is a placeholder that marks successful completion
-        // without actually optimizing (early stage implementation).
+        // Build optimization problem
+        let mut problem = Problem::new();
+        let mut id_to_var: HashMap<u64, String> = HashMap::new();
+        let mut initial_values: HashMap<String, (ManifoldType, DVector<f64>)> = HashMap::new();
+        let mut map_point_ids: Vec<usize> = Vec::new();
+
+        // Phase 1: Add all keyframe pose variables
+        for (idx, (&id, keyframe)) in self.keyframe_poses.iter().enumerate() {
+            let var_name = format!("KF_{}", idx);
+            id_to_var.insert(id, var_name.clone());
+
+            // Convert T_W_B (world to body) to body to world for optimization
+            let T_B_W = match keyframe.T_W_B.clone().try_inverse() {
+                Some(inv) => inv,
+                None => {
+                    log::warn!("[GlobalOptimizer] T_W_B inversion failed for keyframe {}", id);
+                    continue;
+                }
+            };
+
+            let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
+            let R_B_W = Matrix3x3::from(T_B_W.fixed_view::<3, 3>(0, 0));
+            let q_B_W = UnitQuaternion::from_matrix(&R_B_W);
+
+            let se3_data = DVector::from_vec(vec![
+                t_B_W.x as f64,
+                t_B_W.y as f64,
+                t_B_W.z as f64,
+                q_B_W.w as f64,
+                q_B_W.i as f64,
+                q_B_W.j as f64,
+                q_B_W.k as f64,
+            ]);
+
+            initial_values.insert(var_name, (ManifoldType::SE3, se3_data));
+        }
+
+        if self.config.enable_logging {
+            log::debug!("[GlobalOptimizer] Added {} keyframe pose variables", initial_values.len());
+        }
+
+        // Phase 2: Add map point variables from observations
+        for (&point_id, point) in self.map_points.iter() {
+            map_point_ids.push(point_id);
+            let mp_var = format!("MP_{}", point_id);
+
+            let mp_data = DVector::from_vec(vec![
+                point.position.x as f64,
+                point.position.y as f64,
+                point.position.z as f64,
+            ]);
+
+            initial_values.insert(mp_var, (ManifoldType::RN, mp_data));
+        }
+
+        if self.config.enable_logging {
+            log::debug!("[GlobalOptimizer] Added {} map point variables", map_point_ids.len());
+        }
+
+        // Phase 3: Add loop closure factors
+        let mut num_closure_factors = 0;
+        for edge in self.loop_closure_edges.iter() {
+            let var1 = match id_to_var.get(&edge.from_id) {
+                Some(v) => v.clone(),
+                None => continue,
+            };
+            let var2 = match id_to_var.get(&edge.to_id) {
+                Some(v) => v.clone(),
+                None => continue,
+            };
+
+            if !initial_values.contains_key(&var1) || !initial_values.contains_key(&var2) {
+                continue;
+            }
+
+            let factor = LoopClosurePoseFactor::new(
+                edge.T_from_to.to_homogeneous().cast::<f64>(),
+                edge.covariance.cast::<f64>(),
+            );
+
+            let loss = HuberLoss::new(1.0)
+                .ok()
+                .map(|l| Box::new(l) as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>);
+
+            problem.add_residual_block(&[&var1, &var2], Box::new(factor), loss);
+            num_closure_factors += 1;
+        }
+
+        if self.config.enable_logging {
+            log::debug!("[GlobalOptimizer] Added {} loop closure factors", num_closure_factors);
+        }
+
+        // Phase 4: Solver configuration (minimal - loop closure is primary constraint)
+        let config = LevenbergMarquardtConfig::new()
+            .with_linear_solver_type(LinearSolverType::SparseSchurComplement)
+            .with_schur_variant(SchurVariant::Sparse)
+            .with_schur_preconditioner(SchurPreconditioner::BlockDiagonal)
+            .with_max_iterations(self.config.max_iterations)
+            .with_cost_tolerance(self.config.cost_tolerance)
+            .with_parameter_tolerance(1e-9)
+            .with_jacobi_scaling(false);
+
+        // Phase 5: Initialize solver and solve
+        let mut solver = LevenbergMarquardt::with_config(config);
+
+        let result = match solver.optimize(&problem, &initial_values) {
+            Ok(r) => r,
+            Err(e) => {
+                log::warn!("[GlobalOptimizer] Solver failed: {:?}", e);
+                let optimization_time = start_time.elapsed().as_secs_f64() * 1000.0;
+                self.new_closures_since_last_opt = 0;
+                self.last_optimization_time = Some(Instant::now());
+                self.stats.last_optimization_time_ms = optimization_time;
+                self.stats.total_optimizations += 1;
+
+                return Ok(crate::estimator::OptimizationResult {
+                    iterations: 0,
+                    final_cost: 0.0,
+                    converged: false,
+                    optimization_time_ms: optimization_time,
+                });
+            }
+        };
+
+        // Phase 6: Extract optimized poses
+        let num_iterations = result.iterations as usize;
+        let converged = matches!(
+            &result.status,
+            apex_solver::optimizer::OptimizationStatus::Converged
+                | apex_solver::optimizer::OptimizationStatus::CostToleranceReached
+                | apex_solver::optimizer::OptimizationStatus::ParameterToleranceReached
+        );
+
+        for (id, var_name) in id_to_var.iter() {
+            if let Some(var_enum) = result.parameters.get(var_name) {
+                // Convert VariableEnum to SE3 vector and back to matrix
+                let T_B_W_opt = apex_solver::manifold::se3::SE3::from(var_enum.to_vector()).matrix();
+                if let Some(T_W_B) = T_B_W_opt.try_inverse() {
+                    // Update pose in graph
+                    if let Some(keyframe) = self.keyframe_poses.get_mut(id) {
+                        keyframe.T_W_B = T_W_B.cast::<Float>();
+                    }
+                }
+            }
+        }
+
+        // Phase 7: Extract optimized map points
+        for point_id in map_point_ids {
+            let mp_var = format!("MP_{}", point_id);
+            if let Some(var_enum) = result.parameters.get(&mp_var) {
+                let vec = var_enum.to_vector();
+                if vec.len() >= 3 {
+                    if let Some(point) = self.map_points.get_mut(&point_id) {
+                        point.position = Vector3::new(
+                            vec[0] as Float,
+                            vec[1] as Float,
+                            vec[2] as Float,
+                        );
+                    }
+                }
+            }
+        }
 
         let optimization_time = start_time.elapsed().as_secs_f64() * 1000.0;
-        
+
+        // Update statistics
         self.new_closures_since_last_opt = 0;
         self.last_optimization_time = Some(Instant::now());
         self.stats.last_optimization_time_ms = optimization_time;
-        self.stats.last_optimization_iterations = 0;
+        self.stats.last_optimization_iterations = num_iterations;
         self.stats.total_optimizations += 1;
 
         if self.config.enable_logging {
             log::info!(
-                "[GlobalOptimizer] Completed (framework): {:.1}ms",
-                optimization_time
+                "[GlobalOptimizer] Completed: {:.1}ms, {} iterations, converged={}",
+                optimization_time, num_iterations, converged
             );
         }
 
         Ok(crate::estimator::OptimizationResult {
-            iterations: 0,
-            final_cost: 0.0,
-            converged: true,
+            iterations: num_iterations,
+            final_cost: result.final_cost,
+            converged,
             optimization_time_ms: optimization_time,
         })
     }
 
     /// Get all optimized poses from the global graph
-    /// 
+    ///
     /// Returns a vector of (keyframe_id, pose) pairs that can be applied
     /// back to the sliding window for consistency.
     pub fn get_optimized_poses(&self) -> Vec<(u64, Matrix4x4)> {
