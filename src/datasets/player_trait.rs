@@ -360,9 +360,11 @@ pub fn process_single_frame_common(
     // Inform the estimator about the current frame index for visualization.
     estimator.set_viewer_frame(context.current_idx as i64);
 
-    // Load stereo images
+    // Load stereo images (measure decode time)
+    let io_start = std::time::Instant::now();
     let left_image = load_left_image(dataset_path, &image_data[context.current_idx].filename, 0)?;
     let right_image = load_right_image(dataset_path, &image_data[context.current_idx].filename, 1)?;
+    let io_time_ms = io_start.elapsed().as_secs_f64() * 1000.0;
 
     if left_image.is_empty() {
         return Err(VIOError::Image(format!(
@@ -372,6 +374,7 @@ pub fn process_single_frame_common(
     }
 
     // Get IMU data for VIO mode (skip first frame since no previous timestamp)
+    let imu_start = std::time::Instant::now();
     let imu_data: Option<Vec<ImuData>> = if context.processed_frames > 0 {
         Some(get_imu_data(
             context.previous_frame_timestamp,
@@ -380,8 +383,10 @@ pub fn process_single_frame_common(
     } else {
         None
     };
+    let imu_time_ms = imu_start.elapsed().as_secs_f64() * 1000.0;
 
-    // Process frame
+    // Process frame (measure estimator time)
+    let est_start = std::time::Instant::now();
     let imu_slice = imu_data.as_deref();
     estimator.process_frame(
         &left_image,
@@ -389,9 +394,29 @@ pub fn process_single_frame_common(
         image_data[context.current_idx].timestamp,
         imu_slice,
     )?;
+    let est_time_ms = est_start.elapsed().as_secs_f64() * 1000.0;
 
     // Update frame timestamp
     context.previous_frame_timestamp = image_data[context.current_idx].timestamp;
+
+    // Accumulate instrumentation
+    context.io_decode_time_ms_sum += io_time_ms;
+    context.imu_fetch_time_ms_sum += imu_time_ms;
+    context.estimator_time_ms_sum += est_time_ms;
+    context.frames_timed += 1;
+
+    // Periodic summary (every 50 frames)
+    if context.current_idx % 50 == 0 && context.frames_timed > 0 {
+        let avg_io = context.io_decode_time_ms_sum / context.frames_timed as f64;
+        let avg_imu = context.imu_fetch_time_ms_sum / context.frames_timed as f64;
+        let avg_est = context.estimator_time_ms_sum / context.frames_timed as f64;
+        let total_avg_ms = avg_io + avg_imu + avg_est;
+        let fps = if total_avg_ms > 0.0 { 1000.0 / total_avg_ms } else { 0.0 };
+        println!(
+            "[Perf] avg_io={:.2}ms avg_imu={:.2}ms avg_est={:.2}ms total={:.2}ms ({:.1} fps) over {} frames",
+            avg_io, avg_imu, avg_est, total_avg_ms, fps, context.frames_timed
+        );
+    }
 
     let frame_duration = frame_start.elapsed();
     Ok(frame_duration.as_secs_f64() * 1000.0) // Return milliseconds

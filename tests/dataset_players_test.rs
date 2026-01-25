@@ -84,14 +84,12 @@ optimization:
         let config: datasets::config::Config = serde_yaml::from_str(yaml_config).unwrap();
         let estimator = estimator::Estimator::new(config, None);
 
-        let context = datasets::FrameContext {
-            current_idx: 0,
-            processed_frames: 1,
-            previous_frame_timestamp: 1000000000,
-            step_mode: false,
-            auto_play: true,
-            advance_frame: true,
-        };
+        let mut context = datasets::FrameContext::new(false);
+        context.current_idx = 0;
+        context.processed_frames = 1;
+        context.previous_frame_timestamp = 1000000000;
+        context.auto_play = true;
+        context.advance_frame = true;
 
         let player = EurocPlayer::new();
         player.save_trajectories(&estimator, &context, dataset_path);
@@ -198,14 +196,12 @@ optimization:
         let config: datasets::config::Config = serde_yaml::from_str(yaml_config).unwrap();
         let estimator = estimator::Estimator::new(config, None);
 
-        let context = datasets::FrameContext {
-            current_idx: 0,
-            processed_frames: 1,
-            previous_frame_timestamp: 1000000000,
-            step_mode: false,
-            auto_play: true,
-            advance_frame: true,
-        };
+        let mut context = datasets::FrameContext::new(false);
+        context.current_idx = 0;
+        context.processed_frames = 1;
+        context.previous_frame_timestamp = 1000000000;
+        context.auto_play = true;
+        context.advance_frame = true;
 
         let player = FourSeasonsPlayer::new();
         player.save_trajectories(&estimator, &context, dataset_path);
@@ -315,14 +311,12 @@ optimization:
         let config: datasets::config::Config = serde_yaml::from_str(yaml_config).unwrap();
         let estimator = estimator::Estimator::new(config, None);
 
-        let context = datasets::FrameContext {
-            current_idx: 0,
-            processed_frames: 1,
-            previous_frame_timestamp: 1000000000,
-            step_mode: false,
-            auto_play: true,
-            advance_frame: true,
-        };
+        let mut context = datasets::FrameContext::new(false);
+        context.current_idx = 0;
+        context.processed_frames = 1;
+        context.previous_frame_timestamp = 1000000000;
+        context.auto_play = true;
+        context.advance_frame = true;
 
         let player = TUMVIPlayer::new();
         player.save_trajectories(&estimator, &context, dataset_path);

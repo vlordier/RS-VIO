@@ -18,6 +18,11 @@ impl Estimator {
         timestamp_ns: i64,
         imu_data: Option<&[ImuData]>,
     ) -> Result<()> {
+        // Fast-mode gating via environment variable for high-ROI speedups
+        let fast_mode = match std::env::var("RS_VIO_FAST") {
+            Ok(val) => val == "1" || val.eq_ignore_ascii_case("true"),
+            Err(_) => false,
+        };
         let _total_start_time = Instant::now();
         let deadline = _total_start_time + self.max_frame_processing_time;
         self.frame_count += 1;
@@ -390,8 +395,11 @@ impl Estimator {
         self.view_patch_tracking_results(&current_frame, &left_img, &right_img, img_w, img_h);
 
         // Stereo super-resolution refinement with IMU confidence weighting
-        // This refines subpixel disparities using confidence from IMU noise/motion analysis
-        if !current_frame.left_features.is_empty() && !current_frame.right_features.is_empty() {
+        // Skip in fast mode to reduce per-frame compute cost
+        if !fast_mode
+            && !current_frame.left_features.is_empty()
+            && !current_frame.right_features.is_empty()
+        {
             let _superres_start = Instant::now();
 
             // Compute IMU confidence metric from denoise and higher-order filters
@@ -517,8 +525,9 @@ impl Estimator {
         }
 
         // Optional: Apply multi-frame fusion to enhance feature confidence
-        // Buffer frames and call fusion strategy if available
-        if let Some(fusion_strat) = self.fusion_strategy.as_mut() {
+        // Skip in fast mode to reduce extra copying and compute
+        if !fast_mode {
+            if let Some(fusion_strat) = self.fusion_strategy.as_mut() {
             // Add current frame to buffer (Arc-wrapped to avoid expensive clones)
             self.fusion_frame_buffer
                 .push_back(std::sync::Arc::new(current_frame.clone()));
@@ -559,6 +568,7 @@ impl Estimator {
                         }
                     }
                 }
+            }
             }
         }
 
@@ -824,13 +834,23 @@ impl Estimator {
             // This enables PnP factors for motion tracking before full bundle adjustment
             self.backend.sliding_window.triangulate_early_map();
 
-            if let Err(e) = self.backend.sliding_window.optimize_with_imu(
-                imu_prior,
-                imu_weights,
-                imu_huber_delta,
-            ) {
-                log::error!("[Estimator] Bundle adjustment optimization failed: {:?}", e);
-                // Continue execution even if optimization fails
+            // In fast mode, reduce bundle adjustment frequency to every 3rd keyframe
+            let should_optimize_ba = if fast_mode {
+                (self.backend.sliding_window.len() % 3) == 0
+            } else {
+                true
+            };
+            if should_optimize_ba {
+                if let Err(e) = self.backend.sliding_window.optimize_with_imu(
+                    imu_prior,
+                    imu_weights,
+                    imu_huber_delta,
+                ) {
+                    log::error!("[Estimator] Bundle adjustment optimization failed: {:?}", e);
+                    // Continue execution even if optimization fails
+                }
+            } else if self.frame_count % 50 == 0 {
+                log::debug!("[Estimator] Fast mode: skipping BA on this keyframe");
             }
 
             // Report created map points after optimization

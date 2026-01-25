@@ -120,6 +120,11 @@ pub struct FrameContext {
     pub step_mode: bool,
     pub auto_play: bool,
     pub advance_frame: bool,
+    // Instrumentation accumulators
+    pub io_decode_time_ms_sum: f64,
+    pub imu_fetch_time_ms_sum: f64,
+    pub estimator_time_ms_sum: f64,
+    pub frames_timed: usize,
 }
 
 impl FrameContext {
@@ -131,6 +136,10 @@ impl FrameContext {
             step_mode,
             auto_play: !step_mode,
             advance_frame: false,
+            io_decode_time_ms_sum: 0.0,
+            imu_fetch_time_ms_sum: 0.0,
+            estimator_time_ms_sum: 0.0,
+            frames_timed: 0,
         }
     }
 }

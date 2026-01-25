@@ -36,6 +36,10 @@ fn test_frame_context_construction_current_fields() {
         step_mode: true,
         auto_play: false,
         advance_frame: true,
+        io_decode_time_ms_sum: 0.0,
+        imu_fetch_time_ms_sum: 0.0,
+        estimator_time_ms_sum: 0.0,
+        frames_timed: 0,
     };
 
     assert_eq!(ctx.current_idx, 0);
@@ -56,6 +60,10 @@ fn test_frame_context_field_updates() {
         step_mode: true,
         auto_play: false,
         advance_frame: true,
+        io_decode_time_ms_sum: 0.0,
+        imu_fetch_time_ms_sum: 0.0,
+        estimator_time_ms_sum: 0.0,
+        frames_timed: 0,
     };
 
     ctx.current_idx = 5;

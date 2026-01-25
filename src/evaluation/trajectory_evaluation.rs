@@ -58,12 +58,20 @@ impl GroundTruthTrajectory {
         }
     }
 
-    /// Load from TUM VI groundtruth.txt file
+    /// Load from TUM VI ground truth file (supports .tum and .csv)
     ///
-    /// Expected format (space-separated):
-    /// timestamp tx ty tz qx qy qz qw
+    /// Supported formats:
+    /// - Space-separated .tum: `timestamp tx ty tz qx qy qz qw` (timestamp in seconds)
+    /// - Comma-separated .csv: `timestamp_ns, tx, ty, tz, qw, qx, qy, qz` (timestamp in ns)
     pub fn from_file(path: impl AsRef<Path>) -> Result<Self, String> {
-        let file = File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
+        let path_ref = path.as_ref();
+        let is_csv = path_ref
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.eq_ignore_ascii_case("csv"))
+            .unwrap_or(false);
+
+        let file = File::open(path_ref).map_err(|e| format!("Failed to open file: {}", e))?;
         let reader = BufReader::new(file);
         let mut poses = BTreeMap::new();
         let mut count = 0;
@@ -71,54 +79,18 @@ impl GroundTruthTrajectory {
         for line in reader.lines() {
             let line = line.map_err(|e| format!("Read error: {}", e))?;
 
-            // Skip comments
-            if line.starts_with('#') {
+            // Skip comments or empty lines
+            if line.trim().is_empty() || line.starts_with('#') {
                 continue;
             }
 
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() < 8 {
-                continue; // Skip malformed lines
-            }
-
-            // Parse timestamp (seconds, convert to nanoseconds)
-            let timestamp_s: f64 = parts[0]
-                .parse()
-                .map_err(|_| format!("Invalid timestamp: {}", parts[0]))?;
-            let timestamp_ns = (timestamp_s * 1e9) as i64;
-
-            // Parse position
-            let tx: f32 = parts[1]
-                .parse()
-                .map_err(|_| format!("Invalid tx: {}", parts[1]))?;
-            let ty: f32 = parts[2]
-                .parse()
-                .map_err(|_| format!("Invalid ty: {}", parts[2]))?;
-            let tz: f32 = parts[3]
-                .parse()
-                .map_err(|_| format!("Invalid tz: {}", parts[3]))?;
-
-            // Parse quaternion
-            let qx: f32 = parts[4]
-                .parse()
-                .map_err(|_| format!("Invalid qx: {}", parts[4]))?;
-            let qy: f32 = parts[5]
-                .parse()
-                .map_err(|_| format!("Invalid qy: {}", parts[5]))?;
-            let qz: f32 = parts[6]
-                .parse()
-                .map_err(|_| format!("Invalid qz: {}", parts[6]))?;
-            let qw: f32 = parts[7]
-                .parse()
-                .map_err(|_| format!("Invalid qw: {}", parts[7]))?;
-
-            let pose = GroundTruthPose {
-                timestamp_ns,
-                position: Vector3::new(tx as f64, ty as f64, tz as f64),
-                quaternion: na::UnitQuaternion::new_normalize(na::Quaternion::new(qw, qx, qy, qz)),
+            let pose = if is_csv {
+                Self::parse_csv_line(&line)?
+            } else {
+                Self::parse_tum_line(&line)?
             };
 
-            poses.insert(timestamp_ns, pose);
+            poses.insert(pose.timestamp_ns, pose);
             count += 1;
         }
 
@@ -126,11 +98,112 @@ impl GroundTruthTrajectory {
             return Err("No valid poses found in file".to_string());
         }
 
-        log::info!("[GroundTruth] Loaded {} poses from file", count);
+        let seq_name = path_ref
+            .parent()
+            .and_then(|p| p.file_name())
+            .and_then(|s| s.to_str())
+            .unwrap_or("dataset")
+            .to_string();
+
+        log::info!(
+            "[GroundTruth] Loaded {} poses from {}",
+            count,
+            path_ref.display()
+        );
 
         Ok(Self {
             poses,
-            sequence_name: "dataset".to_string(),
+            sequence_name: seq_name,
+        })
+    }
+
+    fn parse_tum_line(line: &str) -> Result<GroundTruthPose, String> {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() < 8 {
+            return Err("Malformed TUM ground truth line".to_string());
+        }
+
+        let timestamp_s: f64 = parts[0]
+            .parse()
+            .map_err(|_| format!("Invalid timestamp: {}", parts[0]))?;
+        let timestamp_ns = (timestamp_s * 1e9) as i64;
+
+        let tx: f32 = parts[1]
+            .parse()
+            .map_err(|_| format!("Invalid tx: {}", parts[1]))?;
+        let ty: f32 = parts[2]
+            .parse()
+            .map_err(|_| format!("Invalid ty: {}", parts[2]))?;
+        let tz: f32 = parts[3]
+            .parse()
+            .map_err(|_| format!("Invalid tz: {}", parts[3]))?;
+
+        let qx: f32 = parts[4]
+            .parse()
+            .map_err(|_| format!("Invalid qx: {}", parts[4]))?;
+        let qy: f32 = parts[5]
+            .parse()
+            .map_err(|_| format!("Invalid qy: {}", parts[5]))?;
+        let qz: f32 = parts[6]
+            .parse()
+            .map_err(|_| format!("Invalid qz: {}", parts[6]))?;
+        let qw: f32 = parts[7]
+            .parse()
+            .map_err(|_| format!("Invalid qw: {}", parts[7]))?;
+
+        Ok(GroundTruthPose {
+            timestamp_ns,
+            position: Vector3::new(tx as f64, ty as f64, tz as f64),
+            quaternion: na::UnitQuaternion::new_normalize(na::Quaternion::new(qw, qx, qy, qz)),
+        })
+    }
+
+    fn parse_csv_line(line: &str) -> Result<GroundTruthPose, String> {
+        let parts: Vec<&str> = line.split(',').collect();
+        if parts.len() < 8 {
+            return Err("Malformed CSV ground truth line".to_string());
+        }
+
+        let timestamp_ns: i64 = parts[0]
+            .trim()
+            .parse()
+            .map_err(|_| format!("Invalid timestamp ns: {}", parts[0]))?;
+
+        let tx: f32 = parts[1]
+            .trim()
+            .parse()
+            .map_err(|_| format!("Invalid tx: {}", parts[1]))?;
+        let ty: f32 = parts[2]
+            .trim()
+            .parse()
+            .map_err(|_| format!("Invalid ty: {}", parts[2]))?;
+        let tz: f32 = parts[3]
+            .trim()
+            .parse()
+            .map_err(|_| format!("Invalid tz: {}", parts[3]))?;
+
+        // CSV order: qw, qx, qy, qz
+        let qw: f32 = parts[4]
+            .trim()
+            .parse()
+            .map_err(|_| format!("Invalid qw: {}", parts[4]))?;
+        let qx: f32 = parts[5]
+            .trim()
+            .parse()
+            .map_err(|_| format!("Invalid qx: {}", parts[5]))?;
+        let qy: f32 = parts[6]
+            .trim()
+            .parse()
+            .map_err(|_| format!("Invalid qy: {}", parts[6]))?;
+        let qz: f32 = parts[7]
+            .trim()
+            .parse()
+            .map_err(|_| format!("Invalid qz: {}", parts[7]))?;
+
+        Ok(GroundTruthPose {
+            timestamp_ns,
+            position: Vector3::new(tx as f64, ty as f64, tz as f64),
+            quaternion: na::UnitQuaternion::new_normalize(na::Quaternion::new(qw, qx, qy, qz)),
         })
     }
 
