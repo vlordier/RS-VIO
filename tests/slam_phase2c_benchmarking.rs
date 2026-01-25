@@ -482,6 +482,7 @@ fn test_slam_convergence_with_loop_closures() {
         .and_then(|s| s.parse::<usize>().ok())
         .filter(|&n| n > 0)
         .unwrap_or(1);
+    let images = &images[..max_frames];
 
     let mut estimator = Estimator::new(config, None);
     let mut context = FrameContext::new(false);

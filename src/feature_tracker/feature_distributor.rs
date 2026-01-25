@@ -5,6 +5,7 @@
 
 use nalgebra::Point2;
 use serde::{Deserialize, Serialize};
+use rayon::prelude::*;
 
 /// Configuration for adaptive feature distribution
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -148,18 +149,24 @@ impl FeatureDistributor {
 
     /// Get cells that need feature detection
     pub fn get_detection_regions(&self) -> Vec<(u32, u32)> {
-        let mut regions = Vec::new();
-
-        for y in 0..self.grid_height {
-            for x in 0..self.grid_width {
-                if matches!(
-                    self.status_map[y as usize][x as usize],
-                    CellStatus::Critical | CellStatus::Underoccupied
-                ) {
-                    regions.push((x, y));
-                }
-            }
-        }
+            // Parallel collection of detection regions across grid cells
+        let mut regions: Vec<(u32, u32)> = (0..self.grid_height)
+                .into_par_iter()
+                .flat_map(|y| {
+                    (0..self.grid_width)
+                        .filter_map(|x| {
+                            if matches!(
+                                self.status_map[y as usize][x as usize],
+                                CellStatus::Critical | CellStatus::Underoccupied
+                            ) {
+                                Some((x, y))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect();
 
         // Sort by distance from center (prefer central regions)
         let center_x = self.grid_width as f32 / 2.0;
@@ -178,17 +185,21 @@ impl FeatureDistributor {
 
     /// Get cells with overoccupied status (candidates for pruning)
     pub fn get_overcrowded_regions(&self) -> Vec<(u32, u32)> {
-        let mut regions = Vec::new();
-
-        for y in 0..self.grid_height {
-            for x in 0..self.grid_width {
-                if self.status_map[y as usize][x as usize] == CellStatus::Overoccupied {
-                    regions.push((x, y));
-                }
-            }
-        }
-
-        regions
+            // Parallel collection of overcrowded regions
+            (0..self.grid_height)
+                .into_par_iter()
+                .flat_map(|y| {
+                    (0..self.grid_width)
+                        .filter_map(|x| {
+                            if self.status_map[y as usize][x as usize] == CellStatus::Overoccupied {
+                                Some((x, y))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect()
     }
 
     /// Compute adaptive quality threshold based on local density
