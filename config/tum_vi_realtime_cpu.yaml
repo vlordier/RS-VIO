@@ -11,9 +11,9 @@ debug:
   log_stereo_undistorted: false
 
 camera:
-  # Optional downscale if pipeline supports it (kept at 512 if fixed). Adjust if supported.
-  image_width: 384
-  image_height: 384
+  # Keep at dataset resolution; loader enforces exact size.
+  image_width: 512
+  image_height: 512
   left_intrinsics: [190.97847715128717, 190.9733070521226, 254.93170605935475, 256.8974428996504]
   left_distortion: [0.0034823894022493434, 0.0007150348452162257, -0.0020532361418706202, 0.00020293673591811182, 0.0]
   left_model: "opencv5"
