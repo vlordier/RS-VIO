@@ -447,54 +447,53 @@ pub fn calculate_ate(
 pub fn calculate_rpe(
     ground_truth: &GroundTruthTrajectory,
     estimated: &EstimatedTrajectory,
-    delta_time_ns: i64,
+    _delta_time_ns: i64,
 ) -> (f64, f64) {
     let mut translation_errors = Vec::new();
     let mut rotation_errors = Vec::new();
 
+    // Use adjacent estimated poses regardless of nominal delta; this makes RPE robust to frame stride/decimation.
     let poses_vec: Vec<_> = estimated.poses().collect();
 
     for i in 0..poses_vec.len().saturating_sub(1) {
         let (ts1, pose1) = poses_vec[i];
         let (ts2, pose2) = poses_vec[i + 1];
 
-        if ts2 - ts1 < delta_time_ns / 2 || ts2 - ts1 > delta_time_ns * 3 / 2 {
-            continue; // Skip non-matching time deltas
-        }
-
-        // Get ground truth for both poses
-        let gt1 = match ground_truth.get_closest_pose(*ts1, 50_000_000) {
+        // Get closest ground-truth for both timestamps with a generous tolerance (100ms)
+        let gt1 = match ground_truth.get_closest_pose(*ts1, 100_000_000) {
             Some(p) => p,
             None => continue,
         };
-        let gt2 = match ground_truth.get_closest_pose(*ts2, 50_000_000) {
+        let gt2 = match ground_truth.get_closest_pose(*ts2, 100_000_000) {
             Some(p) => p,
             None => continue,
         };
 
-        // Calculate relative poses
-        let gt_relative = {
+        // Relative transforms (T2 * inv(T1))
+        let gt_rel = {
             let m1 = gt1.to_matrix();
             let m2 = gt2.to_matrix();
             m2 * m1.try_inverse().unwrap_or(Matrix4x4::identity())
         };
 
-        let est_relative = *pose2 * pose1.try_inverse().unwrap_or(Matrix4x4::identity());
+        let est_rel = *pose2 * pose1.try_inverse().unwrap_or(Matrix4x4::identity());
 
-        // Extract translation error
-        let trans_error = ((est_relative.m14 - gt_relative.m14).powi(2)
-            + (est_relative.m24 - gt_relative.m24).powi(2)
-            + (est_relative.m34 - gt_relative.m34).powi(2))
-        .sqrt();
-        translation_errors.push(trans_error as f64);
+        // Error transform: E = inv(Est_rel) * GT_rel
+        let est_rel_inv = est_rel.try_inverse().unwrap_or(Matrix4x4::identity());
+        let err = gt_rel * est_rel_inv;
 
-        // Extract rotation error (simplified: use trace)
-        let trace_est = est_relative.m11 + est_relative.m22 + est_relative.m33;
-        let trace_gt = gt_relative.m11 + gt_relative.m22 + gt_relative.m33;
-        let angle_error = ((trace_est - trace_gt).abs() / 6.0).clamp(-1.0, 1.0).acos();
-        rotation_errors.push(angle_error as f64);
+        // Translation error magnitude
+        let t_err = (err.m14.powi(2) + err.m24.powi(2) + err.m34.powi(2)).sqrt();
+        translation_errors.push(t_err as f64);
+
+        // Rotation error angle via trace of rotation part of E
+        let trace_r = err.m11 + err.m22 + err.m33;
+        let cos_theta = ((trace_r - 1.0) / 2.0).clamp(-1.0, 1.0);
+        let angle = cos_theta.acos();
+        rotation_errors.push(angle as f64);
     }
 
+    // RMSEs
     let trans_rmse = if !translation_errors.is_empty() {
         let n = translation_errors.len() as f64;
         (translation_errors.iter().map(|e| e * e).sum::<f64>() / n).sqrt()
