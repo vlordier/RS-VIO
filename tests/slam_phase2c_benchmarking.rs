@@ -303,7 +303,17 @@ fn test_slam_vs_vio_benchmarking() {
         .and_then(|s| s.parse::<usize>().ok())
         .map(|n| n.min(images.len()))
         .unwrap_or(images.len());
-    println!("📊 Processing {} frames for benchmarking", max_frames);
+    // Optional frame stride to process every Nth frame (e.g., 2 → ~15 FPS from 30 FPS camera)
+    let frame_stride: usize = std::env::var("RS_VIO_FRAME_STRIDE")
+        .ok()
+        .and_then(|s| s.parse::<usize>().ok())
+        .filter(|&n| n > 0)
+        .unwrap_or(1);
+
+    println!(
+        "📊 Processing {} frames (stride={}) for benchmarking",
+        max_frames, frame_stride
+    );
 
     // VIO Pipeline (Sliding Window Only)
     println!("\n🔵 Running VIO Pipeline (Sliding Window Only)...");
@@ -313,6 +323,7 @@ fn test_slam_vs_vio_benchmarking() {
     let mut vio_ctx = FrameContext::new(false);
 
     for frame_idx in 0..max_frames {
+        if frame_idx % frame_stride != 0 { continue; }
         vio_ctx.current_idx = frame_idx;
 
         if let Err(e) = player.process_single_frame(
@@ -352,6 +363,7 @@ fn test_slam_vs_vio_benchmarking() {
     let mut global_opt_count = 0;
 
     for frame_idx in 0..max_frames {
+        if frame_idx % frame_stride != 0 { continue; }
         slam_ctx.current_idx = frame_idx;
 
         if let Err(e) = player.process_single_frame(
@@ -464,7 +476,12 @@ fn test_slam_convergence_with_loop_closures() {
         .expect("should load TUM-VI IMU data");
 
     let max_frames = 150.min(images.len());
-    let images = &images[..max_frames];
+    // Optional frame stride to process every Nth frame
+    let frame_stride: usize = std::env::var("RS_VIO_FRAME_STRIDE")
+        .ok()
+        .and_then(|s| s.parse::<usize>().ok())
+        .filter(|&n| n > 0)
+        .unwrap_or(1);
 
     let mut estimator = Estimator::new(config, None);
     let mut context = FrameContext::new(false);
@@ -478,6 +495,7 @@ fn test_slam_convergence_with_loop_closures() {
     );
 
     for (frame_idx, _) in images.iter().enumerate() {
+        if frame_idx % frame_stride != 0 { continue; }
         context.current_idx = frame_idx;
 
         if player
@@ -567,6 +585,11 @@ fn test_loop_closure_diagnostics() {
         .and_then(|f| f.parse().ok())
         .unwrap_or(100)
         .min(images.len());
+    let frame_stride: usize = std::env::var("RS_VIO_FRAME_STRIDE")
+        .ok()
+        .and_then(|s| s.parse::<usize>().ok())
+        .filter(|&n| n > 0)
+        .unwrap_or(1);
 
     println!(
         "\nDataset: {} images, testing first {} frames",
@@ -607,6 +630,7 @@ fn test_loop_closure_diagnostics() {
     println!("\nProcessing frames (watching for loop closures)...");
 
     for frame_idx in 0..max_frames {
+        if frame_idx % frame_stride != 0 { continue; }
         ctx.current_idx = frame_idx;
 
         if let Err(e) = player.process_single_frame(
