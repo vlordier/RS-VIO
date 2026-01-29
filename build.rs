@@ -1,8 +1,13 @@
 /// Build script for RS-VIO
 ///
-/// Validates feature flag combinations at compile time to prevent invalid configurations
+/// Validates feature flag combinations at compile time to prevent invalid configurations,
+/// and handles platform-specific linking (Metal on macOS)
 #[allow(clippy::panic)]
 fn main() {
+    // ============================================================================
+    // FEATURE FLAG VALIDATION
+    // ============================================================================
+    
     // Mutually exclusive matching strategy features
     let matching_strategies = [
         "matching-basic-ransac",
@@ -52,6 +57,7 @@ fn main() {
     let has_rerun = std::env::var_os("CARGO_FEATURE_RERUN_VIEWER").is_some();
     let has_gpu = std::env::var_os("CARGO_FEATURE_GPU").is_some();
     let has_lightglue = std::env::var_os("CARGO_FEATURE_LIGHTGLUE").is_some();
+    let has_metal = std::env::var_os("CARGO_FEATURE_METAL_GPU").is_some();
 
     // GPU + LightGlue combination is beneficial
     if has_gpu && has_lightglue {
@@ -71,6 +77,25 @@ fn main() {
         println!("cargo:warning=Embedded + GPU: Ensure Jetson/ARM has WGPU support");
     }
 
+    // ============================================================================
+    // PLATFORM-SPECIFIC LINKING
+    // ============================================================================
+    
+    // Metal frameworks on macOS for student data export
+    #[cfg(target_os = "macos")]
+    {
+        if has_metal {
+            println!("cargo:rustc-link-lib=framework=Metal");
+            println!("cargo:rustc-link-lib=framework=MetalPerformanceShaders");
+            println!("cargo:rustc-link-lib=framework=Foundation");
+            println!("cargo:rustc-link-lib=framework=CoreGraphics");
+            println!("cargo:rustc-link-lib=framework=CoreImage");
+            println!("cargo:rustc-link-lib=framework=AppKit");
+            println!("cargo:warning=Metal GPU acceleration enabled for export_student_data");
+        }
+    }
+
     // Print summary
     println!("cargo:warning=RS-VIO feature validation passed");
 }
+

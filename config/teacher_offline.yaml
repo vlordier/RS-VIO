@@ -1,0 +1,113 @@
+# Teacher Configuration - Offline Processing for High-Quality Ground Truth
+# 
+# This configuration maximizes accuracy at the expense of speed for training
+# data generation. The "teacher" runs offline with generous settings to produce
+# the best possible poses and depth maps for training a fast "student" network.
+#
+# Expected performance: ~1-2 fps (acceptable for offline processing)
+# Output: High-quality labels for learned optimization
+
+# Dataset settings
+dataset:
+  type: tum_vi
+  path: /path/to/TUM-VI  # Update this path
+  sequence: room1  # Process one sequence at a time
+  stereo_mode: true
+  stride: 1  # Process every frame for dense training data
+
+# Camera intrinsics (TUM-VI defaults)
+camera:
+  width: 512
+  height: 512
+  fx: 190.97847715128717
+  fy: 190.9733070521226
+  cx: 254.93170605935475
+  cy: 256.8974428996504
+  baseline: 0.10  # 10cm stereo baseline
+
+# IMU settings
+imu:
+  noise_gyro: 1.6968e-04
+  noise_acc: 2.0e-3
+  noise_gyro_walk: 1.9393e-05
+  noise_acc_walk: 3.0e-3
+  g: 9.81
+
+# Feature detection and tracking - GENEROUS SETTINGS
+feature_detection:
+  max_features: 300  # 3x realtime (detect many for best quality)
+  quality_level: 0.008  # Lower = more features (0.01 is realtime)
+  min_distance: 12  # Less spacing = denser features
+  grid_rows: 20  # 20x6 = 120 cells for excellent coverage
+  grid_cols: 6
+  fast_threshold: 15  # More sensitive FAST detector
+
+feature_tracking:
+  window_size: 21  # Large LK window for robust tracking
+  max_level: 4  # 4 pyramid levels for long-range tracking
+  max_iterations: 50  # Generous iteration budget
+  epsilon: 0.01
+  max_lost_frames: 5  # Tolerate more occlusion
+
+# Stereo matching - HIGH QUALITY
+stereo:
+  max_disparity: 64
+  window_size: 11  # Large window for robust matching
+  min_disparity: 2
+  uniqueness_ratio: 10  # Strict uniqueness check
+
+# State estimation - GENEROUS WINDOW
+state_estimation:
+  window_size: 15  # 15-frame sliding window (vs 8 for realtime)
+  min_features: 50  # Require 50+ features (vs 36 for realtime)
+  max_iterations: 10  # 10 BA iterations (vs 3 for realtime)
+  huber_threshold: 1.0
+  keyframe_threshold: 0.3  # More frequent keyframes
+  
+  # Initialization
+  init_frames: 30  # More frames for stable init
+  init_min_parallax: 0.05  # radians
+
+# Optimization - MAXIMUM QUALITY
+optimization:
+  solver_type: gauss_newton  # Full GN (best quality)
+  max_iterations: 10  # 10 BA iterations per frame
+  convergence_threshold: 1e-6  # Tight convergence
+  use_robust_loss: true
+  robust_loss_param: 1.0  # Huber delta
+  
+  # No shortcuts - use full refinement
+  adaptive_iterations: false  # Always do full iterations
+  early_exit: false  # No early exit
+  
+  # Jacobian computation
+  use_numerical_jacobian: false  # Analytical is more accurate
+  finite_difference_step: 1e-6
+
+# Depth reconstruction - DENSE
+dense_reconstruction:
+  enable: true
+  patch_size: 5  # Large patches for robust matching
+  min_depth: 0.3
+  max_depth: 10.0
+  confidence_threshold: 0.3  # Lower = more depth estimates
+  
+  # Semi-dense reconstruction
+  grid_size: 8  # Dense 8x8 pixel grid
+  propagate_depth: true  # Propagate depth across frames
+  use_sgm: true  # Use semi-global matching for best quality
+
+# Teacher data export settings - Added at top level for Config parsing
+export_dir: ./training_data  # Root directory for HDF5 training data
+sequence_name: room1  # Sequence identifier (room1, room2, room3, room4, room5, room6)
+enable_export: true  # Enable teacher data export to HDF5
+  
+# Visualization (optional, can disable for speed)
+visualization:
+  enable: false  # Disable for faster offline processing
+  rerun_enabled: false
+
+# Logging
+logging:
+  level: info
+  export_metrics: true  # Log quality metrics for each frame

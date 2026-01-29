@@ -1,6 +1,7 @@
 use crate::optimization::loop_closure::LoopClosureConfig;
 use crate::{Result, VIOError};
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 /// Main configuration structure for the VIO system.
 ///
@@ -22,6 +23,15 @@ pub struct Config {
     pub loop_closure: LoopClosureConfig,
     #[serde(default)]
     pub marginalization: crate::optimization::marginalization::MarginalizationConfig,
+    /// Root directory for export output (teacher data export)
+    #[serde(default)]
+    pub export_dir: PathBuf,
+    /// Sequence name for export (teacher data export)
+    #[serde(default)]
+    pub sequence_name: String,
+    /// Enable teacher data export
+    #[serde(default)]
+    pub enable_export: bool,
 }
 
 impl Config {

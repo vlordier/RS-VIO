@@ -281,6 +281,10 @@ pub mod datasets;
 pub mod dense_reconstruction;
 pub mod estimator;
 pub mod evaluation;
+
+#[cfg(feature = "export-teacher")]
+pub mod export;
+
 pub mod feature_detection;
 pub mod feature_tracker;
 pub mod fusion;
@@ -290,6 +294,7 @@ pub mod math;
 pub mod multi_drone;
 pub mod optimization;
 pub mod platform;
+pub mod refinement;
 
 #[cfg(feature = "swarm")]
 pub mod swarm;

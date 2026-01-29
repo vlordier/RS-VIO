@@ -56,8 +56,15 @@ ort = { version = "2.0.0-rc.11", optional = true }
 ndarray = { version = "0.16", optional = true }
 wgpu = { version = "0.20", optional = true }
 pollster = { version = "0.3", optional = true }
+# HDF5 for teacher-student training data export
+hdf5 = { version = "0.12", package = "hdf5-metno", optional = true }
 
-
+# Metal GPU acceleration (macOS only) for fast export
+[target.'cfg(target_os = "macos")'.dependencies]
+metal = { version = "0.27", optional = true }
+objc2 = { version = "0.5", optional = true }
+objc2-foundation = { version = "0.2", optional = true }
+block2 = { version = "0.4", optional = true }
 
 [features]
 default = ["matching-basic-ransac"]
@@ -65,6 +72,12 @@ default = ["matching-basic-ransac"]
 rerun-viewer = ["rerun"]
 # Feature flag for LightGlue ONNX-based verification
 lightglue = ["ort", "ndarray"]
+# Feature flag for neural network position refinement (ONNX Runtime)
+onnx-refinement = ["ort", "ndarray"]
+# Feature flag for teacher data export (HDF5 dataset generation)
+export-teacher = ["hdf5", "ndarray"]
+# Feature flag for Metal GPU acceleration on macOS (student data export)
+metal-gpu = ["metal", "objc2", "objc2-foundation", "block2"]
 # Feature flag for memory profiling with dhat
 dhat-heap = []
 # Feature flag for GPU acceleration framework (placeholder for future CUDA/OpenCL support)
@@ -113,6 +126,16 @@ toml = "0.8"
 [[bin]]
 name = "calib_check"
 path = "src/bin/calib_check.rs"
+
+[[bin]]
+name = "export_teacher"
+path = "src/bin/export_teacher.rs"
+required-features = ["export-teacher"]
+
+[[bin]]
+name = "export_student_data"
+path = "src/bin/export_student_data.rs"
+required-features = ["metal-gpu"]
 
 [package.metadata.cargo-machete]
 ignored = ["tracing"]  # Used via tracing-subscriber for structured logging

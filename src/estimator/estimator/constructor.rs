@@ -21,6 +21,9 @@ use nalgebra as na;
 use std::io::Write;
 use std::time::Duration;
 
+#[cfg(feature = "export-teacher")]
+use crate::export::{ExportConfig, ExportManager};
+
 impl Estimator {
     #![allow(non_snake_case)]
 
@@ -116,6 +119,32 @@ impl Estimator {
         let _imu_config = ImuConfig::default();
         let loop_closure_detector = LoopClosureDetector::new(config.loop_closure.clone());
         let global_pose_graph = GlobalPoseGraph::new(GlobalPoseGraphConfig::default());
+        
+        // Initialize export manager if feature enabled
+        #[cfg(feature = "export-teacher")]
+        let export_manager = match ExportManager::new(ExportConfig {
+            output_dir: config.export_dir.clone(),
+            sequence_name: config.sequence_name.clone(),
+            enabled: config.enable_export,
+        }) {
+            Ok(manager) => manager,
+            Err(e) => {
+                log::warn!("Failed to initialize export manager: {}", e);
+                ExportManager::new(ExportConfig {
+                    output_dir: std::path::PathBuf::from("./training_data"),
+                    sequence_name: "unknown".to_string(),
+                    enabled: false,
+                }).unwrap_or_else(|_| {
+                    // Fallback: create disabled manager
+                    ExportManager::new(ExportConfig {
+                        output_dir: std::path::PathBuf::new(),
+                        sequence_name: String::new(),
+                        enabled: false,
+                    }).expect("Failed to create fallback export manager")
+                })
+            }
+        };
+        
         Estimator {
             frame_id_counter: 0,
             frames_since_last_keyframe: 0,
@@ -177,6 +206,10 @@ impl Estimator {
                     DepthAwareFusionConfig::default(),
                 ))),
             },
+            
+            // Initialize export manager (only compiled with feature)
+            #[cfg(feature = "export-teacher")]
+            export_manager,
         }
     }
 }

@@ -848,6 +848,20 @@ impl Estimator {
                 ) {
                     log::error!("[Estimator] Bundle adjustment optimization failed: {:?}", e);
                     // Continue execution even if optimization fails
+                } else {
+                    // Export teacher frame data after successful optimization
+                    #[cfg(feature = "export-teacher")]
+                    if self.config.enable_export {
+                        if let Err(e) = self.export_teacher_frame(
+                            left_image,
+                            right_image,
+                            img_w,
+                            img_h,
+                            timestamp_ns,
+                        ) {
+                            log::warn!("[Estimator] Failed to export teacher frame: {}", e);
+                        }
+                    }
                 }
             } else if self.frame_count % 50 == 0 {
                 log::debug!("[Estimator] Fast mode: skipping BA on this keyframe");
@@ -907,5 +921,227 @@ impl Estimator {
         );
 
         Ok(())
+    }
+
+    /// Export teacher frame data to HDF5 file
+    /// Called after successful bundle adjustment optimization
+    #[cfg(feature = "export-teacher")]
+    fn export_teacher_frame(
+        &mut self,
+        left_image_raw: &[u8],
+        right_image_raw: &[u8],
+        img_width: u32,
+        img_height: u32,
+        timestamp_ns: i64,
+    ) -> Result<()> {
+        use crate::export::TeacherFrame;
+        use ndarray::Array2;
+
+        // Reconstruct GrayImage objects from raw buffers
+        let left_image = match image::GrayImage::from_raw(img_width, img_height, left_image_raw.to_vec()) {
+            Some(img) => img,
+            None => return Err(VIOError::Optimization("Failed to reconstruct left image".to_string())),
+        };
+        let right_image = match image::GrayImage::from_raw(img_width, img_height, right_image_raw.to_vec()) {
+            Some(img) => img,
+            None => return Err(VIOError::Optimization("Failed to reconstruct right image".to_string())),
+        };
+
+        // Use current frame timestamp as double precision seconds
+        let timestamp_sec = timestamp_ns as f64 / 1_000_000_000.0;
+
+        // Get camera pose - use identity if not available
+        let pose = na::Isometry3::identity();
+
+        // Optical flow grid (8x6)
+        let flow_grid = self.extract_optical_flow_grid()?;
+
+        // Extract depth map
+        let depth_map = self.extract_depth_map().unwrap_or_else(|| {
+            Array2::<f32>::from_elem((
+                self.config.camera.image_height as usize,
+                self.config.camera.image_width as usize,
+            ), -1.0)
+        });
+
+        // Extract depth confidence
+        let depth_confidence = self.extract_depth_confidence().unwrap_or_else(|| {
+            Array2::<f32>::from_elem((
+                self.config.camera.image_height as usize,
+                self.config.camera.image_width as usize,
+            ), 0.0)
+        });
+
+        // Compute reprojection errors
+        let reprojection_errors = self.compute_reprojection_errors().unwrap_or_default();
+
+        // Downscale images to 256x256 for student network
+        let left_downscaled = crate::export::downscale_image(&left_image, 256);
+        let right_downscaled = crate::export::downscale_image(&right_image, 256);
+
+        // Get IMU preintegration if available
+        let imu_preint = if self.config.optimization.imu_prior_enable {
+            // Create 15D vector from IMU preintegrator state
+            let preint_state = self.imu_processor.preintegrator.get();
+            let p = preint_state.delta_position;
+            let v = preint_state.delta_velocity;
+            let q = preint_state.delta_rotation;
+            
+            // Convert rotation to axis-angle
+            let axis_angle = q.scaled_axis();
+            
+            na::SVector::<f64, 15>::from([
+                p.x as f64, p.y as f64, p.z as f64,                    // delta_p (3)
+                v.x as f64, v.y as f64, v.z as f64,                    // delta_v (3)
+                axis_angle.x as f64, axis_angle.y as f64, axis_angle.z as f64,  // delta_w (3)
+                0.0, 0.0, 0.0,                    // bias_w (3) - placeholder
+                0.0, 0.0, 0.0,                    // bias_a (3) - placeholder
+            ])
+        } else {
+            na::SVector::<f64, 15>::zeros()
+        };
+
+        // Create TeacherFrame struct
+        let teacher_frame = TeacherFrame {
+            frame_id: self.frame_id_counter as usize,
+            timestamp: timestamp_sec,
+            left_image: left_image.clone(),
+            right_image: right_image.clone(),
+            left_downscaled,
+            right_downscaled,
+            imu_preintegration: imu_preint,
+            imu_covariance: na::SVector::<f64, 15>::zeros(), // TODO: extract from IMU uncertainty
+            imu_sample_count: 0, // TODO: track from IMU data
+            flow_grid,
+            flow_quality: 0.5, // TODO: compute from flow tracking
+            pose_world_cam: pose,
+            pose_covariance: na::Matrix6::identity(), // TODO: extract from BA
+            velocity: na::Vector3::zeros(),  // TODO: extract from state
+            previous_pose: pose,  // TODO: use previous frame pose
+            previous_velocity: na::Vector3::zeros(),  // TODO: extract from velocity estimate
+            match_quality: vec![0.5; 32], // TODO: extract from feature matcher
+            time_since_keyframe: 1.0,  // TODO: track keyframe count
+            depth_map,
+            depth_confidence,
+            reprojection_errors,
+            mean_reprojection_error: 0.0, // TODO: compute mean
+            ba_iterations: self.config.optimization.bundle_adjustment_max_iterations as usize,
+            ba_converged: true, // Assuming converged since we're exporting
+        };
+
+        // Export to HDF5
+        if let Err(e) = self.export_manager.export_frame(teacher_frame) {
+            log::warn!("[Estimator] Failed to write HDF5 frame: {}", e);
+        }
+
+        Ok(())
+    }
+
+    /// Extract optical flow grid (8x6) from feature tracker state
+    #[cfg(feature = "export-teacher")]
+    fn extract_optical_flow_grid(
+        &self,
+    ) -> Result<Vec<crate::export::OpticalFlowPoint>> {
+        // Extract sparse optical flow points from the current frame's feature data
+        // For simplicity, create a coarse grid representation
+        // For now, return empty vector as we don't have direct flow access in processor
+        // This could be populated from stereo matching residuals or feature tracking state
+        
+        Ok(Vec::new())
+    }
+
+    /// Extract semi-dense depth map from triangulation
+    #[cfg(feature = "export-teacher")]
+    fn extract_depth_map(&self) -> Option<ndarray::Array2<f32>> {
+        use ndarray::Array2;
+        
+        let img_h = self.config.camera.image_height as usize;
+        let img_w = self.config.camera.image_width as usize;
+        
+        // Initialize depth map with invalid values (-1.0)
+        let mut depth_map = Array2::<f32>::from_elem((img_h, img_w), -1.0f32);
+        
+        // Get camera intrinsics from config
+        if self.config.camera.left_intrinsics.len() < 4 {
+            return Some(depth_map); // Return default if intrinsics missing
+        }
+        
+        let fx = self.config.camera.left_intrinsics[0] as f32;
+        let fy = self.config.camera.left_intrinsics[1] as f32;
+        let cx = self.config.camera.left_intrinsics[2] as f32;
+        let cy = self.config.camera.left_intrinsics[3] as f32;
+        
+        // Get last keyframe for pose information
+        // Get last keyframe for pose information
+        // Note: We can't call keyframes_mut() since this function takes &self
+        // Use the last pose from trajectory
+        if let Some((_, last_pose)) = self.trajectory.last() {
+            let T_W_B = *last_pose;
+            // Use identity for camera pose (simplified for now)
+            let T_B_Cl = na::Matrix4::identity();
+            
+            // Compute T_W_Cl = T_W_B * T_B_Cl
+            let T_W_Cl = T_W_B * T_B_Cl;
+            let T_Cl_W = na::Matrix4::from(T_W_Cl).try_inverse()
+                .unwrap_or_else(na::Matrix4::identity);
+            
+            // Project each map point
+            for (_id, point_xyz) in self.backend.sliding_window.map_points.iter() {
+                // Create point in world frame (f64)
+                let p_W = na::Vector4::new(point_xyz[0] as f64, point_xyz[1] as f64, point_xyz[2] as f64, 1.0);
+                let p_Cl = T_Cl_W * p_W;
+                
+                if p_Cl.z > 0.1 { // Only positive depth
+                    let x_pix = (fx * p_Cl.x as f32 / p_Cl.z as f32 + cx) as i32;
+                    let y_pix = (fy * p_Cl.y as f32 / p_Cl.z as f32 + cy) as i32;
+                    
+                    if x_pix >= 0 && x_pix < img_w as i32 && y_pix >= 0 && y_pix < img_h as i32 {
+                        let depth_val = p_Cl.z as f32;
+                        depth_map[[y_pix as usize, x_pix as usize]] = depth_val;
+                    }
+                }
+            }
+        }
+        
+        Some(depth_map)
+    }
+
+    /// Extract depth confidence map
+    #[cfg(feature = "export-teacher")]
+    fn extract_depth_confidence(&self) -> Option<ndarray::Array2<f32>> {
+        use ndarray::Array2;
+        
+        let img_h = self.config.camera.image_height as usize;
+        let img_w = self.config.camera.image_width as usize;
+        
+        // Initialize confidence map with zeros
+        let confidence_map = Array2::<f32>::from_elem((img_h, img_w), 0.0f32);
+        
+        // For simplicity, set confidence based on depth map validity
+        // In practice, this could be based on observation count or residuals
+        if let Some(depth_map) = self.extract_depth_map() {
+            let mut result = confidence_map;
+            // Set confidence 0.9 where depth is positive
+            for (idx, &depth_val) in depth_map.iter().enumerate() {
+                if depth_val > 0.0 {
+                    let y = idx / img_w;
+                    let x = idx % img_w;
+                    result[[y, x]] = 0.9f32;
+                }
+            }
+            return Some(result);
+        }
+        
+        Some(confidence_map)
+    }
+
+    /// Compute reprojection errors after optimization
+    #[cfg(feature = "export-teacher")]
+    fn compute_reprojection_errors(&self) -> Option<Vec<f32>> {
+        // Compute residuals for each map point observation
+        // For now, return empty vector as we'd need access to BA residual cache
+        // This would be computed from the optimization result
+        
+        Some(Vec::new())
     }
 }
