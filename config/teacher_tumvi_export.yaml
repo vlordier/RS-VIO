@@ -1,0 +1,88 @@
+# TUM-VI Teacher Data Export Configuration
+# Used for offline generation of high-quality training data via teacher-student distillation
+
+# Export Parameters
+export_dir: "./teacher_data"        # Output directory for HDF5 files
+sequence_name: "tum_vi"             # Dataset sequence identifier
+enable_export: true                 # Enable teacher frame export after BA
+
+# Debug / Feature Toggle Flags
+debug:
+  use_imu: true
+  use_feature_tracking: true
+  use_triangulation: true
+  use_fallback_depth: true
+  min_stereo_matches: 1
+  log_stereo_undistorted: false
+
+# Camera Parameters (TUM-VI dataset - from dso/camchain.yaml)
+# TUM-VI uses pinhole camera model with equidistant distortion
+camera:
+  image_width: 512
+  image_height: 512
+
+  # Left camera (cam0) intrinsics - from TUM-VI calibration
+  left_intrinsics: [190.97847715128717, 190.9733070521226, 254.93170605935475, 256.8974428996504]
+  left_distortion: [0.0034823894022493434, 0.0007150348452162257, -0.0020532361418706202, 0.00020293673591811182, 0.0]
+  left_model: "opencv5"
+
+  # Right camera (cam1) intrinsics - from TUM-VI calibration
+  right_intrinsics: [190.44236969414825, 190.4344384721956, 252.59949716835982, 254.91723064636983]
+  right_distortion: [0.0034003170790442797, 0.001766278153469831, -0.00266312569781606, 0.0003299517423931039, 0.0]
+  right_model: "opencv5"
+
+  # Left camera extrinsics (T_B_Cl = inverse of T_cam0_imu from DSO camchain.yaml)
+  T_B_Cl: [-0.99952504, 0.00750192, -0.02989013, 0.04557484, 0.02961534, -0.03439736, -0.99896935, -0.07116180, -0.00852233, -0.99938008, 0.03415885, -0.04468125, 0.0, 0.0, 0.0, 1.0]
+
+  # Right camera extrinsics (T_B_Cr = inverse of T_cam1_imu from DSO camchain.yaml)
+  T_B_Cr: [-0.99951105, 0.00810408, -0.03019914, -0.05545634, 0.03029912, 0.01251164, -0.99946257, -0.06925002, -0.00772188, -0.99988889, -0.01275107, -0.04745286, 0.0, 0.0, 0.0, 1.0]
+
+# Keyframe and Windowing Parameters
+# For teacher data generation, use larger window for better quality
+keyframe_management:
+  keyframe_window_size: 20
+  translation_threshold: 0.02    # More conservative for better coverage
+  rotation_threshold: 0.02
+  processing_timeout_ms: 20000
+
+# Feature Detection Parameters
+feature_detection:
+  grid_size: 20
+  max_features_per_grid: 8        # More features for better tracking
+  optical_flow_max_iterations: 20
+  optical_flow_convergence_threshold: 0.01
+
+# Optimization Parameters
+# Teacher uses full optimization for high quality
+optimization:
+  pnp_max_iterations: 10
+  bundle_adjustment_max_iterations: 20      # More iterations for convergence
+  bundle_adjustment_residual_threshold: 3.0
+  enable_motion_prior: false
+  enable_imu_prior: true
+  enable_marginalization: true
+  imu_prior_enable: true
+  imu_gravity_weight: 100.0
+  imu_velocity_weight: 10.0
+  imu_bias_weight: 1.0
+
+# Marginalization Parameters
+marginalization:
+  enabled: true
+  use_fej: true
+  damping: 1e-4
+  max_keyframes: 20
+  num_marginalize_per_step: 1
+  min_landmark_observations: 2
+  landmark_age_limit: 10
+  prior_info_scale: 1.0
+  hessian_approximator: "reduced"
+  gradient_computer: "reduced"
+  prior_constructor: "schur"
+
+# Loop Closure Parameters (disabled for teacher data - unnecessary)
+loop_closure:
+  enabled: false
+  min_loop_closure_matches: 10
+  loop_closure_distance_threshold: 0.5
+  min_consecutive_matching_frames: 3
