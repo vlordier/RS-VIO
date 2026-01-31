@@ -156,7 +156,7 @@ But the `error_context` crate doesn't exist, so compilation fails.
   - `frame_workspace.rs`: Buffer pooling for efficiency
   - `workspace_pool.rs`: Global workspace pool
 
-#### 3. **Optimization System** ✅ COMPLETE  
+#### 3. **Optimization System** ✅ COMPLETE
 - **Files**: `src/optimization/*`
 - **Purpose**: Bundle adjustment, marginalization, loop closure
 - **Status**: Fully implemented
@@ -252,7 +252,7 @@ But the `error_context` crate doesn't exist, so compilation fails.
 
 ### ❌ Missing but NOT Needed
 - `error_context` crate - no usages
-- `numerical_validation` crate - no usages  
+- `numerical_validation` crate - no usages
 - `robust_linear_algebra` crate - no usages
 - `platform_detect` crate - only 2 non-critical usages
 - `resource-pool` crate - never referenced

@@ -300,8 +300,8 @@ When switching to stable releases of dependencies:
 
 ---
 
-**Last Updated**: January 2026  
-**Rust Version**: 1.92+  
+**Last Updated**: January 2026
+**Rust Version**: 1.92+
 **Status**: ✅ 100% Safe Rust | ⚡ Realtime-Ready | 🎯 **Ultra-Tight Embedded**
 
 ## Configuration Summary

@@ -182,4 +182,3 @@ Benchmarking complete_pipeline/full_fusion_imu_and_superres: Collecting 100 samp
 Benchmarking complete_pipeline/full_fusion_imu_and_superres: Analyzing
 complete_pipeline/full_fusion_imu_and_superres
                         time:   [18.070 µs 19.208 µs 20.321 µs]
-

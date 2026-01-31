@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import torch
+
 from train_refinement_network import RefinementNetwork
 
 # Load trained model
@@ -38,5 +39,6 @@ print('✓ ONNX model saved to results/refinement_model.onnx')
 
 # Check file size
 import os
+
 size_mb = os.path.getsize('results/refinement_model.onnx') / (1024 * 1024)
 print(f'  Model size: {size_mb:.2f} MB')

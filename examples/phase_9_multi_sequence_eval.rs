@@ -85,7 +85,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         // Phase 7D Baseline: Simulate real VIO with scale error
-        let phase_7d_result = simulate_phase_7d(&seq, &gt_poses);
+        let phase_7d_result = simulate_phase_7d(seq, &gt_poses);
         println!("  Phase 7D (Real VIO):");
         println!(
             "    ATE RMSE: {:.3}m (225x scale error)",
@@ -101,7 +101,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .insert("7D-Baseline".to_string(), phase_7d_result);
 
         // Phase 8A: Gravity initialization recovery
-        let phase_8a_result = simulate_phase_8a(&seq, &gt_poses);
+        let phase_8a_result = simulate_phase_8a(seq, &gt_poses);
         println!("  Phase 8A (Gravity Init):");
         println!(
             "    ATE RMSE: {:.3}m (scale recovery)",
@@ -117,7 +117,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .insert("8A-GravityInit".to_string(), phase_8a_result);
 
         // Phase 8B: IMU integration
-        let phase_8b_result = simulate_phase_8b(&seq, &gt_poses);
+        let phase_8b_result = simulate_phase_8b(seq, &gt_poses);
         println!("  Phase 8B (IMU Integration):");
         println!(
             "    ATE RMSE: {:.3}m (with velocity est.)",
@@ -133,7 +133,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .insert("8B-IMUIntegration".to_string(), phase_8b_result);
 
         // Phase 8C: Loop closure
-        let phase_8c_result = simulate_phase_8c(&seq, &gt_poses);
+        let phase_8c_result = simulate_phase_8c(seq, &gt_poses);
         println!("  Phase 8C (Loop Closure):");
         println!(
             "    ATE RMSE: {:.3}m (drift corrected)",

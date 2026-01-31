@@ -47,12 +47,12 @@ check_command() {
 
 check_python_deps() {
     print_info "Checking Python dependencies..."
-    
+
     if ! python3 -c "import pandas, matplotlib, numpy" 2>/dev/null; then
         print_warning "Python dependencies not installed"
         echo ""
         echo "Installing pandas, matplotlib, numpy..."
-        
+
         if command -v pip3 &> /dev/null; then
             pip3 install pandas matplotlib numpy
         elif command -v pip &> /dev/null; then
@@ -62,22 +62,22 @@ check_python_deps() {
             exit 1
         fi
     fi
-    
+
     print_success "Python dependencies ready"
 }
 
 generate_demo() {
     print_header "Generating Synthetic Demo Visualization"
-    
+
     echo "Running synthetic example..."
     cargo run --example plot_vio_comparisons
-    
+
     print_success "Demo data generated in ./plot_output/"
 }
 
 generate_tum_vi() {
     print_header "Generating TUM-VI Dataset Visualization"
-    
+
     if [ ! -d "$TUM_VI_PATH" ]; then
         print_error "TUM-VI dataset not found at $TUM_VI_PATH"
         echo ""
@@ -88,27 +88,27 @@ generate_tum_vi() {
         echo "  export DATASET_DIR=/path/to/datasets"
         exit 1
     fi
-    
+
     echo "Processing TUM-VI room1..."
     cargo run --example plot_tum_vi_comparison -- "$TUM_VI_PATH"
-    
+
     print_success "TUM-VI data generated in ./tum_vi_results/"
 }
 
 generate_plots() {
     local output_dir="$1"
     local name="$2"
-    
+
     if [ ! -f "$output_dir/plot_comparisons.py" ]; then
         print_error "No plotting script found in $output_dir"
         echo "Run visualization generation first"
         return 1
     fi
-    
+
     echo "Generating $name plots..."
     cd "$output_dir" && python3 plot_comparisons.py
     cd - > /dev/null
-    
+
     # Check if plots were generated
     if ls "$output_dir"/*.png &> /dev/null; then
         print_success "Plots generated:"
@@ -120,7 +120,7 @@ generate_plots() {
 
 show_results() {
     print_header "Visualization Results"
-    
+
     echo ""
     echo -e "${GREEN}Synthetic Demo:${NC}"
     if [ -d "./plot_output" ]; then
@@ -133,7 +133,7 @@ show_results() {
     else
         echo "  Not generated"
     fi
-    
+
     echo ""
     echo -e "${GREEN}TUM-VI Dataset:${NC}"
     if [ -d "./tum_vi_results" ]; then
@@ -146,7 +146,7 @@ show_results() {
     else
         echo "  Not generated"
     fi
-    
+
     echo ""
 }
 
@@ -187,13 +187,13 @@ main() {
     local do_install=false
     local do_clean=false
     local do_all=false
-    
+
     # Parse arguments
     if [ $# -eq 0 ]; then
         usage
         exit 0
     fi
-    
+
     while [ $# -gt 0 ]; do
         case "$1" in
             --demo)
@@ -226,7 +226,7 @@ main() {
         esac
         shift
     done
-    
+
     # Clean if requested
     if [ "$do_clean" = true ]; then
         print_header "Cleaning Generated Files"
@@ -234,63 +234,63 @@ main() {
         print_success "Cleaned"
         exit 0
     fi
-    
+
     # Install dependencies if requested
     if [ "$do_install" = true ]; then
         check_python_deps
         exit 0
     fi
-    
+
     # Check prerequisites
     check_command cargo || exit 1
     check_command python3 || exit 1
-    
+
     # Handle --all flag
     if [ "$do_all" = true ]; then
         do_demo=true
         do_tum=true
         do_plots=true
     fi
-    
+
     # Check Python deps if we're going to plot
     if [ "$do_plots" = true ]; then
         check_python_deps
     fi
-    
+
     # Generate demo
     if [ "$do_demo" = true ]; then
         generate_demo
         echo ""
     fi
-    
+
     # Generate TUM-VI
     if [ "$do_tum" = true ]; then
         generate_tum_vi
         echo ""
     fi
-    
+
     # Generate plots
     if [ "$do_plots" = true ]; then
         print_header "Generating Plots"
-        
+
         if [ "$do_demo" = true ] || [ -d "./plot_output" ]; then
             echo ""
             generate_plots "./plot_output" "demo"
         fi
-        
+
         if [ "$do_tum" = true ] || [ -d "./tum_vi_results" ]; then
             echo ""
             generate_plots "./tum_vi_results" "TUM-VI"
         fi
-        
+
         echo ""
     fi
-    
+
     # Show results
     show_results
-    
+
     print_header "Complete"
-    
+
     if [ "$do_plots" = false ]; then
         echo ""
         print_info "To generate plots, run:"

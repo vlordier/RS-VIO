@@ -1,7 +1,7 @@
 # Marginalization Deep Robustness Review: Complete Summary
 
-**Date**: January 15, 2026  
-**Scope**: Embedded VIO for drones (Jetson Xavier, Snapdragon)  
+**Date**: January 15, 2026
+**Scope**: Embedded VIO for drones (Jetson Xavier, Snapdragon)
 **Tests**: ✅ All 57 marginalization tests passing
 
 ---
@@ -28,7 +28,7 @@ We conducted a **comprehensive robustness and performance audit** of the margina
 
 **Problem**: Condition number estimation using full SVD was O(n³), causing latency spikes.
 
-**Solution**: 
+**Solution**:
 - Replaced with O(n) fast heuristic: κ ≈ Frobenius norm / trace
 - Error: typically ±2× (acceptable for regularization decisions)
 - New function: `estimate_condition_number_svd()` for offline diagnostics only
@@ -108,23 +108,23 @@ Memory footprint: 400MB → 320MB
 
 ### Numerical Stability
 
-✅ **Cholesky-first strategy**: Detects and handles ill-conditioning gracefully  
-✅ **Bounded damping**: Prevents unbounded regularization  
-✅ **Conservative threshold**: Pseudo-inverse doesn't invert tiny singular values  
-✅ **Logging pipeline**: Each fallback is logged; trajectory quality is traceable  
+✅ **Cholesky-first strategy**: Detects and handles ill-conditioning gracefully
+✅ **Bounded damping**: Prevents unbounded regularization
+✅ **Conservative threshold**: Pseudo-inverse doesn't invert tiny singular values
+✅ **Logging pipeline**: Each fallback is logged; trajectory quality is traceable
 
 ### Real-Time Safety
 
-✅ **Removed SVD from hot path**: Latency is now predictable (<5ms)  
-✅ **Reduced clones**: Fewer allocations = lower GC pressure  
-✅ **Rate-limited logging**: Won't block on serial I/O  
-✅ **FEJ structure hashing**: Cache is robust to parameter reordering  
+✅ **Removed SVD from hot path**: Latency is now predictable (<5ms)
+✅ **Reduced clones**: Fewer allocations = lower GC pressure
+✅ **Rate-limited logging**: Won't block on serial I/O
+✅ **FEJ structure hashing**: Cache is robust to parameter reordering
 
 ### Embedded Constraints
 
-✅ **Smaller window**: max_keyframes=8 (was 10) saves ~80MB  
-✅ **Fast approximators**: Diagonal Hessian for drones (~20× faster than Gauss-Newton)  
-✅ **Conservative damping**: Handles motion blur + poor feature tracking  
+✅ **Smaller window**: max_keyframes=8 (was 10) saves ~80MB
+✅ **Fast approximators**: Diagonal Hessian for drones (~20× faster than Gauss-Newton)
+✅ **Conservative damping**: Handles motion blur + poor feature tracking
 
 ---
 
@@ -245,10 +245,10 @@ After:  ~320MB peak (3–4 clones each)
 
 The marginalization implementation is now **production-ready for embedded drone VIO**:
 
-✅ **Robust**: Graceful degradation; no silent failures  
-✅ **Fast**: Real-time-safe; predictable latency <5ms  
-✅ **Compact**: Minimal memory footprint; suitable for 512MB–1GB platforms  
-✅ **Well-tested**: 57 unit tests; edge cases covered  
-✅ **Well-documented**: Configuration guide for deployment  
+✅ **Robust**: Graceful degradation; no silent failures
+✅ **Fast**: Real-time-safe; predictable latency <5ms
+✅ **Compact**: Minimal memory footprint; suitable for 512MB–1GB platforms
+✅ **Well-tested**: 57 unit tests; edge cases covered
+✅ **Well-documented**: Configuration guide for deployment
 
 The key insight: **marginalization doesn't need full SVD accuracy on drones**. Fast heuristics + graceful fallbacks + bounded regularization provide robustness without latency penalties.

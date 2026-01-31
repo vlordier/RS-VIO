@@ -104,12 +104,12 @@ Iterative algorithms with heavy memory patterns:
 ### 1. **Matrix Operations Dominate (11.0% of IR)**
 **Problem:** NALgebra's matrix operations are heavily monomorphized for different types (f32, f64, fixed/dynamic sizes).
 
-**Why It Matters:** 
+**Why It Matters:**
 - Each matrix operation (inverse, multiply, dot product) gets compiled multiple times
 - VIO uses both 3x3 (rotation) and 4x4 (homogeneous) matrices extensively
 - Bundle adjustment involves dozens of matrix operations per optimization iteration
 
-**Evidence:** 
+**Evidence:**
 - `dotx` alone has 21 copies (monomorphization)
 - `Matrix::apply` has 128 copies (different type combinations)
 
@@ -175,7 +175,7 @@ Iterative algorithms with heavy memory patterns:
 
 ### Priority 1: NALgebra Optimization
 - **Target:** Reduce matrix operation monomorphization from 11% to ~5-7%
-- **Approach:** 
+- **Approach:**
   1. Audit all nalgebra type usage (f32 vs f64)
   2. Standardize on f64 for accuracy-critical operations
   3. Use fixed-size types (`Matrix3`, `Vector3`) instead of dynamic

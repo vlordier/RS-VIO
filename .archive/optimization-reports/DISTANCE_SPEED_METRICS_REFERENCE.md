@@ -161,10 +161,10 @@ Error (mm)
   |      ╱          ╱╲
  50|    ╱          ╱  ╲
   |   ╱          ╱    ╲
-  |  ╱          ╱      
+  |  ╱          ╱
   +──────────────────────── Distance (m)
   0          5         10         15
-  
+
 Key: Fusion maintains 70% advantage across all distances
 ```
 
@@ -183,7 +183,7 @@ Success (%)
  78|
   +──────────────────────── Speed (m/s)
   0    1      2      3      4      5      6
-  
+
 Key: High-speed benefit amplified vs static
 ```
 

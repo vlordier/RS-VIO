@@ -79,7 +79,7 @@ Found **4 major areas of redundant/duplicate implementations** and **3 dead code
 
 ```rust
 fn generate_synthetic_correspondences()  // line 289 - ONLY used by RansacEpipolarVerifier stub
-fn count_inliers()                       // line 307 - ONLY used by RansacEpipolarVerifier stub  
+fn count_inliers()                       // line 307 - ONLY used by RansacEpipolarVerifier stub
 fn compute_hamming_distance()            // line 327 - ONLY used by HammingMatcher (unused)
 ```
 

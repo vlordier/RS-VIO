@@ -18,7 +18,7 @@
   - `transmute_ptr_to_ptr`
   - `missing_const_for_fn`, `inefficient_to_string`
   - `dbg_macro`
-  
+
 - **Numeric Safety** (4 rules):
   - `cast_possible_truncation`
   - `cast_sign_loss`

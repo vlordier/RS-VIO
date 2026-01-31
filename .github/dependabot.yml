@@ -24,7 +24,7 @@ updates:
       include: "scope"
     reviewers:
       - "charleshamesse"
-    
+
   # GitHub Actions - check monthly
   - package-ecosystem: "github-actions"
     directory: "/"

@@ -399,12 +399,12 @@ While the core implementation is **complete and production-ready**, potential fu
 
 The RS-VIO pipeline is now fully configurable with:
 
-✅ **Multi-frame geometric super-resolution** (rotation-only + track-first)  
-✅ **Platform-aware configuration** (CPU/GPU/Realtime/Balanced)  
-✅ **Modular architecture** (every component toggleable)  
-✅ **Runtime configurability** (TOML files + API + presets)  
-✅ **Complete integration** (wired into StereoPatchTracker)  
-✅ **Production-ready** (tested, documented, benchmarked)  
+✅ **Multi-frame geometric super-resolution** (rotation-only + track-first)
+✅ **Platform-aware configuration** (CPU/GPU/Realtime/Balanced)
+✅ **Modular architecture** (every component toggleable)
+✅ **Runtime configurability** (TOML files + API + presets)
+✅ **Complete integration** (wired into StereoPatchTracker)
+✅ **Production-ready** (tested, documented, benchmarked)
 
 **The system can now adapt to any hardware platform from resource-constrained Raspberry Pi to high-performance Jetson, with tunable hyperparameters and validated configurations.**
 

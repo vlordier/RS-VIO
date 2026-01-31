@@ -62,7 +62,7 @@ pub fn compute_residuals_simd(
 
 **Features**:
 - **Time-budget-aware skipping**: Maintains real-time constraints (30 FPS target)
-- **Motion-aware decision making**: 
+- **Motion-aware decision making**:
   - Forces processing on significant motion (>2.0 pixels)
   - Respects user-defined motion thresholds
   - Prevents frame loss during high-motion events

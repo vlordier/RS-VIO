@@ -35,10 +35,10 @@ From the VIO implementation audit, the highest-impact improvements were:
 pub struct RotationStabilizer {
     // Integrates gyro to compute rotation
     fn integrate_gyro_rotation(&self, imu_data: &[ImuData]) -> FusionResult<Matrix3x3>
-    
+
     // Warps frame using rotation matrix
     fn warp_frame_rotation(&self, image: &[u8], rotation: &Matrix3x3) -> Vec<u8>
-    
+
     // Weighted frame accumulation
     fn compute_weights(&self, num_frames: usize) -> Vec<Float>
 }
@@ -61,10 +61,10 @@ pub struct RotationStabilizer {
 pub struct DepthAwareFusion {
     // Estimates patch quality (Laplacian sharpness)
     fn estimate_patch_quality(&self, image: &[u8], x: f32, y: f32, ...) -> Float
-    
+
     // Generates depth hypotheses around estimate
     fn generate_depth_hypotheses(&self, estimated_depth: Float) -> Vec<Float>
-    
+
     // Computes per-feature confidence after fusion
     fn compute_fusion_confidence(&self, base_conf: Float, num_frames: usize, depth_unc: Float) -> Float
 }

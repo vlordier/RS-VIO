@@ -254,18 +254,18 @@ test rerun_cli_screenshot_smoke ... ok
 #[test]
 fn test_vio_with_screenshots() {
     let mut artifacts = ScreenshotArtifacts::new_test("my_test")?;
-    
+
     // Run VIO pipeline
     let pipeline = initialize_vio_pipeline()?;
-    
+
     // Capture key frames
     artifacts.save_screenshot("initial", capture_png()?)?;
     pipeline.process_frame(&frame1)?;
     artifacts.save_screenshot("after_frame1", capture_png()?)?;
-    
+
     // Finalize (writes manifest)
     artifacts.finalize()?;
-    
+
     // Optional: cleanup
     // artifacts.cleanup()?;
 }

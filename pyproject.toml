@@ -1,0 +1,21 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [
+    "target",
+    "data",
+    "datasets",
+    "models",
+    "teacher_data",
+    "exported_data",
+    "exported_data_multi",
+    "results",
+    "benchmark_results",
+    "coverage",
+    "__pycache__",
+    "notebooks",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E402", "E501", "F541", "F841"]

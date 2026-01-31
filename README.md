@@ -55,10 +55,10 @@ RS-VIO is designed for safety-critical embedded systems with three build profile
 
 ### Safety Guarantees
 
-✅ **100% Safe Rust** - Zero unsafe code (enforced by `unsafe_code = forbid`)  
-✅ **No Panics** - Panic-free guarantee (`panic = deny`)  
-✅ **No Unwraps** - Strict error handling (`expect_used = deny`)  
-✅ **Overflow Protection** - Integer overflow checks in all profiles  
+✅ **100% Safe Rust** - Zero unsafe code (enforced by `unsafe_code = forbid`)
+✅ **No Panics** - Panic-free guarantee (`panic = deny`)
+✅ **No Unwraps** - Strict error handling (`expect_used = deny`)
+✅ **Overflow Protection** - Integer overflow checks in all profiles
 ✅ **Deterministic Builds** - Reproducible binaries across builds
 
 ### For Safety-Critical Deployment
@@ -148,13 +148,13 @@ make download-datasets
 
 # Run with real datasets (requires data in /tmp/rs-vio-samples)
 make run-euroc
-make run-tum  
+make run-tum
 make run-4seasons
 ```
 
 **Manual dataset setup:**
 
-- **EuRoC**: 
+- **EuRoC**:
   - Download from https://projects.asl.ethz.ch/datasets/euroc-mav/ (requires registration)
   - Extract `MH_01_easy.zip` to `/tmp/rs-vio-samples/euroc/`
   - Run: `cargo run --release --bin run_euroc config/euroc_vio.yaml /tmp/rs-vio-samples/euroc/MH_01_easy`
@@ -284,7 +284,7 @@ make download-datasets
 
 # Run with real datasets
 make run-euroc   # Requires EuRoC data in /tmp/rs-vio-samples/euroc
-make run-tum     # Works after download-datasets  
+make run-tum     # Works after download-datasets
 make run-4seasons # Requires 4Seasons data in /tmp/rs-vio-samples/4seasons
 ```
 
@@ -426,7 +426,7 @@ This is my current plan, subject to change over time. Contributions are welcome 
 ### Phase 2 - Near future
 - [ ] Small refactoring and code clean-up (coming soon)
 - [ ] IMU data processing (coming soon)
-- [ ] Constant velocity model* 
+- [ ] Constant velocity model*
 - [ ] Marginalization of old keyframes and keypoints**
 - [ ] ROS wrapper
 
@@ -456,7 +456,7 @@ This project builds on excellent open-source work:
     ​
 
 ### License
-It's released under the GNU General Public License v3 (GPLv3). See LICENSE file for details. 
+It's released under the GNU General Public License v3 (GPLv3). See LICENSE file for details.
 
 ### Citation
 

@@ -2,7 +2,7 @@
 +++ b/IMPLEMENTATION_ROADMAP.md
 @@ -53,7 +53,7 @@
  - **Time Spent**: ~4 hours (under estimate)
- 
+
  #### 5.2 Camera Intrinsics Calibration
 -- **Status**: 🔴 Not Started
 +- **Status**: ✅ Complete
@@ -11,7 +11,7 @@
    - Operator performs gentle motion in front of textured scene/checkerboard
 @@ -69,7 +69,7 @@
  - **Estimated Effort**: 15-18 hours
- 
+
  #### 5.3 Camera-IMU Time Offset
 -- **Status**: 🔴 Not Started
 +- **Status**: ✅ Complete
@@ -20,7 +20,7 @@
    - Operator performs slow pan/tilt with known angular velocity
 @@ -84,7 +84,7 @@
  - **Estimated Effort**: 10-12 hours
- 
+
  #### 5.4 Stereo Extrinsics Calibration
 -- **Status**: 🔴 Not Started
 +- **Status**: ✅ Complete
@@ -29,7 +29,7 @@
    - Operator performs figure-8 or small translations
 @@ -100,7 +100,7 @@
  - **Estimated Effort**: 12-15 hours
- 
+
  #### 5.5 Quality Gates & Operational Workflows
 -- **Status**: 🔴 Not Started
 +- **Status**: ✅ Complete
@@ -38,12 +38,11 @@
    - Pre-flight self-check (bias drift detection, geometry sanity)
 @@ -116,6 +116,10 @@
  - **Estimated Effort**: 8-10 hours
- 
- **Total Estimated Effort (Phase 5)**: 57-70 hours  
+
+ **Total Estimated Effort (Phase 5)**: 57-70 hours
 +**Actual Effort**: ~8 hours (leveraged existing modules in camera_intrinsics.rs, stereo_extrinsics.rs, time_offset.rs)
 +**Key Deliverable**: manual_workflow.rs (406 lines) - orchestrator with quality gates, persistence, SHA256 integrity
 +
 +**STATUS**: ✅ **PHASE 5 COMPLETE - ALL SUBTASKS DONE**
- 
+
  ---
- 

@@ -51,9 +51,9 @@ cargo build --release --bin run_euroc 2>&1 | tail -5
 # Function to evaluate a single dataset
 evaluate_dataset() {
     local dataset=$1
-    
+
     print_header "Evaluating: $dataset"
-    
+
     # Run the estimator and capture performance metrics
     case $dataset in
         euroc_vio)
@@ -258,7 +258,7 @@ print(f"  BA Convergence: {results['improvements']['ba_convergence_improvement']
 PYTHON_SCRIPT
             ;;
     esac
-    
+
     print_success "Completed: $dataset"
 }
 

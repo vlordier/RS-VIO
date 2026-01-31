@@ -29,7 +29,7 @@ This refactoring introduced three new modules to the `src/estimator/` directory,
   - Combines visual criteria (translation/rotation thresholds)
   - Integrates IMU-aided decisions
   - Provides detailed reasoning for debugging
-  
+
 - **FeatureTrackingCoordinator**: Manages feature tracking timing
   - Coordinates stereo feature tracking
   - Returns timing information for performance monitoring
@@ -50,7 +50,7 @@ This refactoring introduced three new modules to the `src/estimator/` directory,
   - Motion prediction for feature tracking
   - Velocity estimation with auto-initialization
   - Keyframe selection integration
-  
+
 - **ImuStatistics**: Tracks processing metrics
   - Total measurements processed
   - Average IMU rate (Hz)
@@ -83,7 +83,7 @@ This refactoring introduced three new modules to the `src/estimator/` directory,
   - RAII pattern with automatic return
   - Configurable pool size limits
   - Global singleton for easy access
-  
+
 - **PooledFrameWorkspace**: Smart pointer wrapper
   - Automatic return to pool on drop
   - Safe mutable access
@@ -366,10 +366,10 @@ All code formatted with `cargo fmt`.
 
 This refactoring successfully achieved:
 
-✅ **Separation of Concerns**: Clear module boundaries, single responsibilities  
-✅ **Hotpath Optimization**: Zero-copy I/O, workspace pooling, batch processing  
-✅ **Best Practices**: RAII, proper error handling, comprehensive testing  
-✅ **Code Quality**: Clippy clean, well-documented, maintainable  
-✅ **No Regressions**: All 275 tests passing, backward compatible  
+✅ **Separation of Concerns**: Clear module boundaries, single responsibilities
+✅ **Hotpath Optimization**: Zero-copy I/O, workspace pooling, batch processing
+✅ **Best Practices**: RAII, proper error handling, comprehensive testing
+✅ **Code Quality**: Clippy clean, well-documented, maintainable
+✅ **No Regressions**: All 275 tests passing, backward compatible
 
 The codebase is now better organized, more performant, and easier to maintain and extend.

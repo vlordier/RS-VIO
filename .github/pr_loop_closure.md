@@ -20,7 +20,7 @@ Implements loop closure detection for global consistency in large-scale SLAM wit
 
 ### Highlights
 - **Traits-Oriented Programming**: Pluggable matcher/verifier via `new_with()` constructor
-- **Time-based gating**: Configurable `min_time_gap_ns` with frame-gap fallback  
+- **Time-based gating**: Configurable `min_time_gap_ns` with frame-gap fallback
 - **Anisotropic information matrix**: Separate translation (0.25m) / rotation (0.05rad) sigmas
 - **Memory-safe**: BTreeMap database, no unsafe code, trait objects with Send+Sync bounds
 - **Real-time capable**: Database size limits (5000 default), early-exit gating, RANSAC budget
@@ -42,7 +42,7 @@ Criterion benchmarks included for:
 
 Expected performance (release build):
 - Cosine matching: <100μs per candidate
-- Hamming matching: <50μs per candidate  
+- Hamming matching: <50μs per candidate
 - Simple verification: <10μs per candidate
 - RANSAC verification (1000 iters): <1ms per candidate
 

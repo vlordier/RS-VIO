@@ -95,8 +95,8 @@ camera:
 feature_tracker:
   max_features: 150
   pyramid_levels: 3
-  
-# Optimization settings  
+
+# Optimization settings
 optimization:
   max_iterations: 10
   keyframe_freq: 5

@@ -43,7 +43,7 @@ rc_buffer = "deny"  # Rc<[T]> or Arc<[T]> buffers
 # =============================================================================
 # These lints improve code style - fix or document exceptions
 cast_precision_loss = "warn"  # f64 -> f32 precision loss
-cast_sign_loss = "warn"  # unsigned -> signed sign loss  
+cast_sign_loss = "warn"  # unsigned -> signed sign loss
 cast_lossless = "warn"  # lossy casts between numeric types
 cast_possible_truncation = "warn"  # casts that may truncate
 float_cmp = "warn"  # Float comparison without epsilon
@@ -53,8 +53,6 @@ float_cmp_const = "warn"  # Float const comparison
 # COMPLEXITY (WARN)
 # =============================================================================
 # These lints suggest simpler code
-manual_arithmetic = "warn"  # Manual arithmetic instead of operators
-clone_on_copy = "warn"  # Unnecessary clone on Copy types
 redundant_clone = "warn"  # Redundant clone operations
 
 # =============================================================================
@@ -99,7 +97,6 @@ redundant_closure_call = "allow"  # Redundant closure calls
 significant_drop_in_scrutinee = "allow"  # Drop in match scrutinee
 suspicious_auto_alloc_impl = "allow"  # Auto trait impls for allocations
 type_complexity = "allow"  # Complex type signatures
-unnecessary_cast = "allow"  # Unnecessary type casts
 unnecessary_self_imports = "allow"  # unnecessary_self_imports
 unused_qualifications = "allow"  # Unnecessary qualifications
 useless_transmute = "allow"  # Useless transmute

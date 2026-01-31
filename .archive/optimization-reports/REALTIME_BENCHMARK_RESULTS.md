@@ -1,15 +1,15 @@
 # RS-VIO Real-Time Performance Benchmark Results
 
-**Date:** 21 January 2026  
-**System:** macOS (Apple Silicon/Intel - to be confirmed)  
+**Date:** 21 January 2026
+**System:** macOS (Apple Silicon/Intel - to be confirmed)
 **Build:** Release (optimized)
 
 ---
 
 ## Executive Summary
 
-✅ **Hard Realtime Viability:** YES for 640×480 @ 30Hz, MARGINAL for 60Hz  
-✅ **Frame Budget Met:** All critical pipeline stages < 10ms  
+✅ **Hard Realtime Viability:** YES for 640×480 @ 30Hz, MARGINAL for 60Hz
+✅ **Frame Budget Met:** All critical pipeline stages < 10ms
 ⚠️ **Concerns:** 1280×720 resolution exceeds 30Hz budget (26-27ms)
 
 ---
@@ -265,4 +265,3 @@ See `/tmp/bench_all.txt` for full criterion output.
 - Bundle adjustment (sliding window)
 - Loop closure (if enabled)
 - Multi-frame super-resolution (full workflow)
-

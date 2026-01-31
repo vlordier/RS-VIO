@@ -126,7 +126,7 @@ DATASET_PATH = "/Users/vincent/Work/RS-VIO/datasets/euroc/MH_01_easy"  # Hardcod
   ```python
   def plot_trajectory(data):  # No type hints
       pass
-  
+
   def run_benchmark(config: dict) -> None:  # dict is too generic
       pass
   ```
@@ -228,7 +228,7 @@ DATASETS_DIR = Path(os.environ.get('RS_VIO_DATASETS', PROJECT_ROOT / 'datasets')
 paths:
   datasets: "${HOME}/rs-vio-datasets"
   results: "${PROJECT_ROOT}/evaluation_results"
-  
+
 binaries:
   run_euroc: "target/release/run_euroc"
   run_tum: "target/release/run_tum"
@@ -353,7 +353,7 @@ repos:
   - repo: https://github.com/koalaman/shellcheck-precommit
     hooks:
       - id: shellcheck
-  
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
     hooks:
       - id: ruff

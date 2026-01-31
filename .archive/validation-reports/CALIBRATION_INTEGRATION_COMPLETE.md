@@ -214,7 +214,7 @@ let mut fusion = OptimizedFusionAlgorithm::with_calibration(
 for frame in frames {
     // Get IMU data
     let imu_delta_rotation = preintegrate_imu(&imu_data, frame.timestamp);
-    
+
     for feature in &frame.features {
         // IMU-aided prediction
         if let Some(predicted_pixel) = fusion.predict_pixel_with_imu(
@@ -226,11 +226,11 @@ for frame in frames {
             // Use predicted pixel as initialization for KLT/patch matching
             track_feature_from_prediction(feature, predicted_pixel);
         }
-        
+
         // Rolling shutter correction
         let row = feature.pixel.1 as usize;
         if let Some(t_offset) = fusion.rolling_shutter_time_offset(
-            row, 
+            row,
             frame.height,
             "cam0"
         ) {
@@ -239,7 +239,7 @@ for frame in frames {
             project_with_pose(feature, pose_at_capture);
         }
     }
-    
+
     // Compute confidence for this frame
     let confidence = fusion.adaptive_confidence(
         denoise_conf,
@@ -247,14 +247,14 @@ for frame in frames {
         distance_to_landmarks,
         camera_velocity
     );
-    
+
     // Weight residuals by calibration quality
     let visual_weight = fusion.visual_residual_weight();
     let imu_weight = fusion.imu_residual_weight();
-    
+
     weighted_visual_residuals *= visual_weight;
     weighted_imu_residuals *= imu_weight;
-    
+
     // Adaptive outlier rejection
     let threshold = base_threshold * fusion.robust_threshold_multiplier();
     reject_outliers_above(threshold);
@@ -302,11 +302,11 @@ Total Integration: 672 lines
     - CalibrationQualityStats: 120 lines
     - Helper functions + imports: 30 lines
     - Tests: 205 lines
-  
+
   - src/calibration/types.rs: 77 lines (added to existing)
     - quality_report() method: 67 lines
     - Documentation: 10 lines
-  
+
   - src/vision/adaptive_fusion_algorithm.rs: 100 lines (added to existing)
     - with_calibration() constructor: 15 lines
     - update_calibration(): 10 lines

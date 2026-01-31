@@ -30,7 +30,7 @@ Implemented comprehensive higher-order acceleration filtering for advanced IMU p
 
 ### 4. Exponential Smoothing
 - **Smoothing factors**: Independent alpha values for jerk and snap
-- **Defaults**: 
+- **Defaults**:
   - Jerk smoothing: α = 0.7 (responsive)
   - Snap smoothing: α = 0.6 (more aggressive filtering)
 - **Optional**: Can be disabled for raw derivative computation
@@ -41,29 +41,29 @@ Implemented comprehensive higher-order acceleration filtering for advanced IMU p
 pub struct HigherOrderFilterConfig {
     // Sample rate: 200 Hz for typical IMU
     pub sample_rate: f32,
-    
+
     // Fundamental frequency for spectral analysis (Hz)
     pub fundamental_frequency: f32,
-    
+
     // Jerk filtering cutoffs (HP/LP)
     pub jerk_highpass_hz: f32,      // Default: 0.3 Hz
     pub jerk_lowpass_hz: f32,        // Default: 40 Hz
-    
+
     // Snap filtering cutoffs
     pub snap_highpass_hz: f32,       // Default: 0.5 Hz
     pub snap_lowpass_hz: f32,        // Default: 30 Hz
-    
+
     // Derivative computation window (samples)
     pub derivative_window: usize,    // Default: 5 samples
-    
+
     // Smoothing parameters
     pub jerk_smooth_alpha: f32,      // Default: 0.7
     pub snap_smooth_alpha: f32,      // Default: 0.6
-    
+
     // Spike detection thresholds
     pub jerk_spike_threshold: f32,   // Default: 50 m/s³
     pub snap_spike_threshold: f32,   // Default: 100 m/s⁴
-    
+
     // f0 weighting
     pub enable_f0_weighting: bool,   // Default: true
     pub f0_bandwidth: f32,           // Default: ±0.2 Hz
@@ -180,7 +180,7 @@ let mut filter = HigherOrderFilter::new(config);
 // Process acceleration stream
 for accel in accel_samples {
     let output = filter.process_accel(accel);
-    
+
     println!("Jerk: {} m/s³", output.jerk_magnitude);
     println!("Snap: {} m/s⁴", output.snap_magnitude);
     println!("f0 Confidence: {:.2}", output.f0_confidence);

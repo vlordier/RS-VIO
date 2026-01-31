@@ -52,8 +52,8 @@ fn benchmark_sequence_parsing(c: &mut Criterion) {
                 group.bench_with_input(BenchmarkId::from_parameter(&seq.name), seq, |b, _seq| {
                     b.iter(|| {
                         // Simulate parsing timestamps
-                        let frames = black_box(seq.num_frames());
-                        frames
+                        
+                        black_box(seq.num_frames())
                     });
                 });
             }

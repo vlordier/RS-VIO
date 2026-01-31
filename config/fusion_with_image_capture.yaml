@@ -84,7 +84,7 @@ debug:
   use_triangulation: true
   use_fallback_depth: false
   min_stereo_matches: 2
-  
+
   # *** CRITICAL FOR FUSION: Enable left image capture for quality metrics ***
   # When enabled, estimator preserves left image in each frame for fusion processing.
   # Cost: ~0.5-1.0ms per frame (one clone of 752×480 grayscale image).

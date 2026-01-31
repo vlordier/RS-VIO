@@ -13,7 +13,7 @@ A **complete, production-ready real-time IMU denoising filter** has been designe
 **File**: [src/imu/denoise_filter.rs](src/imu/denoise_filter.rs) (389 lines)
 
 - `DenoiseConfig` - Tunable parameters
-- `BiquadFilter` - 2nd-order IIR filters  
+- `BiquadFilter` - 2nd-order IIR filters
 - `ImuDenoiseFilter` - Main filter with API
 - `PreintegratedMotion` - IMU preintegration for rate matching
 
@@ -92,8 +92,8 @@ These show up as low-frequency jitter in your VIO system.
 A **4-stage Butterworth + Notch filter pipeline**:
 
 ```
-Raw IMU → [Highpass 0.5 Hz] → [Notch 0.06 Hz] → 
-[Notch 1.46 Hz] → [Lowpass 50 Hz] → [Vision Fusion] 
+Raw IMU → [Highpass 0.5 Hz] → [Notch 0.06 Hz] →
+[Notch 1.46 Hz] → [Lowpass 50 Hz] → [Vision Fusion]
 → Clean IMU ✓
 ```
 
@@ -237,7 +237,7 @@ See [FILTER_DESIGN_REFERENCE.md](FILTER_DESIGN_REFERENCE.md) for detailed tuning
 👤 QUICK START (You are here)
 ↓
 ├─→ 👨‍💼 Project Manager?        → Read DENOISING_IMPLEMENTATION_SUMMARY.md
-├─→ 🔧 Integration Engineer?    → Read QUICK_REFERENCE.md + INTEGRATION_GUIDE.md  
+├─→ 🔧 Integration Engineer?    → Read QUICK_REFERENCE.md + INTEGRATION_GUIDE.md
 ├─→ 📊 Researcher?              → Read IMU_DENOISING_STRATEGY.md + FILTER_DESIGN_REFERENCE.md
 ├─→ ✅ QA/Validation?           → Read VALIDATION_EXAMPLES.md
 └─→ 🐛 Debugging?               → Read INTEGRATION_GUIDE.md#troubleshooting
@@ -298,35 +298,35 @@ See [FILTER_DESIGN_REFERENCE.md](FILTER_DESIGN_REFERENCE.md) for detailed tuning
 
 ## 🏆 Why This Solution Works
 
-✅ **Proven Algorithm**: Butterworth + notch filters are industry standard  
-✅ **Empirically Tuned**: Based on actual spectral analysis of your data  
-✅ **Comprehensive**: Handles drift, resonance, noise, AND rate mismatch  
-✅ **Efficient**: <1% CPU overhead, <0.2 ms latency  
-✅ **Robust**: Direct Form II, numerically stable  
-✅ **Extensible**: Easy to add more notches or stages  
-✅ **Well-Documented**: 70 KB of guides with examples  
-✅ **Production-Ready**: Full error handling, tests included  
+✅ **Proven Algorithm**: Butterworth + notch filters are industry standard
+✅ **Empirically Tuned**: Based on actual spectral analysis of your data
+✅ **Comprehensive**: Handles drift, resonance, noise, AND rate mismatch
+✅ **Efficient**: <1% CPU overhead, <0.2 ms latency
+✅ **Robust**: Direct Form II, numerically stable
+✅ **Extensible**: Easy to add more notches or stages
+✅ **Well-Documented**: 70 KB of guides with examples
+✅ **Production-Ready**: Full error handling, tests included
 
 ---
 
 ## ❓ Common Questions
 
-**Q: How long to integrate?**  
+**Q: How long to integrate?**
 A: 5-10 minutes. It's 4 lines of code plus imports.
 
-**Q: Will it slow down my VIO?**  
+**Q: Will it slow down my VIO?**
 A: No. Adds ~0.1 ms per frame (<1% overhead).
 
-**Q: What if it doesn't help?**  
+**Q: What if it doesn't help?**
 A: Remove 4 lines and you're back. No risk.
 
-**Q: Can I test first without full integration?**  
+**Q: Can I test first without full integration?**
 A: Yes. Use minimal integration option (1 minute to revert).
 
-**Q: What about other drones/datasets?**  
+**Q: What about other drones/datasets?**
 A: Filter is generic. Just analyze your IMU spectrum and update `notch_frequencies`.
 
-**Q: Is this the best approach?**  
+**Q: Is this the best approach?**
 A: For real-time VIO with known resonances, yes. Alternatives (Kalman, FFT, ML) are more complex.
 
 ---
@@ -335,19 +335,19 @@ A: For real-time VIO with known resonances, yes. Alternatives (Kalman, FFT, ML) 
 
 **All information you need is in these documents:**
 
-1. **"How do I integrate?"**  
+1. **"How do I integrate?"**
    → [QUICK_REFERENCE.md](QUICK_REFERENCE.md) + [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md)
 
-2. **"Why these parameters?"**  
+2. **"Why these parameters?"**
    → [IMU_DENOISING_STRATEGY.md](IMU_DENOISING_STRATEGY.md)
 
-3. **"How do I tune it?"**  
+3. **"How do I tune it?"**
    → [FILTER_DESIGN_REFERENCE.md](FILTER_DESIGN_REFERENCE.md)
 
-4. **"What will I see?"**  
+4. **"What will I see?"**
    → [VALIDATION_EXAMPLES.md](VALIDATION_EXAMPLES.md)
 
-5. **"What went wrong?"**  
+5. **"What went wrong?"**
    → [INTEGRATION_GUIDE.md#troubleshooting](INTEGRATION_GUIDE.md#troubleshooting)
 
 ---
@@ -373,12 +373,12 @@ A: For real-time VIO with known resonances, yes. Alternatives (Kalman, FFT, ML) 
 
 Everything you need is prepared:
 
-✅ Production-ready source code  
-✅ Comprehensive documentation  
-✅ Step-by-step integration guide  
-✅ Validation examples and success criteria  
-✅ Troubleshooting guide  
-✅ Mathematical foundation for tuning  
+✅ Production-ready source code
+✅ Comprehensive documentation
+✅ Step-by-step integration guide
+✅ Validation examples and success criteria
+✅ Troubleshooting guide
+✅ Mathematical foundation for tuning
 
 **Next action**: Read [QUICK_REFERENCE.md](QUICK_REFERENCE.md) (3 min) and integrate (5 min).
 

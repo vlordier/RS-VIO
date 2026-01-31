@@ -9,13 +9,10 @@ Supports comparing benchmarks across different runs and branches.
 import json
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple
-import subprocess
+from typing import Dict, List
 
 try:
     import matplotlib.pyplot as plt
-    import matplotlib.dates as mdates
-    from datetime import datetime
 except ImportError:
     print("Error: matplotlib not installed. Install with: pip install matplotlib")
     sys.exit(1)

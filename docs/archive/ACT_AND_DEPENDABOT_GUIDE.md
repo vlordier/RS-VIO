@@ -47,7 +47,7 @@ A lightweight workflow designed for act:
 
 1. **Cache actions**: Standard workflows using `actions/cache@v4` may fail in act due to Node.js path issues
    - Solution: Use the `act-test.yml` workflow for local testing
-   
+
 2. **Artifacts**: Upload/download artifact actions also require Node.js
    - Solution: Check job output directly in terminal
 
@@ -207,7 +207,7 @@ gh pr merge <PR-number> --auto --squash
 
 **Problem:** Act times out or hangs
 - **Cause:** Large image download or resource-intensive job
-- **Solution:** 
+- **Solution:**
   - First run: Wait for image download to complete
   - Use `-j quick-check` for faster feedback
   - Check Docker resource limits

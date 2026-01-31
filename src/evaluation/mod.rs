@@ -9,7 +9,7 @@ pub mod robustness_metrics;
 ///
 /// Provides comprehensive evaluation of:
 /// - Trajectory accuracy (ATE, RPE)
-/// - Depth/disparity accuracy  
+/// - Depth/disparity accuracy
 /// - Feature tracking quality
 /// - Robustness metrics
 /// - Motion estimation error

@@ -165,7 +165,7 @@ pub struct BiquadFilter {
     // Coefficients
     b0: f32, b1: f32, b2: f32,
     a1: f32, a2: f32,
-    
+
     // State variables
     x1: f32, x2: f32,  // Previous inputs
     y1: f32, y2: f32,  // Previous outputs
@@ -173,18 +173,18 @@ pub struct BiquadFilter {
 
 impl BiquadFilter {
     pub fn process(&mut self, input: f32) -> f32 {
-        let output = self.b0 * input 
-                   + self.b1 * self.x1 
+        let output = self.b0 * input
+                   + self.b1 * self.x1
                    + self.b2 * self.x2
-                   - self.a1 * self.y1 
+                   - self.a1 * self.y1
                    - self.a2 * self.y2;
-        
+
         // Update state
         self.x2 = self.x1;
         self.x1 = input;
         self.y2 = self.y1;
         self.y1 = output;
-        
+
         output
     }
 }
@@ -193,14 +193,14 @@ pub fn create_highpass(fc: f32, fs: f32) -> BiquadFilter {
     let theta = 2.0 * PI * fc / fs;
     let q = 0.707;  // Butterworth
     let alpha = theta.sin() / (2.0 * q);
-    
+
     let b0 = (1.0 + theta.cos()) / 2.0;
     let b1 = -(1.0 + theta.cos());
     let b2 = (1.0 + theta.cos()) / 2.0;
     let a0 = 1.0 + alpha;
     let a1 = -2.0 * theta.cos();
     let a2 = 1.0 - alpha;
-    
+
     BiquadFilter {
         b0: b0 / a0, b1: b1 / a0, b2: b2 / a0,
         a1: a1 / a0, a2: a2 / a0,
@@ -247,12 +247,12 @@ pub fn create_highpass(fc: f32, fs: f32) -> BiquadFilter {
 #[test]
 fn test_highpass_removes_dc() {
     let mut filter = create_highpass(0.5, 200.0);
-    
+
     // Constant input (DC = 0 Hz)
     let output: Vec<f32> = (0..200)
         .map(|_| filter.process(1.0))
         .collect();
-    
+
     // Last 50 outputs should be near 0
     let mean = output[150..].iter().sum::<f32>() / 50.0;
     assert!(mean.abs() < 0.01);  // <1% of input
@@ -261,25 +261,25 @@ fn test_highpass_removes_dc() {
 #[test]
 fn test_notch_removes_resonance() {
     let mut filter = create_notch(0.06, 200.0, 5.0);
-    
+
     // 0.06 Hz sine input
     let freq = 0.06;
     let period = (200.0 / freq) as usize;
-    
+
     let input: Vec<f32> = (0..period*2)
         .map(|i| (2.0 * PI * freq * i as f32 / 200.0).sin())
         .collect();
-    
+
     let output: Vec<f32> = input.iter()
         .map(|&x| filter.process(x))
         .collect();
-    
+
     // Amplitude in steady state should be ~1% of input
     let amplitude = output[period..].iter()
         .max_by(|a, b| a.abs().partial_cmp(&b.abs()).unwrap())
         .unwrap()
         .abs();
-    
+
     assert!(amplitude < 0.01);  // <1% attenuation
 }
 ```
@@ -292,11 +292,11 @@ Magnitude Response (dB) vs Frequency
 -5 ┤                           ┌───┘         └───┐
 -10┤                       ┌───┘                 └───┐
 -20┤               ┌───────┘                         └───
--40┤       ┌───────┘ ↑ 0.06Hz notch                    
+-40┤       ┌───────┘ ↑ 0.06Hz notch
 -80┤───────┘         ↑ 1.46Hz notch
    └─────┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴─────
     0.01 0.1 0.5 1  2  5  10 20 50 100 200   (Hz, log)
-    
+
     ↑ Highpass      ↑ Notches      ↑ Lowpass
     0.5 Hz          0.06, 1.46     50 Hz
 ```
@@ -336,4 +336,3 @@ python3 /tmp/resonance_decomposition.py  # Shows 0.06 Hz peak
 # After fix (with Q=8.0)
 python3 /tmp/resonance_decomposition.py  # 0.06 Hz peak reduced by 20dB
 ```
-

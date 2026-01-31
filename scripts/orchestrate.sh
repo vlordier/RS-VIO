@@ -12,7 +12,7 @@ COLOR_YELLOW='\033[1;33m'
 COLOR_RED='\033[0;31m'
 NC='\033[0m'
 
-log_section() { 
+log_section() {
   echo ""
   echo -e "${COLOR_BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
   echo -e "${COLOR_BLUE}║${NC} $1"
@@ -60,19 +60,19 @@ EOF
 # Build
 build_all() {
   log_section "Building Project"
-  
+
   log_info "Building debug artifacts..."
   cargo build --all
   log_success "Debug build complete"
-  
+
   log_info "Building release artifacts..."
   cargo build --release --all
   log_success "Release build complete"
-  
+
   log_info "Building binaries..."
   cargo build --release --bins
   log_success "Binary builds complete"
-  
+
   echo ""
   log_info "Build artifacts:"
   for binary in run_euroc run_tum run_4seasons; do
@@ -86,7 +86,7 @@ build_all() {
 # Run tests
 run_all_tests() {
   log_section "Running Tests"
-  
+
   if [ -x "scripts/run-all-tests.sh" ]; then
     bash "scripts/run-all-tests.sh"
   else
@@ -98,7 +98,7 @@ run_all_tests() {
 # Setup datasets
 setup_datasets() {
   log_section "Setting Up Datasets"
-  
+
   if [ -x "scripts/setup-datasets.sh" ]; then
     bash "scripts/setup-datasets.sh" "$DATASETS_DIR"
   else
@@ -110,26 +110,26 @@ setup_datasets() {
 # Run individual binaries
 run_binary_test() {
   local binary="$1" config="$2" dataset="$3"
-  
+
   log_info "Testing: $binary"
-  
+
   if [ ! -x "target/release/$binary" ]; then
     log_warn "Binary not found, building..."
     cargo build --release --bin "$binary"
   fi
-  
+
   if [ ! -d "$dataset" ]; then
     log_error "Dataset not found: $dataset"
     return 1
   fi
-  
+
   timeout 60 "./target/release/$binary" "config/$config" "$dataset" 2>&1 | head -30
 }
 
 # Docker automation
 run_docker_automation() {
   log_section "Docker Automation"
-  
+
   if [ -x "scripts/docker-automation.sh" ]; then
     bash "scripts/docker-automation.sh" "rs-vio:latest" "$DATASETS_DIR"
   else
@@ -141,27 +141,27 @@ run_docker_automation() {
 # Docker push
 push_docker_image() {
   log_section "Docker Push"
-  
+
   local registry="${REGISTRY:-docker.io}"
   local image_name="${IMAGE_NAME:-rs-vio}"
   local tag="${TAG:-latest}"
   local full_name="$registry/$image_name:$tag"
-  
+
   log_info "Building image for push: $full_name"
   cargo build --release
   docker build -t "rs-vio:latest" .
   docker tag "rs-vio:latest" "$full_name"
-  
+
   log_info "Pushing to registry: $registry"
   docker push "$full_name"
-  
+
   log_success "Image pushed: $full_name"
 }
 
 # Clean
 clean_build() {
   log_section "Cleaning Build Artifacts"
-  
+
   log_info "Removing target directory..."
   rm -rf target/
   log_success "Clean complete"
@@ -170,7 +170,7 @@ clean_build() {
 # Generate report
 generate_report() {
   log_section "Test Report"
-  
+
   cat > /tmp/rs-vio-report.txt << 'EOL'
 RS-VIO Project Status Report
 ============================
@@ -183,7 +183,7 @@ EOL
     echo "Location: $PROJECT_ROOT"
     echo ""
   } >> /tmp/rs-vio-report.txt
-  
+
   echo "Git Information:" >> /tmp/rs-vio-report.txt
   cd "$PROJECT_ROOT"
   {
@@ -192,7 +192,7 @@ EOL
     echo "Latest commit: $(git log -1 --oneline)"
     echo ""
   } >> /tmp/rs-vio-report.txt
-  
+
   echo "Dataset Runners:" >> /tmp/rs-vio-report.txt
   for binary in run_euroc run_tum run_4seasons; do
     if [ -f "target/release/$binary" ]; then
@@ -201,21 +201,21 @@ EOL
     fi
   done
   echo "" >> /tmp/rs-vio-report.txt
-  
+
   echo "Code Quality:" >> /tmp/rs-vio-report.txt
   if cargo clippy --all --release -- -D warnings 2>&1 | grep -q "warning:"; then
     echo "  Clippy: WARNINGS FOUND" >> /tmp/rs-vio-report.txt
   else
     echo "  Clippy: ✓ PASS" >> /tmp/rs-vio-report.txt
   fi
-  
+
   if cargo audit 2>&1 | grep -q "vulnerability"; then
     echo "  Security Audit: VULNERABILITIES FOUND" >> /tmp/rs-vio-report.txt
   else
     echo "  Security Audit: ✓ PASS" >> /tmp/rs-vio-report.txt
   fi
   echo "" >> /tmp/rs-vio-report.txt
-  
+
   echo "Datasets:" >> /tmp/rs-vio-report.txt
   if [ -d "$DATASETS_DIR" ]; then
     echo "  Location: $DATASETS_DIR" >> /tmp/rs-vio-report.txt
@@ -225,7 +225,7 @@ EOL
     [ -d "$DATASETS_DIR/4seasons" ] && echo "  - 4Seasons: FOUND" >> /tmp/rs-vio-report.txt || echo "  - 4Seasons: NOT FOUND" >> /tmp/rs-vio-report.txt
   fi
   echo "" >> /tmp/rs-vio-report.txt
-  
+
   cat /tmp/rs-vio-report.txt
   log_success "Report saved to: /tmp/rs-vio-report.txt"
 }
@@ -233,56 +233,56 @@ EOL
 # Run everything
 run_all() {
   log_section "RS-VIO Complete Automation"
-  
+
   log_info "Starting full automation workflow..."
   echo ""
-  
+
   build_all || { log_error "Build failed"; exit 1; }
   echo ""
-  
+
   run_all_tests || { log_warn "Some tests failed"; }
   echo ""
-  
+
   setup_datasets || { log_warn "Dataset setup failed"; }
   echo ""
-  
+
   if [ -d "$DATASETS_DIR/euroc/MH_01_easy" ]; then
     run_binary_test "run_euroc" "euroc_vio.yaml" "$DATASETS_DIR/euroc/MH_01_easy"
     echo ""
   fi
-  
+
   # Run TUM-VI indoor sequence
   if [ -d "$DATASETS_DIR/tum_vi/room1/mav0" ]; then
     run_binary_test "run_tum" "tum_vi.yaml" "$DATASETS_DIR/tum_vi/room1"
     echo ""
   fi
-  
+
   # Run TUM-VI outdoor sequence
   if [ -d "$DATASETS_DIR/tum_vi/magistrale1/mav0" ]; then
     run_binary_test "run_tum" "tum_vi.yaml" "$DATASETS_DIR/tum_vi/magistrale1"
     echo ""
   fi
-  
+
   if find "$DATASETS_DIR"/4seasons -name 'times.txt' -type f | grep -q .; then
     local recording_dir
     recording_dir=$(dirname "$(find "$DATASETS_DIR"/4seasons -name 'times.txt' -type f -printf '%T@ %p\n' | sort -rn | head -1 | cut -d' ' -f2-)")
     run_binary_test "run_4seasons" "4seasons.yaml" "$recording_dir"
     echo ""
   fi
-  
+
   run_docker_automation || { log_warn "Docker automation failed"; }
   echo ""
-  
+
   generate_report
   echo ""
-  
+
   log_success "Automation complete! ✓"
 }
 
 # Main
 main() {
   local command="${1:-all}"
-  
+
   case "$command" in
     all)
       run_all

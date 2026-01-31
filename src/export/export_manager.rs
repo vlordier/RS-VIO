@@ -2,7 +2,6 @@
 ///
 /// Manages the lifecycle of teacher data export during VIO processing.
 /// Only compiled when the `export-teacher` feature is enabled.
-
 use anyhow::Result;
 use std::path::PathBuf;
 
@@ -41,45 +40,45 @@ impl ExportManager {
                     config,
                 });
             }
-            
+
             // Create output directory if it doesn't exist
             std::fs::create_dir_all(&config.output_dir)?;
-            
-            let exporter = TeacherLabelExporterJson::new(
-                &config.output_dir,
-                &config.sequence_name,
-            )?;
-            
-            log::info!("Teacher export enabled (JSON format) for sequence: {}", config.sequence_name);
-            
+
+            let exporter =
+                TeacherLabelExporterJson::new(&config.output_dir, &config.sequence_name)?;
+
+            log::info!(
+                "Teacher export enabled (JSON format) for sequence: {}",
+                config.sequence_name
+            );
+
             Ok(Self {
                 exporter: Some(exporter),
                 config,
             })
         }
-        
+
         #[cfg(not(feature = "export-teacher"))]
         {
             Ok(Self { config })
         }
     }
-    
+
     /// Check if export is enabled
     pub fn is_enabled(&self) -> bool {
-        self.config.enabled
-            && cfg!(feature = "export-teacher")
+        self.config.enabled && cfg!(feature = "export-teacher")
     }
-    
+
     /// Get sequence name
     pub fn sequence_name(&self) -> &str {
         &self.config.sequence_name
     }
-    
+
     /// Get output directory
     pub fn output_dir(&self) -> &PathBuf {
         &self.config.output_dir
     }
-    
+
     /// Export a frame (no-op if export disabled or feature not compiled)
     #[cfg(feature = "export-teacher")]
     pub fn export_frame(&mut self, frame: TeacherFrame) -> Result<()> {
@@ -88,12 +87,12 @@ impl ExportManager {
         }
         Ok(())
     }
-    
+
     #[cfg(not(feature = "export-teacher"))]
     pub fn export_frame(&mut self, _frame: impl std::any::Any) -> Result<()> {
         Ok(())
     }
-    
+
     /// Finalize export (no-op if export disabled or feature not compiled)
     #[cfg(feature = "export-teacher")]
     pub fn finalize(&mut self) -> Result<()> {
@@ -102,7 +101,7 @@ impl ExportManager {
         }
         Ok(())
     }
-    
+
     #[cfg(not(feature = "export-teacher"))]
     pub fn finalize(&mut self) -> Result<()> {
         Ok(())
@@ -123,14 +122,14 @@ impl Drop for ExportManager {
 mod tests {
     use super::*;
     use tempfile::tempdir;
-    
+
     #[test]
     fn test_export_manager_creation() {
         let dir = tempdir().unwrap();
         let config = ExportConfig {
             output_dir: dir.path().to_path_buf(),
             sequence_name: "test".to_string(),
-            enabled: false,  // Disabled for test
+            enabled: false, // Disabled for test
         };
         let manager = ExportManager::new(config);
         assert!(manager.is_ok());

@@ -108,7 +108,7 @@ Full Fusion   ▓▓▓                           5.0% (-67%) ⭐
 - **Baseline**: 8-12cm trajectory error
 - **With Fusion**: 2.5-3.5cm error ⭐ (70% better)
 
-### Outdoor (4Seasons Dataset)  
+### Outdoor (4Seasons Dataset)
 - **Baseline**: 15-20cm trajectory error
 - **With Fusion**: 4-6cm error ⭐ (70% better)
 

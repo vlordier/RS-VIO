@@ -15,7 +15,7 @@
    - Provides gravity vector for IMU preintegration
    - Ready for future gravity estimation extensions
 
-2. **ImuPreintegration Data Structure** 
+2. **ImuPreintegration Data Structure**
    - Accumulates integrated rotation (ΔR), velocity (Δv), position (Δp)
    - Stores covariance matrices for each component (9×9 total)
    - Includes bias jacobians for online refinement
@@ -30,7 +30,7 @@
 
 4. **BiasRefinement Online Estimator**
    - Tracks accelerometer bias: ±0.5 m/s² constraint
-   - Tracks gyroscope bias: ±0.1 rad/s constraint  
+   - Tracks gyroscope bias: ±0.1 rad/s constraint
    - Covariance estimates for uncertainty quantification
    - Update methods for iterative refinement
 
@@ -46,7 +46,7 @@
 
 **Test Coverage**: ✅ 3/3 tests passing
 - Gravity model creation
-- Inter-keyframe factor construction  
+- Inter-keyframe factor construction
 - Bias refinement constraints
 
 #### 2. **Extended Sliding Window State**
@@ -65,7 +65,7 @@
    - ✅ Velocities: 3D vectors (now tracked)
    - ✅ Accel biases: 3D vectors (now tracked)
    - ✅ Gyro biases: 3D vectors (now tracked)
-   
+
    Total: 15 DOF per keyframe vs 6 DOF (loose coupling)
 
 3. **Extended Problem Formulation**
@@ -80,7 +80,7 @@
 ```rust
 impl Factor for InterKeyframeImuFactor {
     fn get_dimension(&self) -> usize { 6 }  // 6D residual
-    
+
     fn linearize(
         &self,
         params: &[DVector<f64>],
@@ -100,7 +100,7 @@ impl Factor for InterKeyframeImuFactor {
 
 **Coverage**:
 - ✅ Loose vs Tight coupling comparison table
-- ✅ Mathematical formulation with equations  
+- ✅ Mathematical formulation with equations
 - ✅ Data structure specifications
 - ✅ Usage examples in Rust
 - ✅ Performance characteristics (3-5x slower per iteration, but 5-15% accuracy gain)
@@ -109,7 +109,7 @@ impl Factor for InterKeyframeImuFactor {
 - ✅ Troubleshooting guide
 - ✅ 8+ academic references
 
-#### 5. **Python Analysis Framework** 
+#### 5. **Python Analysis Framework**
 - **File**: `examples/tight_coupling_sota.py`
 - **Status**: ✅ Complete and runnable
 
@@ -217,7 +217,7 @@ rs-vio/
 
 ### Accuracy Improvements
 - **Smooth sequences**: 5-10% RMS error reduction
-- **Dynamic sequences**: 12-18% RMS error reduction  
+- **Dynamic sequences**: 12-18% RMS error reduction
 - **High-quality IMU**: Best case ~15% overall improvement
 
 ### When Tight Coupling Pays Off
@@ -241,7 +241,7 @@ rs-vio/
 - Documentation comments
 - No clippy warnings expected
 
-### ✅ Maintainability  
+### ✅ Maintainability
 - Clear modular structure
 - Extensible for future enhancements
 - Well-commented implementation

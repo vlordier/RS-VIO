@@ -452,5 +452,5 @@ fn test_recovery_after_circuit_breaker_reset() {
     // Reset
     cb.reset();
     assert_eq!(cb.state(), CircuitState::Closed);
-    assert!((cb.failure_ratio() as f64).abs() < f64::EPSILON);
+    assert!(cb.failure_ratio().abs() < f64::EPSILON);
 }

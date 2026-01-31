@@ -40,7 +40,7 @@ pub struct StereoPatchTracker<const N: u32> {
     // ... other fields ...
     essential_ransac: EssentialMatrixRansac,
     imu_rotation_hint: Option<[f32; 3]>,
-    
+
     // NEW: Stereo matching strategy (pluggable)
     matching_strategy: Box<dyn StereoMatchingStrategy>,
     previous_match_results: Vec<StereoMatchResult>,  // For temporal consistency
@@ -77,7 +77,7 @@ pub fn new(
             // Fallback to BasicRANSAC if config fails
             Box::new(BasicRANSACStrategy::new(BasicRANSACConfig::default()))
         });
-    
+
     Self {
         // ... other fields ...
         matching_strategy,
@@ -98,7 +98,7 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
     ) {
         self.matching_strategy = strategy;
     }
-    
+
     /// Load strategy from configuration file
     pub fn load_strategy_config(&mut self, path: &str) -> Result<(), String> {
         let config = MatchingStrategyConfig::from_file(path)?;
@@ -259,12 +259,12 @@ fn test_tracker_default_strategy() {
 #[cfg(feature = "matching-imu-guided")]
 fn test_switch_to_imu_guided() {
     let mut tracker = StereoPatchTracker::<4>::new(15, 30, 0.005);
-    
+
     let imu_strategy = BasicRANSACConfig::default();
     tracker.set_matching_strategy(
         Box::new(IMUGuidedStrategy::new(8.0, imu_strategy))
     );
-    
+
     assert_eq!(tracker.matching_strategy.name(), "IMUGuided");
 }
 ```
@@ -274,14 +274,14 @@ fn test_switch_to_imu_guided() {
 #[test]
 fn test_load_strategy_config() {
     let mut tracker = StereoPatchTracker::<4>::new(15, 30, 0.005);
-    
+
     // Create test config
     let config_yaml = r#"
 strategy: BasicRANSAC
 params:
   max_iterations: 500
 "#;
-    
+
     // Would test with actual file
     // tracker.load_strategy_config("test_config.yaml").unwrap();
 }
@@ -351,15 +351,15 @@ params:
 
 ## Success Criteria
 
-✅ Compilation succeeds with all features  
-✅ Unit tests pass (with/without each strategy)  
-✅ Integration tests pass (strategy dispatch works)  
-✅ No performance regression on BasicRANSAC  
-✅ IMUGuided strategy 10-20% faster than BasicRANSAC  
-✅ TemporalConsistency processes correctly (may have higher outlier rate)  
-✅ HybridOpticalFlow shows 20-40% speedup on active regions  
-✅ EuRoC dataset produces valid trajectory with all strategies  
-✅ Fps maintained at 68+ even with slowest strategy  
+✅ Compilation succeeds with all features
+✅ Unit tests pass (with/without each strategy)
+✅ Integration tests pass (strategy dispatch works)
+✅ No performance regression on BasicRANSAC
+✅ IMUGuided strategy 10-20% faster than BasicRANSAC
+✅ TemporalConsistency processes correctly (may have higher outlier rate)
+✅ HybridOpticalFlow shows 20-40% speedup on active regions
+✅ EuRoC dataset produces valid trajectory with all strategies
+✅ Fps maintained at 68+ even with slowest strategy
 
 ---
 
@@ -376,14 +376,14 @@ params:
   search_margin_px: 8.0
   max_iterations: 500
   inlier_threshold: 1.0
-  
+
   # For TemporalConsistency
   depth_change_threshold: 0.2
   temporal_weight: 0.9
-  
+
   # For HybridOpticalFlow
   flow_magnitude_threshold: 2.0
-  
+
   # Shared RANSAC config
   min_inliers: 20
   confidence: 0.99
@@ -439,19 +439,19 @@ cargo build --release  # Uses BasicRANSAC by default
 
 ## Questions & Answers
 
-**Q: What if IMU velocity is unavailable?**  
+**Q: What if IMU velocity is unavailable?**
 A: IMUGuided gracefully degrades—uses default 30px disparity and full RANSAC
 
-**Q: Can I switch strategies at runtime without recompilation?**  
+**Q: Can I switch strategies at runtime without recompilation?**
 A: Yes, via `load_strategy_config()` method with YAML file
 
-**Q: What's the memory overhead of having all 4 strategies compiled?**  
+**Q: What's the memory overhead of having all 4 strategies compiled?**
 A: ~2 MB of binary size; runtime memory is negligible (one strategy active at a time)
 
-**Q: Will TemporalConsistency work on erratic drone motion?**  
+**Q: Will TemporalConsistency work on erratic drone motion?**
 A: No—it assumes smooth motion. Falls back to BasicRANSAC for jerky movements
 
-**Q: How do I measure which strategy is best for my drone?**  
+**Q: How do I measure which strategy is best for my drone?**
 A: Run EuRoC dataset with each strategy, compare fps and trajectory error
 
 ---

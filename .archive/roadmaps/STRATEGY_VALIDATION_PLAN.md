@@ -208,7 +208,7 @@ let strategy_result = self.matching_strategy.match_stereo(
 self.previous_match_results = strategy_result.matches.clone();
 
 // Log metrics
-debug_log!("[FeatureTracker] Strategy='{}' inliers={}/{}", 
+debug_log!("[FeatureTracker] Strategy='{}' inliers={}/{}",
     self.matching_strategy.name(), ...);
 ```
 

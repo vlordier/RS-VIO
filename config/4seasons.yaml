@@ -4,8 +4,8 @@
 # Image dimensions and processing parameters
 camera:
   image_width: 800            # Image width in pixels (4Seasons standard)
-  image_height: 400           # Image height in pixels (4Seasons standard)  
-  
+  image_height: 400           # Image height in pixels (4Seasons standard)
+
   # Left camera (cam0) intrinsics from calibration
   left_intrinsics: [527.9990706330082, 527.963495807245, 399.18451401412665, 172.8193108347693]  # [fx, fy, cx, cy]
   left_distortion: [-0.03559759964255725, -0.005093721310999416, 0.019716282737702494, -0.01583280039499382]  # [k1, k2, p1, p2]
@@ -21,7 +21,7 @@ camera:
            -0.006890161859766396, 0.004304637029338462, -0.99996699734021087, 0.0036894333751345677,
            0.01349310815180704, -0.9998992947410829, -0.0043973183521106171, -0.05810612695941222,
            0.0, 0.0, 0.0, 1.0]
-  
+
   # Right camera extrinsics (T_cam_imu from calibration)
   T_B_Cr: [-0.9999948729203221, -0.00041104034603049364, -0.0031757170690647394, -0.12432919293024627,
            0.003173467277625304, 0.005362979695895791, -0.9999805835886111, 0.0023471917960152505,

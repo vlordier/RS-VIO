@@ -1,8 +1,8 @@
 # LLVM Lines Analysis Report - Code Bloat Analysis
 
-**Date**: January 20, 2026  
-**Tool**: `cargo llvm-lines v0.4.45`  
-**Analysis Target**: RS-VIO library (dev profile)  
+**Date**: January 20, 2026
+**Tool**: `cargo llvm-lines v0.4.45`
+**Analysis Target**: RS-VIO library (dev profile)
 **Total LLVM IR Lines**: 909,228 across 23,055 function copies
 
 ## Executive Summary
@@ -161,7 +161,7 @@ These are lean given their complexity - no concerning bloat.
 ## Build Size Impact
 
 For reference, the most monomorphized functions:
-- **358 copies**: `Iterator::map` 
+- **358 copies**: `Iterator::map`
 - **360 copies**: `map_fold::{{closure}}`
 - **338 copies**: `Map::fold`
 
@@ -169,7 +169,7 @@ These suggest opportunities to reduce generic iterator usage in favor of concret
 
 ## Conclusion
 
-**Total RS-VIO Code**: ~2-3% of binary  
+**Total RS-VIO Code**: ~2-3% of binary
 **Optimization Headroom**: ~20,000 lines (2.2% reduction) achievable with moderate effort
 
 The codebase is reasonably lean for its functionality. The main bloat sources are:

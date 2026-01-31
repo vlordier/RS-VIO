@@ -1,5 +1,5 @@
 # Teacher Configuration - Offline Processing for High-Quality Ground Truth
-# 
+#
 # This configuration maximizes accuracy at the expense of speed for training
 # data generation. The "teacher" runs offline with generous settings to produce
 # the best possible poses and depth maps for training a fast "student" network.
@@ -63,7 +63,7 @@ state_estimation:
   max_iterations: 10  # 10 BA iterations (vs 3 for realtime)
   huber_threshold: 1.0
   keyframe_threshold: 0.3  # More frequent keyframes
-  
+
   # Initialization
   init_frames: 30  # More frames for stable init
   init_min_parallax: 0.05  # radians
@@ -75,11 +75,11 @@ optimization:
   convergence_threshold: 1e-6  # Tight convergence
   use_robust_loss: true
   robust_loss_param: 1.0  # Huber delta
-  
+
   # No shortcuts - use full refinement
   adaptive_iterations: false  # Always do full iterations
   early_exit: false  # No early exit
-  
+
   # Jacobian computation
   use_numerical_jacobian: false  # Analytical is more accurate
   finite_difference_step: 1e-6
@@ -91,7 +91,7 @@ dense_reconstruction:
   min_depth: 0.3
   max_depth: 10.0
   confidence_threshold: 0.3  # Lower = more depth estimates
-  
+
   # Semi-dense reconstruction
   grid_size: 8  # Dense 8x8 pixel grid
   propagate_depth: true  # Propagate depth across frames
@@ -101,7 +101,7 @@ dense_reconstruction:
 export_dir: ./training_data  # Root directory for HDF5 training data
 sequence_name: room1  # Sequence identifier (room1, room2, room3, room4, room5, room6)
 enable_export: true  # Enable teacher data export to HDF5
-  
+
 # Visualization (optional, can disable for speed)
 visualization:
   enable: false  # Disable for faster offline processing

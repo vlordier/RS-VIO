@@ -145,8 +145,8 @@ impl LoopClosureDetector {
     fn estimate_relative_pose(&self, _past_pose: &na::Isometry3<f64>) -> na::Isometry3<f64> {
         // Simplified: assume small rotation, primarily translational motion
         // Real system would use PnP with matched features and RANSAC
-        let identity = na::Isometry3::identity();
-        identity // Placeholder: actual implementation estimates from features
+        
+        na::Isometry3::identity() // Placeholder: actual implementation estimates from features
     }
 
     /// Apply loop closure constraints via pose graph optimization
@@ -347,7 +347,7 @@ fn compute_trajectory_drift(poses: &[na::Isometry3<f64>]) -> f64 {
     let expected_direction = (end - start).normalize();
 
     let mut total_drift = 0.0;
-    for (_i, pose) in poses.iter().enumerate() {
+    for pose in poses.iter() {
         let pos = pose.translation.vector;
         let progress = pos - start;
         let expected_pos = start + expected_direction * progress.dot(&expected_direction);

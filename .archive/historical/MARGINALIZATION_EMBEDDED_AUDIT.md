@@ -1,7 +1,7 @@
 # Marginalization Implementation Audit: Robustness & Speed for Embedded VIO
 
-**Date**: January 15, 2026  
-**Target**: Embedded VIO on drones (real-time, resource-constrained)  
+**Date**: January 15, 2026
+**Target**: Embedded VIO on drones (real-time, resource-constrained)
 **Current Status**: Stabilized Schur solver with FEJ support, all tests passing
 
 ---
@@ -24,7 +24,7 @@ The marginalization implementation is structurally sound but has **critical opti
 
 ### 1.1 SVD in Condition Number Estimation is Too Expensive
 
-**Problem**  
+**Problem**
 Lines 1208–1226: For matrices ≤2048×2048, full SVD is computed every marginalization cycle.
 
 ```rust
@@ -34,12 +34,12 @@ if matrix.nrows() * matrix.ncols() <= 2048 * 2048 {
 }
 ```
 
-**Cost Analysis**  
+**Cost Analysis**
 - A 256×256 Schur complement (12 frames × 20 DOF) → SVD: ~100ms (nalgebra unoptimized)
-- On Jetson Xavier (ARM, single-core real-time): easily >500ms  
+- On Jetson Xavier (ARM, single-core real-time): easily >500ms
 - **Drone frame budget**: 33ms @ 30Hz; marginalization should be <5ms
 
-**Recommendation**  
+**Recommendation**
 ✅ **Use fast heuristic always; reserve SVD for offline tuning only**
 
 ```rust
@@ -64,7 +64,7 @@ fn estimate_condition_number_fast(&self, matrix: &DMatrix<f64>) -> Option<f64> {
 
 ### 1.2 Excessive Cloning in `solve_h_bb_system`
 
-**Problem**  
+**Problem**
 Lines 1240–1245: Multiple matrix clones during solve attempts.
 
 ```rust
@@ -82,11 +82,11 @@ if let Some(chol) = Cholesky::new(regularized.clone()) {  // Clone 3!
 let lu = LU::new(regularized.clone());  // Clone 4!
 ```
 
-**Cost Analysis**  
-- Schur complement 256×256: 8× clones × 512KB each = 4MB temporary allocations per marginalization  
-- Drone heap fragmentation → GC pressure → frame drops  
+**Cost Analysis**
+- Schur complement 256×256: 8× clones × 512KB each = 4MB temporary allocations per marginalization
+- Drone heap fragmentation → GC pressure → frame drops
 
-**Recommendation**  
+**Recommendation**
 ✅ **Avoid clones in solve pipeline; use references where possible**
 
 ```rust
@@ -111,7 +111,7 @@ fn solve_h_bb_system(
 
     log::warn!("H_bb Cholesky failed (cond ~{:.1e}); escalating damping",
         self.estimate_condition_number(&regularized).unwrap_or(f64::INFINITY));
-    
+
     // Attempt 2: Cholesky + stronger damping (single re-clone)
     Self::add_diagonal_damping(&mut regularized, self.config.damping * 10.0);
     if let Some(chol) = Cholesky::new(regularized.clone()) {
@@ -142,7 +142,7 @@ fn solve_h_bb_system(
 
 ### 1.3 Unbounded Damping Escalation Risk
 
-**Problem**  
+**Problem**
 Lines 1252–1254: Damping increases by 10× per failed attempt; no upper bound.
 
 ```rust
@@ -152,12 +152,12 @@ if let Some(chol) = Cholesky::new(regularized.clone()) { ... }
 
 If Cholesky still fails, the system **silently falls back to LU/pseudo-inverse** without bounds check.
 
-**Risk**  
-- Unbounded damping → solution accuracy degrades unpredictably  
-- Drone trajectory diverges slowly over many frames  
-- No warning until inconsistency compounds  
+**Risk**
+- Unbounded damping → solution accuracy degrades unpredictably
+- Drone trajectory diverges slowly over many frames
+- No warning until inconsistency compounds
 
-**Recommendation**  
+**Recommendation**
 ✅ **Cap damping; log quality warnings; optionally skip marginalization**
 
 ```rust
@@ -168,7 +168,7 @@ fn solve_h_bb_system(
     b_b: &DVector<f64>,
 ) -> (DMatrix<f64>, DVector<f64>) {
     const MAX_DAMPING_SCALE: f64 = 1e3;  // Upper bound to prevent accuracy collapse
-    
+
     if H_bb.nrows() == 0 {
         return (DMatrix::zeros(H_bb.nrows(), H_ba.ncols()), DVector::zeros(b_b.len()));
     }
@@ -218,19 +218,19 @@ fn solve_h_bb_system(
 
 ### 2.1 Pseudo-Inverse Tolerance is Overly Aggressive
 
-**Problem**  
+**Problem**
 Lines 1276–1288: SVD threshold uses `std::f64::EPSILON * max_sv`.
 
 ```rust
 let tol = std::f64::EPSILON * (matrix.nrows().max(matrix.ncols()) as f64) * max_sv;
 ```
 
-For `max_sv ≈ 10, matrix size 256×256`:  
-- `tol ≈ 2.2e-16 * 256 * 10 ≈ 5.6e-12`  
-- **Too tight**: recovers near-zero singular values with huge reciprocals  
+For `max_sv ≈ 10, matrix size 256×256`:
+- `tol ≈ 2.2e-16 * 256 * 10 ≈ 5.6e-12`
+- **Too tight**: recovers near-zero singular values with huge reciprocals
 - Solution: `x ≈ 1e12 * x_true` (completely wrong)
 
-**Recommendation**  
+**Recommendation**
 ✅ **Use conservative rank-detection tolerance**
 
 ```rust
@@ -245,11 +245,11 @@ fn pseudo_inverse(&self, matrix: &DMatrix<f64>) -> DMatrix<f64> {
     if singulars.is_empty() {
         return DMatrix::identity(matrix.nrows(), matrix.ncols());
     }
-    
+
     let max_sv = singulars.max();
     // Conservative: relative tolerance 1e-10 (IEEE double precision guideline)
     let tol = 1e-10 * max_sv;
-    
+
     let mut rank = 0;
     for (i, sv) in singulars.iter().enumerate() {
         if *sv > tol {
@@ -257,9 +257,9 @@ fn pseudo_inverse(&self, matrix: &DMatrix<f64>) -> DMatrix<f64> {
             rank += 1;
         }
     }
-    
+
     if rank < singulars.len() {
-        log::warn!("Pseudo-inverse: rank {} / {}; effective rank drop", 
+        log::warn!("Pseudo-inverse: rank {} / {}; effective rank drop",
             rank, singulars.len());
     }
 
@@ -271,7 +271,7 @@ fn pseudo_inverse(&self, matrix: &DMatrix<f64>) -> DMatrix<f64> {
 
 ### 2.2 FEJ Cache Structure Hash May Miss Updates
 
-**Problem**  
+**Problem**
 Lines 1305–1325: Structure hash only detects `keep_ids` / `marg_ids` changes, not parameter block dimension changes.
 
 ```rust
@@ -283,10 +283,10 @@ fn compute_structure_hash(keep_ids: &[ParamId], marg_ids: &[ParamId]) -> u64 {
 }
 ```
 
-**Edge Case**  
+**Edge Case**
 If a keyframe ID is reused with different dimension (unlikely but possible in recycled ID pools), FEJ cache returns wrong linearization point.
 
-**Recommendation**  
+**Recommendation**
 ✅ **Include dimension info in hash for paranoia**
 
 ```rust
@@ -294,7 +294,7 @@ fn compute_structure_hash(param_blocks: &HashMap<ParamId, ParamBlock>) -> u64 {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     let mut sorted_ids: Vec<_> = param_blocks.keys().collect();
     sorted_ids.sort_by(|a, b| format!("{:?}", a).cmp(&format!("{:?}", b)));
-    
+
     for id in sorted_ids {
         id.hash(&mut hasher);
         param_blocks[id].dimension.hash(&mut hasher);
@@ -344,20 +344,20 @@ prior_constructor: "Standard",     // Avoid Regularized (adds SVD cost)
 
 ### 3.2 Schur Complement Sparsity Not Exploited
 
-**Problem**  
+**Problem**
 The Schur complement `S = H_aa - H_ab * H_bb^-1 * H_ba` is typically **sparse** for visual-inertial odometry:
-- Keyframe pose: 7 DOF  
-- Landmark: 3 DOF  
-- Only poses linked to shared landmarks → band structure  
+- Keyframe pose: 7 DOF
+- Landmark: 3 DOF
+- Only poses linked to shared landmarks → band structure
 
 But we store as **dense DMatrix**.
 
-**Cost**  
-- 12 frames × 7 DOF = 84×84 pose block  
-- Only observe ~20% of frames in each pose → 84% matrix is zero  
+**Cost**
+- 12 frames × 7 DOF = 84×84 pose block
+- Only observe ~20% of frames in each pose → 84% matrix is zero
 - 7KB dense vs. 1.4KB sparse
 
-**Recommendation** (Long-term)  
+**Recommendation** (Long-term)
 ⚠️ **Defer sparse Schur complement to v0.3**; for now, document trade-off.
 
 ```rust
@@ -373,12 +373,12 @@ But we store as **dense DMatrix**.
 
 ### 4.1 SVD Condition Number Causes Variable Latency
 
-**Measurement**  
-- Cholesky: 0.5ms for 84×84 matrix  
-- SVD: 50ms for 84×84 matrix (**100× variance**)  
+**Measurement**
+- Cholesky: 0.5ms for 84×84 matrix
+- SVD: 50ms for 84×84 matrix (**100× variance**)
 - Drone frame @ 30Hz: 33ms budget; SVD overruns by 50%
 
-**Recommendation**  
+**Recommendation**
 ✅ **Remove SVD from hot path; replace with O(n) heuristic**
 
 ```rust
@@ -388,12 +388,12 @@ fn estimate_condition_number(&self, matrix: &DMatrix<f64>) -> Option<f64> {
     if matrix.nrows() == 0 || matrix.ncols() == 0 {
         return None;
     }
-    
+
     let frob = matrix.norm();
     let trace = (0..matrix.nrows().min(matrix.ncols()))
         .map(|i| matrix[(i, i)].abs())
         .sum::<f64>();
-    
+
     if trace > 1e-12 {  // Avoid division by zero
         Some(frob / trace)
     } else {
@@ -406,27 +406,27 @@ fn estimate_condition_number(&self, matrix: &DMatrix<f64>) -> Option<f64> {
 
 ### 4.2 Excessive Logging in Fallback Paths
 
-**Problem**  
+**Problem**
 Lines 1247, 1252, 1262, 1275: `log::warn!` / `log::error!` called in solve attempts.
 
 On a drone with weak I/O (serial log sink), each log call stalls ~1–5ms.
 
-**Risk**  
-- Marginalization intended: 5ms  
-- Logging + kernel synchronization: 15ms  
+**Risk**
+- Marginalization intended: 5ms
+- Logging + kernel synchronization: 15ms
 - Frame timeout
 
-**Recommendation**  
+**Recommendation**
 ✅ **Log only at WARNING level; use lazy_static for rate-limiting**
 
 ```rust
 fn solve_h_bb_system(...) -> (...) {
     // ... (solve attempts)
-    
+
     if let Some(chol) = Cholesky::new(regularized.clone()) {
         if attempt > 0 {
             // Rate-limited warning: log at most once per 100 frames
-            static CHOL_WARN_COUNTER: std::sync::atomic::AtomicUsize = 
+            static CHOL_WARN_COUNTER: std::sync::atomic::AtomicUsize =
                 std::sync::atomic::AtomicUsize::new(0);
             let count = CHOL_WARN_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             if count % 100 == 0 {
@@ -471,12 +471,12 @@ Add a documented tuning section in [MARGINALIZATION_EMBEDDED_AUDIT.md](MARGINALI
 
 ## 7. Testing Recommendations
 
-### Unit Tests  
+### Unit Tests
 - ✅ Existing: 57 marginalization tests (all passing)
 - ❌ Missing: ill-conditioned Hessian (κ > 1e6) handling
 - ❌ Missing: latency profile (measure `solve_h_bb_system` time)
 
-### Integration Tests  
+### Integration Tests
 - ❌ Missing: memory profile under repeated marginalization (detect fragmentation)
 - ❌ Missing: trajectory consistency check (FEJ + 100 frames)
 
@@ -508,8 +508,8 @@ group.bench_function("solve_h_bb_system_84x84", |b| {
 
 The marginalization implementation is **numerically sound** but has **critical performance gaps** for embedded drones. The top 3 priorities:
 
-1. **Remove SVD from hot path** → 50ms latency reduction  
-2. **Reduce matrix clones** → 4MB heap savings per cycle  
+1. **Remove SVD from hot path** → 50ms latency reduction
+2. **Reduce matrix clones** → 4MB heap savings per cycle
 3. **Cap damping escalation** → Prevent silent quality drift
 
 Implementing these 3 changes (estimated 45 min) will move marginalization from a latency bottleneck to a robust, real-time-safe component.

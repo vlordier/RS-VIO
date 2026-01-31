@@ -12,7 +12,7 @@ find src -name "*.rs" -type f | while read file; do
 ' "$file"
         fi
     fi
-    
+
     # Add allow for expect_used at file level if expect is used
     if grep -q "\.expect(" "$file"; then
         if ! grep -q "#!\[allow(clippy::expect_used)\]" "$file"; then

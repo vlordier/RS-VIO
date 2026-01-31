@@ -178,7 +178,7 @@ Monitor these metrics to assess tuning effectiveness:
 
 ```
 Iteration 1:  Cost=2350  |  Δ_cost=-1200   |  Success
-Iteration 2:  Cost=1100  |  Δ_cost=-1250   |  Success  
+Iteration 2:  Cost=1100  |  Δ_cost=-1250   |  Success
 Iteration 3:  Cost=450   |  Δ_cost=-650    |  Success
 Iteration 4:  Cost=200   |  Δ_cost=-250    |  Success
 Iteration 5:  Cost=180   |  Δ_cost=-20     |  Converged

@@ -42,7 +42,7 @@ pub struct Estimator {
     /// Frame buffer for fusion (Arc-wrapped to avoid expensive clones)
     pub fusion_frame_buffer: std::collections::VecDeque<std::sync::Arc<crate::estimator::Frame>>,
     pub fusion_strategy: Option<Box<dyn FusionStrategyImpl>>,
-    
+
     /// Teacher data export manager (only compiled with export-teacher feature)
     #[cfg(feature = "export-teacher")]
     pub export_manager: ExportManager,

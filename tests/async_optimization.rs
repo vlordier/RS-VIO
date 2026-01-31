@@ -82,7 +82,7 @@ async fn test_optimization_latency() {
 
     // Add several keyframes and measure latency
     for i in 0..3 {
-        let frame = create_test_keyframe(i, i as i64 * 100000000);
+        let frame = create_test_keyframe(i, i64::from(i) * 100000000);
         let start = Instant::now();
         let result = optimizer.add_frame_and_optimize(frame, false).await;
         let elapsed_ms = start.elapsed().as_millis() as u64;
@@ -109,7 +109,7 @@ async fn test_optimization_with_ba() {
 
     // Add enough keyframes to trigger sliding window
     for i in 0..5 {
-        let frame = create_test_keyframe(i, i as i64 * 100000000);
+        let frame = create_test_keyframe(i, i64::from(i) * 100000000);
         let result = optimizer.add_frame_and_optimize(frame, false).await;
         assert!(result.is_ok());
     }
@@ -133,7 +133,7 @@ async fn test_sliding_window_capacity() {
     // Add frames until window is full
     let mut added_count = 0;
     for i in 0..20 {
-        let frame = create_test_keyframe(i, i as i64 * 100000000);
+        let frame = create_test_keyframe(i, i64::from(i) * 100000000);
         let result = optimizer.add_frame_and_optimize(frame, false).await;
 
         if result.is_ok() {

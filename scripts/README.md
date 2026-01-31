@@ -126,7 +126,7 @@ target/doc/
 **Features:**
 - ✅ Run individual or all benchmarks
 - ✅ Save and compare baselines
-- ✅ Automatic plot generation  
+- ✅ Automatic plot generation
 - ✅ Multiple build profiles
 - ✅ Color-coded output
 
@@ -273,7 +273,7 @@ Scripts for downloading and running benchmark datasets.
 **Usage:**
 ```bash
 ./run_euroc.sh              # MH_01_easy dataset
-./run_tum-vi.sh             # dataset-calib-imu_on sequence  
+./run_tum-vi.sh             # dataset-calib-imu_on sequence
 ./run_4seasons.sh           # parking_garage sequence
 ```
 

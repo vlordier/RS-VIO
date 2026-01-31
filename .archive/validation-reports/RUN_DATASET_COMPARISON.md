@@ -20,7 +20,7 @@ python3 ./tum_vi_results/plot_comparisons.py
 
 **Results** (TUM-VI room1):
 - ✅ 17.3% tracking improvement
-- ✅ 66% disparity error reduction  
+- ✅ 66% disparity error reduction
 - ✅ 48% rolling shutter error reduction
 
 ### 2. Run Synthetic Demo

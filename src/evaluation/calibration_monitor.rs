@@ -31,7 +31,7 @@ pub struct CalibrationHealthThresholds {
     /// Maximum acceptable outlier rate (default: 10%)
     pub max_outlier_rate: f32,
 
-    /// Minimum RMS improvement (px) - if improvement < this, consider recal
+    /// Minimum RMS improvement (px) - if improvement < this, consider recalibration
     pub min_rms_improvement_px: f32,
 
     /// Number of samples to collect before next assessment

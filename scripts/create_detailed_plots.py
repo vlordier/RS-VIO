@@ -32,7 +32,7 @@ with_imu: List[dict[str, Any]] = [r for r in successful if r['imu_prior_enabled'
 fig_obj, axes_obj = plt.subplots(2, 2, figsize=(14, 10))  # type: ignore[misc]
 fig = cast(Any, fig_obj)
 axes = cast(Any, axes_obj)
-fig.suptitle('RS-VIO: Visual-only vs Visual+IMU Prior Detailed Analysis', 
+fig.suptitle('RS-VIO: Visual-only vs Visual+IMU Prior Detailed Analysis',
              fontsize=16, fontweight='bold', y=0.995)
 
 # 1. Execution time comparison
@@ -44,7 +44,7 @@ width = 0.35
 visual_times: List[float] = [float(r['execution_time_sec']) for r in visual_only]
 imu_times: List[float] = [float(r['execution_time_sec']) for r in with_imu]
 
-bars1 = ax1.bar(x - width/2, visual_times, width, label='Visual-only', 
+bars1 = ax1.bar(x - width/2, visual_times, width, label='Visual-only',
                 color='#e74c3c', alpha=0.8)
 bars2 = ax1.bar(x + width/2, imu_times, width, label='Visual+IMU',
                 color='#27ae60', alpha=0.8)
@@ -81,7 +81,7 @@ ax2.grid(axis='y', alpha=0.3)
 for bar, val in zip(bars, speedups):
     height = bar.get_height()
     ax2.text(bar.get_x() + bar.get_width()/2., height,
-            f'{val:+.1f}%', ha='center', 
+            f'{val:+.1f}%', ha='center',
             va='bottom' if val > 0 else 'top', fontsize=10, fontweight='bold')
 
 # 3. Keyframes processed
@@ -154,12 +154,12 @@ ax = cast(Any, ax_obj)
 for i, seq in enumerate(sequences):
     # Visual-only
     y_pos = i * 2
-    ax.barh(y_pos, visual_times[i], height=0.7, 
-            label='Visual-only' if i == 0 else '', 
+    ax.barh(y_pos, visual_times[i], height=0.7,
+            label='Visual-only' if i == 0 else '',
             color='#e74c3c', alpha=0.8)
     ax.text(visual_times[i] + 5, y_pos, f'{visual_times[i]:.1f}s',
             va='center', fontsize=10)
-    
+
     # Visual+IMU
     y_pos = i * 2 + 1
     ax.barh(y_pos, imu_times[i], height=0.7,

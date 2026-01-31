@@ -10,7 +10,7 @@
 //! ```
 
 use rs_vio::{
-    datasets::{Config, TUMVIPlayer, PlayerConfig, player_trait::DatasetPlayer},
+    datasets::{player_trait::DatasetPlayer, Config, PlayerConfig, TUMVIPlayer},
     estimator::Estimator,
     init_colored_logging,
 };
@@ -42,7 +42,7 @@ impl ExportArgs {
                     } else {
                         i += 1;
                     }
-                }
+                },
                 "--dataset-path" => {
                     if i + 1 < args.len() {
                         dataset_path = PathBuf::from(&args[i + 1]);
@@ -50,7 +50,7 @@ impl ExportArgs {
                     } else {
                         i += 1;
                     }
-                }
+                },
                 "--output-dir" => {
                     if i + 1 < args.len() {
                         output_dir = PathBuf::from(&args[i + 1]);
@@ -58,7 +58,7 @@ impl ExportArgs {
                     } else {
                         i += 1;
                     }
-                }
+                },
                 "--sequence-name" => {
                     if i + 1 < args.len() {
                         sequence_name = Some(args[i + 1].clone());
@@ -66,18 +66,18 @@ impl ExportArgs {
                     } else {
                         i += 1;
                     }
-                }
+                },
                 "--help" | "-h" => {
                     Self::print_help();
                     std::process::exit(0);
-                }
+                },
                 _ => {
                     // Try as positional argument (first arg is config)
                     if i == 1 && !args[i].starts_with("--") {
                         config = PathBuf::from(&args[i]);
                     }
                     i += 1;
-                }
+                },
             }
         }
 
@@ -123,7 +123,6 @@ EXAMPLES:
     }
 }
 
-
 fn main() -> anyhow::Result<()> {
     // Initialize logging
     init_colored_logging();
@@ -150,9 +149,19 @@ fn main() -> anyhow::Result<()> {
     log::info!("  Export enabled: {}", vio_config.enable_export);
     log::info!("  Export dir: {:?}", vio_config.export_dir);
     log::info!("  Sequence: {}", vio_config.sequence_name);
-    log::info!("  Camera: {}x{}", vio_config.camera.image_width, vio_config.camera.image_height);
-    log::info!("  Features: {} per grid", vio_config.feature_detection.max_features_per_grid);
-    log::info!("  BA iterations: {}", vio_config.optimization.bundle_adjustment_max_iterations);
+    log::info!(
+        "  Camera: {}x{}",
+        vio_config.camera.image_width,
+        vio_config.camera.image_height
+    );
+    log::info!(
+        "  Features: {} per grid",
+        vio_config.feature_detection.max_features_per_grid
+    );
+    log::info!(
+        "  BA iterations: {}",
+        vio_config.optimization.bundle_adjustment_max_iterations
+    );
 
     // Create output directory
     std::fs::create_dir_all(&vio_config.export_dir)?;
@@ -187,22 +196,26 @@ fn main() -> anyhow::Result<()> {
             log::info!("Teacher export complete!");
             log::info!("  Frames processed: {}", result.processed_frames);
             if result.processed_frames > 0 {
-                let _avg_fps = result.processed_frames as f64 / result.average_processing_time_ms as f64 * 1000.0;
-                log::info!("  Average frame time: {:.2} ms", result.average_processing_time_ms);
+                let _avg_fps = result.processed_frames as f64
+                    / result.average_processing_time_ms as f64
+                    * 1000.0;
+                log::info!(
+                    "  Average frame time: {:.2} ms",
+                    result.average_processing_time_ms
+                );
             }
-            
+
             if vio_config.enable_export {
                 log::info!("Export statistics:");
                 log::info!("  Output directory: {:?}", vio_config.export_dir);
                 log::info!("  Sequence name: {}", vio_config.sequence_name);
             }
-        }
+        },
         Err(e) => {
             log::error!("Teacher export failed: {:?}", e);
             return Err(anyhow::anyhow!("Export failed: {}", e));
-        }
+        },
     }
 
     Ok(())
 }
-

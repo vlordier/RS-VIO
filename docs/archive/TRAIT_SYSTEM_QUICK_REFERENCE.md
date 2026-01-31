@@ -80,7 +80,7 @@ println!("Capacity: {}", workspace_pool.capacity());
 pub trait ResourcePool {
     type Resource: Send + Sync;
     type Config: Clone + Debug;
-    
+
     fn new(config: Self::Config) -> Self;
     fn acquire(&self) -> Self::Resource;
     fn try_acquire(&self) -> Option<Self::Resource>;
@@ -248,7 +248,7 @@ let array: Array4x4 = matrix.convert();
 use rs_vio::traits::StateView;
 
 fn validate_state<S: StateView>(state: &S) -> bool {
-    state.pose().is_finite() && 
+    state.pose().is_finite() &&
     state.velocity().norm() < 50.0  // reasonable velocity check
 }
 ```
@@ -268,7 +268,7 @@ where
     if states.len() < 2 {
         return states[0].clone();
     }
-    
+
     states[0].interpolate(&states[1], t)
 }
 ```
@@ -281,7 +281,7 @@ fn process_with_pool<P: ResourcePool>(pool: &P, data: &[u8]) {
     let mut buffer = pool.acquire();
     process_data(&mut buffer, data);
     pool.release(buffer);
-    
+
     // Check pool health
     if pool.utilization() > 0.9 {
         println!("Warning: pool nearly exhausted");
@@ -314,13 +314,13 @@ fn select_matcher(
 #[test]
 fn test_state_view() {
     let state = State::identity();
-    
+
     // Can accept any StateView impl
     fn check<S: StateView>(s: &S) {
         let _pose = s.pose();
         let _vel = s.velocity();
     }
-    
+
     check(&state);
 }
 ```
@@ -330,17 +330,17 @@ fn test_state_view() {
 #[test]
 fn test_conversions() {
     use rs_vio::traits::Convert;
-    
+
     let array = [
         [1.0, 0.0, 0.0, 0.0],
         [0.0, 1.0, 0.0, 0.0],
         [0.0, 0.0, 1.0, 0.0],
         [0.0, 0.0, 0.0, 1.0],
     ];
-    
+
     let matrix: Matrix4x4 = array.convert();
     let back: Array4x4 = matrix.convert();
-    
+
     assert_eq!(array, back);
 }
 ```
@@ -393,22 +393,22 @@ src/
 
 ## Quick Help
 
-**Q: How do I convert Array4x4 to Matrix4x4?**  
+**Q: How do I convert Array4x4 to Matrix4x4?**
 A: Use `array.convert()` (requires `use rs_vio::traits::Convert;`)
 
-**Q: How do I get a reference to pose instead of a copy?**  
+**Q: How do I get a reference to pose instead of a copy?**
 A: Use `StateView` trait bound: `fn f<S: StateView>(s: &S) { s.pose() }`
 
-**Q: How do I interpolate between two states?**  
+**Q: How do I interpolate between two states?**
 A: Use `StateTransform` trait: `state1.interpolate(&state2, 0.5)`
 
-**Q: How do I swap pool implementations?**  
+**Q: How do I swap pool implementations?**
 A: Use `ResourcePool` trait as generic bound, any impl works
 
-**Q: Where are the old ToMatrix/ToVector traits?**  
+**Q: Where are the old ToMatrix/ToVector traits?**
 A: Removed in Phase 4, use `Convert<T>` instead
 
-**Q: Is StateOperations still available?**  
+**Q: Is StateOperations still available?**
 A: No (removed in Phase 3), use `StateView` or `StateTransform` instead
 
 ---
@@ -422,5 +422,5 @@ A: No (removed in Phase 3), use `StateView` or `StateTransform` instead
 
 ---
 
-**Last Updated**: 17 January 2026  
+**Last Updated**: 17 January 2026
 **Status**: Complete and Production Ready ✅

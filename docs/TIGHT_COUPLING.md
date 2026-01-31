@@ -23,7 +23,7 @@ Tight-coupled VIO represents the state-of-the-art integration of visual and iner
 
 ### Tight Coupling (This Implementation)
 - **Architecture**: Joint optimization of vision + IMU factors
-- **State Variables**: 
+- **State Variables**:
   - Camera poses (SE3) per keyframe
   - Velocity (3D) per keyframe
   - IMU biases (accel + gyro, 6D total)

@@ -84,15 +84,15 @@ import sys
 try:
     with open('/tmp/rs_vio_student_training_test/metadata.json', 'r') as f:
         data = json.load(f)
-    
+
     if not isinstance(data, list):
         print("❌ metadata.json is not a list")
         sys.exit(1)
-    
+
     if len(data) == 0:
         print("⚠️  No frames exported")
         sys.exit(1)
-    
+
     # Check first frame has all required fields
     frame = data[0]
     required_fields = [
@@ -104,12 +104,12 @@ try:
         'match_quality', 'time_since_keyframe',
         'mean_reprojection_error'
     ]
-    
+
     missing = [f for f in required_fields if f not in frame]
     if missing:
         print(f"❌ Missing fields: {missing}")
         sys.exit(1)
-    
+
     # Check array dimensions
     checks = {
         'imu_preintegration': 15,
@@ -119,18 +119,18 @@ try:
         'previous_velocity': 3,
         'match_quality': 32,
     }
-    
+
     for field, expected_len in checks.items():
         actual_len = len(frame.get(field, []))
         if actual_len != expected_len:
             print(f"❌ {field}: expected {expected_len} elements, got {actual_len}")
             sys.exit(1)
-    
+
     print(f"✅ All validation checks passed!")
     print(f"   Frames exported: {len(data)}")
     print(f"   All required fields present")
     print(f"   All array dimensions correct")
-    
+
 except Exception as e:
     print(f"❌ Validation error: {e}")
     sys.exit(1)

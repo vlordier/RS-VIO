@@ -83,7 +83,7 @@ debug:
   use_triangulation: true
   use_fallback_depth: false
   min_stereo_matches: 2
-  
+
   # No image capture needed for rotation-only fusion
   capture_left_image_for_fusion: false
 

@@ -23,7 +23,7 @@ for i, frame in enumerate(data):
             'left': f'images/cam0/{left_filename}',
             'right': f'images/cam1/{right_filename}'
         }
-        
+
         # Update depth file reference
         frame['depth_file'] = f'depth_maps/frame_{i:06d}.npy'
 
@@ -44,6 +44,6 @@ for frame in data:
         missing += 1
 
 if missing == 0:
-    print(f"✅ All image file references verified")
+    print("✅ All image file references verified")
 else:
     print(f"⚠️  {missing} missing image files")

@@ -45,14 +45,14 @@ pub fn solve(
 ```rust
 // OLD
 pub trait GeometricVerifier: Send + Sync {
-    fn verify(&self, query: &KeyframeDescriptor, candidate: &KeyframeDescriptor, 
+    fn verify(&self, query: &KeyframeDescriptor, candidate: &KeyframeDescriptor,
               metrics: &MatchMetrics) -> Option<VerifiedMatch>;
 }
 
 // NEW
 pub trait GeometricVerifier: Send + Sync {
-    fn verify(&self, query: &KeyframeDescriptor, candidate: &KeyframeDescriptor, 
-              metrics: &MatchMetrics, 
+    fn verify(&self, query: &KeyframeDescriptor, candidate: &KeyframeDescriptor,
+              metrics: &MatchMetrics,
               workspace: &mut FrameWorkspace) -> Option<VerifiedMatch>;  // NEW REQUIRED PARAMETER
 }
 ```

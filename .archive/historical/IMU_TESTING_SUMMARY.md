@@ -31,7 +31,7 @@ Comprehensive testing of IMU signal analysis, motor state detection, harmonic de
 
 #### Bias Estimation
 15. **test_gravity_estimation** - Z-axis ~-9.81 m/s² detection
-16. **test_gravity_direction_estimation** - Handles tilted orientations  
+16. **test_gravity_direction_estimation** - Handles tilted orientations
 17. **test_bias_estimation_convergence** - Converges to true bias
 
 #### Performance Tests
@@ -104,7 +104,7 @@ Comprehensive testing of IMU signal analysis, motor state detection, harmonic de
 1. **test_imu_signal_analyzer_basic_workflow** - Basic processing flow
 2. **test_noise_floor_adaptation** - Rerun integration with adaptive noise
 3. **test_harmonic_extraction** - Harmonic component extraction
-4. **test_bias_estimation_convergence** - Bias convergence validation  
+4. **test_bias_estimation_convergence** - Bias convergence validation
 5. **test_imu_signal_quality_computation** - Signal quality metrics
 6. **test_window_size_impact** - Window size effects (small vs large)
 
@@ -128,17 +128,17 @@ Comprehensive testing of IMU signal analysis, motor state detection, harmonic de
 - **Noise Levels**: 0.01 - 0.05 m/s² (sensor noise)
 
 ### Edge Cases Covered
-✅ Empty history  
-✅ Single measurement  
-✅ Small windows (< 20 samples)  
-✅ Large datasets (1,000+ samples)  
-✅ Zero vibration (stationary)  
-✅ High vibration (> 2 m/s²)  
-✅ Rapid state transitions (5 cycles in 7s)  
-✅ Multi-frequency beating  
-✅ Tilted orientations  
-✅ Drifting bias  
-✅ Custom thresholds  
+✅ Empty history
+✅ Single measurement
+✅ Small windows (< 20 samples)
+✅ Large datasets (1,000+ samples)
+✅ Zero vibration (stationary)
+✅ High vibration (> 2 m/s²)
+✅ Rapid state transitions (5 cycles in 7s)
+✅ Multi-frequency beating
+✅ Tilted orientations
+✅ Drifting bias
+✅ Custom thresholds
 
 ---
 
@@ -179,13 +179,13 @@ Comprehensive testing of IMU signal analysis, motor state detection, harmonic de
 ## Bug Fixes Applied During Testing
 
 ### Critical Fix: Bias Calculation
-**Issue**: Bias estimate was ~8.8 m/s² (gravity magnitude) instead of near zero  
-**Root Cause**: Line 425 had `accel_mean - self.gravity_estimate * BIAS_UPDATE_RATE_MOTORS_OFF`  
-**Fix**: Changed to `accel_mean - self.gravity_estimate`  
+**Issue**: Bias estimate was ~8.8 m/s² (gravity magnitude) instead of near zero
+**Root Cause**: Line 425 had `accel_mean - self.gravity_estimate * BIAS_UPDATE_RATE_MOTORS_OFF`
+**Fix**: Changed to `accel_mean - self.gravity_estimate`
 **Impact**: All bias-related tests now pass with correct values (< 0.5 m/s²)
 
 ### Unused Constant Cleanup
-**Removed**: `BIAS_UPDATE_RATE_MOTORS_OFF` (no longer needed after fix)  
+**Removed**: `BIAS_UPDATE_RATE_MOTORS_OFF` (no longer needed after fix)
 **Result**: Clean compilation with no dead code warnings
 
 ---

@@ -25,7 +25,7 @@ Speed: ~50ms/opt
 
 ### Tight Coupling (New)
 ```
-Joint: Visual + Inter-Keyframe IMU Factors  
+Joint: Visual + Inter-Keyframe IMU Factors
 Variables: [T_W_B, v, b_a, b_g] per keyframe (15 DOF)
 Accuracy: 12-18% RMS error (5-15% improvement)
 Speed: ~150-250ms/opt (3-5x slower)
@@ -50,7 +50,7 @@ let result = sliding_window.optimize_tight_coupled(
 ```rust
 for frame in sliding_window.keyframes.iter() {
     let v = frame.state.velocity;        // ✅ Now estimated
-    let ba = frame.state.accel_bias;     // ✅ Now optimized  
+    let ba = frame.state.accel_bias;     // ✅ Now optimized
     let bg = frame.state.gyro_bias;      // ✅ Now optimized
 }
 ```
@@ -63,7 +63,7 @@ let g = GravityModel::earth();  // 9.81 m/s²
 let g_vec = g.gravity_vector(); // [0, 0, -9.81]
 ```
 
-### 2. ImuPreintegration  
+### 2. ImuPreintegration
 Stores integration results:
 - `delta_R`: Rotation change (SO(3))
 - `delta_v`: Velocity change (ℝ³)
@@ -128,7 +128,7 @@ Huber loss threshold: 2.0 pixels // Robust to outliers
 - Need velocity estimates
 - Rotational motion or monocular SLAM
 
-### ❌ Loose Coupling  
+### ❌ Loose Coupling
 - Low-power embedded systems
 - Real-time < 50ms requirement
 - Low-quality MEMS sensors
@@ -200,7 +200,7 @@ R_pred = R_i * ΔR_ij
 ```
 Combines:
 - Position covariance: Cov_p (3×3)
-- Velocity covariance: Cov_v (3×3)  
+- Velocity covariance: Cov_v (3×3)
 - Rotation covariance: Cov_R (3×3)
 
 ## Compilation Status
@@ -247,6 +247,6 @@ Improvement:      5-15% (best on dynamic/rotational)
 ---
 
 **Status**: Production-ready core implementation ✅
-**Compilation**: Successful ✅  
+**Compilation**: Successful ✅
 **Tests**: 3/3 passing ✅
 **Documentation**: Complete ✅

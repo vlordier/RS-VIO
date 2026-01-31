@@ -34,30 +34,30 @@ run_benchmark() {
     local dataset_name=$1
     local dataset_path=$2
     local config_path=$3
-    
+
     echo -e "${YELLOW}Benchmarking: ${dataset_name}${NC}"
     echo "Dataset: ${dataset_path}" | tee -a "$RESULTS_FILE"
-    
+
     # Run the benchmark with timing
     start_time=$(date +%s%N)
     output=$("$WORKSPACE_DIR/target/release/run_euroc" "$config_path" "$dataset_path" 2>&1 || true)
     end_time=$(date +%s%N)
-    
+
     # Extract metrics from output
     frames=$(echo "$output" | grep "Total Frames Processed:" | tail -1 | grep -oE '[0-9]+' | head -1)
     avg_time=$(echo "$output" | grep "average" | tail -1 | sed 's/.*average //' | sed 's/ per.*//')
     fps=$(echo "$output" | grep "average" | tail -1 | awk '{print $(NF-2)}' | tr -d 'ms' || echo "N/A")
-    
+
     total_ms=$(((end_time - start_time) / 1000000))
     total_sec=$(echo "scale=2; $total_ms / 1000" | bc)
-    
+
     echo -e "  Frames: ${frames}"
     echo -e "  Avg time/frame: ${avg_time}"
     echo -e "  FPS (reported): ${fps}"
     echo -e "  Wall clock: ${total_sec}s"
     echo -e "  Details: ${output}" >> "$RESULTS_FILE"
     echo ""
-    
+
     # Append to results
     cat >> "$RESULTS_FILE" << EOF
 

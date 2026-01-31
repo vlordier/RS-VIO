@@ -46,7 +46,7 @@ check_tools() {
 download_file() {
   local url="$1" filepath="$2" max_retries=3
   local attempt=1
-  
+
   while [ $attempt -le $max_retries ]; do
     log_info "Downloading (attempt $attempt/$max_retries): $url"
     if curl -fL --continue-at - --progress-bar --max-time 3600 "$url" -o "$filepath"; then
@@ -56,7 +56,7 @@ download_file() {
     attempt=$((attempt + 1))
     [ $attempt -le $max_retries ] && sleep 5
   done
-  
+
   log_error "Failed to download after $max_retries attempts: $url"
   return 1
 }
@@ -95,9 +95,9 @@ verify_checksum() {
 # Extract archive
 extract_archive() {
   local archive="$1" extract_to="$2"
-  
+
   mkdir -p "$extract_to"
-  
+
   if [[ "$archive" == *.zip ]]; then
     log_info "Extracting ZIP: $archive"
     unzip -q -o "$archive" -d "$extract_to" && log_success "Extracted ZIP"
@@ -116,7 +116,7 @@ extract_archive() {
 # Verify dataset structure
 verify_dataset() {
   local dataset_type="$1" dataset_path="$2"
-  
+
   case "$dataset_type" in
     euroc)
       if [ -d "$dataset_path/mav0/cam0/data" ] &&
@@ -149,7 +149,7 @@ verify_dataset() {
       fi
       ;;
   esac
-  
+
   log_warn "Could not verify $dataset_type dataset structure at $dataset_path"
   return 1
 }
@@ -159,7 +159,7 @@ setup_euroc() {
   local euroc_dir="$DATASETS_DIR/euroc"
   local archive="$DATASETS_DIR/.archives/MH_01_easy.zip"
   local machine_hall_url="https://www.research-collection.ethz.ch/bitstreams/7b2419c1-62b5-4714-b7f8-485e5fe3e5fe/download"
-  
+
   log_info "Setting up EuRoC dataset"
   if [ -d "$euroc_dir/MH_01_easy/mav0" ]; then
     log_success "EuRoC dataset already exists"
@@ -169,13 +169,13 @@ setup_euroc() {
     log_info "Check-only mode: skipping EuRoC download"
     return 0
   fi
-  
+
   # Check if archive exists, if not download it
   mkdir -p "$(dirname "$archive")"
   if [ ! -f "$archive" ]; then
     log_info "Downloading EuRoC Machine Hall datasets (12GB)..."
     log_info "This may take 10-20 minutes depending on your connection..."
-    
+
     if ! download_file "$machine_hall_url" "$archive"; then
       log_error "Failed to download EuRoC datasets"
       log_warn "Manual download available at:"
@@ -190,11 +190,11 @@ setup_euroc() {
       return 0
     fi
   fi
-  
+
   log_info "Found EuRoC archive: $archive"
   mkdir -p "$euroc_dir"
   extract_archive "$archive" "$euroc_dir"
-  
+
   # Move from machine_hall subdirectory to euroc root if needed
   if [ -d "$euroc_dir/machine_hall" ]; then
     log_info "Reorganizing EuRoC directory structure..."
@@ -202,7 +202,7 @@ setup_euroc() {
     find "$euroc_dir/machine_hall" -mindepth 1 -maxdepth 1 -type d -exec mv {} "$euroc_dir/" \;
     rmdir "$euroc_dir/machine_hall" 2>/dev/null || true
   fi
-  
+
   # Extract inner sequence zip if it exists (some archives have nested zips)
   if [ -f "$euroc_dir/MH_01_easy/MH_01_easy.zip" ]; then
     log_info "Extracting inner EuRoC sequence archive: MH_01_easy.zip"
@@ -212,7 +212,7 @@ setup_euroc() {
     # Clean up the zip file after extraction
     rm -f "$euroc_dir/MH_01_easy/MH_01_easy.zip"
   fi
-  
+
   # Verify the dataset
   if verify_dataset "euroc" "$euroc_dir/MH_01_easy"; then
     log_success "EuRoC dataset setup complete"
@@ -227,7 +227,7 @@ setup_tum() {
   local tum_dir="$DATASETS_DIR/tum_vi"
   local base_url="https://cdn2.vision.in.tum.de/tumvi/exported/euroc/512_16"
   local archives_dir="$DATASETS_DIR/.archives"
-  
+
   log_info "Setting up TUM-VI dataset"
   if [ "$CHECK_ONLY" -eq 1 ]; then
     verify_dataset "tum" "$tum_dir/room1" || true
@@ -235,14 +235,14 @@ setup_tum() {
     log_info "Check-only mode: skipping TUM-VI download"
     return 0
   fi
-  
+
   mkdir -p "$archives_dir"
-  
+
   # Download indoor sequence (room1)
   local indoor_url="$base_url/dataset-room1_512_16.tar"
   local indoor_archive="$archives_dir/tum_vi_room1.tar"
   local indoor_dir="$tum_dir/room1"
-  
+
   if [ -d "$indoor_dir/mav0" ]; then
     log_success "TUM-VI room1 already exists"
   else
@@ -256,18 +256,18 @@ setup_tum() {
       verify_checksum "$indoor_archive" || { log_warn "Checksum failed for $indoor_archive; re-downloading"; rm -f "$indoor_archive"; setup_tum; return 0; }
       log_info "Found existing archive: $indoor_archive"
     fi
-    
+
     log_info "Extracting TUM-VI room1"
     mkdir -p "$indoor_dir"
     extract_archive "$indoor_archive" "$indoor_dir"
     verify_dataset "tum" "$indoor_dir"
   fi
-  
+
   # Download outdoor sequence (magistrale1)
   local outdoor_url="$base_url/dataset-magistrale1_512_16.tar"
   local outdoor_archive="$archives_dir/tum_vi_magistrale1.tar"
   local outdoor_dir="$tum_dir/magistrale1"
-  
+
   if [ -d "$outdoor_dir/mav0" ]; then
     log_success "TUM-VI magistrale1 already exists"
   else
@@ -281,14 +281,14 @@ setup_tum() {
       verify_checksum "$outdoor_archive" || { log_warn "Checksum failed for $outdoor_archive; re-downloading"; rm -f "$outdoor_archive"; setup_tum; return 0; }
       log_info "Found existing archive: $outdoor_archive"
     fi
-    
+
     log_info "Extracting TUM-VI magistrale1"
     mkdir -p "$outdoor_dir"
     extract_archive "$outdoor_archive" "$outdoor_dir"
     rm -f "$outdoor_archive"
     verify_dataset "tum" "$outdoor_dir"
   fi
-  
+
   log_success "TUM-VI dataset setup complete"
 }
 
@@ -297,32 +297,32 @@ setup_4seasons() {
   local seasons_dir="$DATASETS_DIR/4seasons"
   local seq_name="parking_garage_3_train"
   local recording_id="recording_2021-05-10_19-15-19"
-  
+
   log_info "Setting up 4Seasons dataset ($seq_name)"
   if [ "$CHECK_ONLY" -eq 1 ]; then
     verify_dataset "4seasons" "$seasons_dir/$recording_id" || true
     log_info "Check-only mode: skipping 4Seasons download"
     return 0
   fi
-  
+
   # Check if already extracted
   if [ -d "$seasons_dir/$recording_id/mav0" ] && [ -f "$seasons_dir/$recording_id/mav0/imu0/data.csv" ]; then
     log_success "4Seasons $seq_name already exists"
     return 0
   fi
-  
+
   mkdir -p "$seasons_dir"
-  
+
   # 4Seasons format: Download individual components
   # We need: stereo images + IMU/GNSS data
   local imu_url="https://vision.cs.tum.edu/webshare/g/4seasons-dataset/dataset/$recording_id/${recording_id}_imu_gnss.zip"
   local stereo_url="https://vision.cs.tum.edu/webshare/g/4seasons-dataset/dataset/$recording_id/${recording_id}_stereo_images_distorted.zip"
   local ref_poses_url="https://vision.cs.tum.edu/webshare/g/4seasons-dataset/dataset/$recording_id/${recording_id}_reference_poses.zip"
-  
+
   local temp_dir
   temp_dir=$(mktemp -d)
   trap 'rm -rf "$temp_dir"' EXIT
-  
+
   # Download IMU data
   log_info "Downloading 4Seasons IMU/GNSS data (6.1MB)..."
   if ! download_file "$imu_url" "$temp_dir/imu.zip"; then
@@ -330,7 +330,7 @@ setup_4seasons() {
     return 1
   fi
   verify_checksum "$temp_dir/imu.zip" || log_warn "Checksum skipped/failed for imu.zip"
-  
+
   # Download stereo images
   log_info "Downloading 4Seasons stereo images (1.3GB)..."
   if ! download_file "$stereo_url" "$temp_dir/stereo.zip"; then
@@ -338,7 +338,7 @@ setup_4seasons() {
     return 1
   fi
   verify_checksum "$temp_dir/stereo.zip" || log_warn "Checksum skipped/failed for stereo.zip"
-  
+
   # Download reference poses
   log_info "Downloading 4Seasons reference poses (371KB)..."
   if ! download_file "$ref_poses_url" "$temp_dir/poses.zip"; then
@@ -346,36 +346,36 @@ setup_4seasons() {
   else
     verify_checksum "$temp_dir/poses.zip" || log_warn "Checksum skipped/failed for poses.zip"
   fi
-  
+
   # Extract all to a temp directory
   local extract_dir="$temp_dir/extract"
   mkdir -p "$extract_dir"
-  
+
   log_info "Extracting archives..."
   unzip -q -o "$temp_dir/imu.zip" -d "$extract_dir" || true
   unzip -q -o "$temp_dir/stereo.zip" -d "$extract_dir" || true
   [ -f "$temp_dir/poses.zip" ] && unzip -q -o "$temp_dir/poses.zip" -d "$extract_dir" || true
-  
+
   # Reorganize to EuRoC format: mav0/cam0/, mav0/cam1/, mav0/imu0/
   log_info "Organizing to EuRoC format..."
-  
+
   local recording_dir="$seasons_dir/$recording_id"
   mkdir -p "$recording_dir/mav0/cam0/data" \
            "$recording_dir/mav0/cam1/data" \
            "$recording_dir/mav0/imu0"
-  
+
   # Move camera data from distorted_images/cam{0,1}/ to mav0/
   local src_recording="$extract_dir/$recording_id"
   if [ -d "$src_recording/distorted_images/cam0" ]; then
     log_info "Moving cam0 images..."
     mv "$src_recording/distorted_images/cam0"/*.png "$recording_dir/mav0/cam0/data/" 2>/dev/null || true
   fi
-  
+
   if [ -d "$src_recording/distorted_images/cam1" ]; then
     log_info "Moving cam1 images..."
     mv "$src_recording/distorted_images/cam1"/*.png "$recording_dir/mav0/cam1/data/" 2>/dev/null || true
   fi
-  
+
   # Create data.csv files from timestamps (image filenames are unix timestamps)
   if [ -n "$(find "$recording_dir/mav0/cam0/data" -name '*.png' -type f 2>/dev/null | head -1)" ]; then
     log_info "Creating cam0 data.csv..."
@@ -387,7 +387,7 @@ setup_4seasons() {
       done | sort -n
     } > "$recording_dir/mav0/cam0/data.csv"
   fi
-  
+
   if [ -n "$(find "$recording_dir/mav0/cam1/data" -name '*.png' -type f 2>/dev/null | head -1)" ]; then
     log_info "Creating cam1 data.csv..."
     {
@@ -398,7 +398,7 @@ setup_4seasons() {
       done | sort -n
     } > "$recording_dir/mav0/cam1/data.csv"
   fi
-  
+
   # Convert IMU data from imu.txt to data.csv
   if [ -f "$src_recording/imu.txt" ]; then
     log_info "Converting IMU data..."
@@ -407,7 +407,7 @@ setup_4seasons() {
       tail -n +2 "$src_recording/imu.txt" | cut -d' ' -f1-7
     } > "$recording_dir/mav0/imu0/data.csv"
   fi
-  
+
   # Verify structure
   if verify_dataset "4seasons" "$recording_dir"; then
     log_success "4Seasons $seq_name ready at: $recording_dir"
@@ -422,15 +422,15 @@ setup_4seasons() {
 # Test binary
 test_binary() {
   local binary="$1" config="$2" dataset_path="$3" timeout="${4:-30}"
-  
+
   if [ ! -x "$PROJECT_ROOT/target/release/$binary" ]; then
     log_warn "Binary not found: $binary. Building..."
     cd "$PROJECT_ROOT"
     cargo build --release --bin "$binary" || return 1
   fi
-  
+
   log_info "Testing $binary with dataset: $dataset_path"
-  
+
   if timeout "$timeout" "$PROJECT_ROOT/target/release/$binary" \
     "$PROJECT_ROOT/config/$config" "$dataset_path" 2>&1 | head -20; then
     log_success "$binary test completed"
@@ -451,7 +451,7 @@ main() {
     log_info "Datasets will be stored in: $DATASETS_DIR (add to .gitignore)"
   fi
   echo ""
-  
+
   # Check tools
   if ! check_tools; then
     log_error "Please install missing tools and try again"
@@ -459,13 +459,13 @@ main() {
   fi
   log_success "All required tools available"
   echo ""
-  
+
   # Download or verify datasets
   local setup_results=()
-  
+
   log_info "Starting dataset downloads..."
   echo ""
-  
+
   # EuRoC
   if setup_euroc; then
     setup_results+=("✓ EuRoC")
@@ -473,7 +473,7 @@ main() {
     setup_results+=("✗ EuRoC (manual download required)")
   fi
   echo ""
-  
+
   # TUM-VI
   if setup_tum; then
     setup_results+=("✓ TUM-VI")
@@ -481,7 +481,7 @@ main() {
     setup_results+=("✗ TUM-VI (check network/mirror)")
   fi
   echo ""
-  
+
   # 4Seasons
   if setup_4seasons; then
     setup_results+=("✓ 4Seasons")
@@ -489,35 +489,35 @@ main() {
     setup_results+=("✗ 4Seasons (manual download required)")
   fi
   echo ""
-  
+
   # Summary
   log_info "Download Summary:"
   for result in "${setup_results[@]}"; do
     echo "  $result"
   done
   echo ""
-  
+
   # Test available datasets
   log_info "Testing available datasets..."
   echo ""
-  
+
   if [ -d "$DATASETS_DIR/euroc/MH_01_easy" ]; then
     test_binary "run_euroc" "euroc_vio.yaml" "$DATASETS_DIR/euroc/MH_01_easy"
     echo ""
   fi
-  
+
   if [ -f "$DATASETS_DIR/tum_vi/depth.txt" ]; then
     test_binary "run_tum" "tum_vi.yaml" "$DATASETS_DIR/tum_vi"
     echo ""
   fi
-  
+
   if find "$DATASETS_DIR"/4seasons -name 'times.txt' -type f | grep -q .; then
     local recording_dir
     recording_dir=$(dirname "$(find "$DATASETS_DIR"/4seasons -name 'times.txt' -type f -printf '%T@ %p\n' | sort -rn | head -1 | cut -d' ' -f2-)")
     test_binary "run_4seasons" "4seasons.yaml" "$recording_dir"
     echo ""
   fi
-  
+
   log_success "Setup complete!"
   log_info "Datasets saved to: $DATASETS_DIR"
   echo ""

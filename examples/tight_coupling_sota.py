@@ -18,40 +18,40 @@ References:
 """
 
 from dataclasses import dataclass
-from typing import Dict, Any, Tuple
+from typing import Any, Dict, Tuple
 
 
 @dataclass
 class TightCouplingMetrics:
     """Performance metrics for tight-coupled VIO"""
-    
+
     # Accuracy
     rms_error: float  # meters
     mean_error: float  # meters
     max_error: float  # meters
-    
+
     # Velocity estimation quality
     velocity_rmse: float  # m/s
-    
+
     # Bias estimation
     accel_bias_estimate: Tuple[float, float, float]  # m/s²
     gyro_bias_estimate: Tuple[float, float, float]  # rad/s
     accel_bias_error: float  # m/s²
     gyro_bias_error: float  # rad/s
-    
+
     # Computational
     optimization_time_ms: float
     total_frame_time_ms: float
-    
+
     # Quality indicators
     converged_frames: int
     failed_frames: int
-    
+
     def convergence_rate(self) -> float:
         """What fraction of frames converged?"""
         total = self.converged_frames + self.failed_frames
         return self.converged_frames / total if total > 0 else 0.0
-    
+
     def summary(self) -> str:
         return f"""
 Tight-Coupled VIO Metrics:
@@ -59,16 +59,16 @@ Tight-Coupled VIO Metrics:
     RMS Error:       {self.rms_error:.4f} m
     Mean Error:      {self.mean_error:.4f} m
     Max Error:       {self.max_error:.4f} m
-  
+
   Velocity Estimation:
     RMSE:            {self.velocity_rmse:.4f} m/s
-  
+
   IMU Bias Estimation:
     Accel Bias:      [{self.accel_bias_estimate[0]:.6f}, {self.accel_bias_estimate[1]:.6f}, {self.accel_bias_estimate[2]:.6f}] m/s²
     Accel Error:     {self.accel_bias_error:.6f} m/s²
     Gyro Bias:       [{self.gyro_bias_estimate[0]:.6f}, {self.gyro_bias_estimate[1]:.6f}, {self.gyro_bias_estimate[2]:.6f}] rad/s
     Gyro Error:      {self.gyro_bias_error:.6f} rad/s
-  
+
   Performance:
     Optimization:    {self.optimization_time_ms:.2f} ms
     Total Frame:     {self.total_frame_time_ms:.2f} ms
@@ -78,26 +78,26 @@ Tight-Coupled VIO Metrics:
 
 class TightCoupledVIOSimulator:
     """Simulate tight-coupled VIO performance on different datasets"""
-    
+
     def __init__(self):
         self.gravity = 9.81  # m/s²
-    
-    def evaluate_dataset(self, 
+
+    def evaluate_dataset(self,
                         dataset_name: str,
                         sequence_type: str,
                         motion_intensity: str) -> TightCouplingMetrics:
         """
         Simulate tight-coupled VIO on a dataset with specific characteristics.
-        
+
         Args:
             dataset_name: 'euroc', 'tum_vi', '4seasons'
             sequence_type: 'smooth', 'rotational', 'dynamic'
             motion_intensity: 'slow', 'moderate', 'fast'
-        
+
         Returns:
             Metrics for this configuration
         """
-        
+
         # Base improvement over loose coupling (determined empirically)
         loose_coupling_errors = {
             ('euroc', 'smooth', 'slow'): 0.0890,      # Good baseline
@@ -106,7 +106,7 @@ class TightCoupledVIOSimulator:
             ('tum_vi', 'rotational', 'fast'): 0.2100,
             ('4seasons', 'dynamic', 'fast'): 0.2810,   # Outdoor difficult
         }
-        
+
         # Tight coupling improvements (empirical from literature)
         # With velocity + bias estimation, get additional 5-15% reduction
         improvement_factors = {
@@ -114,37 +114,37 @@ class TightCoupledVIOSimulator:
             ('tum_vi', 'rotational'): 1.12,   # 12% improvement
             ('4seasons', 'dynamic'): 1.18,    # 18% improvement (biases matter more outdoor)
         }
-        
+
         base_error = loose_coupling_errors.get(
             (dataset_name, sequence_type, motion_intensity),
             0.15  # Default if not in table
         )
-        
+
         improvement = improvement_factors.get(
             (dataset_name, sequence_type),
             1.10  # Default 10%
         )
-        
+
         rms_error = base_error / improvement
-        
+
         return TightCouplingMetrics(
             rms_error=rms_error,
             mean_error=rms_error * 0.7,
             max_error=rms_error * 2.1,
-            
+
             # Velocity accuracy typically within 2-5% of speed
             velocity_rmse=0.02,
-            
+
             # Bias estimation (typical ranges)
             accel_bias_estimate=(0.015, -0.008, 0.012),
             gyro_bias_estimate=(0.0002, -0.0001, 0.00015),
             accel_bias_error=0.020,  # m/s² (typically recovers within ~2cm/s²)
             gyro_bias_error=0.0003,  # rad/s
-            
+
             # Performance (tight coupling adds ~5-10ms over loose)
             optimization_time_ms=25.0 if dataset_name == '4seasons' else 20.0,
             total_frame_time_ms=55.0 if dataset_name == '4seasons' else 50.0,
-            
+
             converged_frames=998,
             failed_frames=2,
         )
@@ -152,7 +152,7 @@ class TightCoupledVIOSimulator:
 
 class StateOfTheArtComparison:
     """Compare different VIO approaches"""
-    
+
     @staticmethod
     def loose_coupling_metrics() -> Dict[str, Any]:
         """Loose coupling: IMU prior on latest pose only"""
@@ -165,7 +165,7 @@ class StateOfTheArtComparison:
             'strengths': ['Simple', 'Fast', 'Robust initialization'],
             'weaknesses': ['No velocity estimation', 'Fixed biases', 'Limited by IMU drift'],
         }
-    
+
     @staticmethod
     def tight_coupling_metrics() -> Dict[str, Any]:
         """Tight coupling: velocity + bias + inter-keyframe IMU factors"""
@@ -188,13 +188,13 @@ class StateOfTheArtComparison:
                 'Slightly higher computational cost'
             ],
         }
-    
+
     @staticmethod
     def print_comparison():
         """Print SOTA comparison table"""
         loose = StateOfTheArtComparison.loose_coupling_metrics()
         tight = StateOfTheArtComparison.tight_coupling_metrics()
-        
+
         print("""
 ╔════════════════════════════════════════════════════════════════════════════╗
 ║                    VIO COUPLING STRATEGIES COMPARISON                       ║
@@ -293,29 +293,29 @@ if __name__ == '__main__':
     print("TIGHT-COUPLED VIO: STATE-OF-THE-ART IMPLEMENTATION")
     print("=" * 80)
     print()
-    
+
     # Show comparison
     StateOfTheArtComparison.print_comparison()
-    
+
     print()
     print("=" * 80)
     print("TIGHT-COUPLED VIO PERFORMANCE EVALUATION")
     print("=" * 80)
     print()
-    
+
     simulator = TightCoupledVIOSimulator()
-    
+
     datasets = [
         ('euroc', 'smooth', 'moderate'),
         ('tum_vi', 'rotational', 'fast'),
         ('4seasons', 'dynamic', 'fast'),
     ]
-    
+
     for dataset, sequence, motion in datasets:
         metrics = simulator.evaluate_dataset(dataset, sequence, motion)
         print(f"\n[{dataset.upper()} - {sequence} {motion}]")
         print(metrics.summary())
-    
+
     print()
     print("=" * 80)
     print("KEY IMPROVEMENTS WITH TIGHT COUPLING")
@@ -326,22 +326,22 @@ if __name__ == '__main__':
        • Enables motion prediction for feature tracking
        • Useful for ego-motion compensation
        • Accuracy: typically 2-5% of motion speed
-    
+
     2. ONLINE IMU BIAS REFINEMENT
        • Accelerometer bias: typically 0.5 m/s² (compared to factory ~1 m/s²)
        • Gyroscope bias: typically 0.0003 rad/s (compared to factory ~0.001 rad/s)
        • Continuous refinement prevents IMU drift accumulation
-    
+
     3. BETTER INITIALIZATION
        • Exploit gravity vector for roll/pitch estimation
        • Accelerometer mean gives scale cue during startup
        • Reduced ambiguity in early frames
-    
+
     4. IMPROVED OUTDOOR PERFORMANCE
        • Large, dynamic motions benefit from velocity state
        • Bias estimation crucial for long outdoor trajectories
        • Handles IMU aging (noise increases over time)
-    
+
     5. INTER-KEYFRAME CONSTRAINTS
        • Preintegration factors couple consecutive poses
        • Prevents pose divergence between keyframes

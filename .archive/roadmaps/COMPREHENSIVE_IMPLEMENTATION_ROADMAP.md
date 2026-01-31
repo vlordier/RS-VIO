@@ -1,7 +1,7 @@
 # RS-VIO Comprehensive Implementation Roadmap
 
-**Based on:** Design document for best practical SOTA stack for onboard realtime drone  
-**Date:** Current Session  
+**Based on:** Design document for best practical SOTA stack for onboard realtime drone
+**Date:** Current Session
 **Status:** Planning & Implementation Phase
 
 ## Overview
@@ -87,20 +87,20 @@ feature_detection:
   detector: gftt          # or: fast, orb, akaze, superpoint
   tracker: klt            # or: optical-flow
   descriptor: none        # or: orb, akaze, superpoint
-  
+
   gftt:
     quality_level: 0.01
     min_distance: 10
     grid_size: 30
     max_per_grid: 200
-    
+
   superpoint:
     enabled: false
     model_path: models/superpoint.onnx
     confidence_threshold: 0.015
     nms_radius: 4
     max_keypoints: 1000
-    
+
   tracking:
     pyramid_levels: 4
     window_size: 15
@@ -169,25 +169,25 @@ pub enum FusionStrategy {
 ```yaml
 fusion:
   strategy: rotation-only      # or: se3-planar, depth-patches, depth-full, plane-segmented, epi-volume, keyframe-mosaic
-  
+
   rotation_only:
     num_frames: 3
     weighting_strategy: exponential
-    
+
   se3_planar:
     num_frames: 4
     plane_distance: 10.0       # Assume scene at 10m
-    
+
   depth_aware_full:
     two_pass: true
     num_frames: 5
     occlusion_handling: true
-    
+
   plane_segmented:
     ransac_iterations: 1000
     inlier_threshold: 0.1
     min_plane_size: 100
-    
+
   keyframe_mosaic:
     mosaic_scale: 2.0          # 2x resolution
     detect_on_mosaic: true
@@ -310,7 +310,7 @@ pub struct CalibrationQualityGates {
 
 ```yaml
 platform_profiles:
-  
+
   cpu_only:  # Raspberry Pi 5, small ARM
     detector: gftt
     tracker: klt
@@ -319,7 +319,7 @@ platform_profiles:
     loop_closure: orb-bow
     target_fps: 15
     target_resolution: 640x480
-    
+
   jetson:    # Jetson Nano/Xavier
     detector: gftt         # KLT fast, SuperPoint on keyframes
     tracker: klt
@@ -328,7 +328,7 @@ platform_profiles:
     loop_closure: superpoint+lightglue
     target_fps: 30
     target_resolution: 1280x720
-    
+
   tiny_budget:  # Hard realtime, minimal compute
     detector: fast
     tracker: klt
@@ -337,7 +337,7 @@ platform_profiles:
     loop_closure: patch_matching (keyframes only)
     target_fps: 20
     target_resolution: 320x240
-    
+
   offline:   # Server, no constraint
     detector: superpoint
     tracker: klt

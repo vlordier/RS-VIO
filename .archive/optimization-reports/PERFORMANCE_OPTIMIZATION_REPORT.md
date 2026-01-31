@@ -123,7 +123,7 @@ The parallel feature tracking optimization provides a **measurable 9.1% improvem
 
 ---
 
-**Generated:** 2026-01-11  
-**Dataset:** EuRoC MH_01_easy  
-**Platform:** macOS (multi-core system)  
+**Generated:** 2026-01-11
+**Dataset:** EuRoC MH_01_easy
+**Platform:** macOS (multi-core system)
 **Branch:** feature/realtime-performance

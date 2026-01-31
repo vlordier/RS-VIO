@@ -327,6 +327,9 @@ mod tests {
             debug: Default::default(),
             loop_closure: Default::default(),
             marginalization: Default::default(),
+            export_dir: std::path::PathBuf::new(),
+            sequence_name: String::new(),
+            enable_export: false,
         };
         let T_B_Cl = Matrix4::identity();
         ImuProcessor::new(&config, T_B_Cl)

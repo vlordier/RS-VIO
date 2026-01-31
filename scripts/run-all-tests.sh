@@ -24,7 +24,7 @@ tests_failed=0
 run_test() {
   local name="$1"
   shift
-  
+
   log_info "$name"
   if "$@"; then
     log_success "$name passed"

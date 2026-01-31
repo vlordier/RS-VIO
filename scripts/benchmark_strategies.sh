@@ -2,8 +2,8 @@
 
 ##############################################################################
 # Multi-Strategy Benchmarking Suite for RS-VIO
-# 
-# Tests all stereo matching strategies (BasicRANSAC, IMUGuided, 
+#
+# Tests all stereo matching strategies (BasicRANSAC, IMUGuided,
 # TemporalConsistency, HybridOpticalFlow) across all available datasets
 # (EuRoC, TUM-VI, 4Seasons)
 #
@@ -101,7 +101,7 @@ EOF
 
 check_datasets() {
     log_info "Checking available datasets..."
-    
+
     if [ -d "$DATASET_DIR/euroc/MH_01_easy" ]; then
         DATASETS+=("euroc")
         log_info "EuRoC dataset found"
@@ -149,13 +149,13 @@ run_benchmark() {
     local dataset_path=$3
     local config_file=$4
     local start_time=$(date +%s)
-    
+
     echo -n "  Testing $strategy on ${dataset^^}... "
-    
+
     # Set strategy via environment variable or config mutation
     # For now, we use the default strategy (BasicRANSAC)
     # TODO: Add strategy configuration support to binaries
-    
+
     local cmd=""
     case "$dataset" in
         euroc)
@@ -172,47 +172,47 @@ run_benchmark() {
     # Run with timeout and capture output
     local output
     output=$(timeout 120 $cmd 2>&1 || true)
-    
+
     local end_time=$(date +%s)
     local elapsed=$((end_time - start_time))
-    
+
     # Extract metrics from output
     local frames=$(echo "$output" | grep -oP 'Processed \K[0-9]+' | head -1)
     local avg_time=$(echo "$output" | grep -oP 'average \K[0-9.]+' | head -1)
-    
+
     frames=${frames:-"N/A"}
     avg_time=${avg_time:-"N/A"}
-    
+
     echo -e "${COLOR_GREEN}${elapsed}s${NC} (frames: $frames, avg: ${avg_time}ms)"
-    
+
     # Log result
     echo "$dataset,${dataset^^},$strategy,${elapsed}s,$frames,${avg_time}ms" >> "$RESULTS_FILE"
 }
 
 analyze_results() {
     log_header "Benchmark Results Summary"
-    
+
     if [ ! -f "$RESULTS_FILE" ]; then
         log_error "No results file found"
         return
     fi
-    
+
     echo ""
     echo "Results saved to: $RESULTS_FILE"
     echo ""
-    
+
     # Display summary table
     echo "┌─────────────────┬──────────────────┬──────────┬────────────┐"
     echo "│ Dataset         │ Strategy         │ Frames   │ Avg Time   │"
     echo "├─────────────────┼──────────────────┼──────────┼────────────┤"
-    
+
     tail -n +2 "$RESULTS_FILE" 2>/dev/null | while IFS=',' read -r dataset dataset_name strategy elapsed frames avg_time; do
         # Format table row
         printf "│ %-15s │ %-16s │ %-8s │ %-10s │\n" "$dataset_name" "$strategy" "$frames" "$avg_time"
     done
-    
+
     echo "└─────────────────┴──────────────────┴──────────┴────────────┘"
-    
+
     echo ""
     echo "Next Steps:"
     echo "  1. Review results: cat $RESULTS_FILE"
@@ -228,7 +228,7 @@ main() {
     local selected_strategies=("${STRATEGIES[@]}")
     local selected_datasets=()
     SKIP_BUILD=false
-    
+
     # Parse arguments
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -285,7 +285,7 @@ main() {
 
     # Check and discover datasets
     check_datasets
-    
+
     # If no specific datasets requested, use all available
     if [ ${#selected_datasets[@]} -eq 0 ]; then
         selected_datasets=("${DATASETS[@]}")
@@ -305,16 +305,16 @@ main() {
 
     # Run benchmarks
     log_header "Running Benchmarks"
-    
+
     local total_tests=$((${#selected_strategies[@]} * ${#selected_datasets[@]}))
     local current_test=0
-    
+
     for strategy in "${selected_strategies[@]}"; do
         for dataset in "${selected_datasets[@]}"; do
             current_test=$((current_test + 1))
             echo ""
             echo -e "${COLOR_YELLOW}[$current_test/$total_tests]${NC} Strategy: $strategy"
-            
+
             case "$dataset" in
                 euroc)
                     config_file="$PROJECT_ROOT/config/euroc_vio.yaml"
@@ -349,7 +349,7 @@ main() {
 
     # Analyze and display results
     analyze_results
-    
+
     log_header "Benchmark Complete"
     log_info "Results saved to: $RESULTS_FILE"
     echo ""

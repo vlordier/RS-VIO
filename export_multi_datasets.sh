@@ -22,32 +22,32 @@ export_dataset() {
     local dataset_path="$1"
     local dataset_name="$2"
     local max_frames="${3:-1000}"  # Default 1000 frames per dataset
-    
+
     echo "----------------------------------------------------------------------"
     echo "Exporting: $dataset_name"
     echo "Path: $dataset_path"
     echo "Max frames: $max_frames"
     echo "----------------------------------------------------------------------"
-    
+
     if [ ! -d "$dataset_path" ]; then
         echo "⚠️  Dataset not found: $dataset_path"
         echo "   Skipping..."
         return
     fi
-    
+
     # Create dataset-specific output directory
     output_dir="$OUTPUT_ROOT/$dataset_name"
     mkdir -p "$output_dir"
-    
+
     # Run export
     cargo run --release --bin export_teacher --features export-teacher -- \
         --dataset-path "$dataset_path" \
         --output-dir "$output_dir" \
         --max-frames "$max_frames"
-    
+
     if [ $? -eq 0 ]; then
         echo "✅ Successfully exported $dataset_name"
-        
+
         # Count frames
         if [ -f "$output_dir/metadata.json" ]; then
             frame_count=$(python3 -c "import json; print(len(json.load(open('$output_dir/metadata.json'))))")
@@ -57,7 +57,7 @@ export_dataset() {
     else
         echo "❌ Failed to export $dataset_name"
     fi
-    
+
     echo ""
 }
 
@@ -73,7 +73,7 @@ export_dataset "$DATASETS_ROOT/euroc/MH_02_easy" "euroc_mh02_easy" 800
 export_dataset "$DATASETS_ROOT/euroc/MH_03_medium" "euroc_mh03_medium" 800
 export_dataset "$DATASETS_ROOT/euroc/MH_04_difficult" "euroc_mh04_diff" 600
 
-# Export 4Seasons dataset  
+# Export 4Seasons dataset
 echo "📦 4Seasons Dataset"
 export_dataset "$DATASETS_ROOT/4seasons/recording_2021-05-10_19-15-19" "4seasons_outdoor" 1000
 

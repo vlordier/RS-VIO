@@ -57,7 +57,7 @@ for &(timestamp_ns, data) in imu_data {
     // Filter raw measurements
     let filtered_gyro = self.denoise_filter.process_gyro(&data.gyro);
     let filtered_accel = self.denoise_filter.process_accel(&data.accel);
-    
+
     gyro_vec.push(filtered_gyro);
     accel_vec.push(filtered_accel);
 }
@@ -142,7 +142,7 @@ For camera/IMU rate mismatch (200 Hz vs 30 fps):
                                    ↓
                             (10 Hz or less)
                              Drift-free
-                           
+
 Raw IMU (200 Hz)      [Low-freq from Vision]
     ↓                           +
 [Filter]  ←─────────────────────┘
@@ -276,12 +276,12 @@ The implementation is fully self-documented with docstrings:
 pub struct ImuDenoiseFilter {
     /// Main filtering pipeline configuration
     config: DenoiseConfig,
-    
+
     /// Individual filter stages
     highpass_x: BiquadFilter,  // Remove drift per axis
     lowpass_x: BiquadFilter,   // Remove noise per axis
     notch_filters: Vec<BiquadFilter>,  // Remove resonances
-    
+
     // ...see source for full documentation
 }
 ```

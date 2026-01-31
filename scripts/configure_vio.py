@@ -78,7 +78,7 @@ def print_config_summary(platform: str):
 def print_tuning_recommendations(platform: str):
     """Print platform-specific tuning recommendations."""
     print("\n=== Tuning Recommendations ===\n")
-    
+
     if platform == "cpu_only":
         print("CPU-Only Platform:")
         print("  - Use fewer pyramid levels (2-3) to reduce compute")
@@ -86,7 +86,7 @@ def print_tuning_recommendations(platform: str):
         print("  - Set fusion.num_frames to 3 to save memory")
         print("  - Disable loop closure if FPS drops below target")
         print("  - Consider FAST detector instead of Shi-Tomasi if CPU-limited")
-        
+
     elif platform == "gpu_enabled":
         print("GPU-Enabled Platform:")
         print("  - Can use SuperPoint for keypoint detection on keyframes")
@@ -94,7 +94,7 @@ def print_tuning_recommendations(platform: str):
         print("  - Increase max_features to 300-400 for better accuracy")
         print("  - Use adaptive fusion strategy for best quality")
         print("  - Consider depth-aware fusion for challenging scenes")
-        
+
     elif platform == "hard_realtime":
         print("Hard Realtime Platform:")
         print("  - Minimize feature count (80-150)")
@@ -103,7 +103,7 @@ def print_tuning_recommendations(platform: str):
         print("  - Disable loop closure and bundle adjustment")
         print("  - Reduce stereo disparity search range to 64")
         print("  - Use larger grid cells (48px) to reduce detection overhead")
-        
+
     elif platform == "balanced":
         print("Balanced Platform:")
         print("  - Adjust max_features based on scene complexity (150-300)")
@@ -111,7 +111,7 @@ def print_tuning_recommendations(platform: str):
         print("  - Use ORB descriptors for keyframe matching")
         print("  - Tune pyramid_levels (2-4) based on motion speed")
         print("  - Monitor CPU usage and reduce feature count if needed")
-    
+
     print()
 
 
@@ -140,36 +140,36 @@ def main():
         action="store_true",
         help="Show tuning recommendations",
     )
-    
+
     args = parser.parse_args()
-    
+
     # List platforms
     if args.list:
         print_platform_info()
         return 0
-    
+
     # Interactive mode
     if args.interactive:
         platform = select_platform_interactive()
         print_config_summary(platform)
         print_tuning_recommendations(platform)
-        
+
         config_path = Path(__file__).parent.parent / "configs" / f"{platform}.toml"
         print(f"Configuration file: {config_path}")
-        print(f"\nTo use this configuration:")
+        print("\nTo use this configuration:")
         print(f"  VIOPipelineConfig::load_toml(\"{config_path}\")")
         return 0
-    
+
     # Direct platform selection
     if args.platform:
         print_config_summary(args.platform)
         if args.recommend:
             print_tuning_recommendations(args.platform)
-        
+
         config_path = Path(__file__).parent.parent / "configs" / f"{args.platform}.toml"
         print(f"\nConfiguration file: {config_path}")
         return 0
-    
+
     # No arguments - show help
     parser.print_help()
     return 1

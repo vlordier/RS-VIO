@@ -75,50 +75,50 @@ procedure RefineDisparity(left_feature, right_feature, images, imu_confidence)
         // Low (0.1): 5 pixels
         // Med (0.5): 9 pixels
         // High (0.9): 15 pixels
-    
+
     max_iterations := map_confidence_to_iterations(imu_confidence)
         // Low (0.1): 3 iterations
         // Med (0.5): 6 iterations
         // High (0.9): 10 iterations
-    
+
     // Initialize search region around initial disparity
     initial_disparity := left_feature.x - right_feature.x
     search_range := [-0.5, +0.5] pixels (subpixel precision)
-    
+
     // Iterative refinement
     best_ssd := INFINITY
     for iteration in 1 to max_iterations:
         for offset in [-1.0, -0.75, -0.5, ..., +1.0]:  // 0.25 px resolution
             test_disparity := initial_disparity + offset
-            
+
             // Extract and compare patches
             left_patch := extract_patch(left_image, left_feature, patch_size)
             right_patch := extract_patch(right_image, right_feature + offset, patch_size)
-            
+
             ssd := sum((left_patch[i] - right_patch[i])²)
-            
+
             if ssd < best_ssd:
                 best_ssd := ssd
                 refined_disparity := test_disparity
-        
+
         // Early termination
         if best_ssd < photometric_threshold:
             break
-    
+
     // Normalize residual for confidence
     normalized_residual := sqrt(best_ssd / (patch_size² × 255²))
     residual_confidence := 1 - normalized_residual
-    
+
     // Combined confidence
     final_confidence := residual_confidence × imu_confidence
-    
+
     // Outlier rejection
     if normalized_residual > outlier_threshold:
         is_valid := FALSE
         final_confidence := 0.5 × final_confidence
     else:
         is_valid := TRUE
-    
+
     return SubpixelRefinement {
         disparity_refined: refined_disparity,
         confidence: final_confidence,

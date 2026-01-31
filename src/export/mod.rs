@@ -7,10 +7,10 @@ pub mod teacher_exporter;
 pub mod teacher_exporter_json;
 
 #[cfg(feature = "export-teacher")]
-pub use teacher_exporter::{TeacherFrame, TeacherLabelExporter, OpticalFlowPoint, downscale_image};
+pub use teacher_exporter::{downscale_image, OpticalFlowPoint, TeacherFrame, TeacherLabelExporter};
 
 #[cfg(feature = "export-teacher")]
-pub use teacher_exporter_json::{TeacherLabelExporterJson, TeacherFrameJson};
+pub use teacher_exporter_json::{TeacherFrameJson, TeacherLabelExporterJson};
 
 pub mod export_manager;
 pub use export_manager::{ExportConfig, ExportManager};

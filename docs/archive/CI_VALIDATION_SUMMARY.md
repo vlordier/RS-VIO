@@ -33,7 +33,7 @@ profile = "minimal"
 
 **Root Cause:** Node.js isn't automatically in the PATH within act containers, even when installed
 
-**Recommendation:** 
+**Recommendation:**
 For future local CI testing with act:
 1. Use `catthehacker/ubuntu:act-latest` image (includes Node.js + all dev tools)
 2. Or validate via GitHub Actions directly (more reliable)

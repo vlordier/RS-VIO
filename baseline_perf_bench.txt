@@ -115,4 +115,3 @@ patch_operations/residuals_simd/100
 Found 4 outliers among 100 measurements (4.00%)
   3 (3.00%) low mild
   1 (1.00%) high mild
-

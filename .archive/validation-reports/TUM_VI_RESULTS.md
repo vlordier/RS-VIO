@@ -4,8 +4,8 @@
 
 Successfully ran VIO optimization comparison on **TUM-VI room1** dataset (first 200 frames of 2,821 total).
 
-**Dataset**: `/tmp/rs-vio-samples/tum_vi/room1`  
-**IMU Data**: 28,122 measurements loaded  
+**Dataset**: `/tmp/rs-vio-samples/tum_vi/room1`
+**IMU Data**: 28,122 measurements loaded
 **Camera Frames**: 2,821 total (200 processed for visualization)
 
 ## Results Summary
@@ -97,7 +97,7 @@ Successfully ran VIO optimization comparison on **TUM-VI room1** dataset (first 
 ```
 tum_vi_results/
 ├── tracking_comparison.csv        (13 KB) - 200 frame tracking metrics
-├── disparity_comparison.csv       (35 KB) - 400 feature comparisons  
+├── disparity_comparison.csv       (35 KB) - 400 feature comparisons
 ├── rolling_shutter_comparison.csv (13 KB) - 200 frame RS metrics
 └── plot_comparisons.py           (7.2 KB) - Visualization script
 ```

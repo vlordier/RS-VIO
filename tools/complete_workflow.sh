@@ -117,7 +117,7 @@ if [ -f "$TEACHER_DATA_DIR/train_data_metadata.json" ]; then
         --num-epochs 10 \
         --batch-size 16 \
         --learning-rate 1e-4
-    
+
     log "Network training completed ✓"
 else
     warn "No metadata file found, skipping training"
@@ -133,31 +133,31 @@ import sys
 try:
     import torch
     from tools.student_network import create_student_network
-    
+
     print("Creating student network...")
     model = create_student_network()
     model.eval()
-    
+
     print(f"Network parameters: {sum(p.numel() for p in model.parameters()):,}")
-    
+
     # Test inference
     with torch.no_grad():
         images = torch.randn(1, 2, 256, 256)
         imu = torch.randn(1, 15)
         flow = torch.randn(1, 96)
-        
+
         outputs = model(images, imu, flow)
         pose = outputs['pose']
         uncertainty = outputs.get('uncertainty', None)
-        
+
         print(f"\n✓ Inference successful!")
         print(f"  Pose shape: {pose.shape}")
         print(f"  Pose values: {pose[0].numpy()}")
-        
+
         if uncertainty is not None:
             print(f"  Uncertainty shape: {uncertainty.shape}")
             print(f"  Uncertainty values: {uncertainty[0].numpy()}")
-    
+
 except ImportError as e:
     print(f"Warning: {e}")
     print("Install PyTorch to test inference")

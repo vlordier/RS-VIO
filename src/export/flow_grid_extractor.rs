@@ -1,7 +1,6 @@
 /// Sparse optical flow grid extraction for teacher export
 ///
 /// Extracts a sparse 8×6 grid of optical flow points from tracked features.
-
 use crate::export::OpticalFlowPoint;
 
 /// Simple feature point representation for flow extraction
@@ -19,7 +18,7 @@ pub struct FlowGridExtractor {
 
 impl FlowGridExtractor {
     /// Create new flow grid extractor
-    /// 
+    ///
     /// # Arguments
     /// * `grid_rows` - Number of rows in the flow grid (typically 8)
     /// * `grid_cols` - Number of columns in the flow grid (typically 6)
@@ -29,7 +28,7 @@ impl FlowGridExtractor {
             grid_cols,
         }
     }
-    
+
     /// Extract sparse flow grid from current and previous features
     ///
     /// Divides the image into grid cells and selects one flow point per cell
@@ -43,22 +42,20 @@ impl FlowGridExtractor {
     ) -> Vec<OpticalFlowPoint> {
         let cell_width = image_width / self.grid_cols as f32;
         let cell_height = image_height / self.grid_rows as f32;
-        
-        let mut grid: Vec<Vec<Option<OpticalFlowPoint>>> = vec![
-            vec![None; self.grid_cols];
-            self.grid_rows
-        ];
-        
+
+        let mut grid: Vec<Vec<Option<OpticalFlowPoint>>> =
+            vec![vec![None; self.grid_cols]; self.grid_rows];
+
         // Match current features to previous positions and populate grid
         let min_len = current_features.len().min(previous_features.len());
         for idx in 0..min_len {
             let (cx, cy) = current_features[idx];
             let (px, py) = previous_features[idx];
-            
+
             // Calculate grid cell
             let col = ((cx / cell_width).floor() as usize).min(self.grid_cols - 1);
             let row = ((cy / cell_height).floor() as usize).min(self.grid_rows - 1);
-            
+
             // Only keep if no point in this cell yet (first one wins)
             if grid[row][col].is_none() {
                 grid[row][col] = Some(OpticalFlowPoint {
@@ -67,7 +64,7 @@ impl FlowGridExtractor {
                 });
             }
         }
-        
+
         // Flatten grid, filtering out None values
         let mut flow_points = Vec::new();
         for row in grid.iter() {
@@ -77,10 +74,10 @@ impl FlowGridExtractor {
                 }
             }
         }
-        
+
         flow_points
     }
-    
+
     /// Compute flow grid inlier ratio (0-1)
     ///
     /// Ratio of cells with valid flow points to total grid cells.
@@ -92,25 +89,19 @@ impl FlowGridExtractor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_flow_grid_extractor() {
         let extractor = FlowGridExtractor::new(8, 6);
-        
+
         // Create dummy features
-        let curr_features = vec![
-            (50.0, 50.0),
-            (150.0, 150.0),
-        ];
-        
-        let prev_features = vec![
-            (48.0, 48.0),
-            (148.0, 148.0),
-        ];
-        
+        let curr_features = vec![(50.0, 50.0), (150.0, 150.0)];
+
+        let prev_features = vec![(48.0, 48.0), (148.0, 148.0)];
+
         let grid = extractor.extract_flow_grid(512.0, 512.0, &curr_features, &prev_features);
         assert_eq!(grid.len(), 2);
-        
+
         let inlier_ratio = FlowGridExtractor::compute_inlier_ratio(&grid, 8 * 6);
         assert!(inlier_ratio > 0.0 && inlier_ratio <= 1.0);
     }

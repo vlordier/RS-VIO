@@ -11,22 +11,28 @@ repos:
   # ========================================================================
 
   # Rust formatting with rustfmt
-  - repo: https://github.com/rust-lang/rustfmt
-    rev: 1.7.0
+  - repo: local
     hooks:
       - id: rustfmt
-        args: [--edition, 2021, --check]
+        name: rustfmt (check)
+        description: Format Rust code with rustfmt
+        entry: rustfmt --edition 2021 --check
+        language: system
+        types: [rust]
         files: ^src/
-        stages: [commit]
+        stages: [pre-commit]
 
   # Linting with clippy
-  - repo: https://github.com/bwasty/clippy-checks
-    rev: v1.1.0
+  - repo: local
     hooks:
       - id: clippy
-        args: [--all-features, --all-targets, --, -D warnings]
+        name: cargo clippy
+        description: Lint Rust code with clippy
+        entry: cargo clippy --no-default-features --features matching-basic-ransac --lib --bins -- -D warnings
+        language: system
+        pass_filenames: false
         files: ^src/
-        stages: [commit]
+        stages: [pre-commit]
 
   # Check Cargo.toml sorting (cargo-sort)
   - repo: local
@@ -34,10 +40,11 @@ repos:
       - id: cargo-sort
         name: cargo sort check
         description: Check Cargo.toml ordering
-        entry: cargo sort --check Cargo.toml
+        entry: cargo sort --check .
         language: system
-        types: [toml]
-        stages: [commit]
+        pass_filenames: false
+        files: ^Cargo\.toml$
+        stages: [pre-commit]
 
   # ========================================================================
   # TYPOS CHECKER
@@ -50,7 +57,7 @@ repos:
       - id: typos
         args: [--format, brief]
         files: ^src/
-        stages: [commit]
+        stages: [pre-commit]
 
   # ========================================================================
   # SECURITY TOOLS
@@ -108,6 +115,18 @@ repos:
 
       # Check that files parse as valid Python (if any)
       - id: check-ast
+
+  # ========================================================================
+  # PYTHON + NOTEBOOK LINTING
+  # ========================================================================
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.5.7
+    hooks:
+      - id: ruff
+        name: ruff (python + notebooks)
+        files: \.(py|ipynb)$
+        args: [--config, pyproject.toml]
 
   # Conventional commit linting
   - repo: https://github.com/compilerla/conventional-pre-commit

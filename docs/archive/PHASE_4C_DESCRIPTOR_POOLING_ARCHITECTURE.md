@@ -48,7 +48,7 @@ This phase completes the aggressive optimization effort by establishing full des
 
 **Phase 4a - Loop Closure RANSAC** (20-35 KB)
 - Per-iteration allocation: 3 Vecs per iteration × 8-15 KB
-- Iterations per frame: 100+ 
+- Iterations per frame: 100+
 - Freed immediately after each loop closure detection
 - Saved: Eliminated local Vec creations in PnPRansacSolver
 
@@ -137,7 +137,7 @@ pub fn extract(&self, image: &[u8], w: u32, h: u32) -> Vec<OrbFeature>
 
 // Stage 2 (Ready):
 pub fn extract_with_pool(
-    &self, 
+    &self,
     image: &[u8], w: u32, h: u32,
     pool: Option<&Arc<OrbBinaryPool>>
 ) -> Vec<OrbFeature>
@@ -165,17 +165,17 @@ drop(pool);
 impl Estimator {
     pub fn process_frame(&mut self, ...) {
         let mut workspace = FrameWorkspace::default();
-        
+
         // Extract descriptors with pooling
         let descriptors = self.feature_tracker.extract_descriptors(&mut workspace);
-        
+
         // Pass workspace to RANSAC
         let _result = self.loop_closure_detector.detect_loop_closure(
-            id, 
-            descriptor, 
+            id,
+            descriptor,
             &mut workspace  // Reuse workspace throughout frame
         );
-        
+
         // Workspace destroyed, buffers freed (or recycled if pooled)
     }
 }

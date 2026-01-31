@@ -27,7 +27,7 @@ async fn test_sequential_keyframe_optimization() {
     // Process a sequence of keyframes
     let mut keyframe_count = 0;
     for i in 0..10 {
-        let frame = create_test_keyframe(i, i as i64 * 33_000_000); // ~30Hz
+        let frame = create_test_keyframe(i, i64::from(i) * 33_000_000); // ~30Hz
 
         let opt_result = optimizer.add_frame_and_optimize(frame, false).await;
         assert!(opt_result.is_ok(), "Optimization should succeed");
@@ -57,7 +57,7 @@ async fn test_optimizers_with_local_set() {
             for i in 0..3 {
                 let opt = optimizer.clone_optimizer();
                 let task = tokio::task::spawn_local(async move {
-                    let frame = create_test_keyframe(i, i as i64 * 100_000_000);
+                    let frame = create_test_keyframe(i, i64::from(i) * 100_000_000);
                     opt.add_frame_and_optimize(frame, false).await
                 });
                 tasks.push(task);
@@ -84,7 +84,7 @@ async fn test_optimization_with_bundle_adjustment() {
     // Add keyframes sequentially
     let mut latencies = Vec::new();
     for i in 0..5 {
-        let frame = create_test_keyframe(i, i as i64 * 100_000_000);
+        let frame = create_test_keyframe(i, i64::from(i) * 100_000_000);
 
         let start = Instant::now();
         let result = optimizer.add_frame_and_optimize(frame, false).await;
@@ -129,7 +129,7 @@ async fn test_pipeline_simulation() {
 
     for i in 0..frame_count {
         let start = Instant::now();
-        let frame = create_test_keyframe(i, i as i64 * 33_000_000);
+        let frame = create_test_keyframe(i, i64::from(i) * 33_000_000);
 
         // Optimization
         let opt_start = Instant::now();
@@ -173,7 +173,7 @@ async fn test_optimization_latency_distribution() {
 
     // Process 100 keyframes
     for i in 0..100 {
-        let frame = create_test_keyframe(i, i as i64 * 33_000_000);
+        let frame = create_test_keyframe(i, i64::from(i) * 33_000_000);
 
         let start = Instant::now();
         let _ = optimizer.add_frame_and_optimize(frame, false).await;
@@ -215,12 +215,12 @@ async fn test_optimization_throughput() {
     let overall_start = Instant::now();
 
     for i in 0..frame_count {
-        let frame = create_test_keyframe(i, i as i64 * 33_000_000);
+        let frame = create_test_keyframe(i, i64::from(i) * 33_000_000);
         let _ = optimizer.add_frame_and_optimize(frame, false).await;
     }
 
     let elapsed_ms = overall_start.elapsed().as_millis() as f64;
-    let fps = (frame_count as f64 / elapsed_ms) * 1000.0;
+    let fps = (f64::from(frame_count) / elapsed_ms) * 1000.0;
 
     println!(
         "Throughput: {:.2} fps ({} keyframes in {:.2}ms)",
@@ -240,7 +240,7 @@ async fn test_sliding_window_capacity() {
 
     // Add more keyframes than window capacity
     for i in 0..15 {
-        let frame = create_test_keyframe(i, i as i64 * 100_000_000);
+        let frame = create_test_keyframe(i, i64::from(i) * 100_000_000);
         let _ = optimizer.add_frame_and_optimize(frame, false).await;
     }
 

@@ -119,14 +119,18 @@ fn get_env_path(var: &str) -> Option<String> {
 }
 
 /// Check GT orientation alignment by sampling first few poses
-fn check_gt_orientation_alignment(ground_truth: &GroundTruthTrajectory, vio_traj: &EstimatedTrajectory) {
+fn check_gt_orientation_alignment(
+    ground_truth: &GroundTruthTrajectory,
+    vio_traj: &EstimatedTrajectory,
+) {
     if ground_truth.is_empty() || vio_traj.is_empty() {
         println!("⚠️  Insufficient data for GT alignment check");
         return;
     }
 
     // Collect VIO poses and timestamps
-    let vio_data: Vec<(i64, [[f64; 4]; 4])> = vio_traj.poses()
+    let vio_data: Vec<(i64, [[f64; 4]; 4])> = vio_traj
+        .poses()
         .map(|(ts, pose)| {
             let mut arr = [[0.0; 4]; 4];
             for i in 0..4 {
@@ -137,23 +141,23 @@ fn check_gt_orientation_alignment(ground_truth: &GroundTruthTrajectory, vio_traj
             (*ts, arr)
         })
         .collect();
-    
+
     // Sample 5 poses across trajectory
     let sample_indices = [
-        0, 
-        vio_data.len() / 4, 
-        vio_data.len() / 2, 
-        3 * vio_data.len() / 4, 
-        vio_data.len().saturating_sub(1)
+        0,
+        vio_data.len() / 4,
+        vio_data.len() / 2,
+        3 * vio_data.len() / 4,
+        vio_data.len().saturating_sub(1),
     ];
-    
+
     let mut rotation_errors = Vec::new();
     for &idx in &sample_indices {
         if idx >= vio_data.len() {
             continue;
         }
         let (ts_vio, pose_vio) = &vio_data[idx];
-        
+
         // Extract 3x3 rotation from 4x4 pose matrix
         let mut rot_vio = [[0.0; 3]; 3];
         for i in 0..3 {
@@ -161,7 +165,7 @@ fn check_gt_orientation_alignment(ground_truth: &GroundTruthTrajectory, vio_traj
                 rot_vio[i][j] = pose_vio[i][j];
             }
         }
-        
+
         // Find closest GT pose by timestamp
         if let Some(pose_gt) = ground_truth.get_closest_pose(*ts_vio, 100_000_000) {
             // GT pose is GroundTruthPose; convert to matrix
@@ -172,7 +176,7 @@ fn check_gt_orientation_alignment(ground_truth: &GroundTruthTrajectory, vio_traj
                     rot_gt[i][j] = gt_matrix[(i, j)];
                 }
             }
-            
+
             let angle_err = compute_rotation_error_angle(&rot_vio, &rot_gt);
             rotation_errors.push(angle_err);
         }
@@ -181,12 +185,19 @@ fn check_gt_orientation_alignment(ground_truth: &GroundTruthTrajectory, vio_traj
     if !rotation_errors.is_empty() {
         let mean_err = rotation_errors.iter().sum::<f64>() / rotation_errors.len() as f64;
         println!("\n🔍 GT ORIENTATION ALIGNMENT CHECK:");
-        println!("  Sampled rotation errors (deg): {:?}", 
-            rotation_errors.iter().map(|r| format!("{:.1}", r.to_degrees())).collect::<Vec<_>>());
+        println!(
+            "  Sampled rotation errors (deg): {:?}",
+            rotation_errors
+                .iter()
+                .map(|r| format!("{:.1}", r.to_degrees()))
+                .collect::<Vec<_>>()
+        );
         println!("  Mean rotation error: {:.1}°", mean_err.to_degrees());
         if mean_err.abs() > std::f64::consts::PI * 0.4 {
             println!("  ⚠️  Large rotation mismatch detected!");
-            println!("  Likely cause: Camera frame convention, extrinsics sign, or GT loading issue.");
+            println!(
+                "  Likely cause: Camera frame convention, extrinsics sign, or GT loading issue."
+            );
         } else {
             println!("  ✓ Rotation alignment within expected bounds.");
         }
@@ -194,11 +205,14 @@ fn check_gt_orientation_alignment(ground_truth: &GroundTruthTrajectory, vio_traj
 }
 
 /// Align estimated trajectory to ground truth using first matched pose (rigid transform)
-fn align_trajectory_to_gt(traj: &EstimatedTrajectory, ground_truth: &GroundTruthTrajectory) -> EstimatedTrajectory {
+fn align_trajectory_to_gt(
+    traj: &EstimatedTrajectory,
+    ground_truth: &GroundTruthTrajectory,
+) -> EstimatedTrajectory {
     let clone_traj = |src: &EstimatedTrajectory| {
         let mut out = EstimatedTrajectory::new(src.algorithm_name.clone());
         for (ts, pose) in src.poses() {
-            out.add_pose(*ts, pose.clone());
+            out.add_pose(*ts, *pose);
         }
         out
     };
@@ -267,7 +281,8 @@ fn test_slam_vs_vio_benchmarking() {
     println!("📂 Dataset path: {}", ds_path);
 
     // Load configuration (allow override via RS_VIO_CONFIG_PATH)
-    let cfg_path = std::env::var("RS_VIO_CONFIG_PATH").unwrap_or_else(|_| "config/tum_vi.yaml".to_string());
+    let cfg_path =
+        std::env::var("RS_VIO_CONFIG_PATH").unwrap_or_else(|_| "config/tum_vi.yaml".to_string());
     let config = Config::load(&cfg_path).expect("configuration file should exist");
     // Load dataset
     let player = TUMVIPlayer::new();
@@ -323,15 +338,14 @@ fn test_slam_vs_vio_benchmarking() {
     let mut vio_ctx = FrameContext::new(false);
 
     for frame_idx in 0..max_frames {
-        if frame_idx % frame_stride != 0 { continue; }
+        if frame_idx % frame_stride != 0 {
+            continue;
+        }
         vio_ctx.current_idx = frame_idx;
 
-        if let Err(e) = player.process_single_frame(
-            &mut vio_estimator,
-            &mut vio_ctx,
-            &images,
-            &ds_path,
-        ) {
+        if let Err(e) =
+            player.process_single_frame(&mut vio_estimator, &mut vio_ctx, &images, &ds_path)
+        {
             println!("⚠️  Failed to process frame {}: {}", frame_idx, e);
             continue;
         }
@@ -363,15 +377,14 @@ fn test_slam_vs_vio_benchmarking() {
     let mut global_opt_count = 0;
 
     for frame_idx in 0..max_frames {
-        if frame_idx % frame_stride != 0 { continue; }
+        if frame_idx % frame_stride != 0 {
+            continue;
+        }
         slam_ctx.current_idx = frame_idx;
 
-        if let Err(e) = player.process_single_frame(
-            &mut slam_estimator,
-            &mut slam_ctx,
-            &images,
-            &ds_path,
-        ) {
+        if let Err(e) =
+            player.process_single_frame(&mut slam_estimator, &mut slam_ctx, &images, &ds_path)
+        {
             println!("⚠️  Failed to process frame {}: {}", frame_idx, e);
             continue;
         }
@@ -464,7 +477,8 @@ fn test_slam_convergence_with_loop_closures() {
 
     println!("\n🔄 Testing SLAM Convergence with Loop Closures...");
 
-    let cfg_path = std::env::var("RS_VIO_CONFIG_PATH").unwrap_or_else(|_| "config/tum_vi.yaml".to_string());
+    let cfg_path =
+        std::env::var("RS_VIO_CONFIG_PATH").unwrap_or_else(|_| "config/tum_vi.yaml".to_string());
     let config = Config::load(&cfg_path).expect("configuration file should exist");
     let player = TUMVIPlayer::new();
     let images = player
@@ -496,7 +510,9 @@ fn test_slam_convergence_with_loop_closures() {
     );
 
     for (frame_idx, _) in images.iter().enumerate() {
-        if frame_idx % frame_stride != 0 { continue; }
+        if frame_idx % frame_stride != 0 {
+            continue;
+        }
         context.current_idx = frame_idx;
 
         if player
@@ -560,7 +576,10 @@ fn test_loop_closure_diagnostics() {
     };
 
     if !Path::new(&format!("{}/mav0", ds_path)).exists() {
-        println!("⏭️  Skipping test_loop_closure_diagnostics: mav0/ not found in {}", ds_path);
+        println!(
+            "⏭️  Skipping test_loop_closure_diagnostics: mav0/ not found in {}",
+            ds_path
+        );
         return;
     }
 
@@ -570,7 +589,7 @@ fn test_loop_closure_diagnostics() {
     // Load configuration using Config::load (same as main test)
     let config_path = std::env::var("RS_VIO_CONFIG_PATH")
         .unwrap_or_else(|_| "config/tum_vi_balanced.yaml".to_string());
-    
+
     println!("Configuration: {}", config_path);
 
     let config = Config::load(&config_path).expect("configuration file should exist");
@@ -597,16 +616,13 @@ fn test_loop_closure_diagnostics() {
         images.len(),
         max_frames
     );
-    
+
     println!("\nLoop Closure Configuration:");
     println!(
         "  - min_frame_gap: {} frames",
         config.loop_closure.min_frame_gap
     );
-    println!(
-        "  - num_candidates: {}",
-        config.loop_closure.num_candidates
-    );
+    println!("  - num_candidates: {}", config.loop_closure.num_candidates);
     println!(
         "  - min_matches: {}",
         config.loop_closure.min_matches_for_candidate
@@ -625,21 +641,17 @@ fn test_loop_closure_diagnostics() {
     let mut ctx = FrameContext::new(false);
 
     // Load IMU data
-    let _ = player
-        .load_imu_data(&ds_path, &images, 0, images.len());
+    let _ = player.load_imu_data(&ds_path, &images, 0, images.len());
 
     println!("\nProcessing frames (watching for loop closures)...");
 
     for frame_idx in 0..max_frames {
-        if frame_idx % frame_stride != 0 { continue; }
+        if frame_idx % frame_stride != 0 {
+            continue;
+        }
         ctx.current_idx = frame_idx;
 
-        if let Err(e) = player.process_single_frame(
-            &mut estimator,
-            &mut ctx,
-            &images,
-            &ds_path,
-        ) {
+        if let Err(e) = player.process_single_frame(&mut estimator, &mut ctx, &images, &ds_path) {
             if frame_idx < 5 {
                 println!("⚠️  Failed to process frame {}: {}", frame_idx, e);
             }
@@ -648,7 +660,10 @@ fn test_loop_closure_diagnostics() {
 
         // Every 50 frames, print status
         if frame_idx % 50 == 0 && frame_idx > 0 {
-            println!("  Frame {}: {} frames processed", frame_idx, ctx.processed_frames);
+            println!(
+                "  Frame {}: {} frames processed",
+                frame_idx, ctx.processed_frames
+            );
         }
     }
 
@@ -668,8 +683,14 @@ fn test_loop_closure_diagnostics() {
         "\n  📏 Loop closure detection needs min_frame_gap={}  between attempts",
         config.loop_closure.min_frame_gap
     );
-    println!("     → Requires descriptor matching above {:.0}%", config.loop_closure.descriptor_distance_threshold * 100.0);
-    println!("     → And at least {} feature matches", config.loop_closure.min_matches_for_candidate);
+    println!(
+        "     → Requires descriptor matching above {:.0}%",
+        config.loop_closure.descriptor_distance_threshold * 100.0
+    );
+    println!(
+        "     → And at least {} feature matches",
+        config.loop_closure.min_matches_for_candidate
+    );
 
     println!("\n✅ Loop closure system is functioning correctly:");
     println!("   - Will activate automatically if trajectories revisit");

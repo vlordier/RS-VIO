@@ -22,20 +22,20 @@ export_dataset() {
     local dataset_path=$1
     local output_name=$2
     local max_frames=$3
-    
+
     echo ""
     echo "======================================================================="
     echo "Exporting: $output_name"
     echo "Dataset: $dataset_path"
     echo "Max frames: $max_frames"
     echo "======================================================================="
-    
+
     ./target/release/export_teacher \
       --dataset-path "$dataset_path" \
       --output-dir "data/ground_truth/$output_name" \
       --max-frames "$max_frames" \
       --config config/teacher_tumvi_export.yaml
-    
+
     if [ $? -eq 0 ]; then
         echo "✅ $output_name completed"
     else

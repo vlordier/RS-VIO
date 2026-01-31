@@ -11,8 +11,8 @@ This document lists actionable bugs found during critical review, prioritized by
 ## PRIORITY 1: Fix This First (Do Today)
 
 ### Bug #7: Condition Number Heuristic is Wrong
-**File**: `src/optimization/marginalization.rs:1256-1274`  
-**Severity**: CRITICAL  
+**File**: `src/optimization/marginalization.rs:1256-1274`
+**Severity**: CRITICAL
 **Issue**: Current heuristic `κ ≈ ||A||_F / trace(A)` fails to detect ill-conditioning
 
 **Problem Code**:
@@ -22,7 +22,7 @@ fn estimate_condition_number(&self, matrix: &DMatrix<f64>) -> Option<f64> {
     let trace = (0..matrix.nrows().min(matrix.ncols()))
         .map(|i| matrix[(i, i)].abs())
         .sum::<f64>();
-    
+
     if trace > 1e-12 {
         Some(frob / trace)  // ← WRONG: Not a condition number!
     } else {
@@ -45,13 +45,13 @@ fn estimate_condition_number(&self, matrix: &DMatrix<f64>) -> Option<f64> {
     if matrix.nrows() == 0 || matrix.ncols() == 0 {
         return None;
     }
-    
+
     // Use Frobenius norm divided by minimum diagonal element
     let frob = matrix.norm();
     let min_diag = (0..matrix.nrows().min(matrix.ncols()))
         .map(|i| matrix[(i, i)].abs())
         .fold(f64::INFINITY, f64::min);
-    
+
     if min_diag > 1e-14 {
         Some(frob / min_diag)  // ← Better, though still O(n) approximation
     } else {
@@ -75,9 +75,9 @@ fn test_condition_number_detects_singular() {
 
 ---
 
-### Bug #3: FEJ Cache Hash Misses Dimensions  
-**File**: `src/optimization/marginalization.rs:1451-1474`  
-**Severity**: CRITICAL  
+### Bug #3: FEJ Cache Hash Misses Dimensions
+**File**: `src/optimization/marginalization.rs:1451-1474`
+**Severity**: CRITICAL
 **Issue**: Hash based only on IDs, not dimensions. If dimension changes, cache serves wrong-sized data.
 
 **Problem Code**:
@@ -131,22 +131,22 @@ fn update_fej_cache(&mut self, param_blocks: &HashMap<ParamId, ParamBlock>, ...)
 ---
 
 ### Bug #6: Early Return After Expensive Schur Computation
-**File**: `src/optimization/marginalization.rs:1035-1047`  
-**Severity**: CRITICAL (embedded constraint)  
+**File**: `src/optimization/marginalization.rs:1035-1047`
+**Severity**: CRITICAL (embedded constraint)
 **Issue**: Computes Schur complement even when no marginalization needed (wastes 50ms)
 
 **Problem Code**:
 ```rust
 pub fn marginalize(&mut self, ...) -> MarginalizationResult {
     // ... 50+ lines of setup ...
-    
+
     let (H_aa, H_ab, H_ba, H_bb) = self.partition_hessian(...);  // EXPENSIVE
     let (b_a, b_b) = self.partition_gradient(...);                // EXPENSIVE
-    
+
     let schur_complement = &H_aa - &H_ab * &H_bb_inv_H_ba;        // VERY EXPENSIVE
-    
+
     // ... 100 lines later ...
-    
+
     if prior_param_ids.is_empty() {
         return MarginalizationResult { prior: None, ... };  // ← Discards result!
     }
@@ -160,7 +160,7 @@ pub fn marginalize(&mut self, ...) -> MarginalizationResult {
 pub fn marginalize(&mut self, ...) -> MarginalizationResult {
     // Validate that marginalization is needed BEFORE expensive computation
     let (keep_indices, marg_indices) = self.build_index_maps(param_blocks, keep_ids, marg_ids);
-    
+
     if marg_indices.is_empty() {
         log::debug!("No parameters to marginalize; early exit");
         return MarginalizationResult {
@@ -168,7 +168,7 @@ pub fn marginalize(&mut self, ...) -> MarginalizationResult {
             info: MarginalizationInfo::default(),
         };
     }
-    
+
     // NOW do expensive work
     let (H_aa, H_ab, H_ba, H_bb) = self.partition_hessian(...);
     // ... rest unchanged ...
@@ -182,8 +182,8 @@ pub fn marginalize(&mut self, ...) -> MarginalizationResult {
 ## PRIORITY 2: Fix Before Production Deployment
 
 ### Bug #5: Redundant Scaling Parameters
-**File**: `src/optimization/marginalization.rs:115 + 637-642`  
-**Severity**: CRITICAL (API confusion)  
+**File**: `src/optimization/marginalization.rs:115 + 637-642`
+**Severity**: CRITICAL (API confusion)
 **Issue**: `prior_weight` and `prior_info_scaling` do the same thing
 
 **Current**:
@@ -215,8 +215,8 @@ let info = schur * config.prior_info_scale;  // Clear intent
 ---
 
 ### Bug #10: FEJ Cache Populated But Unused
-**File**: `src/optimization/marginalization.rs:1426-1440 + 913-922`  
-**Severity**: MODERATE (feature incomplete)  
+**File**: `src/optimization/marginalization.rs:1426-1440 + 913-922`
+**Severity**: MODERATE (feature incomplete)
 **Issue**: FEJ linearization points are cached but never consumed by Hessian approximators
 
 **Current Flow**:
@@ -255,8 +255,8 @@ pub fn compute_approximate_hessian(...) -> DMatrix<f64> {
 ## PRIORITY 3: Before First Embedded Flight
 
 ### Bug #1: Partition Logic Reconstructed Each Call
-**File**: `src/optimization/marginalization.rs:1110-1230`  
-**Severity**: MODERATE (fragile logic)  
+**File**: `src/optimization/marginalization.rs:1110-1230`
+**Severity**: MODERATE (fragile logic)
 **Issue**: `expand_block_indices()` rebuilds parameter ordering each time, no assertion that order is consistent
 
 **Current**:

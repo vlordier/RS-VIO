@@ -19,17 +19,17 @@ All code, documentation, and tests delivered. Ready for Phase 3 integration.
   - Block matching with SAD metric
   - RANSAC outlier rejection (1000 iterations)
   - Full disparity range search (60 pixels)
-  
+
 - `IMUGuidedStrategy` (150 lines)
   - IMU velocity prediction
   - Restricted search window (±8 pixels)
   - Reduced RANSAC (500 iterations)
-  
+
 - `TemporalConsistencyStrategy` (150 lines)
   - Frame-to-frame depth coherence filtering
   - Deterministic O(n) processing (no RANSAC)
   - 20% depth change threshold
-  
+
 - `HybridOpticalFlowStrategy` (155 lines)
   - Gradient-based region filtering
   - Selective stereo matching

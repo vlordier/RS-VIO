@@ -157,7 +157,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     println!(
         "  - Average: {:.2}ms per frame",
-        process_time.as_secs_f64() * 1000.0 / processed_count as f64
+        process_time.as_secs_f64() * 1000.0 / f64::from(processed_count)
     );
 
     // Extract trajectory

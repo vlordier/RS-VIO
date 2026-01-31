@@ -54,7 +54,7 @@ python scripts/evaluate_trajectories.py
   - `PerformanceMonitor`: Real-time CPU/memory sampling
   - `VIOBenchmark`: Orchestrates benchmark runs
   - `BenchmarkAnalysis`: Generates comparison tables
-  
+
 **Output:**
 - Per-iteration timing breakdown
 - Peak/average memory usage
@@ -366,7 +366,7 @@ RS-VIO/
 
 For questions about:
 - **Algorithm:** See TIGHT_COUPLING.md
-- **Tuning:** See TUNING_GUIDE.md  
+- **Tuning:** See TUNING_GUIDE.md
 - **Testing:** See tests/tight_coupling_integration_tests.rs
 - **Performance:** See scripts/benchmark_vio.py output
 - **Troubleshooting:** See TUNING_GUIDE.md "Troubleshooting" section

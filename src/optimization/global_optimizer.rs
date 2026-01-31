@@ -18,9 +18,9 @@ use apex_solver::manifold::ManifoldType;
 use apex_solver::optimizer::levenberg_marquardt::{LevenbergMarquardt, LevenbergMarquardtConfig};
 use na::{DVector, UnitQuaternion};
 use nalgebra as na;
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::time::Instant;
-use rayon::prelude::*;
 
 impl GlobalPoseGraph {
     /// Run full global bundle adjustment optimization
@@ -125,48 +125,66 @@ impl GlobalPoseGraph {
 
         // Phase 3: Add visual reprojection factors (Phase 2A)
         // These factors constrain both pose and landmark variables using feature observations
-            // Parallel factor generation across keyframes then serial addition
-            type FactorData = (String, String, Box<BundleAdjustmentFactor>, Option<Box<dyn apex_solver::core::loss_functions::LossFunction + Send>>);
-            let factor_list: Vec<FactorData> = self.keyframe_poses
-                .par_iter()
-                .filter_map(|(keyframe_id, keyframe)| {
-                    let kf_var = id_to_var.get(keyframe_id)?.clone();
-                    let T_Cl_B = keyframe.T_B_Cl.try_inverse()?.cast::<f64>();
-                    let T_Cr_B = keyframe.T_B_Cr.try_inverse()?.cast::<f64>();
-                
-                    let mut factors = Vec::new();
-                
-                    // Left camera observations
-                    for (feature_id, obs_coord) in &keyframe.left_feature_observations {
-                        let mp_var = format!("MP_{}", feature_id);
-                        if initial_values.contains_key(&mp_var) {
-                            let observation = na::Vector2::new(obs_coord.0, obs_coord.1);
-                            let factor = Box::new(BundleAdjustmentFactor::new(observation, T_Cl_B.clone()).with_weight(1.0));
-                            let loss = HuberLoss::new(1.0).ok().map(|l| Box::new(l) as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>);
-                            factors.push((kf_var.clone(), mp_var, factor, loss));
-                        }
+        // Parallel factor generation across keyframes then serial addition
+        type FactorData = (
+            String,
+            String,
+            Box<BundleAdjustmentFactor>,
+            Option<Box<dyn apex_solver::core::loss_functions::LossFunction + Send>>,
+        );
+        let factor_list: Vec<FactorData> = self
+            .keyframe_poses
+            .par_iter()
+            .filter_map(|(keyframe_id, keyframe)| {
+                let kf_var = id_to_var.get(keyframe_id)?.clone();
+                let T_Cl_B = keyframe.T_B_Cl.try_inverse()?.cast::<f64>();
+                let T_Cr_B = keyframe.T_B_Cr.try_inverse()?.cast::<f64>();
+
+                let mut factors = Vec::new();
+
+                // Left camera observations
+                for (feature_id, obs_coord) in &keyframe.left_feature_observations {
+                    let mp_var = format!("MP_{}", feature_id);
+                    if initial_values.contains_key(&mp_var) {
+                        let observation = na::Vector2::new(obs_coord.0, obs_coord.1);
+                        let factor = Box::new(
+                            BundleAdjustmentFactor::new(observation, T_Cl_B.clone())
+                                .with_weight(1.0),
+                        );
+                        let loss = HuberLoss::new(1.0).ok().map(|l| {
+                            Box::new(l)
+                                as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>
+                        });
+                        factors.push((kf_var.clone(), mp_var, factor, loss));
                     }
-                
-                    // Right camera observations
-                    for (feature_id, obs_coord) in &keyframe.right_feature_observations {
-                        let mp_var = format!("MP_{}", feature_id);
-                        if initial_values.contains_key(&mp_var) {
-                            let observation = na::Vector2::new(obs_coord.0, obs_coord.1);
-                            let factor = Box::new(BundleAdjustmentFactor::new(observation, T_Cr_B.clone()).with_weight(1.0));
-                            let loss = HuberLoss::new(1.0).ok().map(|l| Box::new(l) as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>);
-                            factors.push((kf_var.clone(), mp_var, factor, loss));
-                        }
+                }
+
+                // Right camera observations
+                for (feature_id, obs_coord) in &keyframe.right_feature_observations {
+                    let mp_var = format!("MP_{}", feature_id);
+                    if initial_values.contains_key(&mp_var) {
+                        let observation = na::Vector2::new(obs_coord.0, obs_coord.1);
+                        let factor = Box::new(
+                            BundleAdjustmentFactor::new(observation, T_Cr_B.clone())
+                                .with_weight(1.0),
+                        );
+                        let loss = HuberLoss::new(1.0).ok().map(|l| {
+                            Box::new(l)
+                                as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>
+                        });
+                        factors.push((kf_var.clone(), mp_var, factor, loss));
                     }
-                
-                    Some(factors)
-                })
-                .flatten()
-                .collect();
-        
-            let num_visual_factors = factor_list.len();
-            for (kf_var, mp_var, factor, loss) in factor_list {
-                problem.add_residual_block(&[&kf_var, &mp_var], factor, loss);
-            }
+                }
+
+                Some(factors)
+            })
+            .flatten()
+            .collect();
+
+        let num_visual_factors = factor_list.len();
+        for (kf_var, mp_var, factor, loss) in factor_list {
+            problem.add_residual_block(&[&kf_var, &mp_var], factor, loss);
+        }
 
         if self.config.enable_logging {
             log::debug!(

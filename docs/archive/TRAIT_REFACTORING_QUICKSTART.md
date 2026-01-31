@@ -166,7 +166,7 @@ let metrics = matcher.match_keyframes(&query, &candidate);
 // Unified interface across all pools
 fn process_with_pool<P: ResourcePool>(pool: &P) {
     log::info!("Pool utilization: {:.1}%", pool.utilization() * 100.0);
-    
+
     if let Some(resource) = pool.try_acquire() {
         // Process...
         pool.release(resource);
@@ -188,6 +188,6 @@ fn process_state(state: State) -> Result<State, ValidationError> {
 
 ---
 
-**Status**: ✅ Phase 1 Complete  
-**Maintainer**: Ready for production use  
+**Status**: ✅ Phase 1 Complete
+**Maintainer**: Ready for production use
 **Version**: Included in next release (backward compatible)

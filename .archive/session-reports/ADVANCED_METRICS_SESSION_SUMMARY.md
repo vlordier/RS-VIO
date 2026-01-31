@@ -269,7 +269,7 @@ Final Confidence = denoise_confidence × super_res_confidence
 - Temporal smoothing
 - Anomaly detection
 
-### 2. Integration Tests  
+### 2. Integration Tests
 ✅ Benchmarks measure:
 - Distance scaling (0.5m to 15m)
 - Speed scaling (0.01 to 6.0 m/s)

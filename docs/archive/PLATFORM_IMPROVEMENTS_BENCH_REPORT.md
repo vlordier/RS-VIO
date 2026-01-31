@@ -1,7 +1,7 @@
 # Platform Improvements & Benchmark Report
 
-**Date**: 17 January 2026  
-**Scope**: Tightened Clippy, Enhanced platform detection, Benchmarks  
+**Date**: 17 January 2026
+**Scope**: Tightened Clippy, Enhanced platform detection, Benchmarks
 
 ## 1. Clippy Tightening
 
@@ -29,7 +29,7 @@
 - **Behavior**: Attempts GPU acceleration via `wgpu_available()`, falls back to CPU
 - **Log**: `🍎 macOS detected - GPU support available (feature 'gpu')`
 
-### Raspberry Pi 5  
+### Raspberry Pi 5
 - **Detection**: Multi-method (robust)
   1. `/proc/device-tree/model` (primary)
   2. `/proc/cpuinfo` + BCM2712 chip detection (fallback)
@@ -79,7 +79,7 @@ SIMD residual computations on macOS (M1/M2/M3):
 ### Roadmap for GPU Measurement
 To quantify GPU impact, require:
 1. **Actual GPU Implementation**: Convert `geometric_gpu::sampson_distance_batch_gpu` to real wgpu kernel
-2. **Benchmark Setup**: 
+2. **Benchmark Setup**:
    - Same benchmark run with/without `--features gpu`
    - Large correspondence sets (1000+) to show GPU advantage
    - Temperature-controlled environment for stable results
@@ -109,6 +109,6 @@ To quantify GPU impact, require:
 
 ---
 
-**Branch**: `develop`  
-**Default Branch**: `main`  
+**Branch**: `develop`
+**Default Branch**: `main`
 **Ready for PR**: Yes (after GPU validation)

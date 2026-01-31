@@ -36,7 +36,7 @@ impl RefinementNetwork {
     pub fn new(_model_path: &str) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self)
     }
-    
+
     pub fn refine(
         &self,
         _image: &[u8],

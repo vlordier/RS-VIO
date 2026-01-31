@@ -9,7 +9,7 @@ Successfully completed comprehensive end-to-end validation of RS-VIO SLAM system
 ### Problem
 When applying marginalization priors to the optimization problem, if some landmarks were pruned before the optimization step, the information matrix dimensions would not match the parameters actually in the optimization workspace.
 
-**Symptom:** 
+**Symptom:**
 ```
 assertion `left == right` failed: Concatenated parameter dimension 93 must match information matrix dimension 96
   left: 93
@@ -58,7 +58,7 @@ let joint_prior = JointPriorFactor::new(lin_point_concat, info_reduced, ...);
 ```
 
 ### Commit
-**Hash:** `a0a1a2d`  
+**Hash:** `a0a1a2d`
 **Message:** "fix: Handle dimension mismatch when some landmarks are pruned from marginalization"
 
 ---
@@ -259,6 +259,6 @@ This ensures robustness across different scenarios.
 
 ---
 
-**Validation Date:** January 20, 2026  
-**Status:** ✅ COMPLETE  
+**Validation Date:** January 20, 2026
+**Status:** ✅ COMPLETE
 **Result:** PRODUCTION READY

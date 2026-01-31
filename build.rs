@@ -7,7 +7,7 @@ fn main() {
     // ============================================================================
     // FEATURE FLAG VALIDATION
     // ============================================================================
-    
+
     // Mutually exclusive matching strategy features
     let matching_strategies = [
         "matching-basic-ransac",
@@ -80,7 +80,7 @@ fn main() {
     // ============================================================================
     // PLATFORM-SPECIFIC LINKING
     // ============================================================================
-    
+
     // Metal frameworks on macOS for student data export
     #[cfg(target_os = "macos")]
     {
@@ -98,4 +98,3 @@ fn main() {
     // Print summary
     println!("cargo:warning=RS-VIO feature validation passed");
 }
-

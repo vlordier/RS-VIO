@@ -49,7 +49,7 @@ if min_diag > 1e-14 {
 }
 ```
 
-**Why this is better**: 
+**Why this is better**:
 - Detects singular/near-singular matrices (min_diag approach)
 - Still O(n), not O(n³)
 - Falls back to SVD for true diagnostics when needed

@@ -18,7 +18,7 @@ mod error_scenarios {
     }
 
     fn create_test_frame(id: i32) -> Frame {
-        Frame::new(id as i64, id)
+        Frame::new(i64::from(id), id)
     }
 
     fn create_test_image(width: u32, height: u32) -> GrayImage {
@@ -128,7 +128,7 @@ mod error_scenarios {
 
         // Try detections - some may timeout
         for i in 0..3 {
-            let mut frame = create_test_frame(i as i32);
+            let mut frame = create_test_frame(i);
             let _ = detector
                 .detect_features(left.clone(), right.clone(), &mut frame)
                 .await;
@@ -340,7 +340,7 @@ mod error_scenarios {
         // Should have tracked the errors
         let rate = metrics.error_rate();
         assert!(
-            rate >= 0.0 && rate <= 1.0,
+            (0.0..=1.0).contains(&rate),
             "Error rate should be valid: {}",
             rate
         );
@@ -387,7 +387,7 @@ mod error_scenarios {
 
         // Process multiple frames
         for i in 0..5 {
-            let mut frame = create_test_frame(i as i32);
+            let mut frame = create_test_frame(i);
             let left = create_test_image(100, 100);
             let right = create_test_image(100, 100);
 

@@ -11,8 +11,8 @@
 
 use super::{FeatureError, FeatureResult, FeatureTrack, FeatureTracker, Keypoint};
 use crate::types::Float;
-use std::collections::VecDeque;
 use rayon::prelude::*;
+use std::collections::VecDeque;
 
 /// Shi-Tomasi corner detection configuration
 #[derive(Debug, Clone)]
@@ -77,27 +77,27 @@ impl GFTTDetector {
         // Compute gradients
         Self::compute_gradient(image, width, height, &mut dx, &mut dy);
 
-            // Parallel Harris response computation across image rows
+        // Parallel Harris response computation across image rows
         let k = 0.04;
-            let response: Vec<Float> = (0..(w * h))
-                .into_par_iter()
-                .map(|idx| {
-                    let y = idx / w;
-                    let x = idx % w;
-                    if y < 1 || y >= h - 1 || x < 1 || x >= w - 1 {
-                        return 0.0;
-                    }
-                    let ix = dx[idx];
-                    let iy = dy[idx];
-                    let ixx = ix * ix;
-                    let iyy = iy * iy;
-                    let ixy = ix * iy;
-                    let det = ixx * iyy - ixy * ixy;
-                    let trace = ixx + iyy;
-                    det - k * trace * trace
-                })
-                .collect();
-            response
+        let response: Vec<Float> = (0..(w * h))
+            .into_par_iter()
+            .map(|idx| {
+                let y = idx / w;
+                let x = idx % w;
+                if y < 1 || y >= h - 1 || x < 1 || x >= w - 1 {
+                    return 0.0;
+                }
+                let ix = dx[idx];
+                let iy = dy[idx];
+                let ixx = ix * ix;
+                let iyy = iy * iy;
+                let ixy = ix * iy;
+                let det = ixx * iyy - ixy * ixy;
+                let trace = ixx + iyy;
+                det - k * trace * trace
+            })
+            .collect();
+        response
     }
 
     /// Apply non-maximum suppression
@@ -156,36 +156,37 @@ impl GFTTDetector {
         let grid_h = self.config.grid_size;
         let max_per_cell = self.config.max_per_grid;
 
-            // Parallel assignment and keypoint generation
-            use std::sync::Mutex;
-            let grid: Vec<Mutex<Vec<(u32, u32, Float)>>> = 
-                (0..(grid_w * grid_h)).map(|_| Mutex::new(Vec::new())).collect();
+        // Parallel assignment and keypoint generation
+        use std::sync::Mutex;
+        let grid: Vec<Mutex<Vec<(u32, u32, Float)>>> = (0..(grid_w * grid_h))
+            .map(|_| Mutex::new(Vec::new()))
+            .collect();
 
-            corners.par_iter().for_each(|&(x, y, score)| {
-                let gx = (x / grid_w).min(grid_w - 1);
-                let gy = (y / grid_h).min(grid_h - 1);
-                let cell_idx = (gy * grid_w + gx) as usize;
-                let mut cell = grid[cell_idx].lock().unwrap();
-                if cell.len() < max_per_cell as usize {
-                    cell.push((x, y, score));
-                }
-            });
+        corners.par_iter().for_each(|&(x, y, score)| {
+            let gx = (x / grid_w).min(grid_w - 1);
+            let gy = (y / grid_h).min(grid_h - 1);
+            let cell_idx = (gy * grid_w + gx) as usize;
+            let mut cell = grid[cell_idx].lock().unwrap();
+            if cell.len() < max_per_cell as usize {
+                cell.push((x, y, score));
+            }
+        });
 
-            grid.into_par_iter()
-                .flat_map(|cell| {
-                    cell.into_inner()
-                        .unwrap()
-                        .into_iter()
-                        .map(|(x, y, score)| Keypoint {
-                            x: x as Float,
-                            y: y as Float,
-                            score,
-                            scale: 1.0,
-                            angle: None,
-                        })
-                        .collect::<Vec<_>>()
-                })
-                .collect()
+        grid.into_par_iter()
+            .flat_map(|cell| {
+                cell.into_inner()
+                    .unwrap()
+                    .into_iter()
+                    .map(|(x, y, score)| Keypoint {
+                        x: x as Float,
+                        y: y as Float,
+                        score,
+                        scale: 1.0,
+                        angle: None,
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect()
     }
 }
 

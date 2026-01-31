@@ -175,12 +175,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     println!(
         "  - Average: {:.2}ms per frame",
-        process_time.as_secs_f64() * 1000.0 / processed_count as f64
+        process_time.as_secs_f64() * 1000.0 / f64::from(processed_count)
     );
     println!("  - IMU samples processed: {}", total_imu_samples);
     println!(
         "  - IMU samples per frame: {:.1}",
-        total_imu_samples as f64 / processed_count as f64
+        f64::from(total_imu_samples) / f64::from(processed_count)
     );
 
     // Extract trajectory

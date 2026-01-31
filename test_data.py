@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 import json
-import torch
-import numpy as np
 from pathlib import Path
+
+import numpy as np
+import torch
 
 # Load metadata to verify
 with open('exported_data/metadata.json', 'r') as f:
     metadata = json.load(f)
     print(f'Loaded metadata: {len(metadata)} frames')
-    
+
 # Check first frame
 frame = metadata[0]
 print(f'Frame 0 has {len(frame)} fields')

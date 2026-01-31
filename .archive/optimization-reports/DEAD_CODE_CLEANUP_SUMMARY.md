@@ -17,7 +17,7 @@
 
 - **Deleted Stub Helper Functions** (60 lines)
   - `generate_synthetic_correspondences()` - only used by RansacEpipolarVerifier
-  - `count_inliers()` - only used by RansacEpipolarVerifier  
+  - `count_inliers()` - only used by RansacEpipolarVerifier
   - `compute_hamming_distance()` - only used by HammingMatcher
 
 - **Removed Associated Tests** (4 test functions deleted)

@@ -27,7 +27,7 @@ The current heuristic `κ ≈ ||A||_F / trace(A)` is **not** a condition number:
 
 ```
 Example: A = [[1, 0], [0, 1e-6]]
-  
+
 True κ = 1/1e-6 = 1e6 (singular!)
 Computed κ = 1.0 / 1.0 ≈ 1.0 (claims well-conditioned!) ❌
 
@@ -42,7 +42,7 @@ when the matrix is actually ill-conditioned.
 ### 2. **FEJ Cache Stores Data But Never Uses It** (Issue #10)
 Linearization points are cached (to maintain First-Estimate Jacobian property) but:
 - The cache is populated
-- Passed to prior constructor  
+- Passed to prior constructor
 - Stored in MarginalizationPrior
 - **Never actually used by HessianApproximator** ❌
 

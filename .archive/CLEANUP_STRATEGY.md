@@ -74,11 +74,11 @@ More completion reports for phases that are done:
 
 ## What to Keep in Archive
 
-**Validation Reports** (19 files): Actual test results, useful for validation history  
-**Optimization Reports** (16 files): Performance benchmarks, useful for performance history  
-**Session Reports** (14 files): Work session records, historical context  
-**Feature Docs** (5 files): Deep technical content still useful for understanding  
-**Session Logs** (2 files): Cleanup meta-docs, keep for reference  
+**Validation Reports** (19 files): Actual test results, useful for validation history
+**Optimization Reports** (16 files): Performance benchmarks, useful for performance history
+**Session Reports** (14 files): Work session records, historical context
+**Feature Docs** (5 files): Deep technical content still useful for understanding
+**Session Logs** (2 files): Cleanup meta-docs, keep for reference
 **Completed Phases** (8 files):
 - `CALIBRATION_AWARE_METRICS.md` - Actual metrics
 - `CALIBRATION_IMPLEMENTATION_SUMMARY.md` - Implementation details (keep)
@@ -114,8 +114,8 @@ More completion reports for phases that are done:
 
 ## Result
 
-**Before**: 120 archived files  
-**After**: ~82 archived files  
+**Before**: 120 archived files
+**After**: ~82 archived files
 **Removed**: ~38 files with zero information loss
 
 All removed files are either:
@@ -130,4 +130,3 @@ All removed files are either:
 - ✅ Roadmaps for historical understanding
 - ✅ Session reports for work history
 - ✅ Deep technical feature documentation
-

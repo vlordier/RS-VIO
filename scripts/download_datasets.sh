@@ -13,7 +13,7 @@ Dataset Availability:
 - EuRoC: Registration required at https://projects.asl.ethz.ch/datasets/euroc-mav/
   * Download MH_01_easy.zip manually and place in /tmp/MH_01_easy.zip
   * Script will extract it to <target-dir>/euroc/
-  
+
 - TUM-VI: Free download at https://vision.in.tum.de/data/datasets/visual-inertial-dataset
   * This script downloads the walking_xyz sequence automatically
   * ~1.5 GB download
@@ -52,7 +52,7 @@ fetch_euroc() {
   echo "=== EuRoC MH_01_easy ==="
   echo "Note: EuRoC requires registration at https://projects.asl.ethz.ch/datasets/euroc-mav/"
   echo "Please download MH_01_easy.zip manually and extract to: $root"
-  
+
   if [ -f "/tmp/MH_01_easy.zip" ]; then
     extract_zip "/tmp/MH_01_easy.zip" "$root"
     rm "/tmp/MH_01_easy.zip"
@@ -67,12 +67,12 @@ fetch_tum() {
   echo "=== TUM RGB-D freiburg3_walking_xyz ==="
   local url="http://download.tum.de/rgbd/dataset/freiburg3/rgbd-dataset_freiburg3_walking_xyz.tgz"
   local archive="/tmp/tum_vi.tgz"
-  
+
   fetch "$url" "$archive"
   mkdir -p "$root"
   tar -xzf "$archive" -C "$root" --strip-components=1
   rm "$archive"
-  
+
   echo "TUM dataset extracted to $root"
 }
 
@@ -81,7 +81,7 @@ fetch_4seasons() {
   echo "=== 4Seasons Dataset ==="
   echo "Note: 4Seasons requires download from https://www.4seasons-dataset.com/"
   echo "Please download a recording ZIP and extract to: $root"
-  
+
   # Fallback for development: create minimal structure if nothing exists
   if [ ! -d "$root" ] || [ -z "$(ls -A "$root" 2>/dev/null)" ]; then
     echo "4Seasons data not found. Please download manually from https://www.4seasons-dataset.com/"

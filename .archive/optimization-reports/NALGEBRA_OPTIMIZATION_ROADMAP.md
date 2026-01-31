@@ -51,7 +51,7 @@ Check if f32 is actually used or just cargo-culted from float-generic code.
    ```rust
    // Before: Generic over Float type
    pub fn process<F: Float>(data: &[F]) -> F { ... }
-   
+
    // After: Use f64 directly (VIO needs precision)
    pub fn process(data: &[f64]) -> f64 { ... }
    ```
@@ -60,7 +60,7 @@ Check if f32 is actually used or just cargo-culted from float-generic code.
    ```toml
    # Before:
    nalgebra = { version = "0.33.2", features = ["std"] }
-   
+
    # After:
    nalgebra = { version = "0.33.2", features = ["std"], default-features = false }
    # And remove any f32 type specializations
@@ -70,10 +70,10 @@ Check if f32 is actually used or just cargo-culted from float-generic code.
    ```rust
    // Instead of: DMatrix<f64> (dynamic, monomorphized 3x3, 4x4, NxN variants)
    // Use: Matrix3<f64>, Matrix4<f64>, Vector3<f64> (pre-specialized)
-   
+
    // Replace:
    let K = DMatrix::from_row_slice(3, 3, &[fx, 0, cx, 0, fy, cy, 0, 0, 1]);
-   
+
    // With:
    let K = Matrix3::<f64>::new(
        fx, 0.0, cx,
@@ -85,10 +85,10 @@ Check if f32 is actually used or just cargo-culted from float-generic code.
 4. **Reduce Matrix::apply monomorphization (128 variants!)**
    ```rust
    // The issue: Matrix::apply takes a closure, creating a new monomorphization per closure type
-   
+
    // Instead of:
    matrix.map(|x| expensive_operation(x))  // Creates new monomorphization
-   
+
    // Use:
    let mut result = matrix.clone();
    for elem in result.iter_mut() {

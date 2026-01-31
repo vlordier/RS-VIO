@@ -34,7 +34,7 @@ pub fn estimate_with_workspace(
 for iteration in 0..max_iterations {
     let sample_indices = Self::random_sample(matches.len(), Self::MIN_SAMPLES);  // <- Alloc
     let sample: Vec<_> = sample_indices.iter().map(|&i| matches[i]).collect();   // <- Alloc
-    
+
     if let Some(fundamental) = Self::estimate_from_sample(&sample) {
         let mut inliers = Vec::new();  // <- Alloc per iteration
         for (i, (p1, p2)) in matches.iter().enumerate() {
@@ -56,13 +56,13 @@ for iteration in 0..max_iterations {
         // Fill from random pool
         hypothesis_samples.push(idx);
     }
-    
+
     let sample: Vec<_> = hypothesis_samples.iter().map(|&i| matches[i]).collect();
-    
+
     if let Some(fundamental) = Self::estimate_from_sample(&sample) {
         inlier_mask.clear();  // <- No alloc, reuse
         inlier_mask.resize(matches.len(), false);
-        
+
         let mut inlier_count = 0;
         for (i, (p1, p2)) in matches.iter().enumerate() {
             if ... { inlier_mask[i] = true; inlier_count += 1; }
@@ -137,9 +137,9 @@ let result = RansacFundamental::estimate(&matches, threshold, confidence);
 // After: Optimized code with workspace
 let mut workspace = FrameWorkspace::default();
 let result = RansacFundamental::estimate_with_workspace(
-    &matches, 
-    threshold, 
-    confidence, 
+    &matches,
+    threshold,
+    confidence,
     &mut workspace
 );
 ```

@@ -34,7 +34,7 @@ fn create_synthetic_images() -> (image::DynamicImage, image::DynamicImage) {
         for x in 0..width {
             let idx = (y * width + x) as usize;
             // Shift by ~50 pixels (simulating stereo disparity)
-            let shifted_x = if x > 50 { x - 50 } else { 0 };
+            let shifted_x = x.saturating_sub(50);
             right_data[idx] = (((shifted_x + y) % 256) as u8).saturating_mul(2);
         }
     }

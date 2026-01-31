@@ -79,7 +79,7 @@ pub struct ImuAidedInitializer {
 
 impl ImuAidedInitializer {
     /// Create new initializer
-    pub fn new(config: ImuInitConfig) -> Self {
+    pub const fn new(config: ImuInitConfig) -> Self {
         Self {
             config,
             state: InitializationState::WaitingForStatic,
@@ -172,12 +172,12 @@ impl ImuAidedInitializer {
     }
 
     /// Get current gravity estimate
-    pub fn gravity(&self) -> na::Vector3<f64> {
+    pub const fn gravity(&self) -> na::Vector3<f64> {
         self.gravity_estimate
     }
 
     /// Get initialization state
-    pub fn state(&self) -> InitializationState {
+    pub const fn state(&self) -> InitializationState {
         self.state
     }
 

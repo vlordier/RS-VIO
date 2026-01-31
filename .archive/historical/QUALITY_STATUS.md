@@ -1,7 +1,7 @@
 # Quality Tooling Status
 
-**Last Updated**: 2026-01-16  
-**Branch**: develop  
+**Last Updated**: 2026-01-16
+**Branch**: develop
 **Rust Version**: 1.80+
 
 ## ✅ Passing Quality Checks
@@ -44,7 +44,7 @@ cargo geiger  # Hangs or fails with package matching errors
 
 **Root Cause**: Known cargo-geiger issue with large dependency trees and certain package versions (time@0.3.45, valuable@0.1.1, allocator-api2, foldhash)
 
-**Mitigation**: 
+**Mitigation**:
 - Project uses `#![forbid(unsafe_code)]` at crate level
 - Manual verification: `rg "unsafe" src/` returns no hits in production code
 - Dependencies audited via cargo-deny and cargo-audit

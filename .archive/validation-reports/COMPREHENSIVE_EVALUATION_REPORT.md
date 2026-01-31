@@ -5,7 +5,7 @@
 Completed comprehensive metrics-based evaluation of all 4 IMU-vision fusion configurations:
 1. **Baseline**: No IMU filtering, no super-resolution
 2. **IMU Only**: Denoise + higher-order filtering
-3. **Super-Resolution Only**: Adaptive subpixel refinement  
+3. **Super-Resolution Only**: Adaptive subpixel refinement
 4. **Full Fusion**: Both IMU filtering + super-resolution
 
 The evaluation tested 4 critical metrics across synthetic trajectories and feature datasets:
@@ -426,7 +426,7 @@ The adaptive confidence weighting ensures optimal behavior across all motion sce
 
 ---
 
-*Evaluation Report Generated*  
-*Metrics Framework: Custom implementation following TUM RGB-D standards*  
-*Test Coverage: 4 metric categories, 4 configurations, 100 iterations each*  
+*Evaluation Report Generated*
+*Metrics Framework: Custom implementation following TUM RGB-D standards*
+*Test Coverage: 4 metric categories, 4 configurations, 100 iterations each*
 *Statistical Confidence: >99%*

@@ -13,7 +13,7 @@
 ## Phase 1: Production-Grade Descriptors (High Impact, Medium Effort)
 
 ### 1.1 ORB Descriptor Integration
-**Goal**: Replace simple statistics with robust binary descriptors  
+**Goal**: Replace simple statistics with robust binary descriptors
 **Impact**: 10-100x better discrimination, scale/rotation invariance
 
 **Tasks**:
@@ -23,14 +23,14 @@
 - [ ] Benchmark: precision/recall vs current baseline
 - [ ] **Estimated effort**: 2-3 days
 
-**Dependencies**: 
+**Dependencies**:
 - `image-rs` for ORB extraction OR
 - Direct integration with existing feature tracker
 
 ---
 
 ### 1.2 DBoW2 Vocabulary Tree
-**Goal**: Bag-of-Words with inverted index for sub-linear candidate search  
+**Goal**: Bag-of-Words with inverted index for sub-linear candidate search
 **Impact**: Database queries from O(N) → O(log N), enables 10K+ keyframe databases
 
 **Tasks**:
@@ -51,7 +51,7 @@
 ## Phase 2: Advanced Matching & Verification (Medium Impact, Medium Effort)
 
 ### 2.1 ANN-based Candidate Search
-**Goal**: Approximate Nearest Neighbor for real-time large-scale retrieval  
+**Goal**: Approximate Nearest Neighbor for real-time large-scale retrieval
 **Impact**: 100x speedup for >10K keyframes, enables lifelong SLAM
 
 **Tasks**:
@@ -66,7 +66,7 @@
 ---
 
 ### 2.2 PnP-RANSAC Geometric Verification
-**Goal**: Verify loop closures using 3D-2D correspondences instead of 2D-2D  
+**Goal**: Verify loop closures using 3D-2D correspondences instead of 2D-2D
 **Impact**: More accurate pose estimation, reject degenerate motions
 
 **Tasks**:
@@ -84,7 +84,7 @@
 ---
 
 ### 2.3 Multi-Hypothesis Loop Closure
-**Goal**: Track multiple candidate loop closures and resolve ambiguity  
+**Goal**: Track multiple candidate loop closures and resolve ambiguity
 **Impact**: Robust to perceptual aliasing (similar-looking places)
 
 **Tasks**:
@@ -102,7 +102,7 @@
 ## Phase 3: Global Optimization & Pose Graph (High Impact, High Effort)
 
 ### 3.1 Standalone Pose Graph Backend
-**Goal**: Decouple pose graph from sliding window BA for global consistency  
+**Goal**: Decouple pose graph from sliding window BA for global consistency
 **Impact**: Unbounded trajectory optimization, multi-session SLAM
 
 **Tasks**:
@@ -123,7 +123,7 @@
 ---
 
 ### 3.2 iSAM2 Incremental Smoothing
-**Goal**: Replace batch BA with incremental factor graph optimization  
+**Goal**: Replace batch BA with incremental factor graph optimization
 **Impact**: Real-time performance for large-scale SLAM (1000+ keyframes)
 
 **Tasks**:
@@ -140,7 +140,7 @@
 ## Phase 4: Configuration & Usability (Low Effort, High Value)
 
 ### 4.1 YAML Configuration
-**Goal**: Expose all loop-closure parameters in config files  
+**Goal**: Expose all loop-closure parameters in config files
 **Impact**: Easy tuning for different datasets without recompilation
 
 **Tasks**:
@@ -158,7 +158,7 @@
 ---
 
 ### 4.2 Runtime Statistics & Tuning
-**Goal**: Adaptive parameter tuning based on detection quality  
+**Goal**: Adaptive parameter tuning based on detection quality
 **Impact**: Robust performance across varying environments
 
 **Tasks**:
@@ -176,7 +176,7 @@
 ## Phase 5: Evaluation & Benchmarking (Medium Effort, High Value)
 
 ### 5.1 Loop Closure Metrics
-**Goal**: Quantitative evaluation of detection quality  
+**Goal**: Quantitative evaluation of detection quality
 **Impact**: Systematic improvement and ablation studies
 
 **Tasks**:
@@ -198,7 +198,7 @@
 ---
 
 ### 5.2 Real-Dataset Validation
-**Goal**: Test loop closure on diverse real-world sequences  
+**Goal**: Test loop closure on diverse real-world sequences
 **Impact**: Confidence in production deployment
 
 **Tasks**:
@@ -219,7 +219,7 @@
 ## Phase 6: Advanced Features (Stretch Goals)
 
 ### 6.1 Learned Descriptors (NetVLAD, SuperPoint)
-**Goal**: State-of-the-art place recognition with neural networks  
+**Goal**: State-of-the-art place recognition with neural networks
 **Impact**: Superior performance in challenging conditions (night/day, season changes)
 
 **Tasks**:
@@ -236,7 +236,7 @@
 ---
 
 ### 6.2 Multi-Session SLAM
-**Goal**: Save/load loop closure database for map reuse across sessions  
+**Goal**: Save/load loop closure database for map reuse across sessions
 **Impact**: Lifelong SLAM, relocalization in known environments
 
 **Tasks**:
@@ -252,7 +252,7 @@
 ---
 
 ### 6.3 Visual-Inertial Co-Localization
-**Goal**: Use IMU preintegration to validate loop closure constraints  
+**Goal**: Use IMU preintegration to validate loop closure constraints
 **Impact**: Reject false positives using motion consistency
 
 **Tasks**:

@@ -5,12 +5,11 @@ using a CSV-based approach instead of HDF5.
 """
 
 import argparse
+import csv
 import json
 import logging
-from pathlib import Path
 from dataclasses import dataclass
-from typing import Optional
-import csv
+from pathlib import Path
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,21 +30,21 @@ class ExportConfig:
 
 class TeacherExporter:
     """Export teacher frames to CSV and optionally images"""
-    
+
     def __init__(self, config: ExportConfig):
         self.config = config
         self.output_dir = Path(config.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        
+
         self.frame_count = 0
         self.csv_file = None
         self.csv_writer = None
-        
+
         # Open CSV file for writing
         if config.enable_csv:
             csv_path = self.output_dir / f"{config.sequence_name}.csv"
             self.csv_file = open(csv_path, 'w', newline='')
-            
+
             # Write header
             fieldnames = [
                 'frame_id', 'timestamp',
@@ -59,12 +58,12 @@ class TeacherExporter:
             self.csv_writer = csv.DictWriter(self.csv_file, fieldnames=fieldnames)
             self.csv_writer.writeheader()
             logger.info(f"Opened CSV export: {csv_path}")
-    
+
     def export_frame(self, frame_data: dict) -> None:
         """Export a single frame to CSV"""
         if self.csv_writer is None:
             return
-        
+
         try:
             row = {
                 'frame_id': frame_data.get('frame_id', self.frame_count),
@@ -89,47 +88,47 @@ class TeacherExporter:
             }
             self.csv_writer.writerow(row)
             self.frame_count += 1
-            
+
             if self.frame_count % 100 == 0:
                 logger.info(f"Exported {self.frame_count} frames to CSV")
                 self.csv_file.flush()
-                
+
         except Exception as e:
             logger.error(f"Error exporting frame: {e}")
-    
+
     def finalize(self) -> dict:
         """Finalize export and return statistics"""
         if self.csv_file:
             self.csv_file.close()
-        
+
         stats = {
             'frames_exported': self.frame_count,
             'output_dir': str(self.output_dir),
             'sequence_name': self.config.sequence_name,
             'format': 'CSV',
         }
-        
+
         logger.info(f"✅ Teacher export complete: {self.frame_count} frames")
-        
+
         # Write statistics
         stats_file = self.output_dir / f"{self.config.sequence_name}_stats.json"
         with open(stats_file, 'w') as f:
             json.dump(stats, f, indent=2)
         logger.info(f"Statistics saved to: {stats_file}")
-        
+
         return stats
 
 
 def generate_mock_export(output_dir: Path, sequence_name: str, num_frames: int = 100):
     """Generate mock teacher data for testing"""
     logger.info(f"Generating {num_frames} mock frames to {output_dir}")
-    
+
     exporter = TeacherExporter(ExportConfig(
         dataset_path=Path("/data"),
         output_dir=output_dir,
         sequence_name=sequence_name,
     ))
-    
+
     # Generate mock frames
     for i in range(num_frames):
         frame_data = {
@@ -151,7 +150,7 @@ def generate_mock_export(output_dir: Path, sequence_name: str, num_frames: int =
             'image_intensity_mean': 128.0,
         }
         exporter.export_frame(frame_data)
-    
+
     return exporter.finalize()
 
 
@@ -180,12 +179,12 @@ def main():
         action='store_true',
         help="Enable verbose logging"
     )
-    
+
     args = parser.parse_args()
-    
+
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
-    
+
     # Generate mock data
     stats = generate_mock_export(args.output_dir, args.sequence_name, args.num_frames)
     print(f"\n{'='*60}")

@@ -22,7 +22,7 @@
 ```
 Top Resonance Frequencies:
 1. 0.06 Hz   - 99.2% total energy (DOMINANT)
-2. 1.46 Hz   - 0.8% total energy  
+2. 1.46 Hz   - 0.8% total energy
 3-6. Others  - <0.01% each
 ```
 
@@ -48,7 +48,7 @@ Top Resonance Frequencies:
 **Before Filtering:**
 ```
 Power (dB)
-     │ 
+     │
   50 │ ╭─────╮ ← 99.2% energy at 0.06 Hz
   40 │ │  │  │
   30 │ │  │  │
@@ -59,7 +59,7 @@ Power (dB)
       0.06    1.46     10     100  (Hz)
 
 After Filtering:
-     │ 
+     │
   50 │                            ← Clean baseline
   40 │
   30 │
@@ -80,7 +80,7 @@ After Filtering:
 **Raw Signal** (first 10 seconds):
 ```
 Gyro Y-axis (rad/s)
-   0.3 ┤   ╱╲   ╱╲  
+   0.3 ┤   ╱╲   ╱╲
    0.2 ┤╱╲╱  ╲╱  ╲╱╲
    0.1 ┤         (high-frequency jitter)
    0.0 ┤________________________
@@ -93,13 +93,13 @@ Gyro Y-axis (rad/s)
 **Filtered Signal**:
 ```
 Gyro Y-axis (rad/s)
-   0.3 ┤    
-   0.2 ┤  ╱─────╲  
+   0.3 ┤
+   0.2 ┤  ╱─────╲
    0.1 ┤╱        ╲ ╱─ (smooth)
    0.0 ┤─────────────────
   -0.1 ┤        ╱─
   -0.2 ┤╲────╱
-  -0.3 ┤ 
+  -0.3 ┤
        └─────────────────── time
 ```
 
@@ -367,4 +367,3 @@ Numerical Stability:
 | Trajectory error | Same or better | ✓ Expected |
 
 **Overall Assessment**: ✅ Ready for deployment
-

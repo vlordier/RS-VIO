@@ -45,21 +45,21 @@ FAILED=0
 
 for seq in "${SEQUENCES[@]}"; do
     SEQ_PATH="$TUM_VI_ROOT/$seq"
-    
+
     if [ ! -d "$SEQ_PATH" ]; then
         echo "⚠️  Skipping $seq - directory not found"
         continue
     fi
-    
+
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo "Processing: $seq"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    
+
     # Create sequence-specific output directory
     SEQ_OUTPUT="$OUTPUT_DIR/$seq"
     mkdir -p "$SEQ_OUTPUT"
-    
+
     # Run export with proper configuration
     echo "🚀 Starting export..."
     if "$EXPORT_BINARY" \
@@ -68,16 +68,16 @@ for seq in "${SEQUENCES[@]}"; do
         --output-dir "$SEQ_OUTPUT" \
         --sequence-name "$seq" \
         2>&1 | tee "$SEQ_OUTPUT/export.log"; then
-        
+
         echo "✅ Export successful for $seq"
         ((SUCCESSFUL++))
-        
+
         # Validate exported data
         echo "🔍 Validating export..."
         if command -v python3 &> /dev/null; then
             python3 "$REPO_ROOT/tools/validate_export.py" "$SEQ_OUTPUT/$seq.h5" --verbose || true
         fi
-        
+
     else
         echo "❌ Export failed for $seq"
         ((FAILED++))

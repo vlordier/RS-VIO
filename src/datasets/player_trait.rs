@@ -411,7 +411,11 @@ pub fn process_single_frame_common(
         let avg_imu = context.imu_fetch_time_ms_sum / context.frames_timed as f64;
         let avg_est = context.estimator_time_ms_sum / context.frames_timed as f64;
         let total_avg_ms = avg_io + avg_imu + avg_est;
-        let fps = if total_avg_ms > 0.0 { 1000.0 / total_avg_ms } else { 0.0 };
+        let fps = if total_avg_ms > 0.0 {
+            1000.0 / total_avg_ms
+        } else {
+            0.0
+        };
         println!(
             "[Perf] avg_io={:.2}ms avg_imu={:.2}ms avg_est={:.2}ms total={:.2}ms ({:.1} fps) over {} frames",
             avg_io, avg_imu, avg_est, total_avg_ms, fps, context.frames_timed

@@ -78,10 +78,10 @@ pub fn solve_with_workspace(
         // Instead of: let sampled: Vec<usize> = ...
         // Use: workspace.ransac_hypothesis_samples_mut().clear();
         //      workspace.ransac_hypothesis_samples_mut().extend(...);
-        
+
         // Instead of: let mut inliers = Vec::new();
         // Use: workspace.ransac_inlier_mask_mut().iter_mut().for_each(|x| *x = false);
-        
+
         // Instead of: for ... { let error = ...;
         // Use: workspace.ransac_residuals_mut()[i] = error;
     }
@@ -117,13 +117,13 @@ impl Estimator {
     fn process_frame(&mut self, frame: &StereoFrame) -> Result<EstimatorOutput> {
         // Get workspace from self
         let workspace = &mut self.frame_workspace;
-        
+
         // Pass workspace to RANSAC operations
         if let Ok(result) = PnPRansacSolver::new(config)
             .solve_with_workspace(&correspondences, &intrinsics, workspace) {
             // Use result
         }
-        
+
         // Reset workspace after frame processing
         workspace.reset();
     }

@@ -6,22 +6,22 @@ Shows what datasets have been exported and are ready for training.
 
 import json
 from pathlib import Path
-from typing import Dict, List
+
 
 def check_datasets():
     """Check all available datasets"""
-    
+
     print("="*70)
     print("AVAILABLE DATASETS FOR MULTI-DOMAIN TRAINING")
     print("="*70)
     print()
-    
+
     # Check exported_data_multi directory
     multi_path = Path("/Users/vincent/Work/RS-VIO/exported_data_multi")
     single_path = Path("/Users/vincent/Work/RS-VIO/exported_data")
-    
+
     datasets = []
-    
+
     # Check multi-dataset exports
     if multi_path.exists():
         print(f"📁 Multi-dataset exports: {multi_path}")
@@ -38,7 +38,7 @@ def check_datasets():
                         'type': 'multi'
                     })
         print()
-    
+
     # Check single dataset export
     if single_path.exists():
         metadata = single_path / "metadata.json"
@@ -53,7 +53,7 @@ def check_datasets():
                 'type': 'single'
             })
             print()
-    
+
     if not datasets:
         print("❌ No exported datasets found!")
         print()
@@ -61,27 +61,27 @@ def check_datasets():
         print("  ./export_multi_datasets.sh")
         print()
         return
-    
+
     # Print dataset summary
     print("DATASET SUMMARY")
     print("-" * 70)
     print(f"{'Dataset Name':<30} {'Frames':<10} {'Type':<10}")
     print("-" * 70)
-    
+
     total_frames = 0
     for ds in datasets:
         print(f"{ds['name']:<30} {ds['frames']:<10} {ds['type']:<10}")
         total_frames += ds['frames']
-    
+
     print("-" * 70)
     print(f"{'TOTAL':<30} {total_frames:<10}")
     print("=" * 70)
     print()
-    
+
     # Check dataset diversity
     print("DATASET CHARACTERISTICS")
     print("-" * 70)
-    
+
     environments = set()
     for ds in datasets:
         name = ds['name'].lower()
@@ -91,23 +91,23 @@ def check_datasets():
             env = '🏭 Industrial'
         else:
             env = '🏠 Indoor Lab'
-        
+
         difficulty = 'Easy'
         if 'difficult' in name or 'hard' in name:
             difficulty = 'Difficult'
         elif 'medium' in name:
             difficulty = 'Medium'
-        
+
         print(f"{ds['name']:<30} {env:<15} {difficulty}")
         environments.add(env)
-    
+
     print("=" * 70)
     print()
-    
+
     # Training recommendations
     print("TRAINING RECOMMENDATIONS")
     print("-" * 70)
-    
+
     if len(datasets) == 1:
         print("⚠️  Only 1 dataset available - limited generalization")
         print("   Recommendation: Export more datasets for better robustness")
@@ -117,17 +117,17 @@ def check_datasets():
         print("   Recommendation: Add 2-3 more diverse datasets")
     else:
         print("✅ Multiple datasets available - good for robust training")
-    
+
     print()
-    
+
     if len(environments) == 1:
         print("⚠️  All datasets from same environment")
         print("   Recommendation: Add outdoor, industrial, or different lighting")
     else:
         print(f"✅ {len(environments)} different environments - good diversity")
-    
+
     print()
-    
+
     if total_frames < 3000:
         print(f"⚠️  Limited data: {total_frames} frames")
         print("   Recommendation: Export more frames or sequences")
@@ -135,21 +135,21 @@ def check_datasets():
         print(f"✓  Adequate data: {total_frames} frames")
     else:
         print(f"✅ Excellent data: {total_frames} frames")
-    
+
     print("=" * 70)
     print()
-    
+
     # Training command
     print("TRAINING COMMAND")
     print("-" * 70)
-    
+
     if datasets:
         dataset_names = ' '.join([ds['name'] for ds in datasets[:5]])  # Use up to 5 datasets
         print("python3 train_multi_domain_refinement.py \\")
         print(f"    --datasets {dataset_names} \\")
         print("    --epochs 30 \\")
         print("    --batch-size 8")
-    
+
     print("=" * 70)
 
 

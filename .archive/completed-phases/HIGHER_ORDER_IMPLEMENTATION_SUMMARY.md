@@ -42,7 +42,7 @@ let mut filter = HigherOrderFilter::new(config);
 // Process acceleration
 for accel in imu_data {
     let output = filter.process_accel(accel);
-    println!("Jerk: {} m/s³, f0_confidence: {}", 
+    println!("Jerk: {} m/s³, f0_confidence: {}",
         output.jerk_magnitude, output.f0_confidence);
 }
 ```

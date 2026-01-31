@@ -58,7 +58,7 @@ cat > "$RESULTS_DIR/performance_report.txt" << 'EOF'
 
 Algorithm:
 1. Camera transform inversion: ~0.05ms
-2. Ray-to-ray closest point: ~0.10ms  
+2. Ray-to-ray closest point: ~0.10ms
 3. Coordinate transformation: ~0.05ms
 4. Total: ~0.20ms per pair (average case)
 
@@ -107,7 +107,7 @@ Algorithm:
 
 ### Estimator Single Frame (640×480)
 - Baseline (no triangulation): 38.4ms
-- With triangulation: 39.2ms  
+- With triangulation: 39.2ms
 - Overhead: 0.8ms (2.1%)
 - Variance: ±1.2ms
 
@@ -167,7 +167,7 @@ For further optimization:
 
 ## Conclusion
 
-The combined improvements (triangulation + IMU prior) maintain real-time 
+The combined improvements (triangulation + IMU prior) maintain real-time
 performance while significantly improving accuracy:
 - Accuracy gain: 8-17% RMS error reduction
 - Performance cost: <3% overhead
@@ -192,7 +192,7 @@ ${GREEN}✓ Real-Time Performance: CONFIRMED${NC}
 
 ${GREEN}✓ Accuracy Improvements: SIGNIFICANT${NC}
   - EuRoC: 7.9% RMS error reduction
-  - TUM-VI: 9.8% RMS error reduction  
+  - TUM-VI: 9.8% RMS error reduction
   - 4Seasons: 16.7% RMS error reduction
 
 ${GREEN}✓ Memory Impact: MINIMAL${NC}

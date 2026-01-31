@@ -54,7 +54,7 @@ This is fragile:
 
 **Fix**: Pass the actual element index ranges to partition functions instead of reconstructing:
 ```rust
-fn partition_hessian(&self, H: &DMatrix<f64>, 
+fn partition_hessian(&self, H: &DMatrix<f64>,
     keep_start: usize, keep_len: usize,
     marg_start: usize, marg_len: usize) -> (...)
 ```
@@ -111,7 +111,7 @@ fn compute_structure_hash(keep_ids: &[ParamId], marg_ids: &[ParamId]) -> u64 {
 }
 ```
 
-**The Issue**: 
+**The Issue**:
 The hash is based ONLY on parameter IDs, not on dimensions. Consider this scenario:
 
 1. Initial state: KeyframePose(0) with dimension 6
@@ -158,7 +158,7 @@ fn compute_structure_hash(param_blocks: &HashMap<ParamId, ParamBlock>) -> u64 {
 fn pseudo_inverse(&self, matrix: &DMatrix<f64>) -> DMatrix<f64> {
     let svd = SVD::new(matrix.clone(), true, true);
     let singulars = svd.singular_values();
-    
+
     let tol = 1e-10 * max_sv;  // Conservative threshold
     let mut rank = 0;
     for (i, sv) in singulars.iter().enumerate() {
@@ -277,7 +277,7 @@ pub fn marginalize(...) -> MarginalizationResult {
     if marg_ids.is_empty() {
         return MarginalizationResult { prior: None, ... };  // Fast exit
     }
-    
+
     // NOW do expensive work
 }
 ```
@@ -295,7 +295,7 @@ fn estimate_condition_number(&self, matrix: &DMatrix<f64>) -> Option<f64> {
     let trace = (0..matrix.nrows().min(matrix.ncols()))
         .map(|i| matrix[(i, i)].abs())
         .sum::<f64>();
-    
+
     if trace > 1e-12 {
         Some(frob / trace)
     } else {
@@ -346,7 +346,7 @@ fn estimate_condition_number_fast(&self, matrix: &DMatrix<f64>) -> Option<f64> {
     let min_diag = (0..matrix.nrows().min(matrix.ncols()))
         .map(|i| matrix[(i, i)].abs())
         .fold(f64::INFINITY, f64::min);
-    
+
     if min_diag > 1e-12 {
         Some(frob / min_diag)
     } else {
@@ -600,7 +600,7 @@ for attempt in 0..4 {
         H_regularized[(i, i)] -= previous_damping;  // Remove old
         H_regularized[(i, i)] += damping_factor;    // Add new
     }
-    
+
     if let Some(chol) = Cholesky::new(H_regularized.clone()) {  // Only clone for Cholesky
         return (chol.solve(H_ba), chol.solve(b_b));
     }
@@ -637,10 +637,10 @@ for attempt in 0..4 {
 1. **Fix condition number heuristic** (Issue #7) - Currently WRONG, may miss ill-conditioning
    - Replace Frobenius/trace with proper SVD-based estimate or use min diagonal element
    - This directly affects stability decisions and can cause silent failures
-   
+
 2. **Fix FEJ cache hash** (Issue #3) - Include parameter dimensions
    - Prevents dimension mismatch corruption when parameters change size
-   
+
 3. **Fix early return before Schur** (Issue #6) - Compute Schur only when needed
    - Saves ~50ms per marginalization cycle on embedded platforms
 
@@ -651,22 +651,22 @@ for attempt in 0..4 {
 **Short-term (Week 2) - SEMANTIC CLEANUP:**
 1. Merge `prior_weight` and `prior_info_scaling` into single parameter (Issue #5)
    - Currently two redundant parameters causing confusion
-   
+
 2. Implement FEJ usage in Hessian approximators (Issue #10)
    - Pass linearization points from cache to trait implementations
    - Currently passing cache but not consuming it
-   
+
 3. Document or remove `ZeroGradientComputer` (Issue #11)
    - Unclear why this exists; either document use case or remove
 
 **Medium-term (Week 3+) - API IMPROVEMENTS:**
 1. Validate parameter dimensions at initialization (Issue #9)
    - Catch dimension mismatches early instead of silent corruption
-   
+
 2. Fix keyframe selection logic (Issue #8)
    - Use age-based selection instead of index-based
    - Add assertions that marginalizing correct frames
-   
+
 3. Clarify `num_marginalize_per_step` behavior (Issue #12)
    - Either document why it's always 1, or implement multi-frame marginalization
 

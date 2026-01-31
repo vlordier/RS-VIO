@@ -42,7 +42,7 @@ fn main() {
     }
 }
 EOF
-    
+
     # Note: This would require the test to be compiled properly
     echo "⚠️  Note: Full Valgrind profiling requires test harness setup"
 else

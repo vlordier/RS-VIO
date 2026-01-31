@@ -117,18 +117,18 @@ pub struct CalibrationAwareAnalyzer {
 
 impl CalibrationAwareAnalyzer {
     pub fn new() -> Self
-    
+
     /// Record weighted residuals (with calibration confidence applied)
     pub fn record_weighted_visual_residual(&mut self, distance: f64, speed: f32, residual: f32)
     pub fn record_weighted_imu_residual(&mut self, distance: f64, speed: f32, residual: f32)
-    
+
     /// Record unweighted residuals (for baseline comparison)
     pub fn record_unweighted_visual_residual(&mut self, distance: f64, speed: f32, residual: f32)
     pub fn record_unweighted_imu_residual(&mut self, distance: f64, speed: f32, residual: f32)
-    
+
     /// Record feature track length
     pub fn record_track_length(&mut self, length: usize)
-    
+
     /// Generate comprehensive analysis
     pub fn analyze(&self) -> CalibrationAwareMetrics
 }
@@ -143,22 +143,22 @@ use rs_vio::evaluation::{CalibrationAwareAnalyzer, CalibrationAwareMetrics};
 
 fn main() {
     let mut analyzer = CalibrationAwareAnalyzer::new();
-    
+
     // During VIO tracking loop
     for frame in frames {
         for feature in &frame.features {
             let distance = landmark.position.norm();
             let speed = state.velocity.norm() as f32;
-            
+
             // Compute residuals with and without calibration weighting
             let unweighted_residual = reprojection_error(feature);
             let weighted_residual = unweighted_residual * calibration_weight;
-            
+
             // Record for distance bin
             analyzer.record_weighted_visual_residual(distance, speed, weighted_residual);
             analyzer.record_unweighted_visual_residual(distance, speed, unweighted_residual);
         }
-        
+
         // Track feature survival
         for track in &feature_manager.active_tracks {
             if track.frame_count > 0 {
@@ -166,7 +166,7 @@ fn main() {
             }
         }
     }
-    
+
     // Generate report
     let metrics = analyzer.analyze();
     print_report(&metrics);
@@ -174,44 +174,44 @@ fn main() {
 
 fn print_report(metrics: &CalibrationAwareMetrics) {
     println!("=== CALIBRATION AWARENESS IMPACT ===\n");
-    
+
     println!("OVERALL RESIDUAL RMS:");
     println!("  Weighted (with calibration):   {:.4} px", metrics.weighted_residuals.total_rms);
     println!("  Unweighted (baseline):         {:.4} px", metrics.unweighted_residuals.total_rms);
-    println!("  Improvement:                   {:.1}%", 
+    println!("  Improvement:                   {:.1}%",
         metrics.weighted_residuals.improvement_vs(&metrics.unweighted_residuals));
-    
+
     println!("\nVISUAL vs IMU BALANCE:");
     println!("  Visual RMS (weighted):         {:.4} px", metrics.weighted_residuals.visual_rms);
     println!("  IMU RMS (weighted):            {:.4} rad/s", metrics.weighted_residuals.imu_rms);
     println!("  Outlier rate (weighted):       {:.1}%", metrics.weighted_residuals.outlier_rate);
-    
+
     println!("\nFEATURE TRACKING QUALITY:");
     println!("  Median track length:           {:.1} frames", metrics.track_survival.median_track_length);
     println!("  Mean track length:             {:.1} frames", metrics.track_survival.mean_track_length);
     println!("  Features lasting > 5 frames:   {:.1}%", metrics.track_survival.survival_rate_5);
     println!("  Features lasting > 10 frames:  {:.1}%", metrics.track_survival.survival_rate_10);
-    
+
     println!("\nDISTANCE BIN IMPROVEMENTS:");
     let (w, u, imp) = metrics.distance_bin_improvements.near_field;
     println!("  Near field (0-1m):             {:.4} px → {:.4} px ({:.1}%)", u, w, imp);
-    
+
     let (w, u, imp) = metrics.distance_bin_improvements.mid_field;
     println!("  Mid field (1-3m):              {:.4} px → {:.4} px ({:.1}%)", u, w, imp);
-    
+
     let (w, u, imp) = metrics.distance_bin_improvements.far_field;
     println!("  Far field (3-10m):             {:.4} px → {:.4} px ({:.1}%)", u, w, imp);
-    
+
     let (w, u, imp) = metrics.distance_bin_improvements.very_far_field;
     println!("  Very far (10m+):               {:.4} px → {:.4} px ({:.1}%)", u, w, imp);
-    
+
     println!("\nSPEED BIN IMPROVEMENTS:");
     let (w, u, imp) = metrics.speed_bin_improvements.static_scene;
     println!("  Static (<0.1 m/s):             {:.4} px → {:.4} px ({:.1}%)", u, w, imp);
-    
+
     let (w, u, imp) = metrics.speed_bin_improvements.normal_motion;
     println!("  Normal (0.5-2.0 m/s):          {:.4} px → {:.4} px ({:.1}%)", u, w, imp);
-    
+
     let (w, u, imp) = metrics.speed_bin_improvements.very_fast_motion;
     println!("  Very fast (5.0+ m/s):          {:.4} px → {:.4} px ({:.1}%)", u, w, imp);
 }
@@ -230,23 +230,23 @@ for frame in frames {
     for feature in &frame.features {
         let distance = triangulated_landmark.position.norm();
         let speed = state.velocity.norm() as f32;
-        
+
         // Get calibration-aware weights
         let visual_weight = fusion.visual_residual_weight();  // e.g., 0.8
         let imu_weight = fusion.imu_residual_weight();        // e.g., 0.75
-        
+
         // Compute residuals
         let visual_residual = compute_reprojection_error(feature);
         let imu_residual = compute_imu_error(state);
-        
+
         // Apply weighting
         let weighted_visual = visual_residual * visual_weight as f32;
         let weighted_imu = imu_residual * imu_weight as f32;
-        
+
         // Record for analysis
         analyzer.record_weighted_visual_residual(distance, speed, weighted_visual);
         analyzer.record_unweighted_visual_residual(distance, speed, visual_residual);
-        
+
         analyzer.record_weighted_imu_residual(distance, speed, weighted_imu);
         analyzer.record_unweighted_imu_residual(distance, speed, imu_residual);
     }

@@ -113,7 +113,7 @@ dhat-jemalloc:
 	@export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so && \
 	export HEAPPROFILE=/tmp/dhat-heap && \
 	cargo test --features dhat --release --lib 2>&1 | tail -30
-	@echo "Heap profile: /tmp/dhat-heap" 
+	@echo "Heap profile: /tmp/dhat-heap"
 
 # Generate coverage report
 coverage:

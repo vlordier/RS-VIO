@@ -206,22 +206,22 @@ for imu_sample in imu_measurements {
     // Step 1: Bias correction
     let accel_corrected = imu_sample.accel - accel_bias;
     let gyro_corrected = imu_sample.gyro - gyro_bias;
-    
+
     // Step 2: Denoise
     let accel_denoised = self.denoise_filter.process_accel(&accel_f32);
     let gyro_denoised = self.denoise_filter.process_gyro(&gyro_f32);
     let weight1 = self.denoise_filter.weight_scale;
-    
+
     // Step 3: Higher-order filtering
     let ho_output = self.higher_order_filter.process_accel(accel_denoised);
-    
+
     // Step 4: Combined weighting
     let weight_final = weight1 * ho_output.f0_confidence;
-    
+
     // Step 5: Apply to measurements
     let accel_scaled = scale(accel_denoised, weight_final);
     let gyro_scaled = scale(gyro_denoised, weight_final);
-    
+
     // Step 6: Downstream processing
     self.preintegrator.integrate(accel_scaled, gyro_scaled, dt);
     self.motion_predictor.update(accel_scaled, gyro_scaled);

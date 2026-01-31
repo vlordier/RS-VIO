@@ -8,7 +8,7 @@ Comprehensive benchmarking of IMU filtering and stereo super-resolution combinat
 
 ### Test Scenarios
 1. **Hover**: Minimal motion with small sensor noise (~0.01 m/s² noise)
-2. **Gentle Motion**: Moderate accelerations (1-2 m/s² range)  
+2. **Gentle Motion**: Moderate accelerations (1-2 m/s² range)
 3. **Aggressive Motion**: Fast maneuvers (3-5 m/s² range, 2 rad/s rotation)
 4. **Noisy**: High noise environment (0.5 m/s² noise level)
 
@@ -102,7 +102,7 @@ Comprehensive benchmarking of IMU filtering and stereo super-resolution combinat
 - **Rationale**: Comparable performance, IMU helps with motion prediction
 - **Trade-off**: Slight overhead for super-resolution not justified
 
-#### 3. Aggressive Motion / Fast Maneuvers  
+#### 3. Aggressive Motion / Fast Maneuvers
 - **Recommended**: IMU filtering only
 - **Rationale**: 3% performance improvement, better motion prediction
 - **Trade-off**: Super-resolution overhead (9%) not beneficial at high speeds
@@ -117,13 +117,13 @@ Comprehensive benchmarking of IMU filtering and stereo super-resolution combinat
 ### Confidence-Based Adaptive Super-Resolution
 The benchmarks validate the adaptive parameter design:
 
-1. **Low Confidence (0.2)**: 
+1. **Low Confidence (0.2)**:
    - Time: 111 µs for 50 features
    - Minimal refinement to avoid over-fitting noise
    - Best for aggressive motion or poor IMU data
 
 2. **Medium Confidence (0.5)**:
-   - Time: 184 µs for 50 features  
+   - Time: 184 µs for 50 features
    - Balanced refinement (9×9 patches)
    - Best for normal operation
 
@@ -202,7 +202,7 @@ The benchmarks validate the adaptive parameter design:
 imu:
   enable_denoise_filter: true      # Always on (4.5 µs well spent)
   enable_higher_order_filter: true # Enables confidence signals
-  
+
 vision:
   enable_super_resolution: true    # Adaptive overhead justifies gains
   super_resolution:
@@ -221,7 +221,7 @@ match motion_state {
         // High confidence → 13×13 patches, 9 iterations
     },
     "gentle_motion" => {
-        // Full fusion, moderate refinement  
+        // Full fusion, moderate refinement
         imu_filtering: true,
         super_resolution: true,
         // Medium confidence → 9×9 patches, 6 iterations
@@ -258,7 +258,7 @@ For battery-critical applications, consider:
 
 ### Performance Consistency
 - **Hover**: Most consistent (±1.8 µs range)
-- **Gentle motion**: High consistency (±2.1 µs range)  
+- **Gentle motion**: High consistency (±2.1 µs range)
 - **Aggressive motion**: Moderate variation (±2.4 µs range)
 - **Noisy**: Highest variation (±2.9 µs range, expected)
 
@@ -275,7 +275,7 @@ The comprehensive benchmarking validates the **IMU-guided stereo super-resolutio
 
 ---
 
-Generated: $(date)  
-Benchmark Tool: Criterion.rs v0.5  
+Generated: $(date)
+Benchmark Tool: Criterion.rs v0.5
 Platform: Release build, optimized
 Test Duration: ~5 minutes per configuration
