@@ -22,6 +22,16 @@ futures = "0.3"
 typed-arena = "2.0"
 core_affinity = "0.8"
 ndarray = { version = "0.16", optional = true }
+ort = { version = "2.0.0-rc.11", optional = true }
+pollster = { version = "0.3", optional = true }
+wgpu = { version = "0.20", optional = true }
 camera-intrinsic-model = "0.7.2"
 apex-solver = { git = "https://github.com/amin-abouee/apex-solver", branch = "main" } # TODO change when official release includes the Schur complement methods
 faer = "0.23.2"
+
+# Metal GPU acceleration (macOS only) for fast GPU-accelerated workflows
+[target.'cfg(target_os = "macos")'.dependencies]
+block2 = { version = "0.4", optional = true }
+metal = { version = "0.27", optional = true }
+objc2 = { version = "0.5", optional = true }
+objc2-foundation = { version = "0.2", optional = true }
