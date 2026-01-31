@@ -16,11 +16,12 @@ image = "0.25"
 imageproc = "0.25"
 nalgebra = "0.33.2"
 nalgebra034 = { package = "nalgebra", version = "0.34.1" } # TODO improve this, now this is dirty (needed for camera-intrinsic-model for now)
-rayon = "1.11.0"
+rayon = "1.10"
 tokio = { version = "1.35", features = ["full"] }
 futures = "0.3"
 typed-arena = "2.0"
 core_affinity = "0.8"
+ndarray = { version = "0.16", optional = true }
 camera-intrinsic-model = "0.7.2"
 apex-solver = { git = "https://github.com/amin-abouee/apex-solver", branch = "main" } # TODO change when official release includes the Schur complement methods
 faer = "0.23.2"
