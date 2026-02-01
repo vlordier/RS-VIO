@@ -186,6 +186,7 @@ class DatasetDownloader:
             return True
         except subprocess.CalledProcessError as e:
             print(f"❌ Extraction failed: {e}")
+            print(f"Stderr: {e.stderr.decode()}")
             return False
 
     def extract_tar(self, archive_path: Path, extract_to: Path) -> bool:
