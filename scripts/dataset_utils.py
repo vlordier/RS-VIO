@@ -19,12 +19,12 @@ console: Optional[Console] = Console() if HAS_RICH else None
 
 def extract_zip(archive_path: Path, extract_to: Path, verbose: bool = False) -> bool:
     """Extract a ZIP archive.
-    
+
     Args:
         archive_path: Path to ZIP archive
         extract_to: Directory to extract to
         verbose: Print detailed output
-        
+
     Returns:
         True if successful, False otherwise
     """
@@ -66,12 +66,12 @@ def extract_zip(archive_path: Path, extract_to: Path, verbose: bool = False) -> 
 
 def extract_tar_gz(archive_path: Path, extract_to: Path, verbose: bool = False) -> bool:
     """Extract a tar.gz archive.
-    
+
     Args:
         archive_path: Path to tar.gz archive
         extract_to: Directory to extract to
         verbose: Print detailed output
-        
+
     Returns:
         True if successful, False otherwise
     """
@@ -85,7 +85,7 @@ def extract_tar_gz(archive_path: Path, extract_to: Path, verbose: bool = False) 
             else:
                 print(msg)
 
-        result = subprocess.run(
+        subprocess.run(
             ["tar", "-xzf", str(archive_path), "-C", str(extract_to), "--strip-components=1"],
             check=True,
             capture_output=True,
@@ -112,12 +112,12 @@ def extract_tar_gz(archive_path: Path, extract_to: Path, verbose: bool = False) 
 
 def extract_tar(archive_path: Path, extract_to: Path, verbose: bool = False) -> bool:
     """Extract a tar archive (uncompressed).
-    
+
     Args:
         archive_path: Path to tar archive
         extract_to: Directory to extract to
         verbose: Print detailed output
-        
+
     Returns:
         True if successful, False otherwise
     """
@@ -131,7 +131,7 @@ def extract_tar(archive_path: Path, extract_to: Path, verbose: bool = False) -> 
             else:
                 print(msg)
 
-        result = subprocess.run(
+        subprocess.run(
             ["tar", "-xf", str(archive_path), "-C", str(extract_to), "--strip-components=1"],
             check=True,
             capture_output=True,
