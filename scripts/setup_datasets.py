@@ -251,18 +251,18 @@ class DatasetSetup:
         if not tum_dir.exists():
             return False, "⏭️  TUM-VI not found"
 
-        # Check for RGB-D format (rgb/ and depth/ directories)
-        rgb_frames = list(tum_dir.glob("**/rgb/*"))
-        if rgb_frames:
-            frame_count = len(rgb_frames)
-            return True, f"✅ TUM-VI ready ({frame_count} frames, RGB-D format)"
-
-        # Check for MAV0 format (like EuRoC: room1/mav0/cam0/)
+        # Check for MAV0 format (EuRoC-compatible: room1/mav0/cam0/) - preferred format
         mav0_dirs = list(tum_dir.glob("**/mav0/cam0/data/*"))
         if mav0_dirs:
             frame_count = len(mav0_dirs)
             sequences = len(list(tum_dir.glob("*/mav0")))
             return True, f"✅ TUM-VI ready ({sequences} sequences, {frame_count} frames, MAV0 format)"
+
+        # Also check for older RGB-D format (rgb/ and depth/ directories) for backwards compatibility
+        rgb_frames = list(tum_dir.glob("**/rgb/*"))
+        if rgb_frames:
+            frame_count = len(rgb_frames)
+            return True, f"✅ TUM-VI ready ({frame_count} frames, RGB-D format)"
 
         return False, "⏭️  TUM-VI not found"
 

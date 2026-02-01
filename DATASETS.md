@@ -45,8 +45,8 @@ Expected output:
 ## TUM-VI Dataset
 
 **Status**: Auto-downloads (if mirror available), otherwise manual setup
-**Size**: ~2 GB per sequence
-**Sequences**: room1, room2, room3, room4, room5, room6
+**Size**: ~1.6 GB per sequence (EuRoC format, 512x512)
+**Sequences**: room1, room2, room3, room4, room5, room6, magistrale1-6, slides1-3
 
 ### Auto-Download
 
@@ -54,24 +54,24 @@ Expected output:
 just download-datasets
 ```
 
-This will download and extract the TUM RGB-D walking sequence to `/tmp/rs-vio-samples/tum_vi/`.
+This will download and extract TUM-VI sequences in EuRoC format to `/tmp/rs-vio-samples/tum_vi/`.
 
 ### Manual Download
 
 If auto-download fails:
 
-1. Visit https://vision.in.tum.de/data/datasets/visual-inertial-slam
-2. Download the RGB-D sequence (e.g., `rgbd-dataset_freiburg3_walking_xyz.tgz`)
+1. Visit https://cvg.cit.tum.de/data/datasets/visual-inertial-dataset
+2. Download the 512x512 EuRoC format sequences (e.g., `dataset-room1_512_16.tar`)
 3. Extract to `/tmp/rs-vio-samples/tum_vi/`:
    ```bash
-   mkdir -p /tmp/rs-vio-samples/tum_vi
-   tar -xzf rgbd-dataset_freiburg3_walking_xyz.tgz -C /tmp/rs-vio-samples/tum_vi/ --strip-components=1
+   mkdir -p /tmp/rs-vio-samples/tum_vi/room1
+   tar -xf dataset-room1_512_16.tar -C /tmp/rs-vio-samples/tum_vi/room1
    ```
 
 ### Run
 
 ```bash
-cargo run --release --bin run_tum config/tum_vi.yaml /tmp/rs-vio-samples/tum_vi
+cargo run --release --bin run_tum config/tum_vi.yaml /tmp/rs-vio-samples/tum_vi/room1
 ```
 
 ## 4Seasons Dataset
