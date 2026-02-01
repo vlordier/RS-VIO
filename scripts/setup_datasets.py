@@ -16,19 +16,16 @@ Usage:
 
 import argparse
 import hashlib
-import json
 import shutil
 import subprocess
 import sys
-import tempfile
 import zipfile
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 try:
     from rich.console import Console
     from rich.table import Table
-    from rich.progress import Progress
     HAS_RICH = True
 except ImportError:
     HAS_RICH = False
@@ -62,11 +59,11 @@ class DatasetSetup:
 
     def __init__(self, datasets_dir: Path, checksum_file: Optional[Path] = None):
         """Initialize dataset setup.
-        
+
         Args:
             datasets_dir: Path to datasets directory
             checksum_file: Optional path to checksum file
-            
+
         Raises:
             OSError: If datasets directory cannot be created
         """
@@ -76,7 +73,7 @@ class DatasetSetup:
 
             self.checksum_file = checksum_file or CHECKSUM_FILE
             self.checksums = self._load_checksums()
-            
+
             if logger:
                 logger.info(f"Initialized setup with datasets_dir: {self.datasets_dir}")
         except OSError as e:
@@ -110,7 +107,7 @@ class DatasetSetup:
 
     def check_tools(self) -> bool:
         """Check if required tools are available.
-        
+
         Returns:
             True if all tools available, False otherwise
         """

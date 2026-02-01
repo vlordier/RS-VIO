@@ -21,7 +21,7 @@ import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Optional
 
 try:
     from rich.console import Console
@@ -61,17 +61,17 @@ class DatasetDownloader:
 
     def __init__(self, target_dir: Path):
         """Initialize downloader with target directory.
-        
+
         Args:
             target_dir: Target directory for downloaded datasets
-            
+
         Raises:
             OSError: If target directory cannot be created
         """
         try:
             self.target_dir = Path(target_dir)
             self.target_dir.mkdir(parents=True, exist_ok=True)
-            
+
             if logger:
                 logger.info(f"Initialized downloader with target: {self.target_dir}")
         except OSError as e:
@@ -82,7 +82,7 @@ class DatasetDownloader:
 
     def check_dependencies(self) -> bool:
         """Check if required tools are available.
-        
+
         Returns:
             True if all tools are available, False otherwise
         """
@@ -207,7 +207,7 @@ class DatasetDownloader:
 
     def download_euroc(self) -> bool:
         """Download EuRoC dataset.
-        
+
         Returns:
             True if dataset is available or extracted, False otherwise
         """
@@ -243,13 +243,13 @@ class DatasetDownloader:
 
                 success_msg = f"✅ {name} extracted"
                 if logger:
-                    logger.info(f"EuRoC extraction and setup complete")
+                    logger.info("EuRoC extraction and setup complete")
                 self._print_success(success_msg)
                 return True
         else:
             info_msg = f"ℹ️ {name} requires manual download"
             if logger:
-                logger.info(f"EuRoC manual download required")
+                logger.info("EuRoC manual download required")
             self._print_info(info_msg)
             if HAS_RICH and console:
                 console.print("[bold cyan]Steps:[/bold cyan]")
@@ -268,14 +268,14 @@ class DatasetDownloader:
 
     def download_tum(self) -> bool:
         """Download TUM-VI dataset.
-        
+
         Returns:
             True if download/extraction successful, False otherwise
         """
         dataset = DATASETS.get("tum", {})
         name = dataset.get("name", "TUM-VI")
         sequences = dataset.get("sequences", {})
-        
+
         if not sequences:
             url = str(dataset.get("url", ""))
             sequences = {"default": url}
@@ -283,10 +283,10 @@ class DatasetDownloader:
         self._print_header("📊 TUM-VI Dataset Download")
 
         if logger:
-            logger.info(f"Starting TUM-VI dataset download")
+            logger.info("Starting TUM-VI dataset download")
 
         tum_dir = self.target_dir / "tum_vi"
-        
+
         # Check if already extracted (MAV0 format)
         if tum_dir.exists() and list(tum_dir.glob("**/mav0/cam0/data/*")):
             success_msg = f"✅ {name} already extracted"
@@ -300,11 +300,11 @@ class DatasetDownloader:
         for seq_name, seq_url in sequences.items():
             archive_path = self.target_dir / f"tum_vi_{seq_name}.tar"
             seq_dir = tum_dir / seq_name
-            
+
             if seq_dir.exists() and list(seq_dir.glob("**/mav0/cam0/data/*")):
                 self._print_success(f"✅ {seq_name} already extracted")
                 continue
-            
+
             if self.download_file(seq_url, archive_path):
                 if self.extract_tar(archive_path, seq_dir):
                     try:
@@ -314,7 +314,7 @@ class DatasetDownloader:
                     except OSError as e:
                         if logger:
                             logger.warning(f"Failed to delete {archive_path}: {e}")
-                    
+
                     self._print_success(f"✅ {seq_name} extracted")
                 else:
                     all_success = False
@@ -323,13 +323,13 @@ class DatasetDownloader:
 
         if all_success:
             if logger:
-                logger.info(f"TUM-VI download and extraction complete")
-        
+                logger.info("TUM-VI download and extraction complete")
+
         return all_success
 
     def download_4seasons(self) -> bool:
         """Download 4Seasons dataset.
-        
+
         Returns:
             True if dataset found locally, False otherwise
         """

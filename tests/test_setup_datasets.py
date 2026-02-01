@@ -10,11 +10,10 @@ Tests the DatasetSetup class functionality including:
 """
 
 import hashlib
-import json
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import sys
 
 # Add scripts directory to path

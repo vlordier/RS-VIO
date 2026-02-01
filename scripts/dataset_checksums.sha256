@@ -1,6 +1,6 @@
 # SHA256 checksums for dataset archives
 # Format: <sha256>  <filename>
-# 
+#
 # To generate checksums for your downloaded files:
 #   sha256sum /path/to/file >> scripts/dataset_checksums.sha256
 #

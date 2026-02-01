@@ -11,7 +11,7 @@ Tests the DatasetDownloader class functionality including:
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, patch, mock_open
+from unittest.mock import patch
 import sys
 
 # Add scripts directory to path
@@ -35,7 +35,7 @@ class TestDatasetDownloaderInit(unittest.TestCase):
     def test_init_with_existing_dir(self):
         """Test initialization with existing directory."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            downloader = DatasetDownloader(Path(tmpdir))
+            _ = DatasetDownloader(Path(tmpdir))
             self.assertTrue(Path(tmpdir).exists())
 
 
@@ -180,7 +180,7 @@ class TestDatasetDownloaderEuROC(unittest.TestCase):
             manual_file.touch()
 
             downloader = DatasetDownloader(tmppath)
-            
+
             # Mock the config to use our temp file
             with patch("download_datasets.DATASETS", {
                 "euroc": {"name": "EuRoC", "url": "http://example.com", "local_path": str(manual_file)}
