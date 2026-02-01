@@ -4,7 +4,6 @@ use crate::feature_tracker::Feature;
 use crate::types::Matrix4x4;
 use nalgebra034;
 use camera_intrinsic_model::models::opencv5::OpenCVModel5;
-use camera_intrinsic_model::generic_model::CameraModel;
 use crate::datasets::CameraModelType;
 
 /// Type of frame (only Stereo used for now; RGBD omitted).

@@ -117,8 +117,9 @@ pub struct ConcurrentFrameProcessor {
     next_output_id: u64,
 }
 
-/// Internal work item for processing
+/// Internal work item for processing (TODO: use in worker implementation)
 #[derive(Debug)]
+#[allow(dead_code)]
 struct FrameWorkItem {
     sequence: u64,
     data: Vec<u8>,

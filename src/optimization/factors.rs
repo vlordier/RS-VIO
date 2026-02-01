@@ -10,7 +10,7 @@ use apex_solver::manifold::se3;
 ///
 /// - Variables: 3D point in world/camera frame (3 params: x, y, z)
 /// - Fixed parameters: Camera pose (T_world_to_camera, 4x4 matrix),
-///                     Observation (2D normalized/undistorted)
+///   Observation (2D normalized/undistorted)
 ///
 /// The residual is 2D: [u, v] in normalized coordinates
 ///

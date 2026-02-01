@@ -92,15 +92,18 @@ pub struct ResultMetadata {
 pub struct ConcurrentVIOPipeline {
     /// Channel for submitting frames
     frame_sender: mpsc::Sender<SequencedFrame>,
-    /// Channel for receiving results
+    /// Channel for receiving results (TODO: implement in worker)
+    #[allow(dead_code)]
     result_receiver: Arc<tokio::sync::Mutex<mpsc::Receiver<OptimizationResult>>>,
     /// Active task handles
     task_set: JoinSet<()>,
     /// Next sequence number to assign
     sequence: u64,
-    /// Reordering buffer for out-of-order completion
+    /// Reordering buffer for out-of-order completion (TODO: implement in try_get_result)
+    #[allow(dead_code)]
     reorder_buffer: Arc<tokio::sync::Mutex<BTreeMap<u64, OptimizationResult>>>,
-    /// Next sequence to output
+    /// Next sequence to output (TODO: implement in try_get_result)
+    #[allow(dead_code)]
     next_output_seq: Arc<tokio::sync::Mutex<u64>>,
 }
 

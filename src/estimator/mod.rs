@@ -1,3 +1,4 @@
+#[allow(clippy::module_inception)] // Re-exported as crate::estimator::Estimator
 pub mod estimator;
 pub mod frame;
 pub mod state;

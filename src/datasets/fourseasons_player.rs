@@ -241,6 +241,7 @@ impl FourSeasonsPlayer {
         Ok(pixel_data)
     }
 
+    #[allow(dead_code)] // TODO: implement for VIO mode
     fn load_imu_data(
         _dataset_path: &str,
         _image_data: &[ImageData],
@@ -328,7 +329,7 @@ impl FourSeasonsPlayer {
     }
 
     fn save_statistics(result: &PlayerResult, dataset_path: &str) {
-        let stats_file = Path::new(dataset_path).join("statistics.txt".to_string());
+        let stats_file = Path::new(dataset_path).join("statistics.txt");
 
         if let Ok(mut file) = std::fs::File::create(&stats_file) {
             use std::io::Write;

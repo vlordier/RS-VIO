@@ -1,5 +1,6 @@
 pub mod image_utilities;
 pub mod patch;
+#[allow(clippy::module_inception)] // Re-exported as crate::feature_tracker::*
 pub mod feature_tracker;
 pub mod async_detector;
 

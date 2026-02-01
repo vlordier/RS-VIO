@@ -114,8 +114,10 @@ impl<'a> Estimator<'a> {
             log::debug!("============================== Frame {} ==============================", self.frame_id_counter);
         }
 
-        // Timing placeholders
+        // Timing placeholders (warning: assigned before read in log::debug below)
+        #[allow(unused_assignments)]
         let mut frame_creation_time_ms = 0.0f64;
+        #[allow(unused_assignments)]
         let mut patch_tracking_time_ms = 0.0f64;
         let mut motion_tracking_time_ms = 0.0f64;
         let mut optimization_time_ms = 0.0f64;
@@ -241,7 +243,7 @@ impl<'a> Estimator<'a> {
         if current_frame.is_keyframe {
             let optimization_start = Instant::now();
             self.sliding_window.add_frame(current_frame);
-            self.sliding_window.optimize(); // TODO handle error
+            let _ = self.sliding_window.optimize(); // TODO: handle error properly
             optimization_time_ms = optimization_start.elapsed().as_secs_f64() * 1000.0;
             self.view_optimization_results();
         }
