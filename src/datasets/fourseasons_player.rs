@@ -268,9 +268,12 @@ impl FourSeasonsPlayer {
     fn load_imu_data(dataset_path: &str) -> Result<Vec<ImuData>> {
         // 4Seasons dataset may have IMU data in imu.txt or imu.csv
         let imu_file = Path::new(dataset_path).join("imu.txt");
-        
+
         if !imu_file.exists() {
-            log::debug!("[FourSeasonsPlayer] IMU file not found at {:?}, skipping", imu_file);
+            log::debug!(
+                "[FourSeasonsPlayer] IMU file not found at {:?}, skipping",
+                imu_file
+            );
             return Ok(Vec::new());
         }
 
@@ -316,7 +319,11 @@ impl FourSeasonsPlayer {
             }
         }
 
-        log::info!("[FourSeasonsPlayer] Loaded {} IMU samples from {}", imu_data.len(), imu_file.display());
+        log::info!(
+            "[FourSeasonsPlayer] Loaded {} IMU samples from {}",
+            imu_data.len(),
+            imu_file.display()
+        );
         Ok(imu_data)
     }
 
@@ -370,7 +377,11 @@ impl FourSeasonsPlayer {
         };
 
         // Process frame
-        let imu_slice = if imu_between_frames.is_empty() { None } else { Some(imu_between_frames.as_slice()) };
+        let imu_slice = if imu_between_frames.is_empty() {
+            None
+        } else {
+            Some(imu_between_frames.as_slice())
+        };
         estimator.process_frame(
             &left_image,
             &right_image,

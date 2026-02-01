@@ -265,9 +265,12 @@ impl EurocPlayer {
     #[allow(dead_code)]
     fn load_imu_data(dataset_path: &str) -> Result<Vec<ImuData>> {
         let imu_file = Path::new(dataset_path).join("mav0/imu0/data.csv");
-        
+
         if !imu_file.exists() {
-            log::debug!("[EurocPlayer] IMU file not found at {:?}, skipping", imu_file);
+            log::debug!(
+                "[EurocPlayer] IMU file not found at {:?}, skipping",
+                imu_file
+            );
             return Ok(Vec::new());
         }
 
@@ -307,7 +310,11 @@ impl EurocPlayer {
             }
         }
 
-        log::info!("[EurocPlayer] Loaded {} IMU samples from {}", imu_data.len(), imu_file.display());
+        log::info!(
+            "[EurocPlayer] Loaded {} IMU samples from {}",
+            imu_data.len(),
+            imu_file.display()
+        );
         Ok(imu_data)
     }
 
@@ -361,7 +368,11 @@ impl EurocPlayer {
         };
 
         // Process frame
-        let imu_slice = if imu_between_frames.is_empty() { None } else { Some(imu_between_frames.as_slice()) };
+        let imu_slice = if imu_between_frames.is_empty() {
+            None
+        } else {
+            Some(imu_between_frames.as_slice())
+        };
         estimator.process_frame(
             &left_image,
             &right_image,

@@ -49,31 +49,31 @@ matching-temporal = []
 matching-hybrid-of = []
 
 [dependencies]
-clap = { version = "4.5", features = ["derive"] }
-log = "0.4"
-env_logger = "0.11"
-rand = "0.8"
-serde = { version = "1.0", features = ["derive"] }
-serde_yaml = "0.9"
 anyhow = "1.0"
-rerun = "0.25"
+apex-solver = { git = "https://github.com/amin-abouee/apex-solver", branch = "main" } # TODO change when official release includes the Schur complement methods
+camera-intrinsic-model = "0.7.2"
+clap = { version = "4.5", features = ["derive"] }
+core_affinity = "0.8"
+env_logger = "0.11"
+faer = "0.23.2"
+futures = "0.3"
 image = "0.25"
 imageproc = "0.25"
+lazy_static = "1.4"
+log = "0.4"
 nalgebra = "0.33.2"
 nalgebra034 = { package = "nalgebra", version = "0.34.1" } # TODO improve this, now this is dirty (needed for camera-intrinsic-model for now)
-rayon = "1.10"
-tokio = { version = "1.35", features = ["rt-multi-thread", "sync", "time", "macros"] }
-futures = "0.3"
-typed-arena = "2.0"
-core_affinity = "0.8"
-lazy_static = "1.4"
 ndarray = { version = "0.15.4", optional = true }
 ort = { version = "2.0.0-rc.11", optional = true }  # Using ORT 2.0 RC for required 2.0 APIs; monitor for stable 2.0.x release
 pollster = { version = "0.3", optional = true }
+rand = "0.8"
+rayon = "1.10"
+rerun = "0.25"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+tokio = { version = "1.35", features = ["rt-multi-thread", "sync", "time", "macros"] }
+typed-arena = "2.0"
 wgpu = { version = "0.20", optional = true }  # Pinned to 0.20; upgrading requires handling wgpu breaking changes
-camera-intrinsic-model = "0.7.2"
-apex-solver = { git = "https://github.com/amin-abouee/apex-solver", branch = "main" } # TODO change when official release includes the Schur complement methods
-faer = "0.23.2"
 
 # Metal GPU acceleration (macOS only) for fast GPU-accelerated workflows
 [target.'cfg(target_os = "macos")'.dependencies]
