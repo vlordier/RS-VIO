@@ -1,3 +1,4 @@
+#![cfg(feature = "benchmarks")]
 #![allow(
     clippy::expect_used,
     clippy::len_zero,

@@ -195,7 +195,7 @@ mod tests {
 
     #[test]
     fn test_sequenced_frame_ordering() {
-        let mut pipeline = ConcurrentVIOPipeline::new().unwrap();
+        let pipeline = ConcurrentVIOPipeline::new().unwrap();
 
         // Verify sequence counter increments
         let seq1 = pipeline.sequence;

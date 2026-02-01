@@ -5,6 +5,7 @@ edition = "2021"
 
 [features]
 default = ["matching-basic-ransac"]
+benchmarks = []
 # Feature flag for 32-bit float operations (f32) instead of f64
 use_f32 = []
 # Feature flag for Rerun.io 3D visualization (built-in, always available)
