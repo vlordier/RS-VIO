@@ -6,6 +6,7 @@ parameters used by dataset download and setup scripts.
 """
 
 import logging
+import tempfile
 from pathlib import Path
 from typing import List
 
@@ -41,7 +42,7 @@ DATASETS = {
         "name": "EuRoC MH_01_easy",
         "url": "https://projects.asl.ethz.ch/datasets/euroc-mav/",
         "manual": True,
-        "local_path": "/tmp/MH_01_easy.zip",
+        "local_path": str(Path(tempfile.gettempdir()) / "MH_01_easy.zip"),
         "description": "EuRoC Micro Aerial Vehicle dataset",
     },
     "tum": {
