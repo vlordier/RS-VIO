@@ -29,3 +29,9 @@ RS-VIO.code-workspace
 ## OS files
 .DS_Store
 
+## Local reports
+PR_REVIEW_COMPLETE.md
+
+## Rust lockfile (library crate)
+Cargo.lock
+
