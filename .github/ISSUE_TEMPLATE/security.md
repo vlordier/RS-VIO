@@ -5,6 +5,9 @@ title: "[SECURITY] Brief description"
 labels: security
 ---
 
+---
+**Note**: Report vulnerabilities privately to maintainers. See SECURITY.md
+
 ## Description
 Security concern description
 
@@ -16,6 +19,3 @@ What part is affected
 
 ## Potential Impact
 What could happen
-
----
-**Note**: Report vulnerabilities privately to maintainers. See SECURITY.md
