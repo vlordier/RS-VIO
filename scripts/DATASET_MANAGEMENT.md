@@ -11,7 +11,7 @@ Download datasets for testing and benchmarking.
 **Supported Datasets:**
 - **EuRoC**: Requires manual download from https://projects.asl.ethz.ch/datasets/euroc-mav/
 - **TUM-VI**: Automatically downloaded from https://vision.in.tum.de/data/datasets/visual-inertial-dataset
-- **4Seasons**: Requires manual download from https://www.4seasons-dataset.com/
+- **4Seasons**: Requires manual download from https://cvg.cit.tum.de/data/datasets/4seasons-dataset/download
 
 **Usage:**
 
@@ -41,7 +41,7 @@ For EuRoC and 4Seasons datasets that require manual download:
    - Script will extract it automatically
 
 2. **4Seasons:**
-   - Download from https://www.4seasons-dataset.com/
+   - Download from https://cvg.cit.tum.de/data/datasets/4seasons-dataset/download
    - Extract to `<target-dir>/4seasons/`
 
 ### `setup_datasets.py`
