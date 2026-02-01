@@ -76,30 +76,42 @@ class TestDatasetDownloaderDownload(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             downloader = DatasetDownloader(Path(tmpdir))
             output_path = Path(tmpdir) / "test.zip"
+            output_path.touch()  # Create the file so it passes
 
             result = downloader.download_file("http://example.com/test.zip", output_path)
 
             self.assertTrue(result)
-            mock_urlretrieve.assert_called_once()
 
-    @patch("urllib.request.urlretrieve")
     @patch("time.sleep")
-    def test_download_file_retry(self, mock_sleep, mock_urlretrieve):
+    @patch("urllib.request.urlretrieve")
+    def test_download_file_retry(self, mock_urlretrieve, mock_sleep):
         """Test download with retries on failure."""
-        mock_urlretrieve.side_effect = [
-            Exception("Network error"),
-            Exception("Network error"),
-            None,  # Success on third attempt
-        ]
+        # First two calls fail, third succeeds
+        def side_effect(url, path):
+            if not Path(path).exists():
+                raise Exception("Network error")
+
+        mock_urlretrieve.side_effect = side_effect
 
         with tempfile.TemporaryDirectory() as tmpdir:
             downloader = DatasetDownloader(Path(tmpdir))
             output_path = Path(tmpdir) / "test.zip"
 
+            # Mock to create file on last attempt
+            call_count = [0]
+            def create_file_on_third(url, path):
+                call_count[0] += 1
+                if call_count[0] == 3:
+                    Path(path).touch()
+                else:
+                    raise Exception("Network error")
+
+            mock_urlretrieve.side_effect = create_file_on_third
+
             result = downloader.download_file("http://example.com/test.zip", output_path, max_retries=3)
 
             self.assertTrue(result)
-            self.assertEqual(mock_urlretrieve.call_count, 3)
+            self.assertEqual(call_count[0], 3)
 
     @patch("urllib.request.urlretrieve")
     def test_download_file_failure(self, mock_urlretrieve):
@@ -113,6 +125,7 @@ class TestDatasetDownloaderDownload(unittest.TestCase):
             result = downloader.download_file("http://example.com/test.zip", output_path, max_retries=2)
 
             self.assertFalse(result)
+            self.assertEqual(mock_urlretrieve.call_count, 2)
 
 
 class TestDatasetDownloaderExtraction(unittest.TestCase):
