@@ -386,13 +386,16 @@ class DatasetDownloader:
         """Download specific datasets."""
         results = {}
 
+        download_map = {
+            "euroc": self.download_euroc,
+            "tum": self.download_tum,
+            "4seasons": self.download_4seasons,
+        }
+
         for dataset in datasets:
-            if dataset.lower() == "euroc":
-                results["euroc"] = self.download_euroc()
-            elif dataset.lower() == "tum":
-                results["tum"] = self.download_tum()
-            elif dataset.lower() == "4seasons":
-                results["4seasons"] = self.download_4seasons()
+            dataset_lower = dataset.lower()
+            if dataset_lower in download_map:
+                results[dataset_lower] = download_map[dataset_lower]()
 
         self._print_summary(results)
         return True
