@@ -6,9 +6,9 @@
 
 ## Live Execution Summary
 
-**Test Date**: February 1, 2026  
-**Dataset**: EuRoC MH_01_easy (stereo + IMU)  
-**Duration**: ~32 seconds of continuous processing  
+**Test Date**: February 1, 2026
+**Dataset**: EuRoC MH_01_easy (stereo + IMU)
+**Duration**: ~32 seconds of continuous processing
 **Configuration**: Release build with full optimization
 
 ---
@@ -85,7 +85,7 @@ Once 10 keyframes accumulated, optimization began:
 └─ Converged with 160 map points
 ```
 
-**Real-Time Capability**: 
+**Real-Time Capability**:
 - Bundle adjustment runs DURING frame processing
 - Optimization completes before next frame arrives
 - No blocking or frame queue buildup observed

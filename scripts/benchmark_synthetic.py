@@ -16,7 +16,7 @@ import json
 import time
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict
 
 PROJECT_ROOT = Path(__file__).parent.parent
 RESULTS_DIR = PROJECT_ROOT / "benchmark_results"
@@ -176,7 +176,7 @@ def create_report() -> bool:
     print("SYNTHETIC TEST SUMMARY")
     print("=" * 60)
     print(f"Status: {Colors.GREEN}PASSED{Colors.RESET}")
-    print(f"All strategy implementations verified")
+    print("All strategy implementations verified")
     print(f"Unit tests: {Colors.GREEN}60+ passing{Colors.RESET}")
     print()
     print("Ready for real dataset validation:")

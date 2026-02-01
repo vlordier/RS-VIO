@@ -11,28 +11,28 @@
 **Source**: [src/viewers/rerun.rs#L364](src/viewers/rerun.rs#L364)
 
 ```rust
-fn log_camera_frustum(&mut self, focal_length: f32, width: u32, height: u32, 
+fn log_camera_frustum(&mut self, focal_length: f32, width: u32, height: u32,
                       entity_path: &str, size: f32) {
     if !self.initialized {
         return;
     }
-    
+
     if let Some(ref rec) = self.rec {
         // Set frame timing for synchronization
         rec.set_time_sequence("frame", self.frame_id);
         rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
-        
+
         // Create Pinhole camera model from intrinsics
         let focal_vec = (focal_length, focal_length);        // fx, fy (same for square pixels)
         let resolution_vec = (width as f32, height as f32); // image resolution
-        
+
         // Build Pinhole model with depth parameter for visualization
         let pinhole = Pinhole::from_focal_length_and_resolution(focal_vec, resolution_vec)
             .with_image_plane_distance(size);  // size controls frustum depth visualization
-        
+
         // Log to Rerun viewer
         if let Err(e) = rec.log(entity_path, &pinhole) {
-            log::warn!("[RerunViewer] Failed to log camera frustum to {}: {}", 
+            log::warn!("[RerunViewer] Failed to log camera frustum to {}: {}",
                       entity_path, e);
         }
     }
@@ -65,19 +65,19 @@ fn log_pose(&mut self, T_W_B: Matrix4x4, entity_path: &str) {
     if !self.initialized {
         return;
     }
-    
+
     if let Some(ref rec) = self.rec {
         // Synchronize with frame timeline
         rec.set_time_sequence("frame", self.frame_id);
         rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
-        
+
         // Extract translation (position) from 4×4 matrix
         let translation = Array3::from(T_W_B.fixed_view::<3, 1>(0, 3));
-        
+
         // Extract 3×3 rotation and convert to quaternion
         let rotation = Matrix3x3::from(T_W_B.fixed_view::<3, 3>(0, 0));
         let quat = matrix_to_quaternion(rotation.to_array());
-        
+
         // Create quaternion: [x, y, z, w]
         let quaternion = rerun::Quaternion::from_xyzw([
             quat[0] as f32,
@@ -85,7 +85,7 @@ fn log_pose(&mut self, T_W_B: Matrix4x4, entity_path: &str) {
             quat[2] as f32,
             quat[3] as f32
         ]);
-        
+
         // Log Transform3D (translation + rotation)
         if let Err(e) = rec.log(
             entity_path,
@@ -124,11 +124,11 @@ fn log_points(&mut self, points: &[[f32; 3]], entity_path: &str) {
     if !self.initialized || points.is_empty() {
         return;
     }
-    
+
     if let Some(ref rec) = self.rec {
         rec.set_time_sequence("frame", self.frame_id);
         rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
-        
+
         // Filter points: exclude anything further than 300m
         // (prevents numerical errors and visualization clutter)
         let points_3d: Vec<[f32; 3]> = points
@@ -139,7 +139,7 @@ fn log_points(&mut self, points: &[[f32; 3]], entity_path: &str) {
                 distance <= 300.0  // Depth filter
             })
             .collect();
-        
+
         // Log as 3D point cloud to Rerun
         if let Err(e) = rec.log(
             entity_path,
@@ -177,17 +177,17 @@ fn log_points_colored(&mut self, points: &[(usize, [f32; 3])], entity_path: &str
     if !self.initialized || points.is_empty() {
         return;
     }
-    
+
     if let Some(ref rec) = self.rec {
         rec.set_time_sequence("frame", self.frame_id);
         rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
-        
+
         // Extract 3D positions
         let points_3d: Vec<[f32; 3]> = points
             .iter()
             .map(|(_, coord)| *coord)
             .collect();
-        
+
         // Generate colors based on feature ID (deterministic hashing)
         let colors: Vec<rerun::Color> = points
             .iter()
@@ -196,13 +196,13 @@ fn log_points_colored(&mut self, points: &[(usize, [f32; 3])], entity_path: &str
                 rerun::Color::from_rgb(rgb[0], rgb[1], rgb[2])
             })
             .collect();
-        
+
         // Log with colors attached
         if let Err(e) = rec.log(
             entity_path,
             &rerun::Points3D::new(points_3d).with_colors(colors),
         ) {
-            log::warn!("[RerunViewer] Failed to log colored points to {}: {}", 
+            log::warn!("[RerunViewer] Failed to log colored points to {}: {}",
                       entity_path, e);
         }
     }
@@ -230,24 +230,24 @@ Output: Points colored by ID for feature tracking visualization
 **Source**: [src/viewers/rerun.rs#L229](src/viewers/rerun.rs#L229)
 
 ```rust
-fn log_image_with_features(&mut self, image: &[u8], width: u32, height: u32, 
+fn log_image_with_features(&mut self, image: &[u8], width: u32, height: u32,
                            features: &[[f32; 2]], entity_path: &str) {
     if !self.initialized || image.is_empty() {
         return;
     }
-    
+
     // First: Log the raw image
     self.log_image_raw(image, width, height, entity_path);
-    
+
     // Then: Log 2D features overlaid on image
     if let Some(ref rec) = self.rec {
         rec.set_time_sequence("frame", self.frame_id);
         rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
-        
+
         // Features as 2D pixel coordinates
         if !features.is_empty() {
             let points: Vec<[f32; 2]> = features.to_vec();
-            
+
             // Log as 2D points with a path extension
             if let Err(e) = rec.log(
                 format!("{}/features", entity_path).as_str(),
@@ -263,21 +263,21 @@ fn log_image_raw(&mut self, image: &[u8], width: u32, height: u32, entity_path: 
     if !self.initialized || image.is_empty() {
         return;
     }
-    
+
     if let Some(ref rec) = self.rec {
         rec.set_time_sequence("frame", self.frame_id);
         rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
-        
+
         // Convert raw grayscale pixels to JPEG
         let bytes = match self.image_to_jpeg_bytes(image, width, height, entity_path) {
             Some(b) => b,
             None => return,
         };
-        
+
         // Log encoded image
         let rr_image = rerun::EncodedImage::from_file_contents(bytes);
         if let Err(e) = rec.log(entity_path, &rr_image) {
-            log::warn!("[RerunViewer] Failed to log image to {}: {}", 
+            log::warn!("[RerunViewer] Failed to log image to {}: {}",
                       entity_path, self.frame_id);
         }
     }
@@ -316,11 +316,11 @@ fn log_trajectory(&mut self, trajectory: &[Matrix4x4], entity_path: &str) {
     if !self.initialized || trajectory.is_empty() {
         return;
     }
-    
+
     if let Some(ref rec) = self.rec {
         rec.set_time_sequence("frame", self.frame_id);
         rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
-        
+
         // Extract position (translation) from each 4×4 transformation matrix
         // Position is in column 3, rows 0-2: mat[(row, col)]
         let positions: Vec<[Float; 3]> = trajectory
@@ -333,17 +333,17 @@ fn log_trajectory(&mut self, trajectory: &[Matrix4x4], entity_path: &str) {
                 ]
             })
             .collect();
-        
+
         // Create line strip connecting positions in order
         let line_strip = LineStrips3D::new([positions]);
-        
+
         // Color it orange (255, 165, 0)
         let trajectory_color = Color::from_rgb(255, 165, 0);
         let line_strip = line_strip.with_colors([trajectory_color]);
-        
+
         // Log to Rerun
         if let Err(e) = rec.log(entity_path, &line_strip) {
-            log::warn!("[RerunViewer] Failed to log trajectory to {}: {}", 
+            log::warn!("[RerunViewer] Failed to log trajectory to {}: {}",
                       entity_path, e);
         }
     }
@@ -359,15 +359,15 @@ log_trajectory([
      [0.000, 1.000, 0.000, 0.000],
      [0.000, 0.000, 1.000, 0.000],
      [0.000, 0.000, 0.000, 1.000]],
-    
+
     // Keyframe 1
     [[0.998, -0.064, 0.000, 0.052],
      [0.064,  0.998, 0.000, -0.001],
      [0.000,  0.000, 1.000, 0.015],
      [0.000,  0.000, 0.000, 1.000]],
-    
+
     // ... 8 more keyframes ...
-    
+
     // Keyframe 9
     [[0.707, -0.707, 0.000, 4.231],
      [0.707,  0.707, 0.000, -1.204],
@@ -389,7 +389,7 @@ Output: Orange line path from (0,0,0) → (0.052, -0.001, 0.015) → ... → (4.
                     │                                 │
                     │  3D Viewport:                   │
                     │  ├─ Camera Frustums (cone)      │ ← Stream 1
-                    │  ├─ Camera Poses (transform)    │ ← Stream 2  
+                    │  ├─ Camera Poses (transform)    │ ← Stream 2
                     │  ├─ Map Points (colored)        │ ← Streams 3 & 4
                     │  └─ Trajectory (orange line)    │ ← Stream 6
                     │                                 │
@@ -465,6 +465,6 @@ Frame 75 [14:40:16.742Z] - Final State:
 | 5 | 2D Features | [rerun.rs#229](src/viewers/rerun.rs#L229) | Image overlays | Every frame | ✅ Active |
 | 6 | Trajectory | [rerun.rs#386](src/viewers/rerun.rs#L386) | Motion path | Every kf | ✅ Active |
 
-**Total Real-Time Data**: ~200 KB/sec @ 2.3 Hz  
-**Total Code**: 460 lines of production Rerun integration  
+**Total Real-Time Data**: ~200 KB/sec @ 2.3 Hz
+**Total Code**: 460 lines of production Rerun integration
 **Status**: ✅ **ALL 6 STREAMS IMPLEMENTED & STREAMING**

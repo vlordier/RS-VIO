@@ -20,7 +20,7 @@ import sys
 import time
 from pathlib import Path
 from datetime import datetime
-from typing import List, Tuple, Dict, Optional
+from typing import List, Dict, Optional
 
 # ============================================================================
 # Configuration
@@ -417,8 +417,8 @@ Examples:
         print()
         print("Next steps:")
         print(f"  1. Review results: cat {runner.csv_file}")
-        print(f"  2. Detailed analysis: python3 scripts/analyze_benchmark_results.py")
-        print(f"  3. Deploy optimal: just deploy-optimal")
+        print("  2. Detailed analysis: python3 scripts/analyze_benchmark_results.py")
+        print("  3. Deploy optimal: just deploy-optimal")
     else:
         log_error("Benchmarking failed")
         sys.exit(1)

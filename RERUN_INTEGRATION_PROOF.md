@@ -51,10 +51,10 @@ impl Viewer for RerunViewer {
                 log::error!("[RerunViewer] Failed to spawn viewer: {}", e);
                 e
             })?;
-        
+
         self.rec = Some(rec);
         self.initialized = true;
-        
+
         // Give the viewer a moment to fully start up
         std::thread::sleep(std::time::Duration::from_millis(500));
 ```
@@ -69,7 +69,7 @@ impl Viewer for RerunViewer {
 
 #### 1. **Camera Frustum** - Visualizes camera geometry
 ```rust
-fn log_camera_frustum(&mut self, focal_length: f32, width: u32, height: u32, 
+fn log_camera_frustum(&mut self, focal_length: f32, width: u32, height: u32,
                       entity_path: &str, size: f32)
 ├─ Entity: "camera/frustum" or "camera_right/frustum"
 ├─ Type: Pinhole camera model
@@ -81,7 +81,7 @@ fn log_camera_frustum(&mut self, focal_length: f32, width: u32, height: u32,
 #### 2. **Camera Pose** - Real-time trajectory
 ```rust
 fn log_pose(&mut self, T_W_B: Matrix4x4, entity_path: &str)
-├─ Entity: "camera" 
+├─ Entity: "camera"
 ├─ Type: Transform3D (translation + quaternion rotation)
 ├─ Updated: Every frame
 ├─ Data: 4×4 SE(3) transformation matrix
@@ -110,7 +110,7 @@ fn log_points_colored(&mut self, points: &[(usize, [f32; 3])], entity_path: &str
 
 #### 5. **2D Features** - Image-space detections
 ```rust
-fn log_image_with_features(&mut self, image: &[u8], width: u32, height: u32, 
+fn log_image_with_features(&mut self, image: &[u8], width: u32, height: u32,
                            features: &[[f32; 2]], entity_path: &str)
 ├─ Entity: "camera/left/image" and "/features"
 ├─ Type: EncodedImage + Points2D overlay
@@ -140,23 +140,23 @@ VIO Pipeline                    Rerun Stream                  Viewer
 Frame 1: Load image
          └─> [log_image_with_features]
              └─> Rerun: camera/left/image + features
-                 
+
 Feature Detection
          └─> [log_points_colored]
              └─> Rerun: map/features (2D)
-             
+
 Motion Tracking
          └─> [log_pose]
              └─> Rerun: camera pose (Transform3D)
-             
+
 Map Triangulation
          └─> [log_points]
              └─> Rerun: map/points (3D sparse)
-             
+
 Bundle Adjustment (every 10 frames)
          └─> [log_trajectory]
              └─> Rerun: trajectory (LineStrip3D)
-         
+
 Frame N: Repeat with streaming visualization
 ```
 
@@ -177,9 +177,9 @@ let mut viewer: Option<Box<dyn Viewer>> = match create_viewer() {
 
 // Pass to estimator for streaming visualization
 let mut estimator = Estimator::new_with_cameras(
-    cfg, 
+    cfg,
     viewer.as_deref_mut().map(|v| v as &mut dyn Viewer),
-    Some(left_cam), 
+    Some(left_cam),
     Some(right_cam)
 );
 ```
@@ -207,7 +207,7 @@ From [src/estimator/estimator.rs#L300](src/estimator/estimator.rs):
 fn view_motion_tracking_results(&mut self, T_W_B: &Matrix4x4) {
     if let Some(v) = &mut self.viewer {
         v.log_pose(*T_W_B, "pose_current");
-        v.log_camera_frustum(focal_length, width, height, 
+        v.log_camera_frustum(focal_length, width, height,
                             "camera_left", size);
     }
 }
@@ -220,13 +220,13 @@ From [src/estimator/estimator.rs#L319](src/estimator/estimator.rs):
 fn view_optimization_results(&mut self) {
     if let Some(v) = &mut self.viewer {
         // Log 3D map points
-        let colored_points: Vec<(usize, [f32; 3])> = 
+        let colored_points: Vec<(usize, [f32; 3])> =
             self.sliding_window.map_points
             .iter()
             .map(|(id, point)| (*id, *point))
             .collect();
         v.log_points_colored(&colored_points, "map/points");
-        
+
         // Log trajectory
         self.trajectory.push(*keyframe_pose);
         v.log_trajectory(&self.trajectory, "trajectory/path");
@@ -245,7 +245,7 @@ impl Viewer for RerunViewer {
         self.rec = Some(rec);
         self.initialized = true;
         std::thread::sleep(Duration::from_millis(500));
-        
+
         if let Some(ref rec) = self.rec {
             rec.log("origin", &rerun::ViewCoordinates::RDF())?;
         }
@@ -256,11 +256,11 @@ impl Viewer for RerunViewer {
         if let Some(ref rec) = self.rec {
             rec.set_time_sequence("frame", self.frame_id);
             rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
-            
+
             // Convert 4x4 matrix to translation + quaternion
             let translation = extract_translation(T_W_B);
             let quat = matrix_to_quaternion(T_W_B);
-            
+
             rec.log(entity_path, &rerun::Transform3D::from_translation_rotation(
                 translation,
                 rerun::Rotation3D::Quaternion(rerun::components::RotationQuat(quat)),
@@ -272,13 +272,13 @@ impl Viewer for RerunViewer {
         if let Some(ref rec) = self.rec {
             rec.set_time_sequence("frame", self.frame_id);
             rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
-            
+
             let filtered: Vec<[f32; 3]> = points
                 .iter()
                 .cloned()
                 .filter(|p| p.iter().map(|x| x*x).sum::<f32>().sqrt() <= 300.0)
                 .collect();
-            
+
             rec.log(entity_path, &rerun::Points3D::new(filtered)).ok();
         }
     }
@@ -289,10 +289,10 @@ impl Viewer for RerunViewer {
                 .iter()
                 .map(|mat| [mat[(0, 3)], mat[(1, 3)], mat[(2, 3)]])
                 .collect();
-            
+
             let line_strip = LineStrips3D::new([positions])
                 .with_colors([Color::from_rgb(255, 165, 0)]);
-            
+
             rec.log(entity_path, &line_strip).ok();
         }
     }
@@ -377,13 +377,13 @@ This opens Rerun viewer showing:
 
 Each frame stream contains:
 - **Left Image**: 512×512 → ~50-100 KB JPEG
-- **Right Image**: 512×512 → ~50-100 KB JPEG  
+- **Right Image**: 512×512 → ~50-100 KB JPEG
 - **Features 2D**: ~30 points × 8 bytes = ~240 bytes
 - **Features 3D**: ~30 points × 12 bytes = ~360 bytes
 - **Camera Pose**: 4×4 matrix = 128 bytes
 - **Camera Frustum**: Pinhole model = ~256 bytes
 
-**Total per frame**: ~100-200 KB  
+**Total per frame**: ~100-200 KB
 **At 2.3 frames/sec**: ~230-460 KB/sec streaming to viewer
 
 ---
@@ -406,7 +406,7 @@ When running with Rerun integration, you see:
       ▲ ▲ ▲
       █ █ █          ← Sparse triangulated points
       ▪ ▪ ▪
-      
+
   Camera Path:       ← Orange line showing trajectory
     ─────────────
 ```
@@ -439,14 +439,14 @@ Bundle Adj: Converged (cost: 0.123)
 
 ## Proof Summary
 
-✅ **Rerun Integrated** - RecordingStream spawned automatically  
-✅ **Data Streaming** - All 6 data types logged every frame  
-✅ **Viewer Connected** - Auto-launch on run_euroc  
-✅ **Real-Time Sync** - Frame timing synchronized  
-✅ **Zero Latency** - Viewer updates as data arrives  
-✅ **Coordinate System** - RDF (Robotics) set correctly  
-✅ **Image Encoding** - JPEG compression working  
-✅ **3D Visualization** - Map points, trajectory, camera pose  
+✅ **Rerun Integrated** - RecordingStream spawned automatically
+✅ **Data Streaming** - All 6 data types logged every frame
+✅ **Viewer Connected** - Auto-launch on run_euroc
+✅ **Real-Time Sync** - Frame timing synchronized
+✅ **Zero Latency** - Viewer updates as data arrives
+✅ **Coordinate System** - RDF (Robotics) set correctly
+✅ **Image Encoding** - JPEG compression working
+✅ **3D Visualization** - Map points, trajectory, camera pose
 
 **Status**: ✅ **RERUN.IO IS ACTIVE AND STREAMING REAL-TIME VIO DATA**
 
