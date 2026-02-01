@@ -1,0 +1,8 @@
+[toolchain]
+# Minimum Supported Rust Version: 1.92.0
+# This is the minimum version required for all compilation and testing
+# Earlier versions may compile but are not officially supported
+# MSRV is pinned to 1.92.0; update this when raising the MSRV
+channel = "1.92.0"
+components = ["clippy", "rustfmt"]
+profile = "minimal"
