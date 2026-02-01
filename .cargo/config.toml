@@ -1,5 +1,4 @@
-[target.aarch64-apple-darwin]
-rustflags = ["-C", "link-arg=-framework", "-C", "link-arg=Metal"]
+# Cargo configuration for RS-VIO build system
+# Note: Metal framework linking is now conditional in build.rs
+# and only applied when the "gpu" feature is enabled on macOS.
 
-[target.x86_64-apple-darwin]
-rustflags = ["-C", "link-arg=-framework", "-C", "link-arg=Metal"]
