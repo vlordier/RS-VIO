@@ -59,9 +59,7 @@ impl ProcessingHandle {
 
         tokio::time::timeout(timeout, self.receiver.recv())
             .await
-            .map_err(|_| {
-                "Frame processing timeout".to_string()
-            })?
+            .map_err(|_| "Frame processing timeout".to_string())?
             .ok_or_else(|| "Channel closed unexpectedly".to_string())
     }
 
@@ -144,9 +142,9 @@ impl ConcurrentFrameProcessor {
     pub fn submit(&self, sequence: u64, data: Vec<u8>) -> Result<(), String> {
         let item = FrameWorkItem { sequence, data };
 
-        self.work_sender.blocking_send(item).map_err(|_| {
-            "Failed to submit frame work item".to_string()
-        })
+        self.work_sender
+            .blocking_send(item)
+            .map_err(|_| "Failed to submit frame work item".to_string())
     }
 
     /// Try to get next result respecting order if configured

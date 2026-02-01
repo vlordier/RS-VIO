@@ -124,12 +124,12 @@ impl Pattern52 {
     pub fn new(greyscale_image: &GrayImage, px: f32, py: f32) -> Pattern52 {
         let mut j_se2 = na::SMatrix::<f32, PATTERN52_SIZE, 3>::zeros();
         let pattern_scale_down = 2.0;
-        
+
         // Pre-compute pattern matrix once (2x52, transposed from 52x2)
         let pattern_matrix = na::SMatrix::<f32, 2, PATTERN52_SIZE>::from_fn(|i, j| {
             Self::PATTERN_RAW[j][i] / pattern_scale_down
         });
-        
+
         let mut p = Pattern52 {
             valid: false,
             mean: 1.0,
@@ -168,16 +168,16 @@ impl Pattern52 {
         let mut sum: f32 = 0.0;
         let mut num_valid_points = 0;
         let mut residual = na::SVector::<f32, PATTERN52_SIZE>::zeros();
-        
+
         // Fast inline bilinear interpolation - avoids function call overhead
         let width = greyscale_image.width();
         let height = greyscale_image.height();
         let raw_pixels = greyscale_image.as_raw();
-        
+
         for i in 0..PATTERN52_SIZE {
             let x = transformed_pattern[(0, i)];
             let y = transformed_pattern[(1, i)];
-            
+
             // Fast bounds check
             if x >= 2.0 && y >= 2.0 && x < (width - 2) as f32 && y < (height - 2) as f32 {
                 // Fast bilinear interpolation
@@ -185,21 +185,21 @@ impl Pattern52 {
                 let iy = y.floor() as u32;
                 let dx = x - ix as f32;
                 let dy = y - iy as f32;
-                
+
                 let ddx = 1.0 - dx;
                 let ddy = 1.0 - dy;
-                
+
                 // Direct pixel access - much faster than get_pixel
                 let idx00 = (iy * width + ix) as usize;
                 let idx10 = (iy * width + ix + 1) as usize;
                 let idx01 = ((iy + 1) * width + ix) as usize;
                 let idx11 = ((iy + 1) * width + ix + 1) as usize;
-                
+
                 let px00 = raw_pixels[idx00] as f32;
                 let px10 = raw_pixels[idx10] as f32;
                 let px01 = raw_pixels[idx01] as f32;
                 let px11 = raw_pixels[idx11] as f32;
-                
+
                 residual[i] = ddx * ddy * px00 + ddx * dy * px01 + dx * ddy * px10 + dx * dy * px11;
                 sum += residual[i];
                 num_valid_points += 1;

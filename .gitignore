@@ -34,4 +34,3 @@ PR_REVIEW_COMPLETE.md
 
 ## Rust lockfile (library crate)
 Cargo.lock
-

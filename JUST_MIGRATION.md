@@ -187,5 +187,5 @@ just run-euroc
 
 ---
 
-**Migrated**: January 21, 2026  
+**Migrated**: January 21, 2026
 **Status**: All recipes tested and validated

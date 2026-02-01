@@ -5,22 +5,22 @@
 # Image dimensions and processing parameters
 camera:
   image_width: 512            # Image width in pixels (EuRoC standard)
-  image_height: 512           # Image height in pixels (EuRoC standard)  
-  
+  image_height: 512           # Image height in pixels (EuRoC standard)
+
   # Left camera (cam0) intrinsics
   left_intrinsics: [191.75556798912652, 191.74816751185256, 254.9226487139376, 256.8780365577954]
   left_distortion: [0.6246288732884442, 1.0598071085569876]  # [alpha, beta]
   left_model: "EUCM"
 
 
-  # Right camera (cam1) intrinsics 
+  # Right camera (cam1) intrinsics
   right_intrinsics: [ 191.12575044002125, 191.1082274072055, 252.55828522469696, 255.0183218515494]  # [fx, fy, cx, cy]
   right_distortion: [0.6246035984060496, 1.0565986975905006]  # [alpha, beta]
   right_model: "EUCM"
 
   # Left camera extrinsics (T_BC - camera to body transform)
   T_B_Cl: [-0.99954072 , 0.00741901 ,-0.02938199 , 0.04644611,   0.02910045, -0.03556579, -0.99894356, -0.07105542,  -0.00845616, -0.9993398 ,  0.03533356 ,-0.04342594, 0.        ,  0. ,         0.  ,        1. ]
-  
+
   # Right camera extrinsics (T_BC - camera to body transform)
   T_B_Cr: [-0.99953336,  0.00802045, -0.02947447, -0.054498, 0.02956376,  0.01125166, -0.99949957, -0.06910442,-0.0076848 , -0.99990453, -0.01148352, -0.04518668,0.,0., 0.,   1.]
 

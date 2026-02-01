@@ -31,8 +31,6 @@ impl Feature {
     }
 }
 
-
-
 #[derive(Default)]
 pub struct PatchTracker<const N: u32> {
     last_keypoint_id: usize,
@@ -100,7 +98,11 @@ pub struct StereoPatchTracker<const N: u32> {
 }
 
 impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
-    pub fn new(grid_size: u32, optical_flow_max_iterations: u32, optical_flow_convergence_threshold: f64) -> Self {
+    pub fn new(
+        grid_size: u32,
+        optical_flow_max_iterations: u32,
+        optical_flow_convergence_threshold: f64,
+    ) -> Self {
         Self {
             last_keypoint_id: 0,
             tracked_points_map_cam0: HashMap::new(),
@@ -113,14 +115,22 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
         }
     }
 
-    pub fn process_frame(&mut self, greyscale_image0: &GrayImage, greyscale_image1: &GrayImage, frame: &mut crate::estimator::Frame) {
+    pub fn process_frame(
+        &mut self,
+        greyscale_image0: &GrayImage,
+        greyscale_image1: &GrayImage,
+        frame: &mut crate::estimator::Frame,
+    ) {
         // build current image pyramid
         let current_image_pyramid0: Vec<GrayImage> = build_image_pyramid(greyscale_image0, LEVELS);
         let current_image_pyramid1: Vec<GrayImage> = build_image_pyramid(greyscale_image1, LEVELS);
 
         // not initialized
         if !self.previous_image_pyramid0.is_empty() {
-            log::debug!("[FeatureTracker] Number of old points in cam0: {}", self.tracked_points_map_cam0.len());
+            log::debug!(
+                "[FeatureTracker] Number of old points in cam0: {}",
+                self.tracked_points_map_cam0.len()
+            );
             // track prev points
             self.tracked_points_map_cam0 = track_points::<LEVELS>(
                 &self.previous_image_pyramid0,
@@ -136,10 +146,17 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
                 self.optical_flow_max_iterations,
                 self.optical_flow_convergence_threshold,
             );
-            log::debug!("[FeatureTracker] Number of tracked old points in cam0: {}", self.tracked_points_map_cam0.len());
+            log::debug!(
+                "[FeatureTracker] Number of tracked old points in cam0: {}",
+                self.tracked_points_map_cam0.len()
+            );
         }
         // add new points
-        let new_points0 = add_points(&self.tracked_points_map_cam0, greyscale_image0, self.grid_size);
+        let new_points0 = add_points(
+            &self.tracked_points_map_cam0,
+            greyscale_image0,
+            self.grid_size,
+        );
         let tmp_tracked_points0: HashMap<usize, _> = new_points0
             .iter()
             .enumerate()
@@ -350,7 +367,7 @@ pub fn track_point_at_level(
 ) -> bool {
     // Use pre-computed pattern matrix instead of recomputing
     let patten = &dp.pattern_matrix;
-    
+
     for _iteration in 0..optical_flow_max_iterations {
         // Transform pattern: R * pattern + t
         let mut transformed_pat = transform.matrix().fixed_view::<2, 2>(0, 0) * patten;
@@ -358,7 +375,7 @@ pub fn track_point_at_level(
         for i in 0..52 {
             transformed_pat.column_mut(i).add_assign(translation);
         }
-        
+
         if let Some(res) = dp.residual(grayscale_image, &transformed_pat) {
             let inc = -dp.h_se2_inv_j_se2_t * res;
 
@@ -369,12 +386,12 @@ pub fn track_point_at_level(
             if inc.norm() > 1e6 {
                 return false;
             }
-            
+
             // Early termination if converged
             if inc.norm() < optical_flow_convergence_threshold {
                 break;
             }
-            
+
             let new_trans = transform.matrix() * image_utilities::se2_exp_matrix(&inc);
             *transform = na::Affine2::<f32>::from_matrix_unchecked(new_trans);
             let filter_margin = 2;

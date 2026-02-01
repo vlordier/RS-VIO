@@ -133,11 +133,14 @@ impl ConcurrentVIOPipeline {
         let seq = self.sequence;
         self.sequence += 1;
 
-        let seq_frame = SequencedFrame { sequence: seq, frame };
+        let seq_frame = SequencedFrame {
+            sequence: seq,
+            frame,
+        };
 
-        self.frame_sender.blocking_send(seq_frame).map_err(|_| {
-            "Failed to submit frame to processing pipeline".to_string()
-        })?;
+        self.frame_sender
+            .blocking_send(seq_frame)
+            .map_err(|_| "Failed to submit frame to processing pipeline".to_string())?;
 
         Ok(seq)
     }
@@ -151,7 +154,7 @@ impl ConcurrentVIOPipeline {
 
     /// Get current queue depth (number of pending frames)
     pub const fn queue_depth(&self) -> usize {
-        0  // Tokio mpsc::Sender doesn't expose queue depth directly
+        0 // Tokio mpsc::Sender doesn't expose queue depth directly
     }
 
     /// Shutdown the pipeline gracefully
@@ -159,9 +162,7 @@ impl ConcurrentVIOPipeline {
         drop(self.frame_sender.clone());
 
         while let Some(result) = self.task_set.join_next().await {
-            result.map_err(|e| {
-                format!("Task error during shutdown: {}", e)
-            })?;
+            result.map_err(|e| format!("Task error during shutdown: {}", e))?;
         }
 
         Ok(())

@@ -1,3 +1,4 @@
+use std::sync::Arc;
 /// Async feature detection for concurrent VIO pipeline
 ///
 /// Implements parallel feature extraction using tokio tasks for:
@@ -6,7 +7,6 @@
 ///
 /// Designed to work with the concurrent pipeline in estimator::concurrent
 use tokio::task;
-use std::sync::Arc;
 
 /// Detected feature with spatial and quality information
 #[derive(Debug, Clone, Copy)]
@@ -102,16 +102,29 @@ impl AsyncFeatureDetector {
                 Ok(features) => all_features.extend(features),
                 Err(err) => {
                     // Log task panic, continue with other results
-                    eprintln!("AsyncFeatureDetector::detect_async: spawn_blocking task failed: {:?}", err);
-                }
+                    eprintln!(
+                        "AsyncFeatureDetector::detect_async: spawn_blocking task failed: {:?}",
+                        err
+                    );
+                },
             }
         }
 
         // Sort and distribute features in grid
-        distribute_features_in_grid(&mut all_features, width as usize, height as usize, self.config.grid_cell_size, self.config.max_features);
+        distribute_features_in_grid(
+            &mut all_features,
+            width as usize,
+            height as usize,
+            self.config.grid_cell_size,
+            self.config.max_features,
+        );
 
         // Re-sort by score to keep the best features globally after grid distribution
-        all_features.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        all_features.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Limit to max features
         all_features.truncate(self.config.max_features);
@@ -130,11 +143,21 @@ impl AsyncFeatureDetector {
         );
 
         let mut sorted_features = features;
-        distribute_features_in_grid(&mut sorted_features, width as usize, height as usize, self.config.grid_cell_size, self.config.max_features);
-        
+        distribute_features_in_grid(
+            &mut sorted_features,
+            width as usize,
+            height as usize,
+            self.config.grid_cell_size,
+            self.config.max_features,
+        );
+
         // Re-sort by score to keep the best features globally
-        sorted_features.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
-        
+        sorted_features.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
         sorted_features.truncate(self.config.max_features);
         sorted_features
     }
@@ -171,7 +194,11 @@ fn detect_features_in_region(
                 let n3 = image_data[idx - 1] as f32;
                 let n4 = image_data[idx + 1] as f32;
 
-                let corner_score = ((n1 - center).abs() + (n2 - center).abs() + (n3 - center).abs() + (n4 - center).abs()) / 4.0;
+                let corner_score = ((n1 - center).abs()
+                    + (n2 - center).abs()
+                    + (n3 - center).abs()
+                    + (n4 - center).abs())
+                    / 4.0;
 
                 if corner_score > threshold {
                     features.push(DetectedFeature {
@@ -197,13 +224,13 @@ fn distribute_features_in_grid(
 ) {
     let grid_width = width.div_ceil(cell_size);
     let grid_height = height.div_ceil(cell_size);
-    
+
     // Guard against zero division with degenerate images
     if grid_width == 0 || grid_height == 0 {
         features.clear();
         return;
     }
-    
+
     let max_per_cell = std::cmp::max(1, max_features / (grid_width * grid_height));
 
     // Sort by grid cell then by score
@@ -212,7 +239,10 @@ fn distribute_features_in_grid(
         let cell_b = ((b.y as usize) / cell_size) * grid_width + ((b.x as usize) / cell_size);
 
         match cell_a.cmp(&cell_b) {
-            std::cmp::Ordering::Equal => b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal),
+            std::cmp::Ordering::Equal => b
+                .score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal),
             other => other,
         }
     });
@@ -220,7 +250,8 @@ fn distribute_features_in_grid(
     // Keep only top features per cell using in-place filtering
     let mut per_cell_count = vec![0; grid_width * grid_height];
     features.retain(|feature| {
-        let cell = ((feature.y as usize) / cell_size) * grid_width + ((feature.x as usize) / cell_size);
+        let cell =
+            ((feature.y as usize) / cell_size) * grid_width + ((feature.x as usize) / cell_size);
         if cell < per_cell_count.len() && per_cell_count[cell] < max_per_cell {
             per_cell_count[cell] += 1;
             return true;
@@ -284,12 +315,12 @@ mod tests {
         let mut features = vec![
             DetectedFeature {
                 x: 5.0,
-                y: 45.0,  // Different cell from (5,5)
+                y: 45.0, // Different cell from (5,5)
                 score: 100.0,
             },
             DetectedFeature {
                 x: 45.0,
-                y: 5.0,   // Different cell from (45,45)
+                y: 5.0, // Different cell from (45,45)
                 score: 90.0,
             },
             DetectedFeature {

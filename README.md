@@ -13,7 +13,7 @@ This project is a stereo visual-inertial odometry (VIO) system, written fully in
 - **Multi-camera model support**: Supports pinhole-radtan and EUCM camera models with distortion handling, more camera models can be integrated easily.
 - **Dataset support**: Players for EuRoC, TUM-VI, and 4Seasons datasets with configurable parameters.
 - **3D visualization**: Real-time visualization of trajectories, map points, and camera frustums using Rerun.
- 
+
 ## Usage
 
 - EuRoC:
@@ -66,7 +66,7 @@ This is my current plan, subject to change over time. Contributions are welcome 
 ### Phase 2 - Near future
 - [ ] Small refactoring and code clean-up (coming soon)
 - [ ] IMU data processing (coming soon)
-- [ ] Constant velocity model* 
+- [ ] Constant velocity model*
 - [ ] Marginalization of old keyframes and keypoints**
 - [ ] ROS wrapper
 
@@ -96,7 +96,7 @@ This project builds on excellent open-source work:
     ​
 
 ### License
-It's released under the GNU General Public License v3 (GPLv3). See LICENSE file for details. 
+It's released under the GNU General Public License v3 (GPLv3). See LICENSE file for details.
 
 ### Citation
 

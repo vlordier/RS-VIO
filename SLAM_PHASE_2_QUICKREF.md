@@ -206,7 +206,7 @@ let mut estimator = Estimator::new(config, None);
 // Process frames
 for frame in dataset.iter() {
     let state = estimator.process_frame(&frame)?;
-    
+
     // Access global optimization results
     let poses = estimator.global_pose_graph.get_optimized_poses();
     let points = estimator.global_pose_graph.get_map_points();
@@ -258,6 +258,6 @@ For issues or questions about Phase 2:
 
 ---
 
-**SLAM Phase 2 Status**: ✅ COMPLETE  
-**Test Coverage**: 787/787 passing (100%)  
+**SLAM Phase 2 Status**: ✅ COMPLETE
+**Test Coverage**: 787/787 passing (100%)
 **Ready for**: Phase 3 implementation or production deployment

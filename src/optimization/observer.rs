@@ -1,7 +1,7 @@
-use apex_solver::observers::OptObserver;
 use apex_solver::core::problem::VariableEnum;
-use std::collections::HashMap;
+use apex_solver::observers::OptObserver;
 use std::cell::RefCell;
+use std::collections::HashMap;
 
 /// Metrics collected during optimization iterations.
 #[derive(Default, Clone)]
@@ -14,7 +14,7 @@ pub struct IterationMetrics {
 }
 
 /// Terminal observer that prints optimization progress to stdout.
-/// 
+///
 /// This observer implements the `OptObserver` trait to monitor optimization
 /// iterations and print metrics in a tab-separated format suitable for
 /// terminal output or CSV logging.
@@ -51,9 +51,11 @@ impl OptObserver for TerminalObserver {
         let damping = metrics.damping.unwrap_or(0.0);
         let step_norm = metrics.step_norm.unwrap_or(0.0);
         let step_quality = metrics.step_quality.unwrap_or(0.0);
-        
-        println!("{}\t{:.6e}\t{:.6e}\t{:.6e}\t{:.6e}\t{:.6e}", 
-                 iteration, cost, grad_norm, damping, step_norm, step_quality);
+
+        println!(
+            "{}\t{:.6e}\t{:.6e}\t{:.6e}\t{:.6e}\t{:.6e}",
+            iteration, cost, grad_norm, damping, step_norm, step_quality
+        );
     }
 
     fn set_iteration_metrics(
@@ -72,4 +74,3 @@ impl OptObserver for TerminalObserver {
         metrics.step_quality = step_quality;
     }
 }
-

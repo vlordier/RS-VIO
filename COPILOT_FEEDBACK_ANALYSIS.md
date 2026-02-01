@@ -238,13 +238,13 @@ fn main() {
         "matching-temporal",
         "matching-hybrid-of",
     ];
-    
+
     let enabled: Vec<_> = strategies
         .iter()
-        .filter(|&s| std::env::var(format!("CARGO_FEATURE_{}", 
+        .filter(|&s| std::env::var(format!("CARGO_FEATURE_{}",
             s.to_uppercase().replace('-', "_"))).is_ok())
         .collect();
-    
+
     if enabled.len() > 1 {
         panic!("Only one matching strategy can be enabled, found: {:?}", enabled);
     }
@@ -265,7 +265,7 @@ fn main() {
    - **Gemini**: "receiver `_rx` and sender `_result_tx` created and immediately dropped. This closes both ends of the channels, making the pipeline completely non-functional"
    - **Copilot**: "`submit_frame()` will always error because there is no receiver, and the pipeline can never emit results"
    - **Impact**: All async operations fail silently
-   - **Locations**: 
+   - **Locations**:
      - ConcurrentVIOPipeline::with_capacity (lines 114-126)
      - ConcurrentFrameProcessor::new (lines 129-140)
 
@@ -306,14 +306,14 @@ fn main() {
 pub fn with_capacity(capacity: usize) -> Result<Self, String> {
     let (tx, rx) = mpsc::channel::<SequencedFrame>(capacity);
     let (result_tx, result_rx) = mpsc::channel::<OptimizationResult>(capacity);
-    
+
     // Spawn worker task that owns rx and result_tx
     let worker_handle = tokio::spawn(async move {
         while let Some(frame) = rx.recv().await {
             // Process and send to result_tx
         }
     });
-    
+
     Ok(Self {
         frame_sender: tx,
         result_receiver: Arc::new(tokio::sync::Mutex::new(result_rx)),
@@ -326,7 +326,7 @@ pub fn with_capacity(capacity: usize) -> Result<Self, String> {
 pub async fn shutdown(&mut self) -> Result<(), String> {
     // Drop sender to signal shutdown
     drop(std::mem::take(&mut self.frame_sender)); // Requires frame_sender: Option<mpsc::Sender<...>>
-    
+
     // Wait for workers
     while let Some(res) = self.task_set.join_next().await {
         res.map_err(|e| format!("Task join error: {}", e))??;
@@ -339,12 +339,12 @@ pub async fn try_get_result(&self) -> Option<OptimizationResult> {
     let mut receiver = self.result_receiver.lock().await;
     let mut reorder_buffer = self.reorder_buffer.lock().await;
     let mut next_output_seq = self.next_output_seq.lock().await;
-    
+
     // Drain available results into reorder buffer
     while let Ok(result) = receiver.try_recv() {
         reorder_buffer.insert(result.sequence, result);
     }
-    
+
     // Return next in-order result if available
     if let Some(result) = reorder_buffer.remove(&*next_output_seq) {
         *next_output_seq += 1;
@@ -367,7 +367,7 @@ pub async fn try_get_result(&self) -> Option<OptimizationResult> {
    - **Severity**: CRITICAL
    - **Issue**: Incorrect row-major indexing formula causes out-of-bounds access
    - **Gemini**: "formula used is for column-major indexing. This will cause an out-of-bounds access on `per_cell_count` and panic if `grid_width` is larger than `grid_height`"
-   - **Current**: `((x as usize) / cell_size) * grid_width + ((y as usize) / cell_size)` 
+   - **Current**: `((x as usize) / cell_size) * grid_width + ((y as usize) / cell_size)`
    - **Correct**: `((y as usize) / cell_size) * grid_width + ((x as usize) / cell_size)`
    - **Locations**: Lines 192, 193, 206
    - **Impact**: Will panic on most real images (width > height typical for cameras)
@@ -436,7 +436,7 @@ let cell_a = ((a.y as usize) / cell_size) * grid_width + ((a.x as usize) / cell_
 let cell_b = ((b.y as usize) / cell_size) * grid_width + ((b.x as usize) / cell_size);
 
 // Fix 2: Re-sort by score before truncating
-distribute_features_in_grid(&mut all_features, width as usize, height as usize, 
+distribute_features_in_grid(&mut all_features, width as usize, height as usize,
     self.config.grid_cell_size);
 
 // Sort by score to keep the best features globally
@@ -455,13 +455,13 @@ fn distribute_features_in_grid(
 ) {
     let grid_width = (width + cell_size - 1) / cell_size;
     let grid_height = (height + cell_size - 1) / cell_size;
-    
+
     // Guard against zero division
     if grid_width == 0 || grid_height == 0 {
         features.clear();
         return;
     }
-    
+
     let max_per_cell = std::cmp::max(1, max_features / (grid_width * grid_height));
     // ...
 }
@@ -635,19 +635,19 @@ fn main() {
     // Enforce mutual exclusivity of matching strategies
     let strategies = [
         "matching-basic-ransac",
-        "matching-imu-guided", 
+        "matching-imu-guided",
         "matching-temporal",
         "matching-hybrid-of",
     ];
-    
+
     let enabled: Vec<_> = strategies
         .iter()
         .filter(|&s| {
-            std::env::var(format!("CARGO_FEATURE_{}", 
+            std::env::var(format!("CARGO_FEATURE_{}",
                 s.to_uppercase().replace('-', "_"))).is_ok()
         })
         .collect();
-    
+
     if enabled.len() > 1 {
         panic!(
             "Only one matching strategy can be enabled at a time, found: {:?}. \
@@ -655,7 +655,7 @@ fn main() {
             enabled
         );
     }
-    
+
     if enabled.is_empty() {
         eprintln!("warning: No matching strategy enabled, using default");
     }
@@ -792,7 +792,7 @@ While all 18 PRs merged and tests pass, Copilot/Gemini reviews revealed **seriou
 **Create follow-up PR addressing:**
 
 1. **Fix PR #51 grid calculation** (3 locations)
-2. **Implement PR #50 channel/worker logic** 
+2. **Implement PR #50 channel/worker logic**
 3. **Adjust lint levels** (expect_used, unwrap_used to "warn")
 4. **Fix ndarray version** to 0.15.4
 5. **Add [features] section** with proper definitions

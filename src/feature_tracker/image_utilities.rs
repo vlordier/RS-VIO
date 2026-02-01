@@ -16,12 +16,12 @@ pub fn image_grad(grayscale_image: &GrayImage, x: f32, y: f32) -> na::SVector<f3
     // Use direct pixel access instead of get_pixel for better performance
     let width = grayscale_image.width();
     let raw_pixels = grayscale_image.as_raw();
-    
+
     let idx00 = (iy * width + ix) as usize;
     let idx10 = (iy * width + ix + 1) as usize;
     let idx01 = ((iy + 1) * width + ix) as usize;
     let idx11 = ((iy + 1) * width + ix + 1) as usize;
-    
+
     let px0y0 = raw_pixels[idx00] as f32;
     let px1y0 = raw_pixels[idx10] as f32;
     let px0y1 = raw_pixels[idx01] as f32;
@@ -154,7 +154,8 @@ pub fn detect_key_points(
 
             while points_added < num_points_in_cell && threshold >= 10 {
                 let mut fast_corners = corners_fast9(&image_view, threshold);
-                #[allow(clippy::unwrap_used)] // f32::partial_cmp returns None only for NaN, FAST scores are always valid
+                #[allow(clippy::unwrap_used)]
+                // f32::partial_cmp returns None only for NaN, FAST scores are always valid
                 fast_corners.sort_by(|a, b| a.score.partial_cmp(&b.score).unwrap());
 
                 for mut point in fast_corners {

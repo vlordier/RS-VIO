@@ -16,8 +16,8 @@ just run-4seasons
 
 ## EuRoC MAV Dataset
 
-**Status**: Requires registration & manual download  
-**Size**: ~2-3 GB per sequence  
+**Status**: Requires registration & manual download
+**Size**: ~2-3 GB per sequence
 **Sequences**: MH_01_easy, MH_02_easy, MH_03_medium, V1_01_easy, V2_01_easy, etc.
 
 ### Download Instructions
@@ -44,8 +44,8 @@ Expected output:
 
 ## TUM-VI Dataset
 
-**Status**: Auto-downloads (if mirror available), otherwise manual setup  
-**Size**: ~2 GB per sequence  
+**Status**: Auto-downloads (if mirror available), otherwise manual setup
+**Size**: ~2 GB per sequence
 **Sequences**: room1, room2, room3, room4, room5, room6
 
 ### Auto-Download
@@ -76,8 +76,8 @@ cargo run --release --bin run_tum config/tum_vi.yaml /tmp/rs-vio-samples/tum_vi
 
 ## 4Seasons Dataset
 
-**Status**: Requires free registration & manual download  
-**Size**: ~5 GB per recording  
+**Status**: Requires free registration & manual download
+**Size**: ~5 GB per recording
 **Recordings**: 4 seasonal recordings with 600+ minutes of video
 
 ### Download Instructions

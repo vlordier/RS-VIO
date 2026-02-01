@@ -1,15 +1,15 @@
 use clap::Parser;
 use env_logger::{Builder, Env};
 use log::{error, info, LevelFilter};
-use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rand::SeedableRng;
 use rs_vio::{PlayerConfig, TUMVIPlayer};
 use std::process;
 
 fn main() {
     // Set random seed for reproducibility
     let _rng = StdRng::seed_from_u64(42);
-    
+
     // Initialize logger for immediate colored output
     Builder::from_env(Env::default().default_filter_or("debug"))
         // Silence rerun noise unless it's a warning or worse
@@ -41,8 +41,8 @@ fn main() {
     let player_config = PlayerConfig {
         config_path: args.config_file.clone(),
         dataset_path: args.dataset_path.clone(),
-        enable_statistics: true,          // File statistics
-        enable_console_statistics: true,  // Console statistics
+        enable_statistics: true,         // File statistics
+        enable_console_statistics: true, // Console statistics
         step_mode: false,
     };
 
