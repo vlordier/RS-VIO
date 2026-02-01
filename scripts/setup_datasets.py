@@ -25,6 +25,16 @@ import zipfile
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+try:
+    from rich.console import Console
+    from rich.table import Table
+    from rich.progress import Progress
+    HAS_RICH = True
+except ImportError:
+    HAS_RICH = False
+
+console = Console() if HAS_RICH else None
+
 
 class DatasetSetup:
     """Handle dataset setup, extraction, and verification."""
@@ -93,19 +103,33 @@ class DatasetSetup:
         filename = filepath.name
 
         if filename not in self.checksums:
-            print(f"⚠️  No checksum for {filename} (skipping verification)")
+            msg = f"⚠️  No checksum for {filename} (skipping verification)"
+            if HAS_RICH:
+                console.print(msg, style="yellow")
+            else:
+                print(msg)
             return True
 
         expected = self.checksums[filename]
         actual = self.compute_checksum(filepath)
 
         if expected != actual:
-            print(f"❌ Checksum mismatch for {filename}")
-            print(f"   Expected: {expected}")
-            print(f"   Actual:   {actual}")
+            msg = f"❌ Checksum mismatch for {filename}"
+            if HAS_RICH:
+                console.print(msg, style="red")
+                console.print(f"   Expected: {expected}", style="red")
+                console.print(f"   Actual:   {actual}", style="red")
+            else:
+                print(msg)
+                print(f"   Expected: {expected}")
+                print(f"   Actual:   {actual}")
             return False
 
-        print(f"✅ Checksum verified: {filename}")
+        msg = f"✅ Checksum verified: {filename}"
+        if HAS_RICH:
+            console.print(msg, style="green")
+        else:
+            print(msg)
         return True
 
     def extract_zip(self, archive_path: Path, extract_to: Path) -> bool:
@@ -113,13 +137,27 @@ class DatasetSetup:
         extract_to.mkdir(parents=True, exist_ok=True)
 
         try:
-            print(f"📦 Extracting {archive_path.name} -> {extract_to.name}")
+            msg = f"📦 Extracting {archive_path.name} -> {extract_to.name}"
+            if HAS_RICH:
+                console.print(msg, style="cyan")
+            else:
+                print(msg)
+
             with zipfile.ZipFile(archive_path, "r") as zip_ref:
                 zip_ref.extractall(extract_to)
-            print(f"✅ Extracted: {archive_path.name}")
+
+            msg = f"✅ Extracted: {archive_path.name}"
+            if HAS_RICH:
+                console.print(msg, style="green")
+            else:
+                print(msg)
             return True
         except Exception as e:
-            print(f"❌ Extraction failed: {e}")
+            msg = f"❌ Extraction failed: {e}"
+            if HAS_RICH:
+                console.print(msg, style="red")
+            else:
+                print(msg)
             return False
 
     def extract_tar_gz(self, archive_path: Path, extract_to: Path) -> bool:
@@ -127,16 +165,30 @@ class DatasetSetup:
         extract_to.mkdir(parents=True, exist_ok=True)
 
         try:
-            print(f"📦 Extracting {archive_path.name} -> {extract_to.name}")
+            msg = f"📦 Extracting {archive_path.name} -> {extract_to.name}"
+            if HAS_RICH:
+                console.print(msg, style="cyan")
+            else:
+                print(msg)
+
             subprocess.run(
                 ["tar", "-xzf", str(archive_path), "-C", str(extract_to), "--strip-components=1"],
                 check=True,
                 capture_output=True,
             )
-            print(f"✅ Extracted: {archive_path.name}")
+
+            msg = f"✅ Extracted: {archive_path.name}"
+            if HAS_RICH:
+                console.print(msg, style="green")
+            else:
+                print(msg)
             return True
         except subprocess.CalledProcessError as e:
-            print(f"❌ Extraction failed: {e}")
+            msg = f"❌ Extraction failed: {e}"
+            if HAS_RICH:
+                console.print(msg, style="red")
+            else:
+                print(msg)
             return False
 
     def check_euroc(self) -> Tuple[bool, str]:
@@ -172,43 +224,74 @@ class DatasetSetup:
 
     def verify_all(self) -> bool:
         """Verify all datasets."""
-        print("=" * 70)
-        print("📊 DATASET VERIFICATION")
-        print("=" * 70)
-        print()
+        if HAS_RICH:
+            console.rule("📊 DATASET VERIFICATION", style="blue")
+        else:
+            print("=" * 70)
+            print("📊 DATASET VERIFICATION")
+            print("=" * 70)
 
         results = []
 
         # Check each dataset
         euroc_ok, euroc_msg = self.check_euroc()
         results.append(("EuRoC", euroc_ok))
-        print(euroc_msg)
+        if HAS_RICH:
+            console.print(euroc_msg, style="green" if euroc_ok else "cyan")
+        else:
+            print(euroc_msg)
 
         tum_ok, tum_msg = self.check_tum()
         results.append(("TUM-VI", tum_ok))
-        print(tum_msg)
+        if HAS_RICH:
+            console.print(tum_msg, style="green" if tum_ok else "cyan")
+        else:
+            print(tum_msg)
 
         seasons_ok, seasons_msg = self.check_4seasons()
         results.append(("4Seasons", seasons_ok))
-        print(seasons_msg)
+        if HAS_RICH:
+            console.print(seasons_msg, style="green" if seasons_ok else "cyan")
+        else:
+            print(seasons_msg)
 
-        print()
-        print("=" * 70)
+        if HAS_RICH:
+            console.print()
+            table = Table(show_header=True, header_style="bold magenta")
+            table.add_column("Dataset", style="cyan")
+            table.add_column("Status", style="green")
 
-        available = sum(1 for _, ok in results if ok)
-        print(f"📊 Available datasets: {available}/{len(results)}")
-        print("=" * 70)
-        print()
+            for dataset, ok in results:
+                status = "✅ Available" if ok else "⏭️  Missing"
+                table.add_row(dataset, status)
+
+            console.print(table)
+
+            available = sum(1 for _, ok in results if ok)
+            console.rule(f"Available: {available}/{len(results)} datasets", style="green")
+            console.print()
+        else:
+            print()
+            print("=" * 70)
+            available = sum(1 for _, ok in results if ok)
+            print(f"📊 Available datasets: {available}/{len(results)}")
+            print("=" * 70)
+            print()
 
         return available > 0
 
     def setup_all(self) -> bool:
         """Setup all available datasets."""
-        print("=" * 70)
-        print("🔧 DATASET SETUP")
-        print("=" * 70)
-        print(f"Datasets directory: {self.datasets_dir}")
-        print()
+        if HAS_RICH:
+            console.rule("🔧 DATASET SETUP", style="yellow")
+            console.print(f"Datasets directory: {self.datasets_dir}", style="bold")
+            console.print()
+        else:
+            print("=" * 70)
+            print("🔧 DATASET SETUP")
+            print("=" * 70)
+            print(f"Datasets directory: {self.datasets_dir}")
+            print()
 
         # Check for archives and extract them
         archives_found = False
@@ -228,9 +311,16 @@ class DatasetSetup:
                 self.extract_tar_gz(tum_tgz, self.datasets_dir / "tum_vi")
 
         if not archives_found:
-            print("ℹ️  No archives found to extract")
+            msg = "ℹ️  No archives found to extract"
+            if HAS_RICH:
+                console.print(msg, style="yellow")
+            else:
+                print(msg)
 
-        print()
+        if HAS_RICH:
+            console.print()
+        else:
+            print()
 
         # Verify datasets
         self.verify_all()
@@ -272,8 +362,21 @@ Examples:
     # Check dependencies
     setup = DatasetSetup(Path(args.datasets_dir), Path(args.checksum) if args.checksum else None)
 
+    if HAS_RICH:
+        console.rule("[bold blue]🎬 RS-VIO Dataset Setup[/bold blue]")
+        console.print()
+    else:
+        print("\n" + "=" * 70)
+        print("🎬 RS-VIO Dataset Setup")
+        print("=" * 70)
+        print()
+
     if not setup.check_tools():
-        print("❌ Please install missing dependencies")
+        msg = "❌ Please install missing dependencies"
+        if HAS_RICH:
+            console.print(msg, style="bold red")
+        else:
+            print(msg)
         return 1
 
     # Run setup or verify

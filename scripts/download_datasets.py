@@ -16,10 +16,21 @@ import argparse
 import shutil
 import subprocess
 import sys
+import time
 import urllib.request
 import zipfile
 from pathlib import Path
 from typing import Optional
+
+try:
+    from rich.console import Console
+    from rich.table import Table
+    from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
+    HAS_RICH = True
+except ImportError:
+    HAS_RICH = False
+
+console = Console() if HAS_RICH else None
 
 
 class DatasetDownloader:
@@ -50,22 +61,57 @@ class DatasetDownloader:
         return True
 
     def download_file(self, url: str, output_path: Path, max_retries: int = 3) -> bool:
-        """Download a file with retry logic."""
+        """Download a file with retry logic and skip if exists."""
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        for attempt in range(1, max_retries + 1):
-            print(f"⬇️  Downloading (attempt {attempt}/{max_retries}): {url}")
-            try:
-                urllib.request.urlretrieve(url, output_path)
-                print(f"✅ Downloaded: {output_path.name}")
-                return True
-            except Exception as e:
-                print(f"⚠️  Download failed: {e}")
-                if attempt < max_retries:
-                    import time
-                    time.sleep(5)
+        # Skip if already downloaded
+        if output_path.exists():
+            size = output_path.stat().st_size / (1024 * 1024)
+            msg = f"✅ Already downloaded: {output_path.name} ({size:.1f} MB)"
+            if HAS_RICH:
+                console.print(msg, style="green")
+            else:
+                print(msg)
+            return True
 
-        print(f"❌ Failed to download after {max_retries} attempts: {url}")
+        for attempt in range(1, max_retries + 1):
+            try:
+                msg = f"⬇️  Downloading (attempt {attempt}/{max_retries}): {output_path.name}"
+                if HAS_RICH:
+                    console.print(msg, style="blue")
+                else:
+                    print(msg)
+
+                urllib.request.urlretrieve(url, output_path)
+
+                size = output_path.stat().st_size / (1024 * 1024)
+                msg = f"✅ Downloaded: {output_path.name} ({size:.1f} MB)"
+                if HAS_RICH:
+                    console.print(msg, style="green")
+                else:
+                    print(msg)
+                return True
+
+            except Exception as e:
+                msg = f"⚠️  Attempt {attempt} failed: {e}"
+                if HAS_RICH:
+                    console.print(msg, style="yellow")
+                else:
+                    print(msg)
+
+                if attempt < max_retries:
+                    wait = 2 ** attempt  # Exponential backoff: 2, 4, 8 seconds
+                    if HAS_RICH:
+                        console.print(f"⏳ Retrying in {wait}s...", style="dim")
+                    else:
+                        print(f"Retrying in {wait}s...")
+                    time.sleep(wait)
+
+        msg = f"❌ Failed to download after {max_retries} attempts: {url}"
+        if HAS_RICH:
+            console.print(msg, style="red")
+        else:
+            print(msg)
         return False
 
     def extract_zip(self, archive_path: Path, extract_to: Path) -> bool:
@@ -101,63 +147,130 @@ class DatasetDownloader:
 
     def download_euroc(self) -> bool:
         """Download EuRoC dataset."""
-        print("\n" + "=" * 70)
-        print("📊 EuRoC MH_01_easy Dataset")
-        print("=" * 70)
-        print(f"Registration required: {self.EUROC_MANUAL_URL}")
-        print("Please download MH_01_easy.zip manually and place in /tmp/")
-        print()
+        header = "📊 EuRoC MH_01_easy Dataset"
+        if HAS_RICH:
+            console.rule(header, style="blue")
+        else:
+            print("\n" + "=" * 70)
+            print(header)
+            print("=" * 70)
+
+        msg = f"Registration required: {self.EUROC_MANUAL_URL}"
+        if HAS_RICH:
+            console.print(msg, style="yellow")
+            console.print("Please download MH_01_easy.zip and place in /tmp/", style="dim")
+        else:
+            print(msg)
+            print("Please download MH_01_easy.zip and place in /tmp/")
 
         euroc_dir = self.target_dir / "euroc"
+
+        # Check if already extracted
+        extracted_dirs = list(euroc_dir.glob("**/MH_01_easy")) if euroc_dir.exists() else []
+        if extracted_dirs:
+            msg = f"✅ EuROC already extracted to {euroc_dir}"
+            if HAS_RICH:
+                console.print(msg, style="green")
+            else:
+                print(msg)
+            return True
 
         if Path(self.EUROC_MANUAL_FILE).exists():
             if self.extract_zip(Path(self.EUROC_MANUAL_FILE), euroc_dir):
                 Path(self.EUROC_MANUAL_FILE).unlink()
-                print(f"✅ EuRoC extracted to {euroc_dir}")
+                msg = f"✅ EuRoC extracted to {euroc_dir}"
+                if HAS_RICH:
+                    console.print(msg, style="green")
+                else:
+                    print(msg)
                 return True
         else:
-            print("⏭️  EuRoC requires manual download (skipped)")
-            print(f"Steps:")
-            print(f"  1. Register at {self.EUROC_MANUAL_URL}")
-            print(f"  2. Download MH_01_easy.zip")
-            print(f"  3. Place it in /tmp/MH_01_easy.zip")
-            print(f"  4. Re-run this script")
+            msg = "⏭️  EuRoC requires manual download (skipped)"
+            if HAS_RICH:
+                console.print(msg, style="cyan")
+                console.print("Steps:", style="bold")
+                console.print(f"  1. Register at {self.EUROC_MANUAL_URL}", style="dim")
+                console.print("  2. Download MH_01_easy.zip", style="dim")
+                console.print("  3. Place it in /tmp/MH_01_easy.zip", style="dim")
+                console.print("  4. Re-run this script", style="dim")
+            else:
+                print("⏭️  EuRoC requires manual download (skipped)")
+                print(f"Steps:")
+                print(f"  1. Register at {self.EUROC_MANUAL_URL}")
+                print(f"  2. Download MH_01_easy.zip")
+                print(f"  3. Place it in /tmp/MH_01_easy.zip")
+                print(f"  4. Re-run this script")
 
         return False
 
     def download_tum(self) -> bool:
         """Download TUM-VI dataset."""
-        print("\n" + "=" * 70)
-        print("📊 TUM-VI freiburg3_walking_xyz Dataset")
-        print("=" * 70)
+        header = "📊 TUM-VI freiburg3_walking_xyz Dataset"
+        if HAS_RICH:
+            console.rule(header, style="blue")
+        else:
+            print("\n" + "=" * 70)
+            print(header)
+            print("=" * 70)
 
         tum_dir = self.target_dir / "tum_vi"
         archive_path = self.target_dir / "tum_vi.tgz"
 
+        # Check if already extracted
+        if tum_dir.exists() and list(tum_dir.glob("**/rgb/*")):
+            msg = f"✅ TUM-VI already extracted to {tum_dir}"
+            if HAS_RICH:
+                console.print(msg, style="green")
+            else:
+                print(msg)
+            return True
+
         if self.download_file(self.TUM_VI_URL, archive_path):
             if self.extract_tar_gz(archive_path, tum_dir):
                 archive_path.unlink()
-                print(f"✅ TUM-VI extracted to {tum_dir}")
+                msg = f"✅ TUM-VI extracted to {tum_dir}"
+                if HAS_RICH:
+                    console.print(msg, style="green")
+                else:
+                    print(msg)
                 return True
 
         return False
 
     def download_4seasons(self) -> bool:
         """Download 4Seasons dataset (manual)."""
-        print("\n" + "=" * 70)
-        print("📊 4Seasons Dataset")
-        print("=" * 70)
-        print("Download available at: https://www.4seasons-dataset.com/")
-        print("Please download one or more recording ZIPs manually.")
-        print(f"Extract to: {self.target_dir / '4seasons'}")
-        print()
+        header = "📊 4Seasons Dataset"
+        if HAS_RICH:
+            console.rule(header, style="blue")
+        else:
+            print("\n" + "=" * 70)
+            print(header)
+            print("=" * 70)
+
+        msg = "Download available at: https://www.4seasons-dataset.com/"
+        if HAS_RICH:
+            console.print(msg, style="yellow")
+            console.print("Please download one or more recording ZIPs manually.", style="dim")
+            console.print(f"Extract to: {self.target_dir / '4seasons'}", style="dim")
+        else:
+            print(msg)
+            print("Please download one or more recording ZIPs manually.")
+            print(f"Extract to: {self.target_dir / '4seasons'}")
 
         seasons_dir = self.target_dir / "4seasons"
         if seasons_dir.exists() and list(seasons_dir.iterdir()):
-            print(f"✅ 4Seasons found at {seasons_dir}")
+            msg = f"✅ 4Seasons found at {seasons_dir}"
+            if HAS_RICH:
+                console.print(msg, style="green")
+            else:
+                print(msg)
             return True
         else:
-            print("⏭️  4Seasons requires manual download (skipped)")
+            msg = "⏭️  4Seasons requires manual download (skipped)"
+            if HAS_RICH:
+                console.print(msg, style="cyan")
+            else:
+                print(msg)
 
         return False
 
@@ -169,13 +282,7 @@ class DatasetDownloader:
             "4seasons": self.download_4seasons(),
         }
 
-        print("\n" + "=" * 70)
-        print("📊 DOWNLOAD SUMMARY")
-        print("=" * 70)
-        for dataset, success in results.items():
-            status = "✅" if success else "⏭️"
-            print(f"{status} {dataset.upper()}")
-
+        self._print_summary(results)
         return True
 
     def download_specific(self, datasets: list) -> bool:
@@ -190,14 +297,31 @@ class DatasetDownloader:
             elif dataset.lower() == "4seasons":
                 results["4seasons"] = self.download_4seasons()
 
-        print("\n" + "=" * 70)
-        print("📊 DOWNLOAD SUMMARY")
-        print("=" * 70)
-        for dataset, success in results.items():
-            status = "✅" if success else "⏭️"
-            print(f"{status} {dataset.upper()}")
-
+        self._print_summary(results)
         return True
+
+    def _print_summary(self, results: dict) -> None:
+        """Print download summary using rich or plain text."""
+        if HAS_RICH:
+            console.rule("📊 DOWNLOAD SUMMARY", style="green")
+            table = Table(show_header=True, header_style="bold magenta")
+            table.add_column("Dataset", style="cyan")
+            table.add_column("Status", style="green")
+
+            for dataset, success in results.items():
+                status = "✅ Downloaded" if success else "⏭️  Skipped"
+                table.add_row(dataset.upper(), status)
+
+            console.print(table)
+            console.print(f"\n📁 Datasets available at: {self.target_dir}\n", style="bold blue")
+        else:
+            print("\n" + "=" * 70)
+            print("📊 DOWNLOAD SUMMARY")
+            print("=" * 70)
+            for dataset, success in results.items():
+                status = "✅" if success else "⏭️"
+                print(f"{status} {dataset.upper()}")
+            print("=" * 70)
 
 
 def main():
@@ -230,8 +354,21 @@ Examples:
 
     # Check dependencies
     if not downloader.check_dependencies():
-        print("❌ Please install missing dependencies")
+        msg = "❌ Please install missing dependencies"
+        if HAS_RICH:
+            console.print(msg, style="bold red")
+        else:
+            print(msg)
         return 1
+
+    if HAS_RICH:
+        console.rule("[bold blue]🎬 RS-VIO Dataset Downloader[/bold blue]")
+        console.print(f"Target: {downloader.target_dir}\n", style="dim")
+    else:
+        print("\n" + "=" * 70)
+        print("🎬 RS-VIO Dataset Downloader")
+        print("=" * 70)
+        print(f"Target: {downloader.target_dir}\n")
 
     # Download datasets
     if args.datasets.lower() == "all":
@@ -240,7 +377,12 @@ Examples:
         datasets = [d.strip() for d in args.datasets.split(",")]
         downloader.download_specific(datasets)
 
-    print(f"\n✅ Datasets available in: {downloader.target_dir}\n")
+    msg = f"✅ Datasets available in: {downloader.target_dir}\n"
+    if HAS_RICH:
+        console.print(msg, style="bold green")
+    else:
+        print(msg)
+
     return 0
 
 
