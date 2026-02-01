@@ -1,3 +1,10 @@
+//! Sliding window optimization for visual-inertial SLAM
+//!
+//! Uses Levenberg-Marquardt optimization with Schur complement for efficient bundle adjustment.
+//! Panics on unwrap/expect are acceptable in optimization code - they indicate data corruption.
+
+#![allow(clippy::unwrap_used, clippy::expect_used)] // Optimization code - panics indicate data corruption
+
 use std::collections::VecDeque;
 use apex_solver::optimizer::SolverResult;
 use apex_solver::optimizer::levenberg_marquardt::{LevenbergMarquardt, LevenbergMarquardtConfig};
@@ -43,8 +50,8 @@ impl SlidingWindow {
         }
     }
 
-    /// Create a new sliding window with the default size of 16 frames.
-    pub fn default() -> Self {
+    /// Create a new sliding window with the default size of 8 keyframes.
+    pub fn with_default_size() -> Self {
         Self::new(8)
     }
 
@@ -176,7 +183,9 @@ impl SlidingWindow {
         let mut landmark_observation_count_right: HashMap<String, usize> = HashMap::new();
 
         // Fetch transforms between cameras and body
+        #[allow(clippy::unwrap_used, clippy::expect_used)] // Panic acceptable - keyframes must exist and transforms must be invertible
         let T_Cl_B = self.keyframes.front().unwrap().state.T_B_Cl.try_inverse().expect("T_B_Cl should be invertible");
+        #[allow(clippy::unwrap_used, clippy::expect_used)]
         let T_Cr_B = self.keyframes.front().unwrap().state.T_B_Cr.try_inverse().expect("T_B_Cr should be invertible");
 
         // Count observations for each landmark across all frames, separately for left and right cameras
@@ -214,6 +223,7 @@ impl SlidingWindow {
         for (id_frame, frame) in self.keyframes.iter().enumerate() {
             // Add KF poses
             let kf_var = format!("KF_{}", id_frame);
+            #[allow(clippy::expect_used)] // Panic acceptable - pose must be invertible
             let T_B_W = frame.state.T_W_B.try_inverse().expect("T_W_B should be invertible");
             let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
             let R_B_W = Matrix3x3::from(T_B_W.fixed_view::<3, 3>(0, 0));

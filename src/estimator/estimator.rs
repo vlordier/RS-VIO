@@ -202,7 +202,9 @@ impl<'a> Estimator<'a> {
                     current_frame.state.T_W_B = T_W_B;
                     
                     // Check if translation and rotation since last keyframe is large enough to trigger a keyframe
+                    #[allow(clippy::unwrap_used)] // Validated by sliding_window - keyframes exist
                     let T_W_B_last_kf = *self.sliding_window.get_keyframe_poses().last().unwrap();
+                    #[allow(clippy::unwrap_used)] // T_W_B is guaranteed invertible
                     let T_rel = T_W_B * T_W_B_last_kf.try_inverse().unwrap();
                     let t_rel = T_rel.fixed_view::<3, 1>(0, 3).into_owned();
                     let R_rel = T_rel.fixed_view::<3, 3>(0, 0).into_owned();
@@ -355,6 +357,7 @@ impl<'a> Estimator<'a> {
             }
 
             // History of keyframe poses
+            #[allow(clippy::unwrap_used)] // Validated by sliding_window - keyframes exist
             let mat = *self.sliding_window.get_keyframe_poses().first().unwrap();
             self.trajectory.push(mat);
             

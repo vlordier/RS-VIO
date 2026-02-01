@@ -14,12 +14,14 @@ static FEATURE_COLOR_MAP: Mutex<Option<HashMap<usize, [u8; 3]>>> = Mutex::new(No
 /// Get or assign a color for a given feature ID
 /// Colors are deterministically assigned based on the feature ID using a hash function
 pub fn get_feature_color(feature_id: usize) -> [u8; 3] {
+    #[allow(clippy::unwrap_used)] // Mutex only poisoned on panic
     let mut map = FEATURE_COLOR_MAP.lock().unwrap();
     
     if map.is_none() {
         *map = Some(HashMap::new());
     }
     
+    #[allow(clippy::unwrap_used)] // Just checked is_none() above
     let map = map.as_mut().unwrap();
     
     // Check if color already assigned

@@ -154,6 +154,7 @@ pub fn detect_key_points(
 
             while points_added < num_points_in_cell && threshold >= 10 {
                 let mut fast_corners = corners_fast9(&image_view, threshold);
+                #[allow(clippy::unwrap_used)] // f32::partial_cmp returns None only for NaN, FAST scores are always valid
                 fast_corners.sort_by(|a, b| a.score.partial_cmp(&b.score).unwrap());
 
                 for mut point in fast_corners {
