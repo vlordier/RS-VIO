@@ -9,7 +9,6 @@ use std::collections::HashMap;
 use nalgebra as na;
 use na::{DVector, UnitQuaternion};
 use crate::optimization::factors::{BundleAdjustmentFactor, PnPFactor};
-use crate::optimization::observer::TerminalObserver;
 use crate::estimator::Frame;
 use crate::types::{Matrix3x3, Matrix4x4, Vector3};
 
@@ -137,7 +136,7 @@ impl SlidingWindow {
     fn check_sliding_window_size_for_optimization(&self) -> Result<bool, std::io::Error> {
         if self.keyframes.is_empty() {
             log::warn!("[SlidingWindow] Cannot optimize: window is empty");
-            return Err(std::io::Error::new(std::io::ErrorKind::Other, "Window is empty"));
+            return Err(std::io::Error::other("Window is empty"));
         }
 
         if self.keyframes.len() < self.max_frames {
@@ -145,7 +144,7 @@ impl SlidingWindow {
                 "[SlidingWindow] Cannot optimize: need {} keyframes, have {}",
                 self.max_frames,self.keyframes.len()
             );
-            return Err(std::io::Error::new(std::io::ErrorKind::Other, "Need more keyframes"));
+            return Err(std::io::Error::other("Need more keyframes"));
         }
 
         log::debug!(
@@ -153,7 +152,7 @@ impl SlidingWindow {
             self.keyframes.len()
         );
     
-        return Ok(true);
+        Ok(true)
     }
 
     pub fn optimize(&mut self) -> Result<bool, std::io::Error> {
@@ -255,7 +254,7 @@ impl SlidingWindow {
                             } else {
                                 // Default initialization if not in map_points
                                 // TODO Triangulate insrtead of assigning depth 4.0 (quick and dirty way to get going)
-                                let p_C = Vector3::new( feat.undistorted_coord[0] as f64, feat.undistorted_coord[1] as f64, 2.0 as f64);
+                                let p_C = Vector3::new( feat.undistorted_coord[0] as f64, feat.undistorted_coord[1] as f64, 2.0_f64);
                                 let (R_W_B, t_W_B) = (
                                     frame.state.T_W_B.fixed_view::<3, 3>(0, 0).into_owned(),
                                     frame.state.T_W_B.fixed_view::<3, 1>(0, 3).into_owned(),
@@ -381,7 +380,7 @@ impl SlidingWindow {
     }
 
     /// Check if optimization result indicates success
-    fn is_optimization_successful(&self, opt_result: &SolverResult<HashMap<String, VariableEnum>>) -> bool {
+    const fn is_optimization_successful(&self, opt_result: &SolverResult<HashMap<String, VariableEnum>>) -> bool {
         matches!(
             &opt_result.status,
             apex_solver::optimizer::OptimizationStatus::Converged
@@ -504,7 +503,7 @@ impl SlidingWindow {
 
         // Add variable for the new frame
         // Only the new frame is optimized and it's initialized from the last keyframe
-        let kf_var = format!("F");
+        let kf_var = "F".to_string();
         let T_B_W = self.keyframes.back().unwrap().state.T_W_B.try_inverse().expect("T_W_B should be invertible");
         let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
         let R_B_W = Matrix3x3::from(T_B_W.fixed_view::<3, 3>(0, 0));

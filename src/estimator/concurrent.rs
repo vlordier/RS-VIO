@@ -140,14 +140,14 @@ impl ConcurrentVIOPipeline {
     }
 
     /// Try to get the next result in sequence order
-    pub fn try_get_result(&self) -> Option<OptimizationResult> {
+    pub const fn try_get_result(&self) -> Option<OptimizationResult> {
         // This would need async context to properly implement
         // For now, return None (placeholder)
         None
     }
 
     /// Get current queue depth (number of pending frames)
-    pub fn queue_depth(&self) -> usize {
+    pub const fn queue_depth(&self) -> usize {
         0  // Tokio mpsc::Sender doesn't expose queue depth directly
     }
 

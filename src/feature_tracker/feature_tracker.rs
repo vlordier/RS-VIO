@@ -22,7 +22,7 @@ pub struct Feature {
 }
 
 impl Feature {
-    pub fn new(feature_id: usize, pixel_coord: [f32; 2]) -> Self {
+    pub const fn new(feature_id: usize, pixel_coord: [f32; 2]) -> Self {
         Self {
             feature_id,
             pixel_coord,

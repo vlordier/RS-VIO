@@ -12,8 +12,14 @@ use crate::datasets::{config::Config, ImageData, ImuData, FrameContext, PlayerCo
 
 pub struct TUMVIPlayer;
 
+impl Default for TUMVIPlayer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TUMVIPlayer {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         TUMVIPlayer
     }
 
@@ -231,7 +237,7 @@ impl TUMVIPlayer {
         let gray_img = img.to_luma8();
 
         // Return raw pixel data as Vec<u8>
-        let pixel_data = gray_img.as_raw().to_vec();
+        let pixel_data = gray_img.as_raw().clone();
         
         Ok(pixel_data)
     }
@@ -280,7 +286,7 @@ impl TUMVIPlayer {
         }
         
         // Get IMU data if VIO mode
-        let imu_data = if false && context.processed_frames > 0 { // TODO when implementing IMU data loading
+        let imu_data = if false { // TODO when implementing IMU data loading (clippy: simplified dead code)
             Some(Self::get_imu_data_between_frames(
                 context.previous_frame_timestamp,
                 image_data[context.current_idx].timestamp,
@@ -290,7 +296,7 @@ impl TUMVIPlayer {
         };
 
         // Process frame
-        let imu_slice = imu_data.as_ref().map(|v| v.as_slice());
+        let imu_slice = imu_data.as_deref();
         estimator.process_frame(
             &left_image,
             &right_image,
@@ -305,7 +311,7 @@ impl TUMVIPlayer {
         Ok(frame_duration.as_secs_f64() * 1000.0) // Return milliseconds
     }
 
-    fn get_imu_data_between_frames(
+    const fn get_imu_data_between_frames(
         _previous_timestamp: i64,
         _current_timestamp: i64,
     ) -> Vec<ImuData> {
@@ -323,14 +329,14 @@ impl TUMVIPlayer {
     }
 
     fn save_statistics(result: &PlayerResult, dataset_path: &str) {
-        let stats_file = Path::new(dataset_path).join(format!("statistics.txt"));
+        let stats_file = Path::new(dataset_path).join("statistics.txt".to_string());
 
         if let Ok(mut file) = std::fs::File::create(&stats_file) {
             use std::io::Write;
             writeln!(file, "════════════════════════════════════════════════════════════════════").ok();
             writeln!(file, "                          STATISTICS                                ").ok();
             writeln!(file, "════════════════════════════════════════════════════════════════════").ok();
-            writeln!(file, "").ok();
+            writeln!(file).ok();
 
             // Timing statistics
             writeln!(file, "                          TIMING ANALYSIS                           ").ok();

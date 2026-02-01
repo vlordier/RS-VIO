@@ -4,8 +4,7 @@ use crate::estimator::Frame;
 use crate::feature_tracker::StereoPatchTracker;
 use crate::types::{Matrix4x4, UnitQuaternion, Vector3};
 use crate::viewers::Viewer;
-use camera_intrinsic_model::GenericModel;
-use image::{DynamicImage, GrayImage};
+use image::GrayImage;
 use anyhow::Result;
 use nalgebra as na;
 use std::time::Instant;
@@ -91,8 +90,8 @@ impl<'a> Estimator<'a> {
             viewer,
             left_cam,
             right_cam,
-            T_B_Cl: T_B_Cl,
-            T_B_Cr: T_B_Cr,
+            T_B_Cl,
+            T_B_Cr,
             trajectory: Vec::new()
         }
     }
@@ -201,7 +200,7 @@ impl<'a> Estimator<'a> {
                     current_frame.state.T_W_B = T_W_B;
                     
                     // Check if translation and rotation since last keyframe is large enough to trigger a keyframe
-                    let T_W_B_last_kf = self.sliding_window.get_keyframe_poses().last().unwrap().clone();
+                    let T_W_B_last_kf = *self.sliding_window.get_keyframe_poses().last().unwrap();
                     let T_rel = T_W_B * T_W_B_last_kf.try_inverse().unwrap();
                     let t_rel = T_rel.fixed_view::<3, 1>(0, 3).into_owned();
                     let R_rel = T_rel.fixed_view::<3, 3>(0, 0).into_owned();
@@ -296,7 +295,7 @@ impl<'a> Estimator<'a> {
 
     fn view_motion_tracking_results(&mut self, T_W_B: &Matrix4x4) {
         if let Some(v) = &mut self.viewer {
-            let pose_path = format!("pose_current");
+            let pose_path = "pose_current".to_string();
             v.log_pose(*T_W_B, pose_path.as_str());
 
             let width = self.config.camera.image_width;
@@ -354,7 +353,7 @@ impl<'a> Estimator<'a> {
             }
 
             // History of keyframe poses
-            let mat =  self.sliding_window.get_keyframe_poses().first().unwrap().clone();
+            let mat = *self.sliding_window.get_keyframe_poses().first().unwrap();
             self.trajectory.push(mat);
             
             // Display trajectory as a continuous 3D path

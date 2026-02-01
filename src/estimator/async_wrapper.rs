@@ -58,7 +58,7 @@ impl AsyncEstimatorWrapper {
     ///
     /// This is a placeholder. Full implementation requires resolving
     /// Send+Sync constraints for trait objects in Estimator.
-    pub fn new() -> Result<Self, String> {
+    pub const fn new() -> Result<Self, String> {
         // Placeholder: Full implementation pending Estimator refactoring
         Ok(AsyncEstimatorWrapper)
     }

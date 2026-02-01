@@ -173,7 +173,7 @@ impl ConcurrentFrameProcessor {
     }
 
     /// Get configuration
-    pub fn config(&self) -> &ConcurrentConfig {
+    pub const fn config(&self) -> &ConcurrentConfig {
         &self.config
     }
 }

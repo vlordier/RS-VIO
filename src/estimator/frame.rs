@@ -2,9 +2,7 @@ use crate::datasets::ImuData;
 use crate::estimator::state::State;
 use crate::feature_tracker::Feature;
 use crate::types::Matrix4x4;
-use nalgebra as na;
 use nalgebra034;
-use std::collections::HashMap;
 use camera_intrinsic_model::models::opencv5::OpenCVModel5;
 use camera_intrinsic_model::generic_model::CameraModel;
 use crate::datasets::CameraModelType;
@@ -99,7 +97,7 @@ impl Frame {
     }
 
     /// Immutable access to left-image features.
-    pub fn left_features(&self) -> &Vec<Feature> {
+    pub const fn left_features(&self) -> &Vec<Feature> {
         &self.left_features
     }
 
@@ -121,7 +119,7 @@ impl Frame {
     }
 
     /// Immutable access to right-image features.
-    pub fn right_features(&self) -> &Vec<Feature> {
+    pub const fn right_features(&self) -> &Vec<Feature> {
         &self.right_features
     }
 

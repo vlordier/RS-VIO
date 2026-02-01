@@ -73,8 +73,7 @@ impl AsyncFeatureDetector {
         // Spawn parallel detection tasks
         let mut tasks = vec![];
 
-        let rows_per_task = (height as usize + self.config.num_parallel_tasks - 1)
-            / self.config.num_parallel_tasks;
+        let rows_per_task = (height as usize).div_ceil(self.config.num_parallel_tasks);
 
         for task_idx in 0..self.config.num_parallel_tasks {
             let image_data = Arc::clone(&image_data);
@@ -197,8 +196,8 @@ fn distribute_features_in_grid(
     cell_size: usize,
     max_features: usize,
 ) {
-    let grid_width = (width + cell_size - 1) / cell_size;
-    let grid_height = (height + cell_size - 1) / cell_size;
+    let grid_width = width.div_ceil(cell_size);
+    let grid_height = height.div_ceil(cell_size);
     
     // Guard against zero division with degenerate images
     if grid_width == 0 || grid_height == 0 {

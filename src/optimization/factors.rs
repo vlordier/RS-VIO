@@ -1,5 +1,5 @@
 use nalgebra as na;
-use na::{DVector, DMatrix, Vector3, Vector2, Matrix4, UnitQuaternion, Matrix3};
+use na::{DVector, DMatrix, Vector3, Vector2, Matrix4, Matrix3};
 use apex_solver::factors::Factor;
 use apex_solver::manifold::se3;
 
@@ -38,7 +38,7 @@ impl PinholeProjectionFactor {
     /// # Arguments
     /// * `observation` - Observed 2D point in camera (normalized/undistorted: x, y)
     /// * `t_world_to_camera` - Transform from world to camera frame (4x4 matrix)
-    pub fn new(
+    pub const fn new(
         observation: Vector2<f64>,
         T_C_W: Matrix4<f64>,
     ) -> Self {
@@ -154,7 +154,7 @@ pub struct BundleAdjustmentFactorTranslationOnly {
 }
 
 impl BundleAdjustmentFactorTranslationOnly {
-    pub fn new(
+    pub const fn new(
         observation: Vector2<f64>,
         T_C_B: Matrix4<f64>,
     ) -> Self {
@@ -165,7 +165,7 @@ impl BundleAdjustmentFactorTranslationOnly {
         }
     }
 
-    pub fn with_fixed_position(mut self, position: Vector3<f64>) -> Self {
+    pub const fn with_fixed_position(mut self, position: Vector3<f64>) -> Self {
         self.fixed_position = Some(position);
         self
     }
@@ -216,9 +216,9 @@ impl Factor for BundleAdjustmentFactorTranslationOnly {
         // params[0] = 3D point in world frame (3 params: x, y, z)
 
         let p_W = Vector3::new(params[0][0], params[0][1], params[0][2]);
-        let mut t_B_W : Vector3<f64>;
+        let t_B_W : Vector3<f64>;
         if let Some(fixed_position) = self.fixed_position {
-            t_B_W = fixed_position.clone();
+            t_B_W = fixed_position;
             assert_eq!(params.len(), 1, "BundleAdjustmentFactorTranslationOnly with fixed position requires 1 parameter vector");
             assert_eq!(params[0].len(), 3, "3D point must have 3 parameters");
         }
@@ -290,7 +290,7 @@ pub struct BundleAdjustmentFactor {
 }
 
 impl BundleAdjustmentFactor {
-    pub fn new(
+    pub const fn new(
         observation: Vector2<f64>,
         T_C_B: Matrix4<f64>,
     ) -> Self {
@@ -303,7 +303,7 @@ impl BundleAdjustmentFactor {
 
     /// Set a fixed pose T_B_W (SE3 transform from W to B).
     /// When set, the pose is not optimized and only the 3D point is optimized.
-    pub fn with_fixed_pose(mut self, T_B_W: Matrix4<f64>) -> Self {
+    pub const fn with_fixed_pose(mut self, T_B_W: Matrix4<f64>) -> Self {
         self.fixed_pose = Some(T_B_W);
         self
     }
@@ -372,8 +372,8 @@ impl Factor for BundleAdjustmentFactor {
             assert_eq!(params[1].len(), 7, "System pose must have 7 parameters (tx, ty, tz, qw, qx, qy, qz)");
             let T_B_W = se3::SE3::from(params[1].clone());
             (
-                T_B_W.rotation_so3().rotation_matrix().into(),
-                T_B_W.translation().into(),
+                T_B_W.rotation_so3().rotation_matrix(),
+                T_B_W.translation(),
             )
         };
 
@@ -416,7 +416,7 @@ impl Factor for BundleAdjustmentFactor {
             let jac_proj_R_C_B = jac_proj * R_C_B; // 2x3
             
             // ∂r/∂p_W = jac_proj * R_C_B * R_B_W
-            let jac_r_wrt_p_W = jac_proj_R_C_B * &R_B_W; // 2x3
+            let jac_r_wrt_p_W = jac_proj_R_C_B * R_B_W; // 2x3
             
             if self.fixed_pose.is_some() {
                 // Only optimize 3D point
@@ -468,7 +468,7 @@ pub struct PnPFactor {
 }
 
 impl PnPFactor {
-    pub fn new(
+    pub const fn new(
         observation: Vector2<f64>,
         T_C_B: Matrix4<f64>,
         p_W: Vector3<f64>,
@@ -527,8 +527,8 @@ impl Factor for PnPFactor {
         assert_eq!(params.len(), 1, "PnPFactor requires 1 parameter vector");
         assert_eq!(params[0].len(), 7, "System pose must have 7 parameters (tx, ty, tz, qw, qx, qy, qz)");
         let T_B_W = se3::SE3::from(params[0].clone());
-        let R_B_W : na::Matrix3<f64> = T_B_W.rotation_so3().rotation_matrix().into();
-        let t_B_W : na::Vector3<f64> = T_B_W.translation().into();
+        let R_B_W : na::Matrix3<f64> = T_B_W.rotation_so3().rotation_matrix();
+        let t_B_W : na::Vector3<f64> = T_B_W.translation();
         
         // Pre-compute camera transform components (reused in jacobian)
         let R_C_B = self.T_C_B.fixed_view::<3, 3>(0, 0);
@@ -552,7 +552,7 @@ impl Factor for PnPFactor {
             let jac_proj_R_C_B = jac_proj * R_C_B; // 2x3
             
             // ∂r/∂p_W = jac_proj * R_C_B * R_B_W
-            let jac_r_wrt_p_W = jac_proj_R_C_B * &R_B_W; // 2x3
+            let jac_r_wrt_p_W = jac_proj_R_C_B * R_B_W; // 2x3
             
             
             // TODO fix notation of AI-generated comments to match paper
