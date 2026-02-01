@@ -29,6 +29,8 @@ try:
     HAS_RICH = True
 except ImportError:
     HAS_RICH = False
+    Console = None  # type: ignore
+    Table = None    # type: ignore
 
 # Import configuration
 try:
@@ -49,9 +51,9 @@ except ImportError:
     ERROR_MESSAGES = {}
     SUCCESS_MESSAGES = {}
     INFO_MESSAGES = {}
-    logger = None
+    logger = None  # type: ignore
 
-console = Console() if HAS_RICH else None
+console: Optional[Console] = Console() if HAS_RICH else None
 
 
 class DatasetDownloader:
@@ -109,7 +111,7 @@ class DatasetDownloader:
         if output_path.exists():
             size = output_path.stat().st_size / (1024 * 1024)
             msg = f"✅ Already downloaded: {output_path.name} ({size:.1f} MB)"
-            if HAS_RICH:
+            if HAS_RICH and console:
                 console.print(msg, style="green")
             else:
                 print(msg)
@@ -118,7 +120,7 @@ class DatasetDownloader:
         for attempt in range(1, max_retries + 1):
             try:
                 msg = f"⬇️  Downloading (attempt {attempt}/{max_retries}): {output_path.name}"
-                if HAS_RICH:
+                if HAS_RICH and console:
                     console.print(msg, style="blue")
                 else:
                     print(msg)
@@ -127,7 +129,7 @@ class DatasetDownloader:
 
                 size = output_path.stat().st_size / (1024 * 1024)
                 msg = f"✅ Downloaded: {output_path.name} ({size:.1f} MB)"
-                if HAS_RICH:
+                if HAS_RICH and console:
                     console.print(msg, style="green")
                 else:
                     print(msg)
@@ -135,21 +137,21 @@ class DatasetDownloader:
 
             except Exception as e:
                 msg = f"⚠️  Attempt {attempt} failed: {e}"
-                if HAS_RICH:
+                if HAS_RICH and console:
                     console.print(msg, style="yellow")
                 else:
                     print(msg)
 
                 if attempt < max_retries:
                     wait = 2 ** attempt  # Exponential backoff: 2, 4, 8 seconds
-                    if HAS_RICH:
+                    if HAS_RICH and console:
                         console.print(f"⏳ Retrying in {wait}s...", style="dim")
                     else:
                         print(f"Retrying in {wait}s...")
                     time.sleep(wait)
 
         msg = f"❌ Failed to download after {max_retries} attempts: {url}"
-        if HAS_RICH:
+        if HAS_RICH and console:
             console.print(msg, style="red")
         else:
             print(msg)
@@ -195,7 +197,7 @@ class DatasetDownloader:
         dataset = DATASETS.get("euroc", {})
         name = dataset.get("name", "EuRoC")
         url = dataset.get("url", "https://projects.asl.ethz.ch/datasets/euroc-mav/")
-        local_file = dataset.get("local_path", "/tmp/MH_01_easy.zip")
+        local_file = str(dataset.get("local_path", "/tmp/MH_01_easy.zip"))
 
         self._print_header("📊 EuRoC MH_01_easy Dataset")
 
@@ -232,7 +234,7 @@ class DatasetDownloader:
             if logger:
                 logger.info(f"EuRoC manual download required")
             self._print_info(info_msg)
-            if HAS_RICH:
+            if HAS_RICH and console:
                 console.print("[bold cyan]Steps:[/bold cyan]")
                 console.print(f"  1. Register at {url}", style="dim")
                 console.print("  2. Download MH_01_easy.zip", style="dim")
@@ -255,7 +257,7 @@ class DatasetDownloader:
         """
         dataset = DATASETS.get("tum", {})
         name = dataset.get("name", "TUM-VI")
-        url = dataset.get("url", "http://download.tum.de/rgbd/dataset/freiburg3/rgbd-dataset_freiburg3_walking_xyz.tgz")
+        url = str(dataset.get("url", "http://download.tum.de/rgbd/dataset/freiburg3/rgbd-dataset_freiburg3_walking_xyz.tgz"))
 
         self._print_header("📊 TUM-VI freiburg3_walking_xyz Dataset")
 
@@ -319,7 +321,7 @@ class DatasetDownloader:
             if logger:
                 logger.info("4Seasons manual download required")
             self._print_info(info_msg)
-            if HAS_RICH:
+            if HAS_RICH and console:
                 console.print("[bold cyan]Steps:[/bold cyan]")
                 console.print(f"  1. Visit {url}", style="dim")
                 console.print("  2. Download one or more recording ZIPs (undistorted recommended)", style="dim")
@@ -362,31 +364,7 @@ class DatasetDownloader:
 
     def _print_summary(self, results: dict) -> None:
         """Print download summary using rich or plain text."""
-        if HAS_RICH:
-            console.rule("📊 DOWNLOAD SUMMARY", style="green")
-            table = Table(show_header=True, header_style="bold magenta")
-            table.add_column("Dataset", style="cyan")
-            table.add_column("Status", style="green")
-
-            for dataset, success in results.items():
-                status = "✅ Downloaded" if success else "⏭️  Skipped"
-                table.add_row(dataset.upper(), status)
-
-            console.print(table)
-            console.print(f"\n📁 Datasets available at: {self.target_dir}\n", style="bold blue")
-        else:
-            print("\n" + "=" * 70)
-            print("📊 DOWNLOAD SUMMARY")
-            print("=" * 70)
-            for dataset, success in results.items():
-                status = "✅" if success else "⏭️"
-                print(f"{status} {dataset.upper()}")
-            print("=" * 70)
-
-
-    def _print_summary(self, results: dict) -> None:
-        """Print download summary using rich or plain text."""
-        if HAS_RICH:
+        if HAS_RICH and console:
             console.rule("📊 DOWNLOAD SUMMARY", style="green")
             table = Table(show_header=True, header_style="bold magenta")
             table.add_column("Dataset", style="cyan")
@@ -410,9 +388,10 @@ class DatasetDownloader:
         if logger:
             logger.info(f"Download summary: {results}")
 
+
     def _print_header(self, text: str) -> None:
         """Print a formatted header."""
-        if HAS_RICH:
+        if HAS_RICH and console:
             console.rule(text, style="blue")
         else:
             print("\n" + "=" * 70)
@@ -421,28 +400,28 @@ class DatasetDownloader:
 
     def _print_success(self, text: str) -> None:
         """Print a success message."""
-        if HAS_RICH:
+        if HAS_RICH and console:
             console.print(text, style="green")
         else:
             print(text)
 
     def _print_error(self, text: str) -> None:
         """Print an error message."""
-        if HAS_RICH:
+        if HAS_RICH and console:
             console.print(text, style="red")
         else:
             print(text)
 
     def _print_warning(self, text: str) -> None:
         """Print a warning message."""
-        if HAS_RICH:
+        if HAS_RICH and console:
             console.print(text, style="yellow")
         else:
             print(text)
 
     def _print_info(self, text: str) -> None:
         """Print an info message."""
-        if HAS_RICH:
+        if HAS_RICH and console:
             console.print(text, style="blue")
         else:
             print(text)
