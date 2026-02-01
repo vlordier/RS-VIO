@@ -29,6 +29,7 @@ repos:
         description: Lint Rust code with clippy
         entry: cargo clippy --lib --bins -- -D warnings
         language: system
+        types: [rust]
         pass_filenames: false
         stages: [pre-commit]
 
