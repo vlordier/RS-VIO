@@ -42,6 +42,20 @@ impl FourSeasonsPlayer {
             },
         };
 
+        // Load IMU data
+        let imu_data = match Self::load_imu_data(&config.dataset_path) {
+            Ok(data) => {
+                if !data.is_empty() {
+                    log::info!("[FourSeasonsPlayer] Loaded {} IMU samples", data.len());
+                }
+                data
+            },
+            Err(e) => {
+                log::warn!("[FourSeasonsPlayer] Failed to load IMU data: {}", e);
+                Vec::new()
+            },
+        };
+
         let start_frame_idx = 0;
         let end_frame_idx = image_data.len();
 
@@ -113,6 +127,7 @@ impl FourSeasonsPlayer {
                     &mut context,
                     &image_data,
                     &config.dataset_path,
+                    &imu_data,
                 ) {
                     Ok(time) => time,
                     Err(e) => {
@@ -250,15 +265,59 @@ impl FourSeasonsPlayer {
     }
 
     #[allow(dead_code)] // TODO: implement for VIO mode
-    fn load_imu_data(
-        _dataset_path: &str,
-        _image_data: &[ImageData],
-        _start_frame_idx: usize,
-        _end_frame_idx: usize,
-    ) -> Result<()> {
-        // TODO: Implement IMU data loading
-        log::info!("[4SeasonsPlayer] IMU data loading (placeholder)");
-        Ok(())
+    fn load_imu_data(dataset_path: &str) -> Result<Vec<ImuData>> {
+        // 4Seasons dataset may have IMU data in imu.txt or imu.csv
+        let imu_file = Path::new(dataset_path).join("imu.txt");
+        
+        if !imu_file.exists() {
+            log::debug!("[FourSeasonsPlayer] IMU file not found at {:?}, skipping", imu_file);
+            return Ok(Vec::new());
+        }
+
+        let file = File::open(&imu_file)
+            .with_context(|| format!("Cannot open IMU file: {}", imu_file.display()))?;
+
+        let reader = BufReader::new(file);
+        let mut imu_data = Vec::new();
+
+        for (line_num, line) in reader.lines().enumerate() {
+            let line = line?;
+
+            // Skip header and empty lines
+            if line_num == 0 || line.trim().is_empty() || line.trim_start().starts_with('#') {
+                continue;
+            }
+
+            // Try to parse both space-separated and comma-separated formats
+            let parts: Vec<&str> = if line.contains(',') {
+                line.split(',').collect()
+            } else {
+                line.split_whitespace().collect()
+            };
+
+            // Format: timestamp[ns] w.x w.y w.z a.x a.y a.z
+            if parts.len() >= 7 {
+                if let Ok(timestamp) = parts[0].trim().parse::<i64>() {
+                    if let (Ok(wx), Ok(wy), Ok(wz), Ok(ax), Ok(ay), Ok(az)) = (
+                        parts[1].trim().parse::<f64>(),
+                        parts[2].trim().parse::<f64>(),
+                        parts[3].trim().parse::<f64>(),
+                        parts[4].trim().parse::<f64>(),
+                        parts[5].trim().parse::<f64>(),
+                        parts[6].trim().parse::<f64>(),
+                    ) {
+                        imu_data.push(ImuData {
+                            timestamp,
+                            gyro: [wx, wy, wz],
+                            accel: [ax, ay, az],
+                        });
+                    }
+                }
+            }
+        }
+
+        log::info!("[FourSeasonsPlayer] Loaded {} IMU samples from {}", imu_data.len(), imu_file.display());
+        Ok(imu_data)
     }
 
     /// Create camera models from config using the datasets module helper function
@@ -282,6 +341,7 @@ impl FourSeasonsPlayer {
         context: &mut FrameContext,
         image_data: &[ImageData],
         dataset_path: &str,
+        imu_data: &[ImuData],
     ) -> Result<f64> {
         let frame_start = Instant::now();
 
@@ -298,19 +358,19 @@ impl FourSeasonsPlayer {
             anyhow::bail!("Skipping frame {} due to empty image", context.current_idx);
         }
 
-        // Get IMU data if VIO mode
-        let imu_data = if false {
-            // TODO when implementing IMU data loading (clippy: simplified dead code)
-            Some(Self::get_imu_data_between_frames(
+        // Get IMU data between previous and current frame
+        let imu_between_frames = if !imu_data.is_empty() {
+            Self::get_imu_data_between_frames(
                 context.previous_frame_timestamp,
                 image_data[context.current_idx].timestamp,
-            ))
+                imu_data,
+            )
         } else {
-            None
+            Vec::new()
         };
 
         // Process frame
-        let imu_slice = imu_data.as_deref();
+        let imu_slice = if imu_between_frames.is_empty() { None } else { Some(imu_between_frames.as_slice()) };
         estimator.process_frame(
             &left_image,
             &right_image,
@@ -325,12 +385,17 @@ impl FourSeasonsPlayer {
         Ok(frame_duration.as_secs_f64() * 1000.0) // Return milliseconds
     }
 
-    const fn get_imu_data_between_frames(
-        _previous_timestamp: i64,
-        _current_timestamp: i64,
+    fn get_imu_data_between_frames(
+        previous_timestamp: i64,
+        current_timestamp: i64,
+        all_imu_data: &[ImuData],
     ) -> Vec<ImuData> {
-        // TODO: Implement IMU data retrieval between timestamps
-        Vec::new()
+        // Return all IMU samples that fall between previous and current frame timestamps
+        all_imu_data
+            .iter()
+            .filter(|imu| imu.timestamp > previous_timestamp && imu.timestamp <= current_timestamp)
+            .cloned()
+            .collect()
     }
 
     fn save_trajectories(_estimator: &Estimator, _context: &FrameContext, _dataset_path: &str) {
