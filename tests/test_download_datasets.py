@@ -180,10 +180,13 @@ class TestDatasetDownloaderEuROC(unittest.TestCase):
             manual_file.touch()
 
             downloader = DatasetDownloader(tmppath)
-            downloader.EUROC_MANUAL_FILE = str(manual_file)
-
-            with patch.object(downloader, "extract_zip", return_value=True):
-                result = downloader.download_euroc()
+            
+            # Mock the config to use our temp file
+            with patch("download_datasets.DATASETS", {
+                "euroc": {"name": "EuRoC", "url": "http://example.com", "local_path": str(manual_file)}
+            }):
+                with patch.object(downloader, "extract_zip", return_value=True):
+                    result = downloader.download_euroc()
 
             self.assertTrue(result)
 
@@ -192,9 +195,11 @@ class TestDatasetDownloaderEuROC(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmppath = Path(tmpdir)
             downloader = DatasetDownloader(tmppath)
-            downloader.EUROC_MANUAL_FILE = "/nonexistent/MH_01_easy.zip"
 
-            result = downloader.download_euroc()
+            with patch("download_datasets.DATASETS", {
+                "euroc": {"name": "EuRoC", "url": "http://example.com", "local_path": "/nonexistent/MH_01_easy.zip"}
+            }):
+                result = downloader.download_euroc()
 
             # Should return False but not crash
             self.assertFalse(result)

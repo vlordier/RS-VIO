@@ -17,18 +17,39 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
 try:
     from rich.console import Console
     from rich.table import Table
-    from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
     HAS_RICH = True
 except ImportError:
     HAS_RICH = False
+
+# Import configuration
+try:
+    from dataset_config import (
+        DATASETS,
+        DOWNLOAD_CONFIG,
+        ERROR_MESSAGES,
+        INFO_MESSAGES,
+        REQUIRED_TOOLS,
+        SUCCESS_MESSAGES,
+        logger,
+    )
+except ImportError:
+    # Fallback if config not available
+    DATASETS = {}
+    DOWNLOAD_CONFIG = {"max_retries": 3, "retry_delays": [2, 4, 8]}
+    REQUIRED_TOOLS = ["curl", "tar", "unzip"]
+    ERROR_MESSAGES = {}
+    SUCCESS_MESSAGES = {}
+    INFO_MESSAGES = {}
+    logger = None
 
 console = Console() if HAS_RICH else None
 
@@ -36,28 +57,48 @@ console = Console() if HAS_RICH else None
 class DatasetDownloader:
     """Handle downloading and extracting datasets."""
 
-    EUROC_MANUAL_URL = "https://projects.asl.ethz.ch/datasets/euroc-mav/"
-    TUM_VI_URL = "http://download.tum.de/rgbd/dataset/freiburg3/rgbd-dataset_freiburg3_walking_xyz.tgz"
-    EUROC_MANUAL_FILE = "/tmp/MH_01_easy.zip"
-
     def __init__(self, target_dir: Path):
-        """Initialize downloader with target directory."""
-        self.target_dir = Path(target_dir)
-        self.target_dir.mkdir(parents=True, exist_ok=True)
+        """Initialize downloader with target directory.
+        
+        Args:
+            target_dir: Target directory for downloaded datasets
+            
+        Raises:
+            OSError: If target directory cannot be created
+        """
+        try:
+            self.target_dir = Path(target_dir)
+            self.target_dir.mkdir(parents=True, exist_ok=True)
+            
+            if logger:
+                logger.info(f"Initialized downloader with target: {self.target_dir}")
+        except OSError as e:
+            error_msg = f"Failed to create target directory {target_dir}: {e}"
+            if logger:
+                logger.error(error_msg)
+            raise
 
     def check_dependencies(self) -> bool:
-        """Check if required tools are available."""
-        required = ["curl", "tar", "unzip"]
+        """Check if required tools are available.
+        
+        Returns:
+            True if all tools are available, False otherwise
+        """
         missing = []
 
-        for tool in required:
+        for tool in REQUIRED_TOOLS:
             if shutil.which(tool) is None:
                 missing.append(tool)
 
         if missing:
-            print(f"❌ Missing required tools: {', '.join(missing)}")
+            error_msg = f"Missing required tools: {', '.join(missing)}"
+            if logger:
+                logger.error(error_msg)
+            self._print_error(error_msg)
             return False
 
+        if logger:
+            logger.info(f"All required tools available: {', '.join(REQUIRED_TOOLS)}")
         return True
 
     def download_file(self, url: str, output_path: Path, max_retries: int = 3) -> bool:
@@ -146,131 +187,150 @@ class DatasetDownloader:
             return False
 
     def download_euroc(self) -> bool:
-        """Download EuRoC dataset."""
-        header = "📊 EuRoC MH_01_easy Dataset"
-        if HAS_RICH:
-            console.rule(header, style="blue")
-        else:
-            print("\n" + "=" * 70)
-            print(header)
-            print("=" * 70)
+        """Download EuRoC dataset.
+        
+        Returns:
+            True if dataset is available or extracted, False otherwise
+        """
+        dataset = DATASETS.get("euroc", {})
+        name = dataset.get("name", "EuRoC")
+        url = dataset.get("url", "https://projects.asl.ethz.ch/datasets/euroc-mav/")
+        local_file = dataset.get("local_path", "/tmp/MH_01_easy.zip")
 
-        msg = f"Registration required: {self.EUROC_MANUAL_URL}"
-        if HAS_RICH:
-            console.print(msg, style="yellow")
-            console.print("Please download MH_01_easy.zip and place in /tmp/", style="dim")
-        else:
-            print(msg)
-            print("Please download MH_01_easy.zip and place in /tmp/")
+        self._print_header("📊 EuRoC MH_01_easy Dataset")
 
         euroc_dir = self.target_dir / "euroc"
 
         # Check if already extracted
         extracted_dirs = list(euroc_dir.glob("**/MH_01_easy")) if euroc_dir.exists() else []
         if extracted_dirs:
-            msg = f"✅ EuROC already extracted to {euroc_dir}"
-            if HAS_RICH:
-                console.print(msg, style="green")
-            else:
-                print(msg)
+            success_msg = f"✅ {name} already extracted"
+            if logger:
+                logger.info(f"EuRoC already extracted at {euroc_dir}")
+            self._print_success(success_msg)
             return True
 
-        if Path(self.EUROC_MANUAL_FILE).exists():
-            if self.extract_zip(Path(self.EUROC_MANUAL_FILE), euroc_dir):
-                Path(self.EUROC_MANUAL_FILE).unlink()
-                msg = f"✅ EuRoC extracted to {euroc_dir}"
-                if HAS_RICH:
-                    console.print(msg, style="green")
-                else:
-                    print(msg)
+        if Path(local_file).exists():
+            if logger:
+                logger.info(f"Found local EuRoC file: {local_file}")
+            if self.extract_zip(Path(local_file), euroc_dir):
+                try:
+                    Path(local_file).unlink()
+                    if logger:
+                        logger.info(f"Deleted temporary file: {local_file}")
+                except OSError as e:
+                    if logger:
+                        logger.warning(f"Failed to delete {local_file}: {e}")
+
+                success_msg = f"✅ {name} extracted"
+                if logger:
+                    logger.info(f"EuRoC extraction and setup complete")
+                self._print_success(success_msg)
                 return True
         else:
-            msg = "⏭️  EuRoC requires manual download (skipped)"
+            info_msg = f"ℹ️ {name} requires manual download"
+            if logger:
+                logger.info(f"EuRoC manual download required")
+            self._print_info(info_msg)
             if HAS_RICH:
-                console.print(msg, style="cyan")
-                console.print("Steps:", style="bold")
-                console.print(f"  1. Register at {self.EUROC_MANUAL_URL}", style="dim")
+                console.print("[bold cyan]Steps:[/bold cyan]")
+                console.print(f"  1. Register at {url}", style="dim")
                 console.print("  2. Download MH_01_easy.zip", style="dim")
-                console.print("  3. Place it in /tmp/MH_01_easy.zip", style="dim")
+                console.print(f"  3. Place it at {local_file}", style="dim")
                 console.print("  4. Re-run this script", style="dim")
             else:
-                print("⏭️  EuRoC requires manual download (skipped)")
-                print(f"Steps:")
-                print(f"  1. Register at {self.EUROC_MANUAL_URL}")
-                print(f"  2. Download MH_01_easy.zip")
-                print(f"  3. Place it in /tmp/MH_01_easy.zip")
-                print(f"  4. Re-run this script")
+                print("Steps:")
+                print(f"  1. Register at {url}")
+                print("  2. Download MH_01_easy.zip")
+                print(f"  3. Place it at {local_file}")
+                print("  4. Re-run this script")
 
         return False
 
     def download_tum(self) -> bool:
-        """Download TUM-VI dataset."""
-        header = "📊 TUM-VI freiburg3_walking_xyz Dataset"
-        if HAS_RICH:
-            console.rule(header, style="blue")
-        else:
-            print("\n" + "=" * 70)
-            print(header)
-            print("=" * 70)
+        """Download TUM-VI dataset.
+        
+        Returns:
+            True if download/extraction successful, False otherwise
+        """
+        dataset = DATASETS.get("tum", {})
+        name = dataset.get("name", "TUM-VI")
+        url = dataset.get("url", "http://download.tum.de/rgbd/dataset/freiburg3/rgbd-dataset_freiburg3_walking_xyz.tgz")
+
+        self._print_header("📊 TUM-VI freiburg3_walking_xyz Dataset")
+
+        if logger:
+            logger.info(f"Starting TUM-VI dataset download")
 
         tum_dir = self.target_dir / "tum_vi"
         archive_path = self.target_dir / "tum_vi.tgz"
 
         # Check if already extracted
         if tum_dir.exists() and list(tum_dir.glob("**/rgb/*")):
-            msg = f"✅ TUM-VI already extracted to {tum_dir}"
-            if HAS_RICH:
-                console.print(msg, style="green")
-            else:
-                print(msg)
+            success_msg = f"✅ {name} already extracted"
+            if logger:
+                logger.info(f"TUM-VI already extracted at {tum_dir}")
+            self._print_success(success_msg)
             return True
 
-        if self.download_file(self.TUM_VI_URL, archive_path):
+        if self.download_file(url, archive_path):
             if self.extract_tar_gz(archive_path, tum_dir):
-                archive_path.unlink()
-                msg = f"✅ TUM-VI extracted to {tum_dir}"
-                if HAS_RICH:
-                    console.print(msg, style="green")
-                else:
-                    print(msg)
+                try:
+                    archive_path.unlink()
+                    if logger:
+                        logger.info(f"Deleted archive file: {archive_path}")
+                except OSError as e:
+                    if logger:
+                        logger.warning(f"Failed to delete {archive_path}: {e}")
+
+                success_msg = f"✅ {name} extracted"
+                if logger:
+                    logger.info(f"TUM-VI download and extraction complete")
+                self._print_success(success_msg)
                 return True
 
         return False
 
     def download_4seasons(self) -> bool:
-        """Download 4Seasons dataset (manual)."""
-        header = "📊 4Seasons Dataset"
-        if HAS_RICH:
-            console.rule(header, style="blue")
-        else:
-            print("\n" + "=" * 70)
-            print(header)
-            print("=" * 70)
+        """Download 4Seasons dataset.
+        
+        Returns:
+            True if dataset found locally, False otherwise
+        """
+        dataset = DATASETS.get("4seasons", {})
+        name = dataset.get("name", "4Seasons")
+        url = dataset.get("url", "https://www.4seasons-dataset.com/")
 
-        msg = "Download available at: https://www.4seasons-dataset.com/"
-        if HAS_RICH:
-            console.print(msg, style="yellow")
-            console.print("Please download one or more recording ZIPs manually.", style="dim")
-            console.print(f"Extract to: {self.target_dir / '4seasons'}", style="dim")
-        else:
-            print(msg)
-            print("Please download one or more recording ZIPs manually.")
-            print(f"Extract to: {self.target_dir / '4seasons'}")
+        self._print_header("📊 4Seasons Dataset")
+
+        if logger:
+            logger.info("Checking for 4Seasons dataset")
 
         seasons_dir = self.target_dir / "4seasons"
+
         if seasons_dir.exists() and list(seasons_dir.iterdir()):
-            msg = f"✅ 4Seasons found at {seasons_dir}"
-            if HAS_RICH:
-                console.print(msg, style="green")
-            else:
-                print(msg)
+            success_msg = f"✅ {name} found"
+            if logger:
+                logger.info(f"4Seasons dataset found at {seasons_dir}")
+            self._print_success(success_msg)
             return True
         else:
-            msg = "⏭️  4Seasons requires manual download (skipped)"
+            info_msg = f"ℹ️ {name} requires manual download"
+            if logger:
+                logger.info("4Seasons manual download required")
+            self._print_info(info_msg)
             if HAS_RICH:
-                console.print(msg, style="cyan")
+                console.print("[bold cyan]Steps:[/bold cyan]")
+                console.print(f"  1. Visit {url}", style="dim")
+                console.print("  2. Download one or more recording ZIPs", style="dim")
+                console.print(f"  3. Extract to {seasons_dir}", style="dim")
+                console.print("  4. Re-run this script", style="dim")
             else:
-                print(msg)
+                print("Steps:")
+                print(f"  1. Visit {url}")
+                print("  2. Download one or more recording ZIPs")
+                print(f"  3. Extract to {seasons_dir}")
+                print("  4. Re-run this script")
 
         return False
 
@@ -322,6 +382,70 @@ class DatasetDownloader:
                 status = "✅" if success else "⏭️"
                 print(f"{status} {dataset.upper()}")
             print("=" * 70)
+
+
+    def _print_summary(self, results: dict) -> None:
+        """Print download summary using rich or plain text."""
+        if HAS_RICH:
+            console.rule("📊 DOWNLOAD SUMMARY", style="green")
+            table = Table(show_header=True, header_style="bold magenta")
+            table.add_column("Dataset", style="cyan")
+            table.add_column("Status", style="green")
+
+            for dataset, success in results.items():
+                status = "✅ Downloaded" if success else "⏭️  Skipped"
+                table.add_row(dataset.upper(), status)
+
+            console.print(table)
+            console.print(f"\n📁 Datasets available at: {self.target_dir}\n", style="bold blue")
+        else:
+            print("\n" + "=" * 70)
+            print("📊 DOWNLOAD SUMMARY")
+            print("=" * 70)
+            for dataset, success in results.items():
+                status = "✅" if success else "⏭️"
+                print(f"{status} {dataset.upper()}")
+            print("=" * 70)
+
+        if logger:
+            logger.info(f"Download summary: {results}")
+
+    def _print_header(self, text: str) -> None:
+        """Print a formatted header."""
+        if HAS_RICH:
+            console.rule(text, style="blue")
+        else:
+            print("\n" + "=" * 70)
+            print(text)
+            print("=" * 70)
+
+    def _print_success(self, text: str) -> None:
+        """Print a success message."""
+        if HAS_RICH:
+            console.print(text, style="green")
+        else:
+            print(text)
+
+    def _print_error(self, text: str) -> None:
+        """Print an error message."""
+        if HAS_RICH:
+            console.print(text, style="red")
+        else:
+            print(text)
+
+    def _print_warning(self, text: str) -> None:
+        """Print a warning message."""
+        if HAS_RICH:
+            console.print(text, style="yellow")
+        else:
+            print(text)
+
+    def _print_info(self, text: str) -> None:
+        """Print an info message."""
+        if HAS_RICH:
+            console.print(text, style="blue")
+        else:
+            print(text)
 
 
 def main():

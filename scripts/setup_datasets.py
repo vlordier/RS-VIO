@@ -33,6 +33,27 @@ try:
 except ImportError:
     HAS_RICH = False
 
+# Import configuration
+try:
+    from dataset_config import (
+        CHECKSUM_FILE,
+        DATASET_PATTERNS,
+        ERROR_MESSAGES,
+        INFO_MESSAGES,
+        REQUIRED_TOOLS,
+        SUCCESS_MESSAGES,
+        logger,
+    )
+except ImportError:
+    # Fallback if config not available
+    CHECKSUM_FILE = Path(__file__).parent / "dataset_checksums.sha256"
+    DATASET_PATTERNS = {}
+    ERROR_MESSAGES = {}
+    SUCCESS_MESSAGES = {}
+    INFO_MESSAGES = {}
+    REQUIRED_TOOLS = ["curl", "tar", "unzip"]
+    logger = None
+
 console = Console() if HAS_RICH else None
 
 
@@ -40,12 +61,29 @@ class DatasetSetup:
     """Handle dataset setup, extraction, and verification."""
 
     def __init__(self, datasets_dir: Path, checksum_file: Optional[Path] = None):
-        """Initialize dataset setup."""
-        self.datasets_dir = Path(datasets_dir)
-        self.datasets_dir.mkdir(parents=True, exist_ok=True)
+        """Initialize dataset setup.
+        
+        Args:
+            datasets_dir: Path to datasets directory
+            checksum_file: Optional path to checksum file
+            
+        Raises:
+            OSError: If datasets directory cannot be created
+        """
+        try:
+            self.datasets_dir = Path(datasets_dir)
+            self.datasets_dir.mkdir(parents=True, exist_ok=True)
 
-        self.checksum_file = checksum_file or Path(__file__).parent / "dataset_checksums.sha256"
-        self.checksums = self._load_checksums()
+            self.checksum_file = checksum_file or CHECKSUM_FILE
+            self.checksums = self._load_checksums()
+            
+            if logger:
+                logger.info(f"Initialized setup with datasets_dir: {self.datasets_dir}")
+        except OSError as e:
+            error_msg = f"Failed to initialize dataset setup: {e}"
+            if logger:
+                logger.error(error_msg)
+            raise
 
     def _load_checksums(self) -> Dict[str, str]:
         """Load checksums from file."""
@@ -71,18 +109,26 @@ class DatasetSetup:
         return checksums
 
     def check_tools(self) -> bool:
-        """Check if required tools are available."""
-        required = ["curl", "tar", "unzip"]
+        """Check if required tools are available.
+        
+        Returns:
+            True if all tools available, False otherwise
+        """
         missing = []
 
-        for tool in required:
+        for tool in REQUIRED_TOOLS:
             if shutil.which(tool) is None:
                 missing.append(tool)
 
         if missing:
-            print(f"❌ Missing required tools: {', '.join(missing)}")
+            error_msg = f"Missing required tools: {', '.join(missing)}"
+            if logger:
+                logger.error(error_msg)
+            self._print_error(error_msg)
             return False
 
+        if logger:
+            logger.info(f"All required tools available: {', '.join(REQUIRED_TOOLS)}")
         return True
 
     def compute_checksum(self, filepath: Path) -> str:
@@ -326,6 +372,34 @@ class DatasetSetup:
         self.verify_all()
 
         return True
+
+    def _print_success(self, text: str) -> None:
+        """Print a success message."""
+        if HAS_RICH:
+            console.print(text, style="green")
+        else:
+            print(text)
+
+    def _print_error(self, text: str) -> None:
+        """Print an error message."""
+        if HAS_RICH:
+            console.print(text, style="red")
+        else:
+            print(text)
+
+    def _print_warning(self, text: str) -> None:
+        """Print a warning message."""
+        if HAS_RICH:
+            console.print(text, style="yellow")
+        else:
+            print(text)
+
+    def _print_info(self, text: str) -> None:
+        """Print an info message."""
+        if HAS_RICH:
+            console.print(text, style="blue")
+        else:
+            print(text)
 
 
 def main():
