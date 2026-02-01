@@ -1,2 +1,31 @@
-/target
+## Rust build
+/target/
+
+## Python artifacts
+__pycache__/
+*.pyc
+
+## Logs and profiling outputs
+*.log
+*.profraw
+
+## Benchmark outputs
+benchmark_results/
+
+## Datasets and generated data
+datasets/
+data/
+exported_data/
+exported_data_multi/
+results/
+rs-vio-samples/
+teacher_data/
+
+## Local workspace artifacts
+.archive/
+.vscode/
+RS-VIO.code-workspace
+
+## OS files
+.DS_Store
 
