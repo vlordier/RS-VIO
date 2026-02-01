@@ -3,5 +3,6 @@
 # This is the minimum version required for all compilation and testing
 # Earlier versions may compile but are not officially supported
 # Updated to 1.92.0 for Cargo.lock v4 support
-channel = "1.92"
+channel = "1.92.0"
+components = ["clippy", "rustfmt"]
 profile = "minimal"
