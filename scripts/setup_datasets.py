@@ -230,8 +230,9 @@ class DatasetSetup:
             msg = f"❌ Extraction failed: {e}"
             if HAS_RICH:
                 console.print(msg, style="red")
-            else:
-                print(msg)
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Extraction failed: {e}")
+            print(f"Stderr: {e.stderr.decode()}")
             return False
 
     def check_euroc(self) -> Tuple[bool, str]:
