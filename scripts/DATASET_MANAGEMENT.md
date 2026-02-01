@@ -41,6 +41,7 @@ For EuRoC and 4Seasons datasets that require manual download:
    - Script will extract it automatically
 
 2. **4Seasons:**
+   - Register at https://www.4seasons-dataset.com/
    - Download from https://cvg.cit.tum.de/data/datasets/4seasons-dataset/download
    - Extract to `<target-dir>/4seasons/`
 

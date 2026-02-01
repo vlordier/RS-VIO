@@ -299,7 +299,8 @@ class DatasetDownloader:
         """
         dataset = DATASETS.get("4seasons", {})
         name = dataset.get("name", "4Seasons")
-        url = dataset.get("url", "https://www.4seasons-dataset.com/")
+        url = dataset.get("url", "https://cvg.cit.tum.de/data/datasets/4seasons-dataset/download")
+        registration_url = dataset.get("registration_url", "https://www.4seasons-dataset.com/")
 
         self._print_header("📊 4Seasons Dataset")
 
@@ -321,16 +322,18 @@ class DatasetDownloader:
             self._print_info(info_msg)
             if HAS_RICH:
                 console.print("[bold cyan]Steps:[/bold cyan]")
-                console.print(f"  1. Visit {url}", style="dim")
-                console.print("  2. Download one or more recording ZIPs", style="dim")
-                console.print(f"  3. Extract to {seasons_dir}", style="dim")
-                console.print("  4. Re-run this script", style="dim")
+                console.print(f"  1. Register at {registration_url}", style="dim")
+                console.print(f"  2. Download from {url}", style="dim")
+                console.print("  3. Download one or more recording ZIPs", style="dim")
+                console.print(f"  4. Extract to {seasons_dir}", style="dim")
+                console.print("  5. Re-run this script", style="dim")
             else:
                 print("Steps:")
-                print(f"  1. Visit {url}")
-                print("  2. Download one or more recording ZIPs")
-                print(f"  3. Extract to {seasons_dir}")
-                print("  4. Re-run this script")
+                print(f"  1. Register at {registration_url}")
+                print(f"  2. Download from {url}")
+                print("  3. Download one or more recording ZIPs")
+                print(f"  4. Extract to {seasons_dir}")
+                print("  5. Re-run this script")
 
         return False
 
