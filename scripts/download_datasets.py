@@ -188,6 +188,23 @@ class DatasetDownloader:
             print(f"❌ Extraction failed: {e}")
             return False
 
+    def extract_tar(self, archive_path: Path, extract_to: Path) -> bool:
+        """Extract a tar archive (uncompressed)."""
+        extract_to.mkdir(parents=True, exist_ok=True)
+
+        try:
+            print(f"📦 Extracting {archive_path.name} -> {extract_to}")
+            subprocess.run(
+                ["tar", "-xf", str(archive_path), "-C", str(extract_to), "--strip-components=1"],
+                check=True,
+                capture_output=True,
+            )
+            print(f"✅ Extracted: {archive_path.name}")
+            return True
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Extraction failed: {e}")
+            return False
+
     def download_euroc(self) -> bool:
         """Download EuRoC dataset.
         
@@ -257,41 +274,58 @@ class DatasetDownloader:
         """
         dataset = DATASETS.get("tum", {})
         name = dataset.get("name", "TUM-VI")
-        url = str(dataset.get("url", "http://download.tum.de/rgbd/dataset/freiburg3/rgbd-dataset_freiburg3_walking_xyz.tgz"))
+        sequences = dataset.get("sequences", {})
+        
+        if not sequences:
+            url = str(dataset.get("url", ""))
+            sequences = {"default": url}
 
-        self._print_header("📊 TUM-VI freiburg3_walking_xyz Dataset")
+        self._print_header("📊 TUM-VI Dataset Download")
 
         if logger:
             logger.info(f"Starting TUM-VI dataset download")
 
         tum_dir = self.target_dir / "tum_vi"
-        archive_path = self.target_dir / "tum_vi.tgz"
-
-        # Check if already extracted
-        if tum_dir.exists() and list(tum_dir.glob("**/rgb/*")):
+        
+        # Check if already extracted (MAV0 format)
+        if tum_dir.exists() and list(tum_dir.glob("**/mav0/cam0/data/*")):
             success_msg = f"✅ {name} already extracted"
             if logger:
                 logger.info(f"TUM-VI already extracted at {tum_dir}")
             self._print_success(success_msg)
             return True
 
-        if self.download_file(url, archive_path):
-            if self.extract_tar_gz(archive_path, tum_dir):
-                try:
-                    archive_path.unlink()
-                    if logger:
-                        logger.info(f"Deleted archive file: {archive_path}")
-                except OSError as e:
-                    if logger:
-                        logger.warning(f"Failed to delete {archive_path}: {e}")
+        # Download each sequence
+        all_success = True
+        for seq_name, seq_url in sequences.items():
+            archive_path = self.target_dir / f"tum_vi_{seq_name}.tar"
+            seq_dir = tum_dir / seq_name
+            
+            if seq_dir.exists() and list(seq_dir.glob("**/mav0/cam0/data/*")):
+                self._print_success(f"✅ {seq_name} already extracted")
+                continue
+            
+            if self.download_file(seq_url, archive_path):
+                if self.extract_tar(archive_path, seq_dir):
+                    try:
+                        archive_path.unlink()
+                        if logger:
+                            logger.info(f"Deleted archive file: {archive_path}")
+                    except OSError as e:
+                        if logger:
+                            logger.warning(f"Failed to delete {archive_path}: {e}")
+                    
+                    self._print_success(f"✅ {seq_name} extracted")
+                else:
+                    all_success = False
+            else:
+                all_success = False
 
-                success_msg = f"✅ {name} extracted"
-                if logger:
-                    logger.info(f"TUM-VI download and extraction complete")
-                self._print_success(success_msg)
-                return True
-
-        return False
+        if all_success:
+            if logger:
+                logger.info(f"TUM-VI download and extraction complete")
+        
+        return all_success
 
     def download_4seasons(self) -> bool:
         """Download 4Seasons dataset.

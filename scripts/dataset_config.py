@@ -46,11 +46,15 @@ DATASETS = {
         "description": "EuRoC Micro Aerial Vehicle dataset",
     },
     "tum": {
-        "name": "TUM-VI freiburg3_walking_xyz",
-        "url": "http://download.tum.de/rgbd/dataset/freiburg3/rgbd-dataset_freiburg3_walking_xyz.tgz",
+        "name": "TUM-VI room1",
+        "url": "https://vision.in.tum.de/tumvi/exported/euroc/512_16/dataset-room1_512_16.tar",
         "manual": False,
         "local_path": None,
-        "description": "TUM Visual-Inertial dataset",
+        "description": "TUM Visual-Inertial dataset (EuRoC format)",
+        "sequences": {
+            "room1": "https://vision.in.tum.de/tumvi/exported/euroc/512_16/dataset-room1_512_16.tar",
+            "magistrale1": "https://vision.in.tum.de/tumvi/exported/euroc/512_16/dataset-magistrale1_512_16.tar",
+        },
     },
     "4seasons": {
         "name": "4Seasons Dataset",

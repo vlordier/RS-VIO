@@ -209,7 +209,7 @@ class TestDatasetDownloaderTUM(unittest.TestCase):
     """Test TUM-VI dataset download."""
 
     @patch("pathlib.Path.unlink")
-    @patch.object(DatasetDownloader, "extract_tar_gz", return_value=True)
+    @patch.object(DatasetDownloader, "extract_tar", return_value=True)
     @patch.object(DatasetDownloader, "download_file", return_value=True)
     def test_tum_download_success(self, mock_download, mock_extract, mock_unlink):
         """Test successful TUM download."""
@@ -218,8 +218,8 @@ class TestDatasetDownloaderTUM(unittest.TestCase):
             result = downloader.download_tum()
 
             self.assertTrue(result)
-            mock_download.assert_called_once()
-            mock_extract.assert_called_once()
+            mock_download.assert_called()
+            mock_extract.assert_called()
 
     @patch.object(DatasetDownloader, "download_file", return_value=False)
     def test_tum_download_failure(self, mock_download):
