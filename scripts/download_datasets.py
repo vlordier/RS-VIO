@@ -14,14 +14,14 @@ Usage:
 
 import argparse
 import shutil
-import subprocess
 import sys
 import time
 import urllib.error
 import urllib.request
-import zipfile
 from pathlib import Path
 from typing import Optional
+
+from dataset_utils import extract_tar, extract_zip
 
 try:
     from rich.console import Console
@@ -47,7 +47,7 @@ except ImportError:
     # Fallback if config not available
     DATASETS = {}
     DOWNLOAD_CONFIG = {"max_retries": 3, "retry_delays": [2, 4, 8]}
-    REQUIRED_TOOLS = ["curl", "tar", "unzip"]
+    REQUIRED_TOOLS = ["tar", "unzip"]
     ERROR_MESSAGES = {}
     SUCCESS_MESSAGES = {}
     INFO_MESSAGES = {}
@@ -157,54 +157,6 @@ class DatasetDownloader:
             print(msg)
         return False
 
-    def extract_zip(self, archive_path: Path, extract_to: Path) -> bool:
-        """Extract a ZIP archive."""
-        extract_to.mkdir(parents=True, exist_ok=True)
-
-        try:
-            print(f"📦 Extracting {archive_path.name} -> {extract_to}")
-            with zipfile.ZipFile(archive_path, "r") as zip_ref:
-                zip_ref.extractall(extract_to)
-            print(f"✅ Extracted: {archive_path.name}")
-            return True
-        except Exception as e:
-            print(f"❌ Extraction failed: {e}")
-            return False
-
-    def extract_tar_gz(self, archive_path: Path, extract_to: Path) -> bool:
-        """Extract a tar.gz archive."""
-        extract_to.mkdir(parents=True, exist_ok=True)
-
-        try:
-            print(f"📦 Extracting {archive_path.name} -> {extract_to}")
-            subprocess.run(
-                ["tar", "-xzf", str(archive_path), "-C", str(extract_to), "--strip-components=1"],
-                check=True,
-                capture_output=True,
-            )
-            print(f"✅ Extracted: {archive_path.name}")
-            return True
-        except subprocess.CalledProcessError as e:
-            print(f"❌ Extraction failed: {e}")
-            return False
-
-    def extract_tar(self, archive_path: Path, extract_to: Path) -> bool:
-        """Extract a tar archive (uncompressed)."""
-        extract_to.mkdir(parents=True, exist_ok=True)
-
-        try:
-            print(f"📦 Extracting {archive_path.name} -> {extract_to}")
-            subprocess.run(
-                ["tar", "-xf", str(archive_path), "-C", str(extract_to), "--strip-components=1"],
-                check=True,
-                capture_output=True,
-            )
-            print(f"✅ Extracted: {archive_path.name}")
-            return True
-        except subprocess.CalledProcessError as e:
-            print(f"❌ Extraction failed: {e}")
-            return False
-
     def download_euroc(self) -> bool:
         """Download EuRoC dataset.
 
@@ -214,7 +166,6 @@ class DatasetDownloader:
         dataset = DATASETS.get("euroc", {})
         name = dataset.get("name", "EuRoC")
         url = dataset.get("url", "https://projects.asl.ethz.ch/datasets/euroc-mav/")
-        local_file = str(dataset.get("local_path", "/tmp/MH_01_easy.zip"))
 
         self._print_header("📊 EuRoC MH_01_easy Dataset")
 
@@ -229,17 +180,20 @@ class DatasetDownloader:
             self._print_success(success_msg)
             return True
 
-        if Path(local_file).exists():
+        # Look for manual download in target directory
+        manual_archive_path = self.target_dir / "MH_01_easy.zip"
+
+        if manual_archive_path.exists():
             if logger:
-                logger.info(f"Found local EuRoC file: {local_file}")
-            if self.extract_zip(Path(local_file), euroc_dir):
+                logger.info(f"Found local EuRoC file: {manual_archive_path}")
+            if extract_zip(manual_archive_path, euroc_dir):
                 try:
-                    Path(local_file).unlink()
+                    manual_archive_path.unlink()
                     if logger:
-                        logger.info(f"Deleted temporary file: {local_file}")
+                        logger.info(f"Deleted archive file: {manual_archive_path}")
                 except OSError as e:
                     if logger:
-                        logger.warning(f"Failed to delete {local_file}: {e}")
+                        logger.warning(f"Failed to delete {manual_archive_path}: {e}")
 
                 success_msg = f"✅ {name} extracted"
                 if logger:
@@ -255,13 +209,13 @@ class DatasetDownloader:
                 console.print("[bold cyan]Steps:[/bold cyan]")
                 console.print(f"  1. Register at {url}", style="dim")
                 console.print("  2. Download MH_01_easy.zip", style="dim")
-                console.print(f"  3. Place it at {local_file}", style="dim")
+                console.print(f"  3. Place it in {self.target_dir}", style="dim")
                 console.print("  4. Re-run this script", style="dim")
             else:
                 print("Steps:")
                 print(f"  1. Register at {url}")
                 print("  2. Download MH_01_easy.zip")
-                print(f"  3. Place it at {local_file}")
+                print(f"  3. Place it in {self.target_dir}")
                 print("  4. Re-run this script")
 
         return False
@@ -306,17 +260,19 @@ class DatasetDownloader:
                 continue
 
             if self.download_file(seq_url, archive_path):
-                if self.extract_tar(archive_path, seq_dir):
-                    try:
+                extracted = extract_tar(archive_path, seq_dir)
+                # Always attempt to remove archive after extraction attempt
+                try:
+                    if archive_path.exists():
                         archive_path.unlink()
-                        if logger:
-                            logger.info(f"Deleted archive file: {archive_path}")
-                    except OSError as e:
-                        if logger:
-                            logger.warning(f"Failed to delete {archive_path}: {e}")
+                except OSError as e:
+                    if logger:
+                        logger.warning(f"Could not remove archive {archive_path}: {e}")
 
+                if extracted:
                     self._print_success(f"✅ {seq_name} extracted")
                 else:
+                    self._print_error(f"❌ {seq_name} extraction failed")
                     all_success = False
             else:
                 all_success = False

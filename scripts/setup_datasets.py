@@ -17,9 +17,7 @@ Usage:
 import argparse
 import hashlib
 import shutil
-import subprocess
 import sys
-import zipfile
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
@@ -29,6 +27,8 @@ try:
     HAS_RICH = True
 except ImportError:
     HAS_RICH = False
+
+from dataset_utils import extract_tar_gz, extract_zip
 
 # Import configuration
 try:
@@ -175,65 +175,6 @@ class DatasetSetup:
             print(msg)
         return True
 
-    def extract_zip(self, archive_path: Path, extract_to: Path) -> bool:
-        """Extract a ZIP archive."""
-        extract_to.mkdir(parents=True, exist_ok=True)
-
-        try:
-            msg = f"📦 Extracting {archive_path.name} -> {extract_to.name}"
-            if HAS_RICH:
-                console.print(msg, style="cyan")
-            else:
-                print(msg)
-
-            with zipfile.ZipFile(archive_path, "r") as zip_ref:
-                zip_ref.extractall(extract_to)
-
-            msg = f"✅ Extracted: {archive_path.name}"
-            if HAS_RICH:
-                console.print(msg, style="green")
-            else:
-                print(msg)
-            return True
-        except Exception as e:
-            msg = f"❌ Extraction failed: {e}"
-            if HAS_RICH:
-                console.print(msg, style="red")
-            else:
-                print(msg)
-            return False
-
-    def extract_tar_gz(self, archive_path: Path, extract_to: Path) -> bool:
-        """Extract a tar.gz archive."""
-        extract_to.mkdir(parents=True, exist_ok=True)
-
-        try:
-            msg = f"📦 Extracting {archive_path.name} -> {extract_to.name}"
-            if HAS_RICH:
-                console.print(msg, style="cyan")
-            else:
-                print(msg)
-
-            subprocess.run(
-                ["tar", "-xzf", str(archive_path), "-C", str(extract_to), "--strip-components=1"],
-                check=True,
-                capture_output=True,
-            )
-
-            msg = f"✅ Extracted: {archive_path.name}"
-            if HAS_RICH:
-                console.print(msg, style="green")
-            else:
-                print(msg)
-            return True
-        except subprocess.CalledProcessError as e:
-            msg = f"❌ Extraction failed: {e}"
-            if HAS_RICH:
-                console.print(msg, style="red")
-            else:
-                print(msg)
-            return False
-
     def check_euroc(self) -> Tuple[bool, str]:
         """Check EuRoC dataset status."""
         euroc_dir = self.datasets_dir / "euroc"
@@ -356,14 +297,14 @@ class DatasetSetup:
         if euroc_zip.exists():
             archives_found = True
             if self.verify_checksum(euroc_zip):
-                self.extract_zip(euroc_zip, self.datasets_dir / "euroc")
+                extract_zip(euroc_zip, self.datasets_dir / "euroc", verbose=True)
 
         # Check for TUM tgz
         tum_tgz = self.datasets_dir / "tum_vi.tgz"
         if tum_tgz.exists():
             archives_found = True
             if self.verify_checksum(tum_tgz):
-                self.extract_tar_gz(tum_tgz, self.datasets_dir / "tum_vi")
+                extract_tar_gz(tum_tgz, self.datasets_dir / "tum_vi", verbose=True)
 
         if not archives_found:
             msg = "ℹ️  No archives found to extract"
@@ -438,6 +379,11 @@ Examples:
         "--verify",
         action="store_true",
         help="Verify datasets and exit (don't setup)",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print detailed output during extraction",
     )
 
     args = parser.parse_args()
