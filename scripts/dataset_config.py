@@ -54,7 +54,7 @@ DATASETS = {
     },
     "4seasons": {
         "name": "4Seasons Dataset",
-        "url": "https://vision.cs.tum.edu/webshare/g/4seasons-dataset/",
+        "url": "https://cvg.cit.tum.de/data/datasets/4seasons-dataset/download",
         "manual": True,
         "local_path": None,
         "description": "4Seasons cross-season dataset",

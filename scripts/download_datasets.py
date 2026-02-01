@@ -5,7 +5,7 @@ Download datasets for RS-VIO testing and benchmarking.
 Supports:
 - EuRoC: Requires manual download from https://projects.asl.ethz.ch/datasets/euroc-mav/
 - TUM-VI: Automatic download from https://vision.in.tum.de/data/datasets/visual-inertial-dataset
-- 4Seasons: Manual download from https://vision.cs.tum.edu/webshare/g/4seasons-dataset/
+- 4Seasons: Manual download from https://cvg.cit.tum.de/data/datasets/4seasons-dataset/download
 
 Usage:
     python scripts/download_datasets.py --target /path/to/datasets [--datasets euroc,tum,4seasons]
@@ -299,7 +299,7 @@ class DatasetDownloader:
         """
         dataset = DATASETS.get("4seasons", {})
         name = dataset.get("name", "4Seasons")
-        url = dataset.get("url", "https://vision.cs.tum.edu/webshare/g/4seasons-dataset/")
+        url = dataset.get("url", "https://cvg.cit.tum.de/data/datasets/4seasons-dataset/download")
 
         self._print_header("📊 4Seasons Dataset")
 
