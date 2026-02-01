@@ -3,7 +3,6 @@
 /// Implements parallel feature extraction using tokio tasks for:
 /// - FAST corner detection
 /// - Feature grid distribution
-/// - Descriptor computation
 ///
 /// Designed to work with the concurrent pipeline in estimator::concurrent
 
@@ -99,18 +98,22 @@ impl AsyncFeatureDetector {
         }
 
         // Wait for all tasks to complete
-        let mut all_features = Vec::new();
+        let mut all_features = Vec::with_capacity(self.config.max_features);
         for task in tasks {
             match task.await {
                 Ok(features) => all_features.extend(features),
-                Err(_) => {
+                Err(err) => {
                     // Log task panic, continue with other results
+                    eprintln!("AsyncFeatureDetector::detect_async: spawn_blocking task failed: {:?}", err);
                 }
             }
         }
 
         // Sort and distribute features in grid
-        distribute_features_in_grid(&mut all_features, width as usize, height as usize, self.config.grid_cell_size);
+        distribute_features_in_grid(&mut all_features, width as usize, height as usize, self.config.grid_cell_size, self.config.max_features);
+
+        // Re-sort by score to keep the best features globally after grid distribution
+        all_features.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
 
         // Limit to max features
         all_features.truncate(self.config.max_features);
@@ -129,7 +132,11 @@ impl AsyncFeatureDetector {
         );
 
         let mut sorted_features = features;
-        distribute_features_in_grid(&mut sorted_features, width as usize, height as usize, self.config.grid_cell_size);
+        distribute_features_in_grid(&mut sorted_features, width as usize, height as usize, self.config.grid_cell_size, self.config.max_features);
+        
+        // Re-sort by score to keep the best features globally
+        sorted_features.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        
         sorted_features.truncate(self.config.max_features);
         sorted_features
     }
@@ -146,10 +153,16 @@ fn detect_features_in_region(
 ) -> Vec<DetectedFeature> {
     let mut features = Vec::new();
 
+    // Compute safe iteration bounds that avoid underflow for small images
+    let y_start = start_row.saturating_add(3);
+    let y_end = std::cmp::min(end_row, height.saturating_sub(3));
+    let x_start = 3usize;
+    let x_end = width.saturating_sub(3);
+
     // Simple FAST-like corner detection
     // In practice, would use optimized FAST algorithm
-    for y in start_row + 3..std::cmp::min(end_row, height - 3) {
-        for x in 3..width - 3 {
+    for y in y_start..y_end {
+        for x in x_start..x_end {
             let idx = y * width + x;
             if idx + width < image_data.len() {
                 let center = image_data[idx] as f32;
@@ -182,15 +195,23 @@ fn distribute_features_in_grid(
     width: usize,
     height: usize,
     cell_size: usize,
+    max_features: usize,
 ) {
     let grid_width = (width + cell_size - 1) / cell_size;
     let grid_height = (height + cell_size - 1) / cell_size;
-    let max_per_cell = std::cmp::max(1, 1000 / (grid_width * grid_height));
+    
+    // Guard against zero division with degenerate images
+    if grid_width == 0 || grid_height == 0 {
+        features.clear();
+        return;
+    }
+    
+    let max_per_cell = std::cmp::max(1, max_features / (grid_width * grid_height));
 
     // Sort by grid cell then by score
     features.sort_by(|a, b| {
-        let cell_a = ((a.x as usize) / cell_size) * grid_width + ((a.y as usize) / cell_size);
-        let cell_b = ((b.x as usize) / cell_size) * grid_width + ((b.y as usize) / cell_size);
+        let cell_a = ((a.y as usize) / cell_size) * grid_width + ((a.x as usize) / cell_size);
+        let cell_b = ((b.y as usize) / cell_size) * grid_width + ((b.x as usize) / cell_size);
 
         match cell_a.cmp(&cell_b) {
             std::cmp::Ordering::Equal => b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal),
@@ -198,19 +219,16 @@ fn distribute_features_in_grid(
         }
     });
 
-    // Keep only top features per cell
-    let mut kept_features = Vec::new();
+    // Keep only top features per cell using in-place filtering
     let mut per_cell_count = vec![0; grid_width * grid_height];
-
-    for feature in features.iter() {
-        let cell = ((feature.x as usize) / cell_size) * grid_width + ((feature.y as usize) / cell_size);
+    features.retain(|feature| {
+        let cell = ((feature.y as usize) / cell_size) * grid_width + ((feature.x as usize) / cell_size);
         if cell < per_cell_count.len() && per_cell_count[cell] < max_per_cell {
-            kept_features.push(*feature);
             per_cell_count[cell] += 1;
+            return true;
         }
-    }
-
-    *features = kept_features;
+        false
+    });
 }
 
 #[cfg(test)]
@@ -268,18 +286,28 @@ mod tests {
         let mut features = vec![
             DetectedFeature {
                 x: 5.0,
-                y: 5.0,
+                y: 45.0,  // Different cell from (5,5)
                 score: 100.0,
             },
             DetectedFeature {
                 x: 45.0,
-                y: 45.0,
+                y: 5.0,   // Different cell from (45,45)
                 score: 90.0,
+            },
+            DetectedFeature {
+                x: 5.0,
+                y: 5.0,
+                score: 80.0,
+            },
+            DetectedFeature {
+                x: 45.0,
+                y: 45.0,
+                score: 70.0,
             },
         ];
 
-        distribute_features_in_grid(&mut features, 64, 64, 32);
-        // Should keep both features in different cells
-        assert_eq!(features.len(), 2);
+        distribute_features_in_grid(&mut features, 64, 64, 32, 1000);
+        // Should keep features from different cells
+        assert_eq!(features.len(), 4);
     }
 }
