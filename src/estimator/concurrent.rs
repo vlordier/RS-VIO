@@ -195,6 +195,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unwrap_used)]
     fn test_sequenced_frame_ordering() {
         let pipeline = ConcurrentVIOPipeline::new().unwrap();
 
@@ -210,6 +211,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::float_cmp)]
     fn test_result_metadata_default() {
         let metadata = ResultMetadata::default();
         assert_eq!(metadata.processing_time_ms, 0.0);

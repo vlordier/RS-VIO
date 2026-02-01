@@ -265,6 +265,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[allow(clippy::float_cmp)]
     fn test_config_default() {
         let config = AsyncDetectorConfig::default();
         assert_eq!(config.num_parallel_tasks, 4);

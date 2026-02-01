@@ -198,6 +198,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unwrap_used)]
     fn test_processor_with_custom_config() {
         let config = ConcurrentConfig {
             pipeline_depth: 8,
@@ -212,6 +213,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::float_cmp)]
     fn test_processing_result_creation() {
         let result = ProcessingResult {
             sequence: 42,
@@ -227,6 +229,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unwrap_used)]
     fn test_reorder_buffer_structure() {
         let config = ConcurrentConfig::default();
         let processor = ConcurrentFrameProcessor::new(config).unwrap();

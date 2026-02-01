@@ -1,4 +1,8 @@
 #[cfg(test)]
+#[allow(clippy::module_inception)]
+#[allow(clippy::unwrap_used)]
+#[allow(clippy::clone_on_copy)]
+#[allow(clippy::needless_borrow)]
 mod tests {
     use crate::optimization::factors::BundleAdjustmentFactor;
     use crate::optimization::factors::BundleAdjustmentFactorTranslationOnly;
