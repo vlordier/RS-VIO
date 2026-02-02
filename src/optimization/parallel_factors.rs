@@ -231,7 +231,19 @@ mod tests {
         assert_eq!(serial_factors.len(), 10_000);
         assert_eq!(parallel_factors.len(), 10_000);
 
+        let serial_ms = serial_duration.as_secs_f64() * 1_000.0;
+        let parallel_ms = parallel_duration.as_secs_f64() * 1_000.0;
+        let speedup = if parallel_ms > 0.0 {
+            serial_ms / parallel_ms
+        } else {
+            0.0
+        };
+
         println!("serial:   {:?}", serial_duration);
         println!("parallel: {:?}", parallel_duration);
+        println!(
+            "benchmark_parallel_factors serial_ms={:.3} parallel_ms={:.3} speedup={:.3}",
+            serial_ms, parallel_ms, speedup
+        );
     }
 }
