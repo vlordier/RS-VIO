@@ -3,10 +3,10 @@
 //! Provides parallelized batch operations for creating and processing
 //! optimization factors in bundle adjustment and other optimization tasks.
 
-use rayon::prelude::*;
 use super::factors::{BundleAdjustmentFactor, PinholeProjectionFactor};
-use nalgebra as na;
 use na::{Matrix4, Vector2};
+use nalgebra as na;
+use rayon::prelude::*;
 
 /// Configuration for parallel factor processing
 #[derive(Debug, Clone)]
@@ -30,7 +30,7 @@ pub struct ParallelFactorBatch {
 
 impl ParallelFactorBatch {
     /// Create new parallel factor batch processor
-    pub fn new(config: ParallelFactorConfig) -> Self {
+    pub const fn new(config: ParallelFactorConfig) -> Self {
         Self { config }
     }
 
@@ -89,11 +89,7 @@ impl ParallelFactorBatch {
     /// Process factors in batches with parallelization
     ///
     /// Useful for applying the same operation to a large set of factors
-    pub fn process_batch_parallel<T, F, O>(
-        &self,
-        items: Vec<T>,
-        mapper: F,
-    ) -> Vec<O>
+    pub fn process_batch_parallel<T, F, O>(&self, items: Vec<T>, mapper: F) -> Vec<O>
     where
         T: Send,
         F: Fn(T) -> O + Send + Sync,
