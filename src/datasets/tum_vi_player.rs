@@ -11,10 +11,7 @@ use std::path::Path;
 use std::thread;
 use std::time::{Duration, Instant};
 
-pub struct TUMVIPlayer {
-    #[allow(dead_code)]
-    imu_data: Vec<ImuData>,
-}
+pub struct TUMVIPlayer;
 
 impl Default for TUMVIPlayer {
     fn default() -> Self {
@@ -24,9 +21,7 @@ impl Default for TUMVIPlayer {
 
 impl TUMVIPlayer {
     pub const fn new() -> Self {
-        TUMVIPlayer {
-            imu_data: Vec::new(),
-        }
+        TUMVIPlayer
     }
 
     pub fn run(&self, config: PlayerConfig) -> PlayerResult {
@@ -67,7 +62,7 @@ impl TUMVIPlayer {
         // Initialize viewer
         let mut viewer: Option<Box<dyn Viewer>> = match create_viewer() {
             Ok(v) => {
-                log::info!("[EurocPlayer] Viewer initialized successfully");
+                log::info!("[TUMVIPlayer] Viewer initialized successfully");
                 Some(v)
             },
             Err(e) => {
@@ -310,8 +305,14 @@ impl TUMVIPlayer {
                             gyro: [wx, wy, wz],
                             accel: [ax, ay, az],
                         });
+                    } else {
+                        log::debug!("[TUMVIPlayer] Skipped malformed IMU line {}: invalid numeric values", line_num);
                     }
+                } else {
+                    log::debug!("[TUMVIPlayer] Skipped malformed IMU line {}: invalid timestamp", line_num);
                 }
+            } else {
+                log::debug!("[TUMVIPlayer] Skipped malformed IMU line {}: insufficient fields (expected 7+, got {})", line_num, parts.len());
             }
         }
 
@@ -397,12 +398,19 @@ impl TUMVIPlayer {
         current_timestamp: i64,
         all_imu_data: &[ImuData],
     ) -> Vec<ImuData> {
-        // Return all IMU samples that fall between previous and current frame timestamps
-        all_imu_data
-            .iter()
-            .filter(|imu| imu.timestamp > previous_timestamp && imu.timestamp <= current_timestamp)
-            .cloned()
-            .collect()
+        // Use binary search for efficiency with large datasets
+        // Find start index: first IMU sample > previous_timestamp
+        let start_idx = all_imu_data.partition_point(|imu| imu.timestamp <= previous_timestamp);
+
+        // Find end index: last IMU sample <= current_timestamp
+        let end_idx = all_imu_data.partition_point(|imu| imu.timestamp <= current_timestamp);
+
+        // Collect IMU samples in the range
+        if start_idx < end_idx {
+            all_imu_data[start_idx..end_idx].to_vec()
+        } else {
+            Vec::new()
+        }
     }
 
     fn save_trajectories(_estimator: &Estimator, _context: &FrameContext, _dataset_path: &str) {

@@ -305,8 +305,14 @@ impl EurocPlayer {
                             gyro: [wx, wy, wz],
                             accel: [ax, ay, az],
                         });
+                    } else {
+                        log::debug!("[EurocPlayer] Skipped malformed IMU line {}: invalid numeric values", line_num);
                     }
+                } else {
+                    log::debug!("[EurocPlayer] Skipped malformed IMU line {}: invalid timestamp", line_num);
                 }
+            } else {
+                log::debug!("[EurocPlayer] Skipped malformed IMU line {}: insufficient fields (expected 7+, got {})", line_num, parts.len());
             }
         }
 

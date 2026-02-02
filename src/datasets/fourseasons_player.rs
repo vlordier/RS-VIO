@@ -62,7 +62,7 @@ impl FourSeasonsPlayer {
         // Initialize viewer
         let mut viewer: Option<Box<dyn Viewer>> = match create_viewer() {
             Ok(v) => {
-                log::info!("[EurocPlayer] Viewer initialized successfully");
+                log::info!("[FourSeasonsPlayer] Viewer initialized successfully");
                 Some(v)
             },
             Err(e) => {
@@ -314,8 +314,14 @@ impl FourSeasonsPlayer {
                             gyro: [wx, wy, wz],
                             accel: [ax, ay, az],
                         });
+                    } else {
+                        log::debug!("[FourSeasonsPlayer] Skipped malformed IMU line {}: invalid numeric values", line_num);
                     }
+                } else {
+                    log::debug!("[FourSeasonsPlayer] Skipped malformed IMU line {}: invalid timestamp", line_num);
                 }
+            } else {
+                log::debug!("[FourSeasonsPlayer] Skipped malformed IMU line {}: insufficient fields (expected 7+, got {})", line_num, parts.len());
             }
         }
 
