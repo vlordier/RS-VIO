@@ -55,7 +55,7 @@ impl GroundTruthTrajectory {
     /// Expected format (space-separated):
     /// timestamp tx ty tz qx qy qz qw
     pub fn from_file(path: impl AsRef<Path>) -> Result<Self, String> {
-        let file = File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
+        let file = File::open(&path).map_err(|e| format!("Failed to open file: {}", e))?;
         let reader = BufReader::new(file);
         let mut poses = BTreeMap::new();
         let mut count = 0;
