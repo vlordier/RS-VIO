@@ -1,10 +1,10 @@
 use crate::datasets::{
-    config::Config, FrameContext, ImageData, ImuData, PlayerConfig, PlayerResult,
+    config::Config, load_grayscale_image, FrameContext, ImageData, ImuData, PlayerConfig,
+    PlayerResult,
 };
 use crate::estimator::Estimator;
 use crate::viewers::{create_viewer, Viewer};
 use anyhow::{Context, Result};
-use image::ImageReader;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
@@ -244,24 +244,7 @@ impl FourSeasonsPlayer {
             .join("undistorted_images")
             .join(cam_folder)
             .join(filename);
-
-        if !full_path.exists() {
-            anyhow::bail!("Cannot load image: {}", full_path.display());
-        }
-
-        // Load image using image crate
-        let img = ImageReader::open(&full_path)
-            .with_context(|| format!("Failed to open image: {}", full_path.display()))?
-            .decode()
-            .with_context(|| format!("Failed to decode image: {}", full_path.display()))?;
-
-        // Convert to grayscale if needed (EuRoC images are typically grayscale)
-        let gray_img = img.to_luma8();
-
-        // Return raw pixel data as Vec<u8>
-        let pixel_data = gray_img.as_raw().clone();
-
-        Ok(pixel_data)
+        load_grayscale_image(&full_path)
     }
 
     #[allow(dead_code)] // TODO: implement for VIO mode

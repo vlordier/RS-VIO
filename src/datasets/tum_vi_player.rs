@@ -1,10 +1,10 @@
 use crate::datasets::{
-    config::Config, FrameContext, ImageData, ImuData, PlayerConfig, PlayerResult,
+    config::Config, load_csv_image_timestamps, load_grayscale_image, FrameContext, ImageData,
+    ImuData, PlayerConfig, PlayerResult,
 };
 use crate::estimator::Estimator;
 use crate::viewers::{create_viewer, Viewer};
 use anyhow::{Context, Result};
-use image::ImageReader;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
@@ -203,35 +203,8 @@ impl TUMVIPlayer {
 
     fn load_image_timestamps(dataset_path: &str) -> Result<Vec<ImageData>> {
         let data_file = Path::new(dataset_path).join("mav0/cam0/data.csv");
-        let file = File::open(&data_file)
-            .with_context(|| format!("Cannot open data.csv file: {}", data_file.display()))?;
-
-        let reader = BufReader::new(file);
-        let mut image_data = Vec::new();
-
-        for (line_num, line) in reader.lines().enumerate() {
-            let line = line?;
-
-            // Skip header and empty lines
-            if line_num == 0 || line.trim().is_empty() || line.trim_start().starts_with('#') {
-                continue;
-            }
-
-            let parts: Vec<&str> = line.split(',').collect();
-            if parts.len() >= 2 {
-                let timestamp_str = parts[0].trim();
-                let filename = parts[1].trim().to_string();
-
-                if let Ok(timestamp) = timestamp_str.parse::<i64>() {
-                    image_data.push(ImageData {
-                        timestamp,
-                        filename,
-                    });
-                }
-            }
-        }
-
-        log::info!("[EurocPlayer] Loaded {} image timestamps", image_data.len());
+        let image_data = load_csv_image_timestamps(&data_file)?;
+        log::info!("[TUMVIPlayer] Loaded {} image timestamps", image_data.len());
         Ok(image_data)
     }
 
@@ -242,24 +215,7 @@ impl TUMVIPlayer {
             .join(cam_folder)
             .join("data")
             .join(filename);
-
-        if !full_path.exists() {
-            anyhow::bail!("Cannot load image: {}", full_path.display());
-        }
-
-        // Load image using image crate
-        let img = ImageReader::open(&full_path)
-            .with_context(|| format!("Failed to open image: {}", full_path.display()))?
-            .decode()
-            .with_context(|| format!("Failed to decode image: {}", full_path.display()))?;
-
-        // Convert to grayscale if needed (EuRoC images are typically grayscale)
-        let gray_img = img.to_luma8();
-
-        // Return raw pixel data as Vec<u8>
-        let pixel_data = gray_img.as_raw().clone();
-
-        Ok(pixel_data)
+        load_grayscale_image(&full_path)
     }
 
     #[allow(dead_code)]
