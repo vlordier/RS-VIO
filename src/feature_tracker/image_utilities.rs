@@ -194,6 +194,84 @@ mod tests {
     use std::time::Instant;
 
     #[test]
+    fn test_detect_key_points_deterministic() {
+        // Run detection twice on same image, ensure same results
+        let width = 100;
+        let height = 100;
+        let mut image = ImageBuffer::new(width, height);
+        // Add a single bright pixel in a specific spot that should trigger a corner
+        // FAST needs a ring of pixels. Let's make a simple pattern.
+        // Or just random noise with fixed seed (but here we construct manually)
+        for (x, y, pixel) in image.enumerate_pixels_mut() {
+            if (x % 10 == 0) && (y % 10 == 0) {
+                 *pixel = image::Luma([255u8]);
+            } else {
+                 *pixel = image::Luma([((x + y) % 50) as u8]);
+            }
+        }
+
+        let grid_size = 30;
+        let current_corners = Vec::new();
+        let num_points_in_cell = 2;
+
+        let corners1 = detect_key_points(&image, grid_size, &current_corners, num_points_in_cell);
+        
+        let corners2 = detect_key_points(&image, grid_size, &current_corners, num_points_in_cell);
+
+        assert_eq!(corners1.len(), corners2.len());
+        // rayon might change order if we are not careful, but identical inputs should usually produce identical outputs.
+        // Let's sort to be safe before comparing.
+        let mut sorted1 = corners1.clone();
+        let mut sorted2 = corners2.clone();
+        sorted1.sort_by(|a, b| (a.x, a.y).cmp(&(b.x, b.y)));
+        sorted2.sort_by(|a, b| (a.x, a.y).cmp(&(b.x, b.y)));
+        
+        // Assert equality by checking x,y coords
+        for (c1, c2) in sorted1.iter().zip(sorted2.iter()) {
+            assert_eq!(c1.x, c2.x);
+            assert_eq!(c1.y, c2.y);
+        }
+        
+        // Also ensure we actually found something
+        assert!(!corners1.is_empty(), "Should have found corners in synthetic image");
+    }
+
+    #[test]
+    fn test_detect_key_points_grid_occupancy() {
+        // Verify that if a grid cell is occupied, no new points are added there
+        let width = 60;
+        let height = 60;
+        let mut image = ImageBuffer::new(width, height);
+        // Make entire image high contrast so corners exist everywhere
+        for (x, y, pixel) in image.enumerate_pixels_mut() {
+             *pixel = image::Luma([(x % 2 * 255) as u8]);
+        }
+
+        let grid_size = 30;
+        // Occupy the top-left cell completely
+        // The logic checks if *any* corner exists in the grid cell
+        let x_start = (width % grid_size) / 2;
+        let y_start = (height % grid_size) / 2;
+        
+        let center_x = x_start + grid_size / 2;
+        let center_y = y_start + grid_size / 2;
+
+        let current_corners = vec![Corner::new(center_x, center_y, 10.0)];
+        let num_points_in_cell = 5;
+
+        let new_corners = detect_key_points(&image, grid_size, &current_corners, num_points_in_cell);
+
+        // Should NOT find corners in the top-left cell because it had a corner
+        // But might find in others (top-right, bottom-left, bottom-right)
+        
+        for c in new_corners {
+            let cx = (c.x - x_start) / grid_size;
+            let cy = (c.y - y_start) / grid_size;
+            assert!(!(cx == 0 && cy == 0), "Should not detect corners in occupied cell (0,0)");
+        }
+    }
+
+    #[test]
     fn benchmark_detect_key_points_performance() {
         // Create a large synthetic image
         let width = 1200;
