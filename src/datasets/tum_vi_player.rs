@@ -1,6 +1,6 @@
+use crate::datasets::io::{load_csv_image_timestamps, load_grayscale_image};
 use crate::datasets::{
-    config::Config, load_csv_image_timestamps, load_grayscale_image, FrameContext, ImageData,
-    ImuData, PlayerConfig, PlayerResult,
+    config::Config, FrameContext, ImageData, ImuData, PlayerConfig, PlayerResult,
 };
 use crate::estimator::Estimator;
 use crate::viewers::{create_viewer, Viewer};
@@ -437,6 +437,7 @@ impl TUMVIPlayer {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
     use super::*;
     use crate::datasets::test_utils::{sample_imu_data, timestamps, write_file};

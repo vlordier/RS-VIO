@@ -1,6 +1,6 @@
+use crate::datasets::io::load_grayscale_image;
 use crate::datasets::{
-    config::Config, load_grayscale_image, FrameContext, ImageData, ImuData, PlayerConfig,
-    PlayerResult,
+    config::Config, FrameContext, ImageData, ImuData, PlayerConfig, PlayerResult,
 };
 use crate::estimator::Estimator;
 use crate::viewers::{create_viewer, Viewer};
@@ -393,12 +393,19 @@ impl FourSeasonsPlayer {
         current_timestamp: i64,
         all_imu_data: &[ImuData],
     ) -> Vec<ImuData> {
-        // Return all IMU samples that fall between previous and current frame timestamps
-        all_imu_data
-            .iter()
-            .filter(|imu| imu.timestamp > previous_timestamp && imu.timestamp <= current_timestamp)
-            .cloned()
-            .collect()
+        // Use binary search for efficiency with large datasets
+        // Find start index: first IMU sample > previous_timestamp
+        let start_idx = all_imu_data.partition_point(|imu| imu.timestamp <= previous_timestamp);
+
+        // Find end index: last IMU sample <= current_timestamp
+        let end_idx = all_imu_data.partition_point(|imu| imu.timestamp <= current_timestamp);
+
+        // Collect IMU samples in the range
+        if start_idx < end_idx {
+            all_imu_data[start_idx..end_idx].to_vec()
+        } else {
+            Vec::new()
+        }
     }
 
     fn save_trajectories(_estimator: &Estimator, _context: &FrameContext, _dataset_path: &str) {
@@ -463,6 +470,7 @@ impl FourSeasonsPlayer {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
     use super::*;
     use crate::datasets::test_utils::{sample_imu_data, timestamps, write_file};
