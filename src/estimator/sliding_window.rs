@@ -13,6 +13,7 @@ use apex_solver::core::problem::{Problem, VariableEnum};
 use apex_solver::linalg::{LinearSolverType, SchurPreconditioner, SchurVariant};
 use apex_solver::manifold::ManifoldType;
 use apex_solver::optimizer::levenberg_marquardt::{LevenbergMarquardt, LevenbergMarquardtConfig};
+use std::sync::Arc;
 use apex_solver::optimizer::SolverResult;
 use na::{DVector, UnitQuaternion};
 use nalgebra as na;
@@ -201,10 +202,13 @@ impl SlidingWindow {
             .map(|(id_frame, frame)| {
                 // Pre-allocate to avoid re-allocations
                 let mut local_initials = Vec::with_capacity(300);
-                let mut local_residuals: Vec<(Vec<String>, Box<BundleAdjustmentFactor>, Option<Box<dyn apex_solver::core::loss_functions::LossFunction + Send>>)> = Vec::with_capacity(300);
+
+                // Use a tuple structure for residuals to avoid allocating Vec<String>
+                // (lm_var, Option<kf_var>, factor, loss)
+                let mut local_residuals: Vec<(String, Option<Arc<String>>, Box<BundleAdjustmentFactor>, Option<Box<dyn apex_solver::core::loss_functions::LossFunction + Send>>)> = Vec::with_capacity(300);
 
                 // Add KF pose
-                let kf_var = format!("KF_{}", id_frame);
+                let kf_var = Arc::new(format!("KF_{}", id_frame));
                 #[allow(clippy::expect_used)]
                 let T_B_W = frame.state.T_W_B.try_inverse().expect("T_W_B should be invertible");
                 let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
@@ -213,7 +217,7 @@ impl SlidingWindow {
                 let se3_data = DVector::from_vec(vec![
                     t_B_W.x, t_B_W.y, t_B_W.z, q_B_W.w, q_B_W.i, q_B_W.j, q_B_W.k,
                 ]);
-                local_initials.push((kf_var.clone(), (ManifoldType::SE3, se3_data.cast::<f64>())));
+                local_initials.push(((*kf_var).clone(), (ManifoldType::SE3, se3_data.cast::<f64>())));
 
                 let camera_features = [
                     (&frame.left_features, T_Cl_B),
@@ -272,16 +276,17 @@ impl SlidingWindow {
                                 factor = factor.with_fixed_pose(T_B_W_inv);
                             }
 
-                            let var_names = if id_frame == 0 {
-                                vec![lm_var]
+                            // Use tuple based residual storage
+                            let kf_var_opt = if id_frame == 0 {
+                                None
                             } else {
-                                vec![lm_var, kf_var.clone()]
+                                Some(kf_var.clone())
                             };
                             
                             // Huber loss
                             let huber_loss = HuberLoss::new(2.0).ok();
                             
-                            local_residuals.push((var_names, Box::new(factor), huber_loss.map(|l| Box::new(l) as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>)));
+                            local_residuals.push((lm_var, kf_var_opt, Box::new(factor), huber_loss.map(|l| Box::new(l) as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>)));
                         }
                     }
                 }
@@ -313,9 +318,12 @@ impl SlidingWindow {
             );
 
         for residuals in all_residuals_vecs {
-            for (var_names, factor, loss) in residuals {
-                let var_refs: Vec<&str> = var_names.iter().map(|s| s.as_str()).collect();
-                problem.add_residual_block(&var_refs, factor, loss);
+            for (lm_var, kf_var_opt, factor, loss) in residuals {
+                if let Some(kf_val) = kf_var_opt {
+                    problem.add_residual_block(&[&lm_var, &*kf_val], factor, loss);
+                } else {
+                    problem.add_residual_block(&[&lm_var], factor, loss);
+                }
             }
         }
 
