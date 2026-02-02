@@ -18,6 +18,7 @@ use na::{DVector, UnitQuaternion};
 use nalgebra as na;
 use std::collections::HashMap;
 use std::collections::VecDeque;
+use rayon::prelude::*;
 
 /// Sliding window of keyframes for bundle adjustment optimization.
 ///
@@ -162,136 +163,81 @@ impl SlidingWindow {
         Ok(true)
     }
 
-    pub fn optimize(&mut self) -> Result<bool, std::io::Error> {
-        self.check_sliding_window_size_for_optimization()?;
-
-        // Save current state before optimization for potential rollback
-        let saved_keyframe_poses: Vec<Matrix4x4> =
-            self.keyframes.iter().map(|f| f.state.T_W_B).collect();
-        let saved_map_points = self.map_points.clone();
-
-        // Initialize problem and solver
+    pub fn build_optimization_problem(&self) -> (Problem, HashMap<String, (ManifoldType, DVector<f64>)>) {
         let mut problem = Problem::new();
-        let mut solver = LevenbergMarquardt::with_config(self.build_solver_config());
-        let mut initial_values = HashMap::new();
-        // solver.add_observer(TerminalObserver::new());
 
-        // Initialize maps for tracking and counting observations
-        let mut map_feature_to_landmark: HashMap<usize, String> = HashMap::new();
-        let mut landmark_observation_count_left: HashMap<String, usize> = HashMap::new();
-        let mut landmark_observation_count_right: HashMap<String, usize> = HashMap::new();
+        // PART 1: Count observations (Parallel)
+        let (landmark_counts_left, landmark_counts_right) = self.keyframes.par_iter()
+            .fold(
+                || (HashMap::new(), HashMap::new()),
+                |(mut acc_l, mut acc_r), frame| {
+                    for feat in &frame.left_features {
+                        *acc_l.entry(feat.feature_id).or_insert(0) += 1;
+                    }
+                    for feat in &frame.right_features {
+                        *acc_r.entry(feat.feature_id).or_insert(0) += 1;
+                    }
+                    (acc_l, acc_r)
+                }
+            )
+            .reduce(
+                || (HashMap::new(), HashMap::new()),
+                |(mut l1, mut r1), (l2, r2)| {
+                    for (k, v) in l2 { *l1.entry(k).or_insert(0) += v; }
+                    for (k, v) in r2 { *r1.entry(k).or_insert(0) += v; }
+                    (l1, r1)
+                }
+            );
 
-        // Fetch transforms between cameras and body
+        // Fetch transforms
+        let first_frame = self.keyframes.front().expect("Keyframes should not be empty");
         #[allow(clippy::unwrap_used, clippy::expect_used)]
-        // Panic acceptable - keyframes must exist and transforms must be invertible
-        let T_Cl_B = self
-            .keyframes
-            .front()
-            .unwrap()
-            .state
-            .T_B_Cl
-            .try_inverse()
-            .expect("T_B_Cl should be invertible");
+        let T_Cl_B = first_frame.state.T_B_Cl.try_inverse().expect("T_B_Cl should be invertible");
         #[allow(clippy::unwrap_used, clippy::expect_used)]
-        let T_Cr_B = self
-            .keyframes
-            .front()
-            .unwrap()
-            .state
-            .T_B_Cr
-            .try_inverse()
-            .expect("T_B_Cr should be invertible");
+        let T_Cr_B = first_frame.state.T_B_Cr.try_inverse().expect("T_B_Cr should be invertible");
 
-        // Count observations for each landmark across all frames, separately for left and right cameras
-        for frame in self.keyframes.iter() {
-            // Count left camera observations
-            for feat in frame.left_features.iter() {
-                let feature_id = feat.feature_id;
+        // PART 2: Build Factors (Parallel)
+        let results: Vec<_> = self.keyframes.par_iter().enumerate()
+            .map(|(id_frame, frame)| {
+                // Pre-allocate to avoid re-allocations
+                let mut local_initials = Vec::with_capacity(300);
+                let mut local_residuals: Vec<(Vec<String>, Box<BundleAdjustmentFactor>, Option<Box<dyn apex_solver::core::loss_functions::LossFunction + Send>>)> = Vec::with_capacity(300);
 
-                // Get or create landmark variable name
-                let lm_var = map_feature_to_landmark
-                    .entry(feature_id)
-                    .or_insert_with(|| format!("LM_{}", feature_id))
-                    .clone();
+                // Add KF pose
+                let kf_var = format!("KF_{}", id_frame);
+                #[allow(clippy::expect_used)]
+                let T_B_W = frame.state.T_W_B.try_inverse().expect("T_W_B should be invertible");
+                let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
+                let R_B_W = Matrix3x3::from(T_B_W.fixed_view::<3, 3>(0, 0));
+                let q_B_W = UnitQuaternion::from_matrix(&R_B_W);
+                let se3_data = DVector::from_vec(vec![
+                    t_B_W.x, t_B_W.y, t_B_W.z, q_B_W.w, q_B_W.i, q_B_W.j, q_B_W.k,
+                ]);
+                local_initials.push((kf_var.clone(), (ManifoldType::SE3, se3_data.cast::<f64>())));
 
-                // Increment left camera observation count
-                *landmark_observation_count_left
-                    .entry(lm_var.clone())
-                    .or_insert(0) += 1;
-            }
+                let camera_features = [
+                    (&frame.left_features, T_Cl_B),
+                    (&frame.right_features, T_Cr_B),
+                ];
 
-            // Count right camera observations
-            for feat in frame.right_features.iter() {
-                let feature_id = feat.feature_id;
+                for (features, T_C_B) in camera_features.iter() {
+                    for feat in features.iter() {
+                        let feature_id = feat.feature_id;
+                        
+                        let count_left = landmark_counts_left.get(&feature_id).copied().unwrap_or(0);
+                        let count_right = landmark_counts_right.get(&feature_id).copied().unwrap_or(0);
 
-                // Get or create landmark variable name
-                let lm_var = map_feature_to_landmark
-                    .entry(feature_id)
-                    .or_insert_with(|| format!("LM_{}", feature_id))
-                    .clone();
+                        if count_left > 0 && count_right > 0 {
+                            let lm_var = format!("LM_{}", feature_id);
 
-                // Increment right camera observation count
-                *landmark_observation_count_right
-                    .entry(lm_var.clone())
-                    .or_insert(0) += 1;
-            }
-        }
-
-        // Add factors
-        for (id_frame, frame) in self.keyframes.iter().enumerate() {
-            // Add KF poses
-            let kf_var = format!("KF_{}", id_frame);
-            #[allow(clippy::expect_used)] // Panic acceptable - pose must be invertible
-            let T_B_W = frame
-                .state
-                .T_W_B
-                .try_inverse()
-                .expect("T_W_B should be invertible");
-            let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
-            let R_B_W = Matrix3x3::from(T_B_W.fixed_view::<3, 3>(0, 0));
-            let q_B_W = UnitQuaternion::from_matrix(&R_B_W);
-            let se3_data = DVector::from_vec(vec![
-                t_B_W.x, t_B_W.y, t_B_W.z, q_B_W.w, q_B_W.i, q_B_W.j, q_B_W.k,
-            ]);
-            // println!("KF_{} initial pose: {:?}", frame.frame_id, se3_data);
-            initial_values.insert(kf_var.clone(), (ManifoldType::SE3, se3_data.cast::<f64>()));
-
-            // Process features from both cameras
-            let camera_features = [
-                (&frame.left_features, T_Cl_B),
-                (&frame.right_features, T_Cr_B),
-            ];
-
-            for (features, T_C_B) in camera_features.iter() {
-                for feat in features.iter() {
-                    let feature_id = feat.feature_id;
-                    let lm_var = map_feature_to_landmark
-                        .get(&feature_id)
-                        .cloned()
-                        .unwrap_or_else(|| format!("LM_{}", feature_id));
-
-                    // Only process landmarks that are seen at least once in BOTH cameras (stereo constraint)
-                    let count_left = landmark_observation_count_left
-                        .get(&lm_var)
-                        .copied()
-                        .unwrap_or(0);
-                    let count_right = landmark_observation_count_right
-                        .get(&lm_var)
-                        .copied()
-                        .unwrap_or(0);
-
-                    if count_left > 0 && count_right > 0 {
-                        // Create initial value for landmark if not already present
-                        initial_values.entry(lm_var.clone()).or_insert_with(|| {
-                            let data = if let Some(&last_pos) = self.map_points.get(&feature_id) {
+                            // Initial Value logic
+                             let data = if let Some(&last_pos) = self.map_points.get(&feature_id) {
                                 DVector::from_vec(vec![
                                     last_pos[0] as f64,
                                     last_pos[1] as f64,
                                     last_pos[2] as f64,
                                 ])
                             } else {
-                                // Default initialization if not in map_points
-                                // TODO Triangulate insrtead of assigning depth 4.0 (quick and dirty way to get going)
                                 let p_C = Vector3::new(
                                     feat.undistorted_coord[0] as f64,
                                     feat.undistorted_coord[1] as f64,
@@ -301,8 +247,7 @@ impl SlidingWindow {
                                     frame.state.T_W_B.fixed_view::<3, 3>(0, 0).into_owned(),
                                     frame.state.T_W_B.fixed_view::<3, 1>(0, 3).into_owned(),
                                 );
-                                let T_B_C =
-                                    T_C_B.try_inverse().expect("T_C_B should be invertible");
+                                let T_B_C = T_C_B.try_inverse().expect("T_C_B should be invertible");
                                 let (R_B_C, t_B_C) = (
                                     T_B_C.fixed_view::<3, 3>(0, 0).into_owned(),
                                     T_B_C.fixed_view::<3, 1>(0, 3).into_owned(),
@@ -310,45 +255,86 @@ impl SlidingWindow {
                                 let p_W = R_W_B * (R_B_C * p_C + t_B_C) + t_W_B;
                                 DVector::from_vec(vec![p_W.x, p_W.y, p_W.z])
                             };
-                            (ManifoldType::RN, data)
-                        });
+                            local_initials.push((lm_var.clone(), (ManifoldType::RN, data)));
 
-                        // Create camera projection factor
-                        let mut factor = BundleAdjustmentFactor::new(
-                            na::Vector2::new(feat.undistorted_coord[0], feat.undistorted_coord[1])
-                                .cast::<f64>(),
-                            *T_C_B,
-                        );
+                            // Factor logic
+                            let mut factor = BundleAdjustmentFactor::new(
+                                na::Vector2::new(feat.undistorted_coord[0], feat.undistorted_coord[1])
+                                    .cast::<f64>(),
+                                *T_C_B,
+                            );
 
-                        // Fix pose for first frame
-                        if id_frame == 0 {
-                            // Factor expects T_B_W (Body-from-World), but frame.state.T_W_B is World-from-Body
-                            let T_B_W = frame
-                                .state
-                                .T_W_B
-                                .try_inverse()
-                                .expect("T_W_B should be invertible");
-                            factor = factor.with_fixed_pose(T_B_W);
+                            if id_frame == 0 {
+                                // For first frame, fix the pose
+                                // We need T_B_W (Body-from-World)
+                                // frame.state.T_W_B is World-from-Body
+                                let T_B_W_inv = frame.state.T_W_B.try_inverse().expect("T_W_B should be invertible");
+                                factor = factor.with_fixed_pose(T_B_W_inv);
+                            }
+
+                            let var_names = if id_frame == 0 {
+                                vec![lm_var]
+                            } else {
+                                vec![lm_var, kf_var.clone()]
+                            };
+                            
+                            // Huber loss
+                            let huber_loss = HuberLoss::new(2.0).ok();
+                            
+                            local_residuals.push((var_names, Box::new(factor), huber_loss.map(|l| Box::new(l) as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>)));
                         }
-
-                        // Determine variable names based on frame
-                        let var_names: Vec<&str> = if id_frame == 0 {
-                            vec![&lm_var]
-                        } else {
-                            vec![&lm_var, &kf_var]
-                        };
-
-                        // Add residual block with Huber loss
-                        let huber_loss = HuberLoss::new(2.0).unwrap();
-                        problem.add_residual_block(
-                            &var_names,
-                            Box::new(factor),
-                            Some(Box::new(huber_loss)),
-                        );
                     }
                 }
+                (local_initials, local_residuals)
+            })
+            .collect();
+
+        // PART 3: Aggregate into Problem and Initial Values
+        let (all_initials_maps, all_residuals_vecs): (Vec<_>, Vec<_>) = results.into_par_iter().unzip();
+
+        let initial_values = all_initials_maps.into_par_iter()
+            .fold(
+                HashMap::new,
+                |mut acc, block_initials| {
+                    for (k, v) in block_initials {
+                        acc.entry(k).or_insert(v);
+                    }
+                    acc
+                }
+            )
+            .reduce(
+                HashMap::new,
+                |mut left, right| {
+                    for (k, v) in right {
+                        left.entry(k).or_insert(v);
+                    }
+                    left
+                }
+            );
+
+        for residuals in all_residuals_vecs {
+            for (var_names, factor, loss) in residuals {
+                let var_refs: Vec<&str> = var_names.iter().map(|s| s.as_str()).collect();
+                problem.add_residual_block(&var_refs, factor, loss);
             }
         }
+
+        (problem, initial_values)
+    }
+
+    pub fn optimize(&mut self) -> Result<bool, std::io::Error> {
+        self.check_sliding_window_size_for_optimization()?;
+
+        // Save current state before optimization for potential rollback
+        let saved_keyframe_poses: Vec<Matrix4x4> =
+            self.keyframes.iter().map(|f| f.state.T_W_B).collect();
+        let saved_map_points = self.map_points.clone();
+
+        // Initialize problem and solver
+        let mut solver = LevenbergMarquardt::with_config(self.build_solver_config());
+        // solver.add_observer(TerminalObserver::new());
+
+        let (problem, initial_values) = self.build_optimization_problem();
 
         let num_residuals = problem.num_residual_blocks();
         let num_variables = initial_values.len();
@@ -695,3 +681,5 @@ impl SlidingWindow {
         }
     }
 }
+
+
