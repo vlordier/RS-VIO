@@ -3,7 +3,6 @@ use imageproc::corners::Corner;
 use nalgebra as na;
 use rayon::prelude::*;
 use std::collections::HashMap;
-use std::ops::AddAssign;
 
 use super::{image_utilities, patch};
 
@@ -246,9 +245,13 @@ fn build_image_pyramid(greyscale_image: &GrayImage, levels: u32) -> Vec<GrayImag
     (0..levels)
         .into_par_iter()
         .map(|i| {
-            let scale_down: u32 = 1 << i;
-            let (new_w, new_h) = (w0 / scale_down, h0 / scale_down);
-            imageops::resize(greyscale_image, new_w, new_h, FILTER_TYPE)
+            if i == 0 {
+                greyscale_image.clone()
+            } else {
+                let scale_down: u32 = 1 << i;
+                let (new_w, new_h) = (w0 / scale_down, h0 / scale_down);
+                imageops::resize(greyscale_image, new_w, new_h, FILTER_TYPE)
+            }
         })
         .collect()
 }
@@ -383,17 +386,8 @@ pub fn track_point_at_level(
     optical_flow_convergence_threshold: f32,
 ) -> bool {
     // Use pre-computed pattern matrix instead of recomputing
-    let patten = &dp.pattern_matrix;
-
     for _iteration in 0..optical_flow_max_iterations {
-        // Transform pattern: R * pattern + t
-        let mut transformed_pat = transform.matrix().fixed_view::<2, 2>(0, 0) * patten;
-        let translation = transform.matrix().fixed_view::<2, 1>(0, 2);
-        for i in 0..52 {
-            transformed_pat.column_mut(i).add_assign(translation);
-        }
-
-        if let Some(res) = dp.residual(grayscale_image, &transformed_pat) {
+        if let Some(res) = dp.residual(grayscale_image, transform) {
             let inc = -dp.h_se2_inv_j_se2_t * res;
 
             // avoid NaN in increment (leads to SE2::exp crashing)

@@ -163,7 +163,7 @@ impl Pattern52 {
     pub fn residual(
         &self,
         greyscale_image: &GrayImage,
-        transformed_pattern: &na::SMatrix<f32, 2, PATTERN52_SIZE>,
+        transform: &na::Affine2<f32>,
     ) -> Option<na::SVector<f32, PATTERN52_SIZE>> {
         let mut sum: f32 = 0.0;
         let mut num_valid_points = 0;
@@ -174,9 +174,21 @@ impl Pattern52 {
         let height = greyscale_image.height();
         let raw_pixels = greyscale_image.as_raw();
 
+        // Extract transform components for fast manual multiplication
+        let m = transform.matrix();
+        let r11 = m.m11;
+        let r12 = m.m12;
+        let tx = m.m13;
+        let r21 = m.m21;
+        let r22 = m.m22;
+        let ty = m.m23;
+
         for i in 0..PATTERN52_SIZE {
-            let x = transformed_pattern[(0, i)];
-            let y = transformed_pattern[(1, i)];
+            let px_raw = self.pattern_matrix[(0, i)];
+            let py_raw = self.pattern_matrix[(1, i)];
+
+            let x = r11 * px_raw + r12 * py_raw + tx;
+            let y = r21 * px_raw + r22 * py_raw + ty;
 
             // Fast bounds check
             if x >= 2.0 && y >= 2.0 && x < (width - 2) as f32 && y < (height - 2) as f32 {
