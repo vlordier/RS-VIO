@@ -129,6 +129,15 @@ mod tests {
     }
 
     #[test]
+    fn test_empty_batch() {
+        let batch = ParallelFactorBatch::new(ParallelFactorConfig::default());
+        let observations: Vec<(Vector2<f64>, Matrix4<f64>)> = Vec::new();
+
+        let factors = batch.create_pinhole_factors_parallel(observations);
+        assert!(factors.is_empty());
+    }
+
+    #[test]
     fn test_small_batch_serial() {
         let batch = ParallelFactorBatch::new(ParallelFactorConfig {
             parallelization_threshold: 1000,
@@ -141,6 +150,25 @@ mod tests {
 
         let factors = batch.create_pinhole_factors_parallel(observations);
         assert_eq!(factors.len(), 2);
+    }
+
+    #[test]
+    fn test_threshold_boundary_parallelization() {
+        let batch = ParallelFactorBatch::new(ParallelFactorConfig {
+            parallelization_threshold: 4,
+        });
+
+        let observations = (0..4)
+            .map(|i| {
+                (
+                    Vector2::new(i as f64 / 10.0, i as f64 / 10.0),
+                    Matrix4::identity(),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        let factors = batch.create_pinhole_factors_parallel(observations);
+        assert_eq!(factors.len(), 4);
     }
 
     #[test]
@@ -170,5 +198,40 @@ mod tests {
         assert_eq!(doubled.len(), 100);
         assert_eq!(doubled[0], 0);
         assert_eq!(doubled[50], 100);
+    }
+
+    #[cfg(feature = "benchmarks")]
+    #[test]
+    fn benchmark_parallel_vs_serial_factor_creation() {
+        use std::time::Instant;
+        let batch_parallel = ParallelFactorBatch::new(ParallelFactorConfig {
+            parallelization_threshold: 16,
+        });
+        let batch_serial = ParallelFactorBatch::new(ParallelFactorConfig {
+            parallelization_threshold: 10_000,
+        });
+
+        let observations = (0..10_000)
+            .map(|i| {
+                (
+                    Vector2::new(i as f64 / 10_000.0, i as f64 / 10_000.0),
+                    Matrix4::identity(),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        let start_serial = Instant::now();
+        let serial_factors = batch_serial.create_pinhole_factors_parallel(observations.clone());
+        let serial_duration = start_serial.elapsed();
+
+        let start_parallel = Instant::now();
+        let parallel_factors = batch_parallel.create_pinhole_factors_parallel(observations);
+        let parallel_duration = start_parallel.elapsed();
+
+        assert_eq!(serial_factors.len(), 10_000);
+        assert_eq!(parallel_factors.len(), 10_000);
+
+        println!("serial:   {:?}", serial_duration);
+        println!("parallel: {:?}", parallel_duration);
     }
 }
