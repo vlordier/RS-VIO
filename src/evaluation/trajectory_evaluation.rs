@@ -24,20 +24,11 @@ pub struct GroundTruthPose {
 impl GroundTruthPose {
     /// Convert to SE(3) matrix (world to body)
     pub fn to_matrix(&self) -> Matrix4x4 {
-        let rotation = self.quaternion.to_rotation_matrix();
-        let mut matrix = Matrix4x4::identity();
-
-        for i in 0..3 {
-            for j in 0..3 {
-                matrix[(i, j)] = rotation.matrix()[(i, j)] as f64;
-            }
-        }
-
-        matrix[(0, 3)] = self.position.x;
-        matrix[(1, 3)] = self.position.y;
-        matrix[(2, 3)] = self.position.z;
-
-        matrix
+        na::Isometry3::from_parts(
+            na::Translation3::from(self.position),
+            self.quaternion.cast::<f64>(),
+        )
+        .to_homogeneous()
     }
 }
 
@@ -131,7 +122,12 @@ impl GroundTruthTrajectory {
 
         Ok(Self {
             poses,
-            sequence_name: "dataset".to_string(),
+            sequence_name: path
+                .as_ref()
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("dataset")
+                .to_string(),
         })
     }
 
@@ -151,19 +147,23 @@ impl GroundTruthTrajectory {
             return Some(pose.clone());
         }
 
-        // Find closest
-        let mut best_pose = None;
-        let mut best_delta = i64::MAX;
-
-        for (ts, pose) in self.poses.iter() {
-            let delta = (ts - timestamp_ns).abs();
-            if delta < best_delta && delta <= max_delta_ns {
-                best_delta = delta;
-                best_pose = Some(pose.clone());
+        let before = self.poses.range(..=timestamp_ns).next_back();
+        let after = self.poses.range(timestamp_ns..).next();
+        let closest = match (before, after) {
+            (Some((ts_b, pose_b)), Some((ts_a, pose_a))) => {
+                if timestamp_ns - ts_b <= ts_a - timestamp_ns {
+                    Some((ts_b, pose_b))
+                } else {
+                    Some((ts_a, pose_a))
+                }
             }
-        }
-
-        best_pose
+            (Some(p), None) => Some(p),
+            (None, Some(p)) => Some(p),
+            (None, None) => None,
+        };
+        closest
+            .filter(|(ts, _)| (timestamp_ns - *ts).abs() <= max_delta_ns)
+            .map(|(_, pose)| pose.clone())
     }
 
     /// Get all poses
@@ -223,19 +223,26 @@ impl EstimatedTrajectory {
         if let Some(pose) = self.poses.get(&timestamp_ns) {
             return Some(pose);
         }
-
-        let mut best_pose = None;
-        let mut best_delta = i64::MAX;
-
-        for (ts, pose) in self.poses.iter() {
-            let delta = (ts - timestamp_ns).abs();
-            if delta < best_delta && delta <= max_delta_ns {
-                best_delta = delta;
-                best_pose = Some(pose);
+        let before = self.poses.range(..timestamp_ns).next_back();
+        let after = self.poses.range(timestamp_ns..).next();
+        let closest_key = match (before, after) {
+            (Some((ts_b, _)), Some((ts_a, _))) => {
+                if timestamp_ns - *ts_b < *ts_a - timestamp_ns {
+                    Some(ts_b)
+                } else {
+                    Some(ts_a)
+                }
+            }
+            (Some((ts, _)), None) => Some(ts),
+            (None, Some((ts, _))) => Some(ts),
+            (None, None) => None,
+        };
+        if let Some(key) = closest_key {
+            if (timestamp_ns - *key).abs() <= max_delta_ns {
+                return self.poses.get(key);
             }
         }
-
-        best_pose
+        None
     }
 
     /// Get all poses
@@ -415,12 +422,10 @@ pub fn calculate_rpe(
         .sqrt();
         translation_errors.push(trans_error);
 
-        // Extract rotation error using a trace-difference heuristic.
-        // NOTE: This is a lightweight approximation; consider replacing with
-        // a proper SO(3) geodesic distance when precision is required.
-        let trace_est = est_relative.m11 + est_relative.m22 + est_relative.m33;
-        let trace_gt = gt_relative.m11 + gt_relative.m22 + gt_relative.m33;
-        let angle_error = ((trace_est - trace_gt).abs() / 6.0).clamp(-1.0, 1.0).acos();
+        let rot_error_tf = est_relative * gt_relative.try_inverse().unwrap_or(Matrix4x4::identity());
+        let trace_rel = rot_error_tf.m11 + rot_error_tf.m22 + rot_error_tf.m33;
+        let cos_angle = ((trace_rel - 1.0) / 2.0).clamp(-1.0, 1.0);
+        let angle_error = cos_angle.acos();
         rotation_errors.push(angle_error);
     }
 
@@ -699,9 +704,7 @@ mod tests {
 
         let (trans_rmse, rot_rmse) = calculate_rpe(&gt, &est, 1_000_000);
         assert!(trans_rmse.abs() < 1e-9);
-        assert!(rot_rmse.is_finite());
-        // Current implementation uses trace-difference heuristic which yields pi/2 for identical rotations
-        assert!((rot_rmse - std::f64::consts::FRAC_PI_2).abs() < 1e-9);
+        assert!(rot_rmse.abs() < 1e-9);
     }
 
     #[test]
