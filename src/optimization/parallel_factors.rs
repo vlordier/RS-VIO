@@ -45,19 +45,9 @@ impl ParallelFactorBatch {
         &self,
         observations: Vec<(Vector2<f64>, Matrix4<f64>)>,
     ) -> Vec<PinholeProjectionFactor> {
-        if observations.len() < self.config.parallelization_threshold {
-            // Serial processing for small batches
-            observations
-                .into_iter()
-                .map(|(obs, transform)| PinholeProjectionFactor::new(obs, transform))
-                .collect()
-        } else {
-            // Parallel processing for large batches using Rayon
-            observations
-                .into_par_iter()
-                .map(|(obs, transform)| PinholeProjectionFactor::new(obs, transform))
-                .collect()
-        }
+        self.process_batch_parallel(observations, |(obs, transform)| {
+            PinholeProjectionFactor::new(obs, transform)
+        })
     }
 
     /// Batch create BundleAdjustmentFactors in parallel
@@ -71,19 +61,9 @@ impl ParallelFactorBatch {
         &self,
         observations: Vec<(Vector2<f64>, Matrix4<f64>)>,
     ) -> Vec<BundleAdjustmentFactor> {
-        if observations.len() < self.config.parallelization_threshold {
-            // Serial processing for small batches
-            observations
-                .into_iter()
-                .map(|(obs, T_C_B)| BundleAdjustmentFactor::new(obs, T_C_B))
-                .collect()
-        } else {
-            // Parallel processing for large batches
-            observations
-                .into_par_iter()
-                .map(|(obs, T_C_B)| BundleAdjustmentFactor::new(obs, T_C_B))
-                .collect()
-        }
+        self.process_batch_parallel(observations, |(obs, T_C_B)| {
+            BundleAdjustmentFactor::new(obs, T_C_B)
+        })
     }
 
     /// Process factors in batches with parallelization
