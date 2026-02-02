@@ -75,7 +75,7 @@ impl Pattern52 {
     pub fn set_data_jac_se2(
         &mut self,
         greyscale_image: &GrayImage,
-        j_se2: &mut na::SMatrix<f32, PATTERN52_SIZE, 3>,
+        j_se2: &mut na::SMatrix<f32, 3, PATTERN52_SIZE>,
     ) {
         let mut num_valid_points = 0;
         let mut sum: f32 = 0.0;
@@ -97,9 +97,9 @@ impl Pattern52 {
 
                 self.data[i] = val_grad[0];
                 sum += val_grad[0];
-                let re = val_grad.fixed_rows::<2>(1).transpose() * jw_se2;
-                j_se2.set_row(i, &re);
-                grad_sum_se2.add_assign(j_se2.fixed_rows::<1>(i).transpose());
+                let re = jw_se2.transpose() * val_grad.fixed_rows::<2>(1);
+                j_se2.set_column(i, &re);
+                grad_sum_se2.add_assign(re);
                 num_valid_points += 1;
             } else {
                 self.data[i] = -1.0;
@@ -112,17 +112,17 @@ impl Pattern52 {
 
         for i in 0..Self::PATTERN_RAW.len() {
             if self.data[i] >= 0.0 {
-                let rhs = grad_sum_se2.transpose() * self.data[i] / sum;
-                j_se2.fixed_rows_mut::<1>(i).add_assign(-rhs);
+                let rhs = grad_sum_se2 * (self.data[i] / sum);
+                j_se2.column_mut(i).add_assign(-rhs);
                 self.data[i] *= mean_inv;
             } else {
-                j_se2.set_row(i, &na::SMatrix::<f32, 1, 3>::zeros());
+                j_se2.column_mut(i).fill(0.0);
             }
         }
         *j_se2 *= mean_inv;
     }
     pub fn new(greyscale_image: &GrayImage, px: f32, py: f32) -> Pattern52 {
-        let mut j_se2 = na::SMatrix::<f32, PATTERN52_SIZE, 3>::zeros();
+        let mut j_se2 = na::SMatrix::<f32, 3, PATTERN52_SIZE>::zeros();
         let pattern_scale_down = 2.0;
 
         // Pre-compute pattern matrix once (2x52, transposed from 52x2)
@@ -140,12 +140,12 @@ impl Pattern52 {
             pattern_matrix,
         };
         p.set_data_jac_se2(greyscale_image, &mut j_se2);
-        let h_se2 = j_se2.transpose() * j_se2;
+        let h_se2 = j_se2 * j_se2.transpose();
         let mut h_se2_inv = na::SMatrix::<f32, 3, 3>::identity();
 
         if let Some(x) = h_se2.cholesky() {
             x.solve_mut(&mut h_se2_inv);
-            p.h_se2_inv_j_se2_t = h_se2_inv * j_se2.transpose();
+            p.h_se2_inv_j_se2_t = h_se2_inv * j_se2;
 
             // NOTE: while it's very unlikely we get a source patch with all black
             // pixels, since points are usually selected at corners, it doesn't cost
