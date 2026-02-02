@@ -1,12 +1,12 @@
-use crate::datasets::io::{load_csv_image_timestamps, load_grayscale_image};
+use crate::datasets::io::{
+    load_csv_image_timestamps, load_grayscale_image, load_imu_data, ImuFormat,
+};
 use crate::datasets::{
     config::Config, FrameContext, ImageData, ImuData, PlayerConfig, PlayerResult,
 };
 use crate::estimator::Estimator;
 use crate::viewers::{create_viewer, Viewer};
-use anyhow::{Context, Result};
-use std::fs::File;
-use std::io::{BufRead, BufReader};
+use anyhow::Result;
 use std::path::Path;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -221,68 +221,8 @@ impl TUMVIPlayer {
     #[allow(dead_code)]
     fn load_imu_data(dataset_path: &str) -> Result<Vec<ImuData>> {
         let imu_file = Path::new(dataset_path).join("dso/imu.txt");
-
-        if !imu_file.exists() {
-            log::debug!(
-                "[TUMVIPlayer] IMU file not found at {:?}, skipping",
-                imu_file
-            );
-            return Ok(Vec::new());
-        }
-
-        let file = File::open(&imu_file)
-            .with_context(|| format!("Cannot open IMU file: {}", imu_file.display()))?;
-
-        let reader = BufReader::new(file);
-        let mut imu_data = Vec::new();
-
-        for (line_num, line) in reader.lines().enumerate() {
-            let line = line?;
-
-            // Skip header and empty lines
-            if line_num == 0 || line.trim().is_empty() || line.trim_start().starts_with('#') {
-                continue;
-            }
-
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            // Format: timestamp[ns] w.x w.y w.z a.x a.y a.z
-            if parts.len() >= 7 {
-                if let Ok(timestamp) = parts[0].parse::<i64>() {
-                    if let (Ok(wx), Ok(wy), Ok(wz), Ok(ax), Ok(ay), Ok(az)) = (
-                        parts[1].parse::<f64>(),
-                        parts[2].parse::<f64>(),
-                        parts[3].parse::<f64>(),
-                        parts[4].parse::<f64>(),
-                        parts[5].parse::<f64>(),
-                        parts[6].parse::<f64>(),
-                    ) {
-                        imu_data.push(ImuData {
-                            timestamp,
-                            gyro: [wx, wy, wz],
-                            accel: [ax, ay, az],
-                        });
-                    } else {
-                        log::debug!(
-                            "[TUMVIPlayer] Skipped malformed IMU line {}: invalid numeric values",
-                            line_num
-                        );
-                    }
-                } else {
-                    log::debug!(
-                        "[TUMVIPlayer] Skipped malformed IMU line {}: invalid timestamp",
-                        line_num
-                    );
-                }
-            } else {
-                log::debug!("[TUMVIPlayer] Skipped malformed IMU line {}: insufficient fields (expected 7+, got {})", line_num, parts.len());
-            }
-        }
-
-        log::info!(
-            "[TUMVIPlayer] Loaded {} IMU samples from {}",
-            imu_data.len(),
-            imu_file.display()
-        );
+        let (imu_data, _stats) =
+            load_imu_data(&imu_file, ImuFormat::WhitespaceDelimited, "TUMVIPlayer")?;
         Ok(imu_data)
     }
 

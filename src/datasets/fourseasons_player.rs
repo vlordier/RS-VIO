@@ -250,6 +250,7 @@ impl FourSeasonsPlayer {
     #[allow(dead_code)] // TODO: implement for VIO mode
     fn load_imu_data(dataset_path: &str) -> Result<Vec<ImuData>> {
         // 4Seasons dataset may have IMU data in imu.txt or imu.csv
+        // Special handling: supports both comma and space-separated formats
         let imu_file = Path::new(dataset_path).join("imu.txt");
 
         if !imu_file.exists() {
@@ -276,7 +277,7 @@ impl FourSeasonsPlayer {
 
             // Try to parse both space-separated and comma-separated formats
             let parts: Vec<&str> = if line.contains(',') {
-                line.split(',').collect()
+                line.split(',').map(|s| s.trim()).collect()
             } else {
                 line.split_whitespace().collect()
             };
@@ -292,11 +293,22 @@ impl FourSeasonsPlayer {
                         parts[5].trim().parse::<f64>(),
                         parts[6].trim().parse::<f64>(),
                     ) {
-                        imu_data.push(ImuData {
-                            timestamp,
-                            gyro: [wx, wy, wz],
-                            accel: [ax, ay, az],
-                        });
+                        // Validate ranges
+                        let gyro_magnitude = (wx * wx + wy * wy + wz * wz).sqrt();
+                        let accel_magnitude = (ax * ax + ay * ay + az * az).sqrt();
+
+                        if gyro_magnitude <= 1000.0 && accel_magnitude <= 200.0 {
+                            imu_data.push(ImuData {
+                                timestamp,
+                                gyro: [wx, wy, wz],
+                                accel: [ax, ay, az],
+                            });
+                        } else {
+                            log::debug!(
+                                "[FourSeasonsPlayer] Skipped malformed IMU line {}: out-of-range values (gyro={:.1}, accel={:.1})",
+                                line_num, gyro_magnitude, accel_magnitude
+                            );
+                        }
                     } else {
                         log::debug!("[FourSeasonsPlayer] Skipped malformed IMU line {}: invalid numeric values", line_num);
                     }
