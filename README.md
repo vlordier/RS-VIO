@@ -26,7 +26,7 @@ cargo run --release --bin run_euroc config/euroc_vio.yaml {path_to_euroc_folder}
   - Download the 512x512 datasets in EuRoC/DSO format from https://cvg.cit.tum.de/data/datasets/visual-inertial-dataset
   - Run:
 ```bash
-cargo run --release --bin run_tum config/tum_vi.yaml {path_to_tum_folder}/MH_01_easy/
+cargo run --release --bin run_tum config/tum_vi.yaml {path_to_tum_folder}/dataset-room1_512_16/
 ```
 - 4Seasons:
   - Download the undistorted image datasets from https://cvg.cit.tum.de/data/datasets/4seasons-dataset/download

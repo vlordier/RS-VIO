@@ -1,0 +1,10 @@
+# SHA256 checksums for dataset archives
+# Format: <sha256>  <filename>
+#
+# To generate checksums for your downloaded files:
+#   sha256sum /path/to/file >> scripts/dataset_checksums.sha256
+#
+# Examples (replace with real values):
+# abc123...  MH_01_easy.zip
+# def456...  tum_vi.tgz
+# ghi789...  recording_2021-05-10_19-15-19_imu_gnss.zip
