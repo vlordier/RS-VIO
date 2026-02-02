@@ -82,6 +82,9 @@ metal = { version = "0.27", optional = true }
 objc2 = { version = "0.5", optional = true }
 objc2-foundation = { version = "0.2", optional = true }
 
+[dev-dependencies]
+tempfile = "3"
+
 [lints.rust]
 unsafe_code = "warn"  # Allowed only for SIMD intrinsics (must be documented)
 # warnings = "deny"  # Temporarily allowing warnings due to existing codebase issues

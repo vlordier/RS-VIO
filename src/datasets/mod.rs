@@ -1,6 +1,7 @@
 pub mod config;
 pub mod euroc_player;
 pub mod fourseasons_player;
+pub mod io;
 pub mod tum_vi_player;
 
 use crate::datasets::config::Config;
@@ -163,4 +164,35 @@ pub fn create_camera_models_from_config(config: &Config) -> (CameraModelType, Ca
     };
 
     (left_cam, right_cam)
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+pub(crate) mod test_utils {
+    use super::ImuData;
+    use std::fs;
+    use std::io::Write;
+    use std::path::Path;
+
+    pub(crate) fn write_file(path: &Path, contents: &str) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create parent dirs");
+        }
+        let mut file = fs::File::create(path).expect("create file");
+        file.write_all(contents.as_bytes()).expect("write file");
+    }
+
+    pub(crate) fn sample_imu_data() -> Vec<ImuData> {
+        (1..=5)
+            .map(|timestamp| ImuData {
+                timestamp,
+                gyro: [0.0; 3],
+                accel: [0.0; 3],
+            })
+            .collect()
+    }
+
+    pub(crate) fn timestamps(data: &[ImuData]) -> Vec<i64> {
+        data.iter().map(|imu| imu.timestamp).collect()
+    }
 }

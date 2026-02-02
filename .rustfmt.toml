@@ -14,7 +14,7 @@ tab_spaces = 4
 reorder_modules = true
 
 # Function formatting (stable)
-fn_args_layout = "Tall"
+fn_params_layout = "Tall"
 
 # Match formatting
 match_block_trailing_comma = true
