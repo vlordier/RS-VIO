@@ -182,6 +182,25 @@ target/
 - `1` - Benchmarks failed to compile/run
 - `2` - Python/matplotlib not available (plotting skipped)
 
+## compare_trajectory_evaluation.sh - Branch Comparison Helper
+
+**Purpose:** Compare trajectory evaluation unit-test runtime between `develop` and a feature branch.
+
+**Features:**
+- ✅ Checks out branches safely (restores current branch on exit)
+- ✅ Runs release-mode trajectory evaluation tests
+- ✅ Prints timing summary for both refs
+
+**Basic Usage:**
+
+```bash
+# Compare develop vs current branch
+./compare_trajectory_evaluation.sh
+
+# Compare develop vs a specific ref
+./compare_trajectory_evaluation.sh develop feature/trajectory-evaluation
+```
+
 ### plot_benchmarks.py - Benchmark Visualization
 
 **Purpose:** Convert Criterion JSON output into performance visualizations.

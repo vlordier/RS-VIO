@@ -156,7 +156,7 @@ impl GroundTruthTrajectory {
                 } else {
                     Some((ts_a, pose_a))
                 }
-            }
+            },
             (Some(p), None) => Some(p),
             (None, Some(p)) => Some(p),
             (None, None) => None,
@@ -232,7 +232,7 @@ impl EstimatedTrajectory {
                 } else {
                     Some(ts_a)
                 }
-            }
+            },
             (Some((ts, _)), None) => Some(ts),
             (None, Some((ts, _))) => Some(ts),
             (None, None) => None,
@@ -394,7 +394,7 @@ pub fn calculate_rpe(
             None => {
                 prev = next;
                 continue;
-            }
+            },
         };
 
         if ts2 - ts1 < delta_time_ns / 2 || ts2 - ts1 > delta_time_ns * 3 / 2 {
@@ -408,14 +408,14 @@ pub fn calculate_rpe(
             None => {
                 prev = next;
                 continue;
-            }
+            },
         };
         let gt2 = match ground_truth.get_closest_pose(*ts2, 50_000_000) {
             Some(p) => p,
             None => {
                 prev = next;
                 continue;
-            }
+            },
         };
 
         // Calculate relative poses
