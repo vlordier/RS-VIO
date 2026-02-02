@@ -1,7 +1,7 @@
 [default.extend-words]
 # Mathematical and algorithm-specific variable names
 iy = "iy"        # Image y coordinate
-Pn = "Pn"        # PnP algorithm/Point n  
+Pn = "Pn"        # PnP algorithm/Point n
 BA = "BA"        # Bundle Adjustment
 ba = "ba"        # Bundle adjustment (lowercase)
 Fo = "Fo"        # Factor/Force variable
