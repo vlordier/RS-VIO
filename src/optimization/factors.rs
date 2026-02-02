@@ -1,7 +1,7 @@
 use apex_solver::factors::Factor;
-use apex_solver::manifold::se3;
-use na::{DMatrix, DVector, Matrix3, Matrix4, Vector2, Vector3};
+use na::{DMatrix, DVector, Matrix3, Matrix4, Vector2, Vector3, UnitQuaternion, Quaternion};
 use nalgebra as na;
+use std::sync::Arc;
 
 /// Pinhole projection factor for optimizing 3D point positions from camera observations.
 ///
@@ -277,14 +277,14 @@ pub struct BundleAdjustmentFactor {
     pub observation: Vector2<f64>,
 
     /// Transform from body to camera (T_C_B: SE3 transform from B to C)
-    pub T_C_B: Matrix4<f64>,
+    pub T_C_B: Arc<Matrix4<f64>>,
 
     /// Fixed pose T_B_W (SE3 transform from W to B) if provided, None if pose is optimized
-    pub fixed_pose: Option<Matrix4<f64>>,
+    pub fixed_pose: Option<Arc<Matrix4<f64>>>,
 }
 
 impl BundleAdjustmentFactor {
-    pub const fn new(observation: Vector2<f64>, T_C_B: Matrix4<f64>) -> Self {
+    pub const fn new(observation: Vector2<f64>, T_C_B: Arc<Matrix4<f64>>) -> Self {
         Self {
             observation,
             T_C_B,
@@ -294,7 +294,7 @@ impl BundleAdjustmentFactor {
 
     /// Set a fixed pose T_B_W (SE3 transform from W to B).
     /// When set, the pose is not optimized and only the 3D point is optimized.
-    pub const fn with_fixed_pose(mut self, T_B_W: Matrix4<f64>) -> Self {
+    pub fn with_fixed_pose(mut self, T_B_W: Arc<Matrix4<f64>>) -> Self {
         self.fixed_pose = Some(T_B_W);
         self
     }
@@ -308,6 +308,7 @@ impl BundleAdjustmentFactor {
 
     /// Compute Jacobian of normalized projection w.r.t. 3D point in camera frame.
     /// For pinhole: [x/z, y/z], so ∂[x/z, y/z]/∂[x, y, z]
+    #[allow(dead_code)]
     fn jacobian_r_wrt_p_C(&self, point_3d_cam: Vector3<f64>) -> na::Matrix2x3<f64> {
         let x = point_3d_cam[0];
         let y = point_3d_cam[1];
@@ -341,7 +342,7 @@ impl Factor for BundleAdjustmentFactor {
         let p_W = Vector3::new(params[0][0], params[0][1], params[0][2]);
 
         // Extract T_B_W (SE3 transform from W to B)
-        let (R_B_W, t_B_W) = if let Some(T_B_W) = self.fixed_pose {
+        let (R_B_W, t_B_W) = if let Some(T_B_W) = &self.fixed_pose {
             assert_eq!(
                 params.len(),
                 1,
@@ -364,8 +365,11 @@ impl Factor for BundleAdjustmentFactor {
                 7,
                 "System pose must have 7 parameters (tx, ty, tz, qw, qx, qy, qz)"
             );
-            let T_B_W = se3::SE3::from(params[1].clone());
-            (T_B_W.rotation_so3().rotation_matrix(), T_B_W.translation())
+            
+            // Optimized extraction avoiding heap allocation and cloning
+            let t_B_W = Vector3::new(params[1][0], params[1][1], params[1][2]);
+            let quat = UnitQuaternion::new_normalize(Quaternion::new(params[1][3], params[1][4], params[1][5], params[1][6]));
+            (quat.to_rotation_matrix().into_inner(), t_B_W)
         };
 
         // Pre-compute camera transform components (reused in jacobian)
@@ -400,13 +404,26 @@ impl Factor for BundleAdjustmentFactor {
         ]);
 
         let jacobian_matrix = if compute_jacobian {
-            let jac_proj = self.jacobian_r_wrt_p_C(p_C); // 2x3
+            // Optimized Jacobian computation
+            let inv_z = 1.0 / p_C.z;
+            let inv_z_sq = inv_z * inv_z;
+            let fx = inv_z;
+            let fy = inv_z;
+            let fz_x = -p_C.x * inv_z_sq;
+            let fz_y = -p_C.y * inv_z_sq;
 
-            // Pre-compute: jac_proj * R_C_B (reused for both translation and rotation jacobians)
-            let jac_proj_R_C_B = jac_proj * R_C_B; // 2x3
+            // Compute R_total = R_C_B * R_B_W
+            let R_C_B = self.T_C_B.fixed_view::<3, 3>(0, 0);
+            let R_total = R_C_B * R_B_W;
 
-            // ∂r/∂p_W = jac_proj * R_C_B * R_B_W
-            let jac_r_wrt_p_W = jac_proj_R_C_B * R_B_W; // 2x3
+            // ∂r/∂p_W = jac_proj * R_total
+            // Manually computed to exploit sparsity of jac_proj
+            // jac_proj = [fx, 0, fz_x; 0, fy, fz_y]
+            let mut jac_r_wrt_p_W = na::Matrix2x3::<f64>::zeros();
+            for i in 0..3 {
+                jac_r_wrt_p_W[(0, i)] = fx * R_total[(0, i)] + fz_x * R_total[(2, i)];
+                jac_r_wrt_p_W[(1, i)] = fy * R_total[(1, i)] + fz_y * R_total[(2, i)];
+            }
 
             if self.fixed_pose.is_some() {
                 // Only optimize 3D point
@@ -414,22 +431,42 @@ impl Factor for BundleAdjustmentFactor {
                 jac.copy_from(&jac_r_wrt_p_W);
                 Some(jac)
             } else {
-                // TODO fix notation of AI-generated comments to match paper
-                // Optimize both 3D point and pose: [∂r/∂p_W (2x3) | ∂r/∂T_B_W (2x6)]
-                // where T_B_W SE3 tangent = [t; ω] (3 translation + 3 rotation)
+                // Compute ∂r/∂ω = -∂r/∂p_W * [p_W]x
+                // Manually computed to exploit sparsity of skew matrix [p_W]x
+                // [p_W]x = [0, -z, y; z, 0, -x; -y, x, 0]
+                // Row0 = J00, J01, J02 * Cols
+                // C0 = J01*z - J02*y
+                // C1 = J02*x - J00*z
+                // C2 = J00*y - J01*x
+                let x = p_W.x;
+                let y = p_W.y;
+                let z = p_W.z;
+                
+                let mut jac_r_wrt_rot = na::Matrix2x3::<f64>::zeros();
+                
+                // Row 0
+                let j00 = jac_r_wrt_p_W[(0, 0)];
+                let j01 = jac_r_wrt_p_W[(0, 1)];
+                let j02 = jac_r_wrt_p_W[(0, 2)];
+                jac_r_wrt_rot[(0, 0)] = j01 * z - j02 * y;
+                jac_r_wrt_rot[(0, 1)] = j02 * x - j00 * z;
+                jac_r_wrt_rot[(0, 2)] = j00 * y - j01 * x;
 
-                // Compute rotation jacobian: ∂r/∂ω = jac_proj * R_C_B * (-R_B_W * [p_W]×)
-                // We use the identity: R * [v]x = [R*v]x * R.
-                // Thus R * [v]x * R^T = [R*v]x. => R * [v]x = [R*v]x * R.
-                // So -jac_proj * R_C_B * R_B_W * [p_W]x = -jac_r_wrt_p_W * [p_W]x
-                let p_W_skew = skew_symmetric(&p_W);
-                let jac_r_wrt_rot = -(&jac_r_wrt_p_W * p_W_skew); // 2x3
+                // Row 1
+                let j10 = jac_r_wrt_p_W[(1, 0)];
+                let j11 = jac_r_wrt_p_W[(1, 1)];
+                let j12 = jac_r_wrt_p_W[(1, 2)];
+                jac_r_wrt_rot[(1, 0)] = j11 * z - j12 * y;
+                jac_r_wrt_rot[(1, 1)] = j12 * x - j10 * z;
+                jac_r_wrt_rot[(1, 2)] = j10 * y - j11 * x;
 
-                // Translation jacobian: ∂r/∂t = jac_proj * R_C_B * R_B_W (same as ∂r/∂p_W)
-                // Concatenate: [∂r/∂p_W (2x3) | ∂r/∂t (2x3) | ∂r/∂ω (2x3)] = [2x3 | 2x6]
+                // Negate result (formula is -J * skew)
+                // We computed J * skew, so negate
+                jac_r_wrt_rot.neg_mut();
+
                 let mut jac = DMatrix::zeros(2, 9);
                 jac.view_mut((0, 0), (2, 3)).copy_from(&jac_r_wrt_p_W); // ∂r/∂p_W
-                jac.view_mut((0, 3), (2, 3)).copy_from(&jac_r_wrt_p_W); // ∂r/∂t
+                jac.view_mut((0, 3), (2, 3)).copy_from(&jac_r_wrt_p_W); // ∂r/∂t (Following original logic)
                 jac.view_mut((0, 6), (2, 3)).copy_from(&jac_r_wrt_rot); // ∂r/∂ω
                 Some(jac)
             }
@@ -510,9 +547,22 @@ impl Factor for PnPFactor {
             7,
             "System pose must have 7 parameters (tx, ty, tz, qw, qx, qy, qz)"
         );
-        let T_B_W = se3::SE3::from(params[0].clone());
-        let R_B_W: na::Matrix3<f64> = T_B_W.rotation_so3().rotation_matrix();
-        let t_B_W: na::Vector3<f64> = T_B_W.translation();
+        
+        // OPTIMIZATION: Manually extract params to avoid SE3 allocation
+        // let T_B_W = se3::SE3::from(params[0].clone());
+        let tx = params[0][0];
+        let ty = params[0][1];
+        let tz = params[0][2];
+        let qw = params[0][3];
+        let qx = params[0][4];
+        let qy = params[0][5];
+        let qz = params[0][6];
+
+        // Construct rotation/translation manually
+        let t_B_W = Vector3::new(tx, ty, tz);
+        // We assume valid unit quaternion from solver
+        let q_B_W = UnitQuaternion::new_unchecked(Quaternion::new(qw, qx, qy, qz)); 
+        let R_B_W = q_B_W.to_rotation_matrix();
 
         // Pre-compute camera transform components (reused in jacobian)
         let R_C_B = self.T_C_B.fixed_view::<3, 3>(0, 0);
@@ -530,27 +580,79 @@ impl Factor for PnPFactor {
         ]);
 
         let jacobian_matrix = if compute_jacobian {
+            // Using helper method but could inline for further speed (helper is small though)
             let jac_proj = self.jacobian_r_wrt_p_C(p_C); // 2x3
 
-            // Pre-compute: jac_proj * R_C_B (reused for both translation and rotation jacobians)
-            let jac_proj_R_C_B = jac_proj * R_C_B; // 2x3
+            // Dense multiplication optimization: Expand jac_proj * R_C_B manually
+            // R_C_B is 3x3, jac_proj is 2x3.
+            // R_C_B columns
+            let r00 = R_C_B[(0,0)]; let r01 = R_C_B[(0,1)]; let r02 = R_C_B[(0,2)];
+            let r10 = R_C_B[(1,0)]; let r11 = R_C_B[(1,1)]; let r12 = R_C_B[(1,2)];
+            let r20 = R_C_B[(2,0)]; let r21 = R_C_B[(2,1)]; let r22 = R_C_B[(2,2)];
 
-            // ∂r/∂p_W = jac_proj * R_C_B * R_B_W
-            let jac_r_wrt_p_W = jac_proj_R_C_B * R_B_W; // 2x3
+            // jac_proj elements
+            let j00 = jac_proj[(0,0)]; let j01 = jac_proj[(0,1)]; let j02 = jac_proj[(0,2)];
+            let j10 = jac_proj[(1,0)]; let j11 = jac_proj[(1,1)]; let j12 = jac_proj[(1,2)];
 
-            // TODO fix notation of AI-generated comments to match paper
-            // Optimize both 3D point and pose: [∂r/∂p_W (2x3) | ∂r/∂T_B_W (2x6)]
-            // where T_B_W SE3 tangent = [t; ω] (3 translation + 3 rotation)
+            // jac_proj_R_C_B = jac_proj * R_C_B
+            let jpR00 = j00*r00 + j01*r10 + j02*r20;
+            let jpR01 = j00*r01 + j01*r11 + j02*r21;
+            let jpR02 = j00*r02 + j01*r12 + j02*r22;
 
-            // Compute rotation jacobian: ∂r/∂ω = jac_proj * R_C_B * (-R_B_W * [p_W]×)
-            let p_W_skew = skew_symmetric(&self.p_W);
-            let jac_r_wrt_rot = jac_proj_R_C_B * (-&R_B_W * p_W_skew); // 2x3
+            let jpR10 = j10*r00 + j11*r10 + j12*r20;
+            let jpR11 = j10*r01 + j11*r11 + j12*r21;
+            let jpR12 = j10*r02 + j11*r12 + j12*r22;
 
-            // Translation jacobian: ∂r/∂t = jac_proj * R_C_B * R_B_W (same as ∂r/∂p_W)
-            // Concatenate: [∂r/∂p_W (2x3) | ∂r/∂t (2x3) | ∂r/∂ω (2x3)] = [2x3 | 2x6]
+            // Transpose R_B_W for multiplication if needed, but we need jac * R_B_W
+            // R_B_W (3x3)
+            let rb00 = R_B_W[(0,0)]; let rb01 = R_B_W[(0,1)]; let rb02 = R_B_W[(0,2)];
+            let rb10 = R_B_W[(1,0)]; let rb11 = R_B_W[(1,1)]; let rb12 = R_B_W[(1,2)];
+            let rb20 = R_B_W[(2,0)]; let rb21 = R_B_W[(2,1)]; let rb22 = R_B_W[(2,2)];
+
+            // Translation Jacobian: ∂r/∂t = jac_proj * R_C_B * R_B_W
+            // = [jpR] * [R_B_W] (2x3 * 3x3 = 2x3)
+            let jt00 = jpR00*rb00 + jpR01*rb10 + jpR02*rb20;
+            let jt01 = jpR00*rb01 + jpR01*rb11 + jpR02*rb21;
+            let jt02 = jpR00*rb02 + jpR01*rb12 + jpR02*rb22;
+
+            let jt10 = jpR10*rb00 + jpR11*rb10 + jpR12*rb20;
+            let jt11 = jpR10*rb01 + jpR11*rb11 + jpR12*rb21;
+            let jt12 = jpR10*rb02 + jpR11*rb12 + jpR12*rb22;
+
+            // Rotation Jacobian: ∂r/∂ω = jac_proj * R_C_B * (-R_B_W * [p_W]×)
+            // = (Jacobian_t) * (-1 * [p_W]x)
+            let px = self.p_W[0];
+            let py = self.p_W[1];
+            let pz = self.p_W[2];
+
+            // skew(p_W) = [0, -z, y; z, 0, -x; -y, x, 0]
+            // -skew(p_W) = [0, z, -y; -z, 0, x; y, -x, 0]
+            // J_rot = J_trans * (-skew(p_W))
+            /*
+                [jt00 jt01 jt02] * [ 0  z -y]
+                [jt10 jt11 jt12]   [-z  0  x]
+                                   [ y -x  0]
+                
+                col0 = jt00(0) + jt01(-z) + jt02(y)
+                col1 = jt00(z) + jt01(0) + jt02(-x)
+                col2 = jt00(-y) + jt01(x) + jt02(0)
+            */
+            let jr00 = -jt01*pz + jt02*py;
+            let jr01 =  jt00*pz - jt02*px;
+            let jr02 = -jt00*py + jt01*px;
+
+            let jr10 = -jt11*pz + jt12*py;
+            let jr11 =  jt10*pz - jt12*px;
+            let jr12 = -jt10*py + jt11*px;
+
             let mut jac = DMatrix::zeros(2, 6);
-            jac.view_mut((0, 0), (2, 3)).copy_from(&jac_r_wrt_p_W); // ∂r/∂t
-            jac.view_mut((0, 3), (2, 3)).copy_from(&jac_r_wrt_rot); // ∂r/∂ω
+            // Translate part
+            jac[(0,0)] = jt00; jac[(0,1)] = jt01; jac[(0,2)] = jt02;
+            jac[(1,0)] = jt10; jac[(1,1)] = jt11; jac[(1,2)] = jt12;
+            // Rotate part
+            jac[(0,3)] = jr00; jac[(0,4)] = jr01; jac[(0,5)] = jr02;
+            jac[(1,3)] = jr10; jac[(1,4)] = jr11; jac[(1,5)] = jr12;
+            
             Some(jac)
         } else {
             None

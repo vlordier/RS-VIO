@@ -461,9 +461,9 @@ mod tests {
             T_C_B: na::Matrix4<f64>, // T_C_B: SE3 transform from B to C
             fixed_pose: Option<na::Matrix4<f64>>,
         ) {
-            let mut factor = BundleAdjustmentFactor::new(observation, T_C_B);
+            let mut factor = BundleAdjustmentFactor::new(observation, std::sync::Arc::new(T_C_B));
             if let Some(pose) = fixed_pose {
-                factor = factor.with_fixed_pose(pose);
+                factor = factor.with_fixed_pose(std::sync::Arc::new(pose));
             }
 
             let var_names: Vec<&str> = if let Some(cv) = cam_var {

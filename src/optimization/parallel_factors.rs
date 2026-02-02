@@ -62,7 +62,7 @@ impl ParallelFactorBatch {
         observations: Vec<(Vector2<f64>, Matrix4<f64>)>,
     ) -> Vec<BundleAdjustmentFactor> {
         self.process_batch_parallel(observations, |(obs, T_C_B)| {
-            BundleAdjustmentFactor::new(obs, T_C_B)
+            BundleAdjustmentFactor::new(obs, std::sync::Arc::new(T_C_B))
         })
     }
 
