@@ -247,18 +247,27 @@ impl FourSeasonsPlayer {
         load_grayscale_image(&full_path)
     }
 
-    #[allow(dead_code)] // TODO: implement for VIO mode
     fn load_imu_data(dataset_path: &str) -> Result<Vec<ImuData>> {
         // 4Seasons dataset may have IMU data in imu.txt or imu.csv
         // Special handling: supports both comma and space-separated formats
-        let imu_file = Path::new(dataset_path).join("imu.txt");
+        let mut imu_file = Path::new(dataset_path).join("imu.txt");
 
         if !imu_file.exists() {
-            log::debug!(
-                "[FourSeasonsPlayer] IMU file not found at {:?}, skipping",
-                imu_file
-            );
-            return Ok(Vec::new());
+            let imu_csv = Path::new(dataset_path).join("imu.csv");
+            if imu_csv.exists() {
+                log::debug!(
+                    "[FourSeasonsPlayer] IMU file imu.txt not found, falling back to {:?}",
+                    imu_csv
+                );
+                imu_file = imu_csv;
+            } else {
+                log::debug!(
+                    "[FourSeasonsPlayer] IMU file not found (tried {:?} and {:?}), skipping",
+                    imu_file,
+                    imu_csv
+                );
+                return Ok(Vec::new());
+            }
         }
 
         let file = File::open(&imu_file)

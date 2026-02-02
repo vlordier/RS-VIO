@@ -43,7 +43,7 @@ impl TUMVIPlayer {
         };
 
         // Load IMU data
-        let imu_data = match Self::load_imu_data(&config.dataset_path) {
+        let imu_data = match self.load_imu_data(&config.dataset_path) {
             Ok(data) => {
                 if !data.is_empty() {
                     log::info!("[TUMVIPlayer] Loaded {} IMU samples", data.len());
@@ -218,8 +218,7 @@ impl TUMVIPlayer {
         load_grayscale_image(&full_path)
     }
 
-    #[allow(dead_code)]
-    fn load_imu_data(dataset_path: &str) -> Result<Vec<ImuData>> {
+    pub fn load_imu_data(&self, dataset_path: &str) -> Result<Vec<ImuData>> {
         let imu_file = Path::new(dataset_path).join("dso/imu.txt");
         let (imu_data, _stats) =
             load_imu_data(&imu_file, ImuFormat::WhitespaceDelimited, "TUMVIPlayer")?;
@@ -388,7 +387,8 @@ mod tests {
         let dir = tempdir().expect("tempdir");
         let dataset_path = dir.path().to_str().expect("path utf-8");
 
-        let imu_data = TUMVIPlayer::load_imu_data(dataset_path).expect("load imu data");
+        let player = TUMVIPlayer::new();
+        let imu_data = player.load_imu_data(dataset_path).expect("load imu data");
         assert!(imu_data.is_empty());
     }
 
@@ -407,7 +407,8 @@ not_a_timestamp 0 0 0 0 0 0\n\
         );
 
         let dataset_path = dir.path().to_str().expect("path utf-8");
-        let imu_data = TUMVIPlayer::load_imu_data(dataset_path).expect("load imu data");
+        let player = TUMVIPlayer::new();
+        let imu_data = player.load_imu_data(dataset_path).expect("load imu data");
         assert_eq!(imu_data.len(), 1);
         assert_eq!(imu_data[0].timestamp, 3);
     }

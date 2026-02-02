@@ -218,7 +218,6 @@ impl EurocPlayer {
         load_grayscale_image(&full_path)
     }
 
-    #[allow(dead_code)]
     fn load_imu_data(dataset_path: &str) -> Result<Vec<ImuData>> {
         let imu_file = Path::new(dataset_path).join("mav0/imu0/data.csv");
         let (imu_data, _stats) = load_imu_data(&imu_file, ImuFormat::CsvComma, "EurocPlayer")?;
