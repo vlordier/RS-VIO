@@ -306,10 +306,16 @@ impl EurocPlayer {
                             accel: [ax, ay, az],
                         });
                     } else {
-                        log::debug!("[EurocPlayer] Skipped malformed IMU line {}: invalid numeric values", line_num);
+                        log::debug!(
+                            "[EurocPlayer] Skipped malformed IMU line {}: invalid numeric values",
+                            line_num
+                        );
                     }
                 } else {
-                    log::debug!("[EurocPlayer] Skipped malformed IMU line {}: invalid timestamp", line_num);
+                    log::debug!(
+                        "[EurocPlayer] Skipped malformed IMU line {}: invalid timestamp",
+                        line_num
+                    );
                 }
             } else {
                 log::debug!("[EurocPlayer] Skipped malformed IMU line {}: insufficient fields (expected 7+, got {})", line_num, parts.len());

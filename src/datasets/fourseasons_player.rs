@@ -318,7 +318,10 @@ impl FourSeasonsPlayer {
                         log::debug!("[FourSeasonsPlayer] Skipped malformed IMU line {}: invalid numeric values", line_num);
                     }
                 } else {
-                    log::debug!("[FourSeasonsPlayer] Skipped malformed IMU line {}: invalid timestamp", line_num);
+                    log::debug!(
+                        "[FourSeasonsPlayer] Skipped malformed IMU line {}: invalid timestamp",
+                        line_num
+                    );
                 }
             } else {
                 log::debug!("[FourSeasonsPlayer] Skipped malformed IMU line {}: insufficient fields (expected 7+, got {})", line_num, parts.len());

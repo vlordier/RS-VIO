@@ -306,10 +306,16 @@ impl TUMVIPlayer {
                             accel: [ax, ay, az],
                         });
                     } else {
-                        log::debug!("[TUMVIPlayer] Skipped malformed IMU line {}: invalid numeric values", line_num);
+                        log::debug!(
+                            "[TUMVIPlayer] Skipped malformed IMU line {}: invalid numeric values",
+                            line_num
+                        );
                     }
                 } else {
-                    log::debug!("[TUMVIPlayer] Skipped malformed IMU line {}: invalid timestamp", line_num);
+                    log::debug!(
+                        "[TUMVIPlayer] Skipped malformed IMU line {}: invalid timestamp",
+                        line_num
+                    );
                 }
             } else {
                 log::debug!("[TUMVIPlayer] Skipped malformed IMU line {}: insufficient fields (expected 7+, got {})", line_num, parts.len());
