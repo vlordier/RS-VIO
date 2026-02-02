@@ -386,34 +386,54 @@ pub fn calculate_rpe(
     let mut translation_errors = Vec::new();
     let mut rotation_errors = Vec::new();
 
-    let poses_vec: Vec<_> = estimated.poses().collect();
-
-    for i in 0..poses_vec.len().saturating_sub(1) {
-        let (ts1, pose1) = poses_vec[i];
-        let (ts2, pose2) = poses_vec[i + 1];
+    let mut prev: Option<(&i64, &Matrix4x4)> = None;
+    for (ts2, pose2) in estimated.poses() {
+        let next = Some((ts2, pose2));
+        let (ts1, pose1) = match prev {
+            Some(p) => p,
+            None => {
+                prev = next;
+                continue;
+            }
+        };
 
         if ts2 - ts1 < delta_time_ns / 2 || ts2 - ts1 > delta_time_ns * 3 / 2 {
+            prev = next;
             continue; // Skip non-matching time deltas
         }
 
         // Get ground truth for both poses
         let gt1 = match ground_truth.get_closest_pose(*ts1, 50_000_000) {
             Some(p) => p,
-            None => continue,
+            None => {
+                prev = next;
+                continue;
+            }
         };
         let gt2 = match ground_truth.get_closest_pose(*ts2, 50_000_000) {
             Some(p) => p,
-            None => continue,
+            None => {
+                prev = next;
+                continue;
+            }
         };
 
         // Calculate relative poses
         let gt_relative = {
             let m1 = gt1.to_matrix();
             let m2 = gt2.to_matrix();
-            m2 * m1.try_inverse().unwrap_or(Matrix4x4::identity())
+            let Some(m1_inv) = m1.try_inverse() else {
+                prev = next;
+                continue;
+            };
+            m2 * m1_inv
         };
 
-        let est_relative = *pose2 * pose1.try_inverse().unwrap_or(Matrix4x4::identity());
+        let Some(pose1_inv) = pose1.try_inverse() else {
+            prev = next;
+            continue;
+        };
+        let est_relative = *pose2 * pose1_inv;
 
         // Extract translation error
         let trans_error = ((est_relative.m14 - gt_relative.m14).powi(2)
@@ -422,11 +442,17 @@ pub fn calculate_rpe(
         .sqrt();
         translation_errors.push(trans_error);
 
-        let rot_error_tf = est_relative * gt_relative.try_inverse().unwrap_or(Matrix4x4::identity());
+        let Some(gt_relative_inv) = gt_relative.try_inverse() else {
+            prev = next;
+            continue;
+        };
+        let rot_error_tf = est_relative * gt_relative_inv;
         let trace_rel = rot_error_tf.m11 + rot_error_tf.m22 + rot_error_tf.m33;
         let cos_angle = ((trace_rel - 1.0) / 2.0).clamp(-1.0, 1.0);
         let angle_error = cos_angle.acos();
         rotation_errors.push(angle_error);
+
+        prev = next;
     }
 
     let trans_rmse = if !translation_errors.is_empty() {
