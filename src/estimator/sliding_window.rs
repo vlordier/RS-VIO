@@ -167,35 +167,50 @@ impl SlidingWindow {
     pub fn build_optimization_problem(&self) -> (Problem, HashMap<String, (ManifoldType, DVector<f64>)>) {
         let mut problem = Problem::new();
 
-        // PART 1: Count observations (Parallel)
-        let (landmark_counts_left, landmark_counts_right) = self.keyframes.par_iter()
+        // PART 1: Count observations and find first observation frame (Parallel)
+        // Map: feature_id -> (left_count, right_count, first_frame_idx)
+        let landmark_stats = self.keyframes.par_iter().enumerate()
             .fold(
-                || (HashMap::new(), HashMap::new()),
-                |(mut acc_l, mut acc_r), frame| {
+                HashMap::new,
+                |mut acc: HashMap<usize, (usize, usize, usize)>, (frame_idx, frame)| {
                     for feat in &frame.left_features {
-                        *acc_l.entry(feat.feature_id).or_insert(0) += 1;
+                        let entry = acc.entry(feat.feature_id).or_insert((0, 0, usize::MAX));
+                        entry.0 += 1;
+                        if frame_idx < entry.2 { entry.2 = frame_idx; }
                     }
                     for feat in &frame.right_features {
-                        *acc_r.entry(feat.feature_id).or_insert(0) += 1;
+                        let entry = acc.entry(feat.feature_id).or_insert((0, 0, usize::MAX));
+                        entry.1 += 1;
+                        if frame_idx < entry.2 { entry.2 = frame_idx; }
                     }
-                    (acc_l, acc_r)
+                    acc
                 }
             )
             .reduce(
-                || (HashMap::new(), HashMap::new()),
-                |(mut l1, mut r1), (l2, r2)| {
-                    for (k, v) in l2 { *l1.entry(k).or_insert(0) += v; }
-                    for (k, v) in r2 { *r1.entry(k).or_insert(0) += v; }
-                    (l1, r1)
+                HashMap::new,
+                |mut map1, map2| {
+                    for (k, (l, r, f)) in map2 {
+                        let entry = map1.entry(k).or_insert((0, 0, usize::MAX));
+                        entry.0 += l;
+                        entry.1 += r;
+                        if f < entry.2 { entry.2 = f; }
+                    }
+                    map1
                 }
             );
+
+        // Pre-generate feature variable strings
+        // This avoids calling format!("LM_{}") thousands of times during building
+        let lm_string_cache: HashMap<usize, Arc<String>> = landmark_stats.keys()
+             .map(|&id| (id, Arc::new(format!("LM_{}", id))))
+             .collect();
 
         // Fetch transforms
         let first_frame = self.keyframes.front().expect("Keyframes should not be empty");
         #[allow(clippy::unwrap_used, clippy::expect_used)]
-        let T_Cl_B = first_frame.state.T_B_Cl.try_inverse().expect("T_B_Cl should be invertible");
+        let T_Cl_B = Arc::new(first_frame.state.T_B_Cl.try_inverse().expect("T_B_Cl should be invertible"));
         #[allow(clippy::unwrap_used, clippy::expect_used)]
-        let T_Cr_B = first_frame.state.T_B_Cr.try_inverse().expect("T_B_Cr should be invertible");
+        let T_Cr_B = Arc::new(first_frame.state.T_B_Cr.try_inverse().expect("T_B_Cr should be invertible"));
 
         // PART 2: Build Factors (Parallel)
         let results: Vec<_> = self.keyframes.par_iter().enumerate()
@@ -205,7 +220,8 @@ impl SlidingWindow {
 
                 // Use a tuple structure for residuals to avoid allocating Vec<String>
                 // (lm_var, Option<kf_var>, factor, loss)
-                let mut local_residuals: Vec<(String, Option<Arc<String>>, Box<BundleAdjustmentFactor>, Option<Box<dyn apex_solver::core::loss_functions::LossFunction + Send>>)> = Vec::with_capacity(300);
+                // Stores Arc<String> instead of String to avoid duplication
+                let mut local_residuals: Vec<(Arc<String>, Option<Arc<String>>, BundleAdjustmentFactor, Option<Box<dyn apex_solver::core::loss_functions::LossFunction + Send>>)> = Vec::with_capacity(300);
 
                 // Add KF pose
                 let kf_var = Arc::new(format!("KF_{}", id_frame));
@@ -220,73 +236,63 @@ impl SlidingWindow {
                 local_initials.push(((*kf_var).clone(), (ManifoldType::SE3, se3_data.cast::<f64>())));
 
                 let camera_features = [
-                    (&frame.left_features, T_Cl_B),
-                    (&frame.right_features, T_Cr_B),
+                    (&frame.left_features, T_Cl_B.clone()),
+                    (&frame.right_features, T_Cr_B.clone()),
                 ];
 
                 for (features, T_C_B) in camera_features.iter() {
                     for feat in features.iter() {
                         let feature_id = feat.feature_id;
                         
-                        let count_left = landmark_counts_left.get(&feature_id).copied().unwrap_or(0);
-                        let count_right = landmark_counts_right.get(&feature_id).copied().unwrap_or(0);
+                        // Use stats lookup
+                        if let Some((count_left, count_right, first_frame_idx)) = landmark_stats.get(&feature_id) {
+                            if *count_left > 0 && *count_right > 0 {
+                                // Retrieve cached string
+                                let lm_var_arc = lm_string_cache.get(&feature_id).expect("Cache sync error");
 
-                        if count_left > 0 && count_right > 0 {
-                            let lm_var = format!("LM_{}", feature_id);
+                                // Initial Value logic: Only if not already known AND this is the first responsible frame
+                                if !self.map_points.contains_key(&feature_id) && id_frame == *first_frame_idx {
+                                    let p_C = Vector3::new(
+                                        feat.undistorted_coord[0] as f64,
+                                        feat.undistorted_coord[1] as f64,
+                                        2.0_f64,
+                                    );
+                                    let (R_W_B, t_W_B) = (
+                                        frame.state.T_W_B.fixed_view::<3, 3>(0, 0).into_owned(),
+                                        frame.state.T_W_B.fixed_view::<3, 1>(0, 3).into_owned(),
+                                    );
+                                    let T_B_C = T_C_B.try_inverse().expect("T_C_B should be invertible");
+                                    let (R_B_C, t_B_C) = (
+                                        T_B_C.fixed_view::<3, 3>(0, 0).into_owned(),
+                                        T_B_C.fixed_view::<3, 1>(0, 3).into_owned(),
+                                    );
+                                    let p_W = R_W_B * (R_B_C * p_C + t_B_C) + t_W_B;
+                                    let data = DVector::from_vec(vec![p_W.x, p_W.y, p_W.z]);
+                                    local_initials.push(((**lm_var_arc).clone(), (ManifoldType::RN, data)));
+                                }
 
-                            // Initial Value logic
-                             let data = if let Some(&last_pos) = self.map_points.get(&feature_id) {
-                                DVector::from_vec(vec![
-                                    last_pos[0] as f64,
-                                    last_pos[1] as f64,
-                                    last_pos[2] as f64,
-                                ])
-                            } else {
-                                let p_C = Vector3::new(
-                                    feat.undistorted_coord[0] as f64,
-                                    feat.undistorted_coord[1] as f64,
-                                    2.0_f64,
+                                // Factor logic
+                                let mut factor = BundleAdjustmentFactor::new(
+                                    na::Vector2::new(feat.undistorted_coord[0], feat.undistorted_coord[1])
+                                        .cast::<f64>(),
+                                    (*T_C_B).clone(),
                                 );
-                                let (R_W_B, t_W_B) = (
-                                    frame.state.T_W_B.fixed_view::<3, 3>(0, 0).into_owned(),
-                                    frame.state.T_W_B.fixed_view::<3, 1>(0, 3).into_owned(),
-                                );
-                                let T_B_C = T_C_B.try_inverse().expect("T_C_B should be invertible");
-                                let (R_B_C, t_B_C) = (
-                                    T_B_C.fixed_view::<3, 3>(0, 0).into_owned(),
-                                    T_B_C.fixed_view::<3, 1>(0, 3).into_owned(),
-                                );
-                                let p_W = R_W_B * (R_B_C * p_C + t_B_C) + t_W_B;
-                                DVector::from_vec(vec![p_W.x, p_W.y, p_W.z])
-                            };
-                            local_initials.push((lm_var.clone(), (ManifoldType::RN, data)));
 
-                            // Factor logic
-                            let mut factor = BundleAdjustmentFactor::new(
-                                na::Vector2::new(feat.undistorted_coord[0], feat.undistorted_coord[1])
-                                    .cast::<f64>(),
-                                *T_C_B,
-                            );
+                                if id_frame == 0 {
+                                    let T_B_W_inv = frame.state.T_W_B.try_inverse().expect("T_W_B should be invertible");
+                                    factor = factor.with_fixed_pose(Arc::new(T_B_W_inv));
+                                }
 
-                            if id_frame == 0 {
-                                // For first frame, fix the pose
-                                // We need T_B_W (Body-from-World)
-                                // frame.state.T_W_B is World-from-Body
-                                let T_B_W_inv = frame.state.T_W_B.try_inverse().expect("T_W_B should be invertible");
-                                factor = factor.with_fixed_pose(T_B_W_inv);
+                                let kf_var_opt = if id_frame == 0 {
+                                    None
+                                } else {
+                                    Some(kf_var.clone())
+                                };
+                                
+                                let huber_loss = HuberLoss::new(2.0).ok();
+                                // Store Arc<String>
+                                local_residuals.push((lm_var_arc.clone(), kf_var_opt, factor, huber_loss.map(|l| Box::new(l) as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>)));
                             }
-
-                            // Use tuple based residual storage
-                            let kf_var_opt = if id_frame == 0 {
-                                None
-                            } else {
-                                Some(kf_var.clone())
-                            };
-                            
-                            // Huber loss
-                            let huber_loss = HuberLoss::new(2.0).ok();
-                            
-                            local_residuals.push((lm_var, kf_var_opt, Box::new(factor), huber_loss.map(|l| Box::new(l) as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>)));
                         }
                     }
                 }
@@ -297,7 +303,7 @@ impl SlidingWindow {
         // PART 3: Aggregate into Problem and Initial Values
         let (all_initials_maps, all_residuals_vecs): (Vec<_>, Vec<_>) = results.into_par_iter().unzip();
 
-        let initial_values = all_initials_maps.into_par_iter()
+        let mut initial_values = all_initials_maps.into_par_iter()
             .fold(
                 HashMap::new,
                 |mut acc, block_initials| {
@@ -317,12 +323,27 @@ impl SlidingWindow {
                 }
             );
 
+        // Add already known landmarks (avoid re-computing them in every frame)
+        // Use the cache to filter only ACTIVE landmarks
+        for (id, lm_var_arc) in &lm_string_cache {
+            if let Some(pos) = self.map_points.get(id) {
+                // Only add if not already present (new initial values take precedence if collision - but shouldn't happen due to if check above)
+                initial_values.entry((**lm_var_arc).clone()).or_insert_with(|| {
+                    (
+                        ManifoldType::RN,
+                        DVector::from_vec(vec![pos[0] as f64, pos[1] as f64, pos[2] as f64]),
+                    )
+                });
+            }
+        }
+
         for residuals in all_residuals_vecs {
             for (lm_var, kf_var_opt, factor, loss) in residuals {
                 if let Some(kf_val) = kf_var_opt {
-                    problem.add_residual_block(&[&lm_var, &*kf_val], factor, loss);
+                    // Pass &str to solver
+                    problem.add_residual_block(&[&lm_var, &*kf_val], Box::new(factor), loss);
                 } else {
-                    problem.add_residual_block(&[&lm_var], factor, loss);
+                    problem.add_residual_block(&[&lm_var], Box::new(factor), loss);
                 }
             }
         }
