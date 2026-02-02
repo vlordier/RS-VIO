@@ -479,3 +479,53 @@ impl TUMVIPlayer {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::datasets::test_utils::{sample_imu_data, timestamps, write_file};
+    use tempfile::tempdir;
+
+    #[test]
+    fn load_imu_data_missing_file_returns_empty() {
+        let dir = tempdir().expect("tempdir");
+        let dataset_path = dir.path().to_str().expect("path utf-8");
+
+        let imu_data = TUMVIPlayer::load_imu_data(dataset_path).expect("load imu data");
+        assert!(imu_data.is_empty());
+    }
+
+    #[test]
+    fn load_imu_data_skips_malformed_lines() {
+        let dir = tempdir().expect("tempdir");
+        let imu_path = dir.path().join("dso/imu.txt");
+
+        write_file(
+            &imu_path,
+            "timestamp w.x w.y w.z a.x a.y a.z\n\
+not_a_timestamp 0 0 0 0 0 0\n\
+1 0 0 0 0 0\n\
+2 0 0 0 0 0 bad\n\
+3 0.1 0.2 0.3 1.0 1.1 1.2\n",
+        );
+
+        let dataset_path = dir.path().to_str().expect("path utf-8");
+        let imu_data = TUMVIPlayer::load_imu_data(dataset_path).expect("load imu data");
+        assert_eq!(imu_data.len(), 1);
+        assert_eq!(imu_data[0].timestamp, 3);
+    }
+
+    #[test]
+    fn get_imu_data_between_frames_boundaries() {
+        let imu_data = sample_imu_data();
+
+        let between = TUMVIPlayer::get_imu_data_between_frames(2, 4, &imu_data);
+        assert_eq!(timestamps(&between), vec![3, 4]);
+
+        let between = TUMVIPlayer::get_imu_data_between_frames(0, 1, &imu_data);
+        assert_eq!(timestamps(&between), vec![1]);
+
+        let between = TUMVIPlayer::get_imu_data_between_frames(3, 3, &imu_data);
+        assert!(between.is_empty());
+    }
+}

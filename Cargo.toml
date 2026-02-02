@@ -75,6 +75,9 @@ tokio = { version = "1.35", features = ["rt-multi-thread", "sync", "time", "macr
 typed-arena = "2.0"
 wgpu = { version = "0.20", optional = true }  # Pinned to 0.20; upgrading requires handling wgpu breaking changes
 
+[dev-dependencies]
+tempfile = "3"
+
 # Metal GPU acceleration (macOS only) for fast GPU-accelerated workflows
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = { version = "0.4", optional = true }
