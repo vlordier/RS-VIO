@@ -1,6 +1,7 @@
 use image::{GenericImageView, GrayImage};
 use imageproc::corners::{corners_fast9, Corner};
 use nalgebra as na;
+use rayon::prelude::*;
 
 pub fn image_grad(grayscale_image: &GrayImage, x: f32, y: f32) -> na::SVector<f32, 3> {
     // inbound
@@ -138,19 +139,26 @@ pub fn detect_key_points(
         }
     }
 
+    let mut tasks = Vec::new();
     for x in (x_start..x_stop).step_by(grid_size as usize) {
         for y in (y_start..y_stop).step_by(grid_size as usize) {
             if grids[(
                 ((y - y_start) / grid_size) as usize,
                 ((x - x_start) / grid_size) as usize,
-            )] > 0
+            )] == 0
             {
-                continue;
+                tasks.push((x, y));
             }
+        }
+    }
 
+    let new_corners: Vec<Corner> = tasks
+        .par_iter()
+        .flat_map(|&(x, y)| {
             let image_view = image.view(x, y, grid_size, grid_size).to_image();
             let mut points_added = 0;
             let mut threshold: u8 = 40;
+            let mut cell_corners = Vec::new();
 
             while points_added < num_points_in_cell && threshold >= 10 {
                 let mut fast_corners = corners_fast9(&image_view, threshold);
@@ -165,13 +173,57 @@ pub fn detect_key_points(
                     point.x += x;
                     point.y += y;
                     if point_in_bound(&point, h, w, EDGE_THRESHOLD) {
-                        all_corners.push(point);
+                        cell_corners.push(point);
                         points_added += 1;
                     }
                 }
                 threshold -= 5;
             }
-        }
-    }
+            cell_corners
+        })
+        .collect();
+
+    all_corners.extend(new_corners);
     all_corners
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::ImageBuffer;
+    use std::time::Instant;
+
+    #[test]
+    fn benchmark_detect_key_points_performance() {
+        // Create a large synthetic image
+        let width = 1200;
+        let height = 800;
+        let mut image = ImageBuffer::new(width, height);
+
+        // Add some noise/features so FAST has something to do
+        for (x, y, pixel) in image.enumerate_pixels_mut() {
+            if (x % 20 == 0) && (y % 20 == 0) {
+                *pixel = image::Luma([255u8]);
+            } else {
+                let val = ((x ^ y) % 50) as u8;
+                *pixel = image::Luma([val]);
+            }
+        }
+
+        let grid_size = 30;
+        // Populate some grid cells
+        let mut current_corners = Vec::new();
+        for i in 0..100 {
+            current_corners.push(Corner::new(i * 10 % width, i * 10 % height, 10.0));
+        }
+
+        let num_points_in_cell = 5;
+
+        let start = Instant::now();
+        let _new_corners =
+            detect_key_points(&image, grid_size, &current_corners, num_points_in_cell);
+        let duration = start.elapsed();
+
+        println!("detect_key_points runtime: {:?}", duration);
+    }
 }
