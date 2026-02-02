@@ -122,8 +122,11 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
         frame: &mut crate::estimator::Frame,
     ) {
         // build current image pyramid
-        let current_image_pyramid0: Vec<GrayImage> = build_image_pyramid(greyscale_image0, LEVELS);
-        let current_image_pyramid1: Vec<GrayImage> = build_image_pyramid(greyscale_image1, LEVELS);
+        // Parallelize pyramid construction
+        let (current_image_pyramid0, current_image_pyramid1) = rayon::join(
+            || build_image_pyramid(greyscale_image0, LEVELS),
+            || build_image_pyramid(greyscale_image1, LEVELS)
+        );
 
         // not initialized
         if !self.previous_image_pyramid0.is_empty() {
@@ -132,20 +135,34 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
                 self.tracked_points_map_cam0.len()
             );
             // track prev points
-            self.tracked_points_map_cam0 = track_points::<LEVELS>(
-                &self.previous_image_pyramid0,
-                &current_image_pyramid0,
-                &self.tracked_points_map_cam0,
-                self.optical_flow_max_iterations,
-                self.optical_flow_convergence_threshold,
+            // Parallelize temporal tracking (Left and Right cameras independently)
+            let prev_pyr0 = &self.previous_image_pyramid0;
+            let prev_pyr1 = &self.previous_image_pyramid1;
+            let map0 = &self.tracked_points_map_cam0;
+            let map1 = &self.tracked_points_map_cam1;
+            let max_iters = self.optical_flow_max_iterations;
+            let threshold = self.optical_flow_convergence_threshold;
+
+            let (new_map0, new_map1) = rayon::join(
+                || track_points::<LEVELS>(
+                    prev_pyr0,
+                    &current_image_pyramid0,
+                    map0,
+                    max_iters,
+                    threshold,
+                ),
+                || track_points::<LEVELS>(
+                    prev_pyr1,
+                    &current_image_pyramid1,
+                    map1,
+                    max_iters,
+                    threshold,
+                )
             );
-            self.tracked_points_map_cam1 = track_points::<LEVELS>(
-                &self.previous_image_pyramid1,
-                &current_image_pyramid1,
-                &self.tracked_points_map_cam1,
-                self.optical_flow_max_iterations,
-                self.optical_flow_convergence_threshold,
-            );
+
+            self.tracked_points_map_cam0 = new_map0;
+            self.tracked_points_map_cam1 = new_map1;
+
             log::debug!(
                 "[FeatureTracker] Number of tracked old points in cam0: {}",
                 self.tracked_points_map_cam0.len()
