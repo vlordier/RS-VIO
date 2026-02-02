@@ -1,5 +1,6 @@
 pub mod datasets;
 pub mod estimator;
+pub mod evaluation;
 pub mod feature_tracker;
 pub mod optimization;
 pub mod types;
@@ -11,3 +12,7 @@ pub use datasets::euroc_player::EurocPlayer;
 pub use datasets::fourseasons_player::FourSeasonsPlayer;
 pub use datasets::tum_vi_player::TUMVIPlayer;
 pub use datasets::{PlayerConfig, PlayerResult};
+pub use evaluation::{
+    calculate_ate, calculate_rpe, EstimatedTrajectory, GroundTruthPose, GroundTruthTrajectory,
+    TrajectoryEvaluation,
+};
