@@ -419,8 +419,11 @@ impl Factor for BundleAdjustmentFactor {
                 // where T_B_W SE3 tangent = [t; ω] (3 translation + 3 rotation)
 
                 // Compute rotation jacobian: ∂r/∂ω = jac_proj * R_C_B * (-R_B_W * [p_W]×)
+                // We use the identity: R * [v]x = [R*v]x * R.
+                // Thus R * [v]x * R^T = [R*v]x. => R * [v]x = [R*v]x * R.
+                // So -jac_proj * R_C_B * R_B_W * [p_W]x = -jac_r_wrt_p_W * [p_W]x
                 let p_W_skew = skew_symmetric(&p_W);
-                let jac_r_wrt_rot = jac_proj_R_C_B * (-&R_B_W * p_W_skew); // 2x3
+                let jac_r_wrt_rot = -(&jac_r_wrt_p_W * p_W_skew); // 2x3
 
                 // Translation jacobian: ∂r/∂t = jac_proj * R_C_B * R_B_W (same as ∂r/∂p_W)
                 // Concatenate: [∂r/∂p_W (2x3) | ∂r/∂t (2x3) | ∂r/∂ω (2x3)] = [2x3 | 2x6]
