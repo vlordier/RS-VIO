@@ -4,6 +4,7 @@
 /// trajectory evaluation metrics (ATE, RPE) for comparing VIO vs SLAM.
 use crate::types::{Matrix4x4, Vector3};
 use nalgebra as na;
+use rayon::prelude::*;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fs::File;
@@ -310,40 +311,50 @@ pub fn calculate_ate(
     ground_truth: &GroundTruthTrajectory,
     estimated: &EstimatedTrajectory,
 ) -> TrajectoryEvaluation {
-    let mut errors = Vec::new();
-    let mut failed_matches = 0;
+    // Collect estimated poses into a vector for parallel iteration
+    let estimated_poses: Vec<_> = estimated.poses().collect();
 
-    for (ts, pose) in estimated.poses() {
-        // 50ms tolerance aligns with typical TUM-VI timestamp jitter.
-        let gt_pose = match ground_truth.get_closest_pose(*ts, 50_000_000) {
-            Some(p) => p,
-            None => {
-                failed_matches += 1;
-                continue;
+    let (errors, failed_matches) = estimated_poses
+        .par_iter()
+        .fold(
+            || (Vec::new(), 0),
+            |(mut errs, mut fails), (ts, pose)| {
+                // 50ms tolerance aligns with typical TUM-VI timestamp jitter.
+                if let Some(gt_pose) = ground_truth.get_closest_pose(**ts, 50_000_000) {
+                    // Extract position from both poses
+                    let est_pos = Vector3::new(pose.m14, pose.m24, pose.m34);
+                    let gt_pos = gt_pose.position;
+
+                    // Calculate error
+                    let error = ((est_pos.x - gt_pos.x).powi(2)
+                        + (est_pos.y - gt_pos.y).powi(2)
+                        + (est_pos.z - gt_pos.z).powi(2))
+                    .sqrt();
+
+                    errs.push(error);
+                } else {
+                    fails += 1;
+                }
+                (errs, fails)
             },
-        };
-
-        // Extract position from both poses
-        let est_pos = Vector3::new(pose.m14, pose.m24, pose.m34);
-        let gt_pos = gt_pose.position;
-
-        // Calculate error
-        let error = ((est_pos.x - gt_pos.x).powi(2)
-            + (est_pos.y - gt_pos.y).powi(2)
-            + (est_pos.z - gt_pos.z).powi(2))
-        .sqrt();
-
-        errors.push(error);
-    }
+        )
+        .reduce(
+            || (Vec::new(), 0),
+            |(mut errs1, fails1), (errs2, fails2)| {
+                errs1.extend(errs2);
+                (errs1, fails1 + fails2)
+            },
+        );
 
     // Calculate statistics
     let (rmse, mean, median, min, max, std) = if !errors.is_empty() {
         let n = errors.len() as f64;
-        let sum: f64 = errors.iter().sum();
+        let sum: f64 = errors.par_iter().sum();
         let mean = sum / n;
-        let rmse = (errors.iter().map(|e| e * e).sum::<f64>() / n).sqrt();
+        let rmse = (errors.par_iter().map(|e| e * e).sum::<f64>() / n).sqrt();
 
         let mut sorted = errors.clone();
+        #[allow(clippy::unwrap_used)]
         sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
         let median = if sorted.len() % 2 == 0 {
             (sorted[sorted.len() / 2 - 1] + sorted[sorted.len() / 2]) / 2.0
@@ -354,7 +365,7 @@ pub fn calculate_ate(
         let min = sorted.first().copied().unwrap_or(0.0);
         let max = sorted.last().copied().unwrap_or(0.0);
 
-        let variance: f64 = errors.iter().map(|e| (e - mean).powi(2)).sum::<f64>() / n;
+        let variance: f64 = errors.par_iter().map(|e| (e - mean).powi(2)).sum::<f64>() / n;
         let std = variance.sqrt();
 
         (rmse, mean, median, min, max, std)
@@ -383,88 +394,64 @@ pub fn calculate_rpe(
     estimated: &EstimatedTrajectory,
     delta_time_ns: i64,
 ) -> (f64, f64) {
-    let mut translation_errors = Vec::new();
-    let mut rotation_errors = Vec::new();
+    let estimated_poses: Vec<_> = estimated.poses().collect();
 
-    let mut prev: Option<(&i64, &Matrix4x4)> = None;
-    for (ts2, pose2) in estimated.poses() {
-        let next = Some((ts2, pose2));
-        let (ts1, pose1) = match prev {
-            Some(p) => p,
-            None => {
-                prev = next;
-                continue;
-            },
-        };
+    let (translation_errors, rotation_errors): (Vec<f64>, Vec<f64>) = estimated_poses
+        .par_windows(2)
+        .filter_map(|window| {
+            let (ts1, pose1) = window[0];
+            let (ts2, pose2) = window[1];
 
-        if ts2 - ts1 < delta_time_ns / 2 || ts2 - ts1 > delta_time_ns * 3 / 2 {
-            prev = next;
-            continue; // Skip non-matching time deltas
-        }
+            if *ts2 - *ts1 < delta_time_ns / 2 || *ts2 - *ts1 > delta_time_ns * 3 / 2 {
+                return None; // Skip non-matching time deltas
+            }
 
-        // Get ground truth for both poses
-        let gt1 = match ground_truth.get_closest_pose(*ts1, 50_000_000) {
-            Some(p) => p,
-            None => {
-                prev = next;
-                continue;
-            },
-        };
-        let gt2 = match ground_truth.get_closest_pose(*ts2, 50_000_000) {
-            Some(p) => p,
-            None => {
-                prev = next;
-                continue;
-            },
-        };
+            // Get ground truth for both poses
+            let gt1 = ground_truth.get_closest_pose(*ts1, 50_000_000)?;
+            let gt2 = ground_truth.get_closest_pose(*ts2, 50_000_000)?;
 
-        // Calculate relative poses
-        let gt_relative = {
-            let m1 = gt1.to_matrix();
-            let m2 = gt2.to_matrix();
-            let Some(m1_inv) = m1.try_inverse() else {
-                prev = next;
-                continue;
+            // Calculate relative poses
+            let gt_relative = {
+                let m1 = gt1.to_matrix();
+                let m2 = gt2.to_matrix();
+                let m1_inv = m1.try_inverse()?;
+                m2 * m1_inv
             };
-            m2 * m1_inv
-        };
 
-        let Some(pose1_inv) = pose1.try_inverse() else {
-            prev = next;
-            continue;
-        };
-        let est_relative = *pose2 * pose1_inv;
+            let pose1_inv = pose1.try_inverse()?;
+            let est_relative = *pose2 * pose1_inv;
 
-        // Extract translation error
-        let trans_error = ((est_relative.m14 - gt_relative.m14).powi(2)
-            + (est_relative.m24 - gt_relative.m24).powi(2)
-            + (est_relative.m34 - gt_relative.m34).powi(2))
-        .sqrt();
-        translation_errors.push(trans_error);
+            // Extract translation error
+            let trans_error = ((est_relative.m14 - gt_relative.m14).powi(2)
+                + (est_relative.m24 - gt_relative.m24).powi(2)
+                + (est_relative.m34 - gt_relative.m34).powi(2))
+            .sqrt();
 
-        let Some(gt_relative_inv) = gt_relative.try_inverse() else {
-            prev = next;
-            continue;
-        };
-        let rot_error_tf = est_relative * gt_relative_inv;
-        let trace_rel = rot_error_tf.m11 + rot_error_tf.m22 + rot_error_tf.m33;
-        let cos_angle = ((trace_rel - 1.0) / 2.0).clamp(-1.0, 1.0);
-        let angle_error = cos_angle.acos();
-        rotation_errors.push(angle_error);
+            let gt_relative_inv = gt_relative.try_inverse()?;
+            let rot_error_tf = est_relative * gt_relative_inv;
+            let trace_rel = rot_error_tf.m11 + rot_error_tf.m22 + rot_error_tf.m33;
+            let cos_angle = ((trace_rel - 1.0) / 2.0).clamp(-1.0, 1.0);
+            let angle_error = cos_angle.acos();
 
-        prev = next;
-    }
+            Some((trans_error, angle_error))
+        })
+        .unzip();
 
     let trans_rmse = if !translation_errors.is_empty() {
         let n = translation_errors.len() as f64;
-        (translation_errors.iter().map(|e| e * e).sum::<f64>() / n).sqrt()
+        (translation_errors
+            .par_iter()
+            .map(|e: &f64| e * e)
+            .sum::<f64>()
+            / n)
+            .sqrt()
     } else {
         0.0
     };
 
     let rot_rmse = if !rotation_errors.is_empty() {
         let n = rotation_errors.len() as f64;
-        (rotation_errors.iter().map(|e| e * e).sum::<f64>() / n).sqrt()
+        (rotation_errors.par_iter().map(|e: &f64| e * e).sum::<f64>() / n).sqrt()
     } else {
         0.0
     };
@@ -756,5 +743,75 @@ mod tests {
         let (trans_rmse, rot_rmse) = calculate_rpe(&gt, &est, 10_000_000);
         assert!(trans_rmse.abs() < 1e-12);
         assert!(rot_rmse.abs() < 1e-12);
+    }
+}
+
+#[cfg(test)]
+mod benchmarks {
+    use super::*;
+    use std::time::Instant;
+
+    #[test]
+    fn benchmark_ate_calculation() {
+        let num_poses = 20_000;
+        let mut gt = GroundTruthTrajectory::new("bench_gt");
+        let mut est = EstimatedTrajectory::new("bench_est");
+
+        for i in 0..num_poses {
+            let ts = i as i64 * 10_000_000;
+            let t = i as f64 * 0.01;
+
+            // Ground Truth
+            let gt_pose = GroundTruthPose {
+                timestamp_ns: ts,
+                position: Vector3::new(t, t.sin(), t.cos()),
+                quaternion: na::UnitQuaternion::identity(),
+            };
+            gt.poses.insert(ts, gt_pose);
+
+            // Estimated (with some error)
+            let mut matrix = Matrix4x4::identity();
+            matrix[(0, 3)] = t + 0.1;
+            matrix[(1, 3)] = t.sin() + 0.05;
+            matrix[(2, 3)] = t.cos() - 0.05;
+            est.add_pose(ts, matrix);
+        }
+
+        let start = Instant::now();
+        let _result = calculate_ate(&gt, &est);
+        let duration = start.elapsed();
+
+        println!("calculate_ate ({} poses): {:?}", num_poses, duration);
+    }
+
+    #[test]
+    fn benchmark_rpe_calculation() {
+        let num_poses = 50_000; // Increase to 50k
+        let mut gt = GroundTruthTrajectory::new("bench_gt");
+        let mut est = EstimatedTrajectory::new("bench_est");
+
+        for i in 0..num_poses {
+            let ts = i as i64 * 10_000_000;
+            let t = i as f64 * 0.01;
+
+            let gt_pose = GroundTruthPose {
+                timestamp_ns: ts,
+                position: Vector3::new(t, 0.0, 0.0),
+                quaternion: na::UnitQuaternion::from_euler_angles(0.0, 0.0, (0.01 * t) as f32),
+            };
+            gt.poses.insert(ts, gt_pose);
+
+            let rot = na::UnitQuaternion::from_euler_angles(0.0, 0.0, 0.01 * t + 0.01);
+            let trans = na::Translation3::new(t + 0.1, 0.0, 0.0);
+            let iso = na::Isometry3::from_parts(trans, rot);
+            est.add_pose(ts, iso.to_homogeneous());
+        }
+
+        let delta = 10_000_000; // 10ms (matching generation step)
+        let start = Instant::now();
+        let _result = calculate_rpe(&gt, &est, delta);
+        let duration = start.elapsed();
+
+        println!("calculate_rpe ({} poses): {:?}", num_poses, duration);
     }
 }

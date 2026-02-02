@@ -215,7 +215,7 @@ mod tests {
         let num_points_in_cell = 2;
 
         let corners1 = detect_key_points(&image, grid_size, &current_corners, num_points_in_cell);
-        
+
         let corners2 = detect_key_points(&image, grid_size, &current_corners, num_points_in_cell);
 
         assert_eq!(corners1.len(), corners2.len());
@@ -225,13 +225,13 @@ mod tests {
         let mut sorted2 = corners2.clone();
         sorted1.sort_by(|a, b| (a.x, a.y).cmp(&(b.x, b.y)));
         sorted2.sort_by(|a, b| (a.x, a.y).cmp(&(b.x, b.y)));
-        
+
         // Assert equality by checking x,y coords
         for (c1, c2) in sorted1.iter().zip(sorted2.iter()) {
             assert_eq!(c1.x, c2.x);
             assert_eq!(c1.y, c2.y);
         }
-        
+
         // Also ensure we actually found something
         assert!(!corners1.is_empty(), "Should have found corners in synthetic image");
     }
@@ -243,8 +243,8 @@ mod tests {
         let height = 60;
         let mut image = ImageBuffer::new(width, height);
         // Make entire image high contrast so corners exist everywhere
-        for (x, y, pixel) in image.enumerate_pixels_mut() {
-             *pixel = image::Luma([(x % 2 * 255) as u8]);
+        for (x, _y, pixel) in image.enumerate_pixels_mut() {
+            *pixel = image::Luma([(x % 2 * 255) as u8]);
         }
 
         let grid_size = 30;
@@ -252,7 +252,7 @@ mod tests {
         // The logic checks if *any* corner exists in the grid cell
         let x_start = (width % grid_size) / 2;
         let y_start = (height % grid_size) / 2;
-        
+
         let center_x = x_start + grid_size / 2;
         let center_y = y_start + grid_size / 2;
 
@@ -263,7 +263,7 @@ mod tests {
 
         // Should NOT find corners in the top-left cell because it had a corner
         // But might find in others (top-right, bottom-left, bottom-right)
-        
+
         for c in new_corners {
             let cx = (c.x - x_start) / grid_size;
             let cy = (c.y - y_start) / grid_size;
