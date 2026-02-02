@@ -18,6 +18,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
 from download_datasets import DatasetDownloader
+from dataset_utils import extract_tar_gz, extract_zip
 
 
 class TestDatasetDownloaderInit(unittest.TestCase):
@@ -143,13 +144,12 @@ class TestDatasetDownloaderExtraction(unittest.TestCase):
             with zipfile.ZipFile(zip_file, "w") as zf:
                 zf.writestr("test.txt", "test content")
 
-            downloader = DatasetDownloader(tmppath)
-            result = downloader.extract_zip(zip_file, extract_dir)
+            result = extract_zip(zip_file, extract_dir)
 
             self.assertTrue(result)
             self.assertTrue((extract_dir / "test.txt").exists())
 
-    @patch("subprocess.run")
+    @patch("dataset_utils.subprocess.run")
     def test_extract_tar_gz(self, mock_run):
         """Test tar.gz extraction."""
         mock_run.return_value = None
@@ -162,8 +162,7 @@ class TestDatasetDownloaderExtraction(unittest.TestCase):
             # Create dummy archive file
             archive.touch()
 
-            downloader = DatasetDownloader(tmppath)
-            result = downloader.extract_tar_gz(archive, extract_dir)
+            result = extract_tar_gz(archive, extract_dir)
 
             self.assertTrue(result)
             mock_run.assert_called_once()
@@ -185,7 +184,7 @@ class TestDatasetDownloaderEuROC(unittest.TestCase):
             with patch("download_datasets.DATASETS", {
                 "euroc": {"name": "EuRoC", "url": "http://example.com", "local_path": str(manual_file)}
             }):
-                with patch.object(downloader, "extract_zip", return_value=True):
+                with patch("download_datasets.extract_zip", return_value=True):
                     result = downloader.download_euroc()
 
             self.assertTrue(result)
@@ -209,7 +208,7 @@ class TestDatasetDownloaderTUM(unittest.TestCase):
     """Test TUM-VI dataset download."""
 
     @patch("pathlib.Path.unlink")
-    @patch.object(DatasetDownloader, "extract_tar", return_value=True)
+    @patch("download_datasets.extract_tar", return_value=True)
     @patch.object(DatasetDownloader, "download_file", return_value=True)
     def test_tum_download_success(self, mock_download, mock_extract, mock_unlink):
         """Test successful TUM download."""

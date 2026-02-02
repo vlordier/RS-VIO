@@ -20,6 +20,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
 from setup_datasets import DatasetSetup
+from dataset_utils import extract_tar_gz, extract_zip
 
 
 class TestDatasetSetupInit(unittest.TestCase):
@@ -168,13 +169,12 @@ class TestDatasetSetupExtraction(unittest.TestCase):
             with zipfile.ZipFile(zip_file, "w") as zf:
                 zf.writestr("file.txt", "content")
 
-            setup = DatasetSetup(tmppath / "datasets")
-            result = setup.extract_zip(zip_file, extract_dir)
+            result = extract_zip(zip_file, extract_dir)
 
             self.assertTrue(result)
             self.assertTrue((extract_dir / "file.txt").exists())
 
-    @patch("subprocess.run")
+    @patch("dataset_utils.subprocess.run")
     def test_extract_tar_gz(self, mock_run):
         """Test tar.gz extraction."""
         mock_run.return_value = None
@@ -186,8 +186,7 @@ class TestDatasetSetupExtraction(unittest.TestCase):
 
             archive.touch()
 
-            setup = DatasetSetup(tmppath / "datasets")
-            result = setup.extract_tar_gz(archive, extract_dir)
+            result = extract_tar_gz(archive, extract_dir)
 
             self.assertTrue(result)
             mock_run.assert_called_once()
