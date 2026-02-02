@@ -156,28 +156,26 @@ pub fn detect_key_points(
         .par_iter()
         .flat_map(|&(x, y)| {
             let image_view = image.view(x, y, grid_size, grid_size).to_image();
-            let mut points_added = 0;
-            let mut threshold: u8 = 40;
+            
+            // Optimization: Run FAST once with minimum threshold (10) instead of iterative loop.
+            // This yields a super-set of corners. We then sort by score and take the best ones.
+            // This avoids re-scanning the image pixels multiple times in low-contrast observations.
+            let mut fast_corners = corners_fast9(&image_view, 10);
+            
+            #[allow(clippy::unwrap_used)]
+            // Sort Descending (Best score first). Original code was Ascending (Bug?), fixed here.
+            fast_corners.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+
             let mut cell_corners = Vec::new();
-
-            while points_added < num_points_in_cell && threshold >= 10 {
-                let mut fast_corners = corners_fast9(&image_view, threshold);
-                #[allow(clippy::unwrap_used)]
-                // f32::partial_cmp returns None only for NaN, FAST scores are always valid
-                fast_corners.sort_by(|a, b| a.score.partial_cmp(&b.score).unwrap());
-
-                for mut point in fast_corners {
-                    if points_added >= num_points_in_cell {
-                        break;
-                    }
-                    point.x += x;
-                    point.y += y;
-                    if point_in_bound(&point, h, w, EDGE_THRESHOLD) {
-                        cell_corners.push(point);
-                        points_added += 1;
-                    }
+            for mut point in fast_corners {
+                if cell_corners.len() as u32 >= num_points_in_cell {
+                    break;
                 }
-                threshold -= 5;
+                point.x += x;
+                point.y += y;
+                if point_in_bound(&point, h, w, EDGE_THRESHOLD) {
+                    cell_corners.push(point);
+                }
             }
             cell_corners
         })
