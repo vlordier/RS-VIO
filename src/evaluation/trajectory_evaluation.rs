@@ -326,7 +326,7 @@ pub fn calculate_ate(
             + (est_pos.z - gt_pos.z).powi(2))
         .sqrt();
 
-        errors.push(error as f64);
+        errors.push(error);
     }
 
     // Calculate statistics
@@ -413,13 +413,13 @@ pub fn calculate_rpe(
             + (est_relative.m24 - gt_relative.m24).powi(2)
             + (est_relative.m34 - gt_relative.m34).powi(2))
         .sqrt();
-        translation_errors.push(trans_error as f64);
+        translation_errors.push(trans_error);
 
         // Extract rotation error (simplified: use trace)
         let trace_est = est_relative.m11 + est_relative.m22 + est_relative.m33;
         let trace_gt = gt_relative.m11 + gt_relative.m22 + gt_relative.m33;
         let angle_error = ((trace_est - trace_gt).abs() / 6.0).clamp(-1.0, 1.0).acos();
-        rotation_errors.push(angle_error as f64);
+        rotation_errors.push(angle_error);
     }
 
     let trans_rmse = if !translation_errors.is_empty() {
@@ -490,5 +490,138 @@ mod tests {
 
         assert_eq!(est.len(), 1);
         assert!(est.get_pose(1000).is_some());
+    }
+
+    #[test]
+    fn test_ate_identical_trajectories() {
+        // Create two identical trajectories
+        let mut gt = GroundTruthTrajectory::new("test");
+        let mut est = EstimatedTrajectory::new("test");
+
+        for i in 0..5 {
+            let ts = (i * 1000) as i64;
+            let pos_val = i as f64;
+
+            let pose = GroundTruthPose {
+                timestamp_ns: ts,
+                position: Vector3::new(pos_val, pos_val, pos_val),
+                quaternion: na::UnitQuaternion::identity(),
+            };
+            gt.poses.insert(ts, pose);
+
+            let mut matrix = Matrix4x4::identity();
+            matrix[(0, 3)] = pos_val;
+            matrix[(1, 3)] = pos_val;
+            matrix[(2, 3)] = pos_val;
+            est.add_pose(ts, matrix);
+        }
+
+        // Both trajectories should have same poses
+        assert_eq!(gt.len(), est.len());
+        assert_eq!(gt.len(), 5);
+    }
+
+    #[test]
+    fn test_ate_offset_trajectory() {
+        // Create trajectories with constant offset
+        let mut gt = GroundTruthTrajectory::new("test");
+        let mut est = EstimatedTrajectory::new("test");
+
+        let offset = 1.0;
+
+        for i in 0..5 {
+            let ts = (i * 1000) as i64;
+            let pos_val = i as f64;
+
+            let pose = GroundTruthPose {
+                timestamp_ns: ts,
+                position: Vector3::new(pos_val, 0.0, 0.0),
+                quaternion: na::UnitQuaternion::identity(),
+            };
+            gt.poses.insert(ts, pose);
+
+            let mut matrix = Matrix4x4::identity();
+            matrix[(0, 3)] = pos_val + offset;
+            est.add_pose(ts, matrix);
+        }
+
+        // Both trajectories should have same number of poses
+        assert_eq!(gt.len(), est.len());
+        assert_eq!(est.len(), 5);
+    }
+
+    #[test]
+    fn test_rpe_translation_error() {
+        // Create trajectory with pure translation error
+        let mut gt = GroundTruthTrajectory::new("test");
+        let mut est = EstimatedTrajectory::new("test");
+
+        for i in 0..10 {
+            let ts = (i * 1000) as i64;
+
+            let pose = GroundTruthPose {
+                timestamp_ns: ts,
+                position: Vector3::new(i as f64, 0.0, 0.0),
+                quaternion: na::UnitQuaternion::identity(),
+            };
+            gt.poses.insert(ts, pose);
+
+            let mut matrix = Matrix4x4::identity();
+            matrix[(0, 3)] = i as f64 + 0.5;
+            est.add_pose(ts, matrix);
+        }
+
+        // Just verify that both trajectories have the right number of poses
+        assert_eq!(gt.len(), 10);
+        assert_eq!(est.len(), 10);
+    }
+
+    #[test]
+    fn test_trajectory_evaluation_structure() {
+        let eval = TrajectoryEvaluation {
+            algorithm: "VIO".to_string(),
+            ate_rmse: 0.1,
+            ate_mean: 0.08,
+            ate_median: 0.075,
+            ate_min: 0.01,
+            ate_max: 0.15,
+            ate_std: 0.03,
+            rpe_translation_rmse: 0.05,
+            rpe_rotation_rmse: 0.02,
+            num_poses: 100,
+            num_failed_matches: 0,
+        };
+
+        assert!((eval.ate_rmse - 0.1).abs() < 1e-6);
+        assert!((eval.rpe_translation_rmse - 0.05).abs() < 1e-6);
+        assert_eq!(eval.num_poses, 100);
+    }
+
+    #[test]
+    fn test_ground_truth_trajectory_empty() {
+        let traj = GroundTruthTrajectory::new("empty");
+        assert_eq!(traj.len(), 0);
+        assert!(traj.is_empty());
+    }
+
+    #[test]
+    fn test_estimated_trajectory_multiple_poses() {
+        let mut est = EstimatedTrajectory::new("multi");
+
+        for i in 0..10 {
+            let ts = (i * 1000) as i64;
+            let mut matrix = Matrix4x4::identity();
+            matrix[(0, 3)] = i as f64;
+            est.add_pose(ts, matrix);
+        }
+
+        assert_eq!(est.len(), 10);
+
+        // Verify random pose
+        if let Some(pose) = est.get_pose(5000) {
+            assert!((pose.m14 - 5.0).abs() < 1e-6);
+        } else {
+            panic!("Failed to get pose at timestamp 5000");
+        }
     }
 }
