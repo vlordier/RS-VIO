@@ -125,6 +125,7 @@
 //! - **Initialization**: Static period bias estimation
 
 pub mod bias_feedback_tests;
+pub mod batch_processing;
 pub mod buffer;
 pub mod eskf;
 pub mod initialization;

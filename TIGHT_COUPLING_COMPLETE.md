@@ -1,7 +1,7 @@
 # Tight Visual-Inertial Coupling - Implementation Complete ✅
 
-**Status**: COMPLETE - All phases implemented and tested  
-**Last Updated**: February 3, 2026  
+**Status**: COMPLETE - All phases implemented and tested
+**Last Updated**: February 3, 2026
 **Test Results**: 94/94 tests passing
 
 ---
@@ -61,7 +61,7 @@
 - ✅ ImuFactorSe3 created between consecutive keyframes
 - ✅ Factors added to BA objective
 
-**Code**: 
+**Code**:
 - src/estimator/frame.rs (Frame structure with IMU field)
 - src/estimator/estimator.rs lines 493-495 (capture at keyframe)
 - src/estimator/sliding_window.rs lines 374-390 (factor creation)
@@ -168,7 +168,7 @@ All issues from IMU_IMPLEMENTATION_ISSUES.md resolved:
 ```
 Total IMU system:       2,046 lines
 ├─ Core implementations: 1,340 lines
-├─ Tests:                 467 lines  
+├─ Tests:                 467 lines
 ├─ Documentation:         239 lines
 
 Test coverage:

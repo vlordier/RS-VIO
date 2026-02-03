@@ -1,6 +1,6 @@
 # IMU Implementation - Documentation Index
 
-**Status**: Complete and production-ready  
+**Status**: Complete and production-ready
 **Last Updated**: February 3, 2026
 
 ---

@@ -97,7 +97,7 @@ pub struct PreintegratedImu {
     pub linearization_point_ba: na::Vector3<f64>,
 
     /// Noise parameters
-    noise: ImuNoise,
+    pub noise: ImuNoise,
 }
 
 impl PreintegratedImu {
@@ -307,7 +307,7 @@ pub fn exp_map_so3(omega: na::Vector3<f64>) -> na::UnitQuaternion<f64> {
 /// Right Jacobian of SO(3)
 ///
 /// Jr(ω) = I - (1-cos(θ))/θ² [ω]_× + (θ-sin(θ))/θ³ [ω]_×²
-fn right_jacobian_so3(omega: na::Vector3<f64>) -> na::Matrix3<f64> {
+pub fn right_jacobian_so3(omega: na::Vector3<f64>) -> na::Matrix3<f64> {
     let theta = omega.norm();
 
     if theta < 1e-8 {
@@ -326,7 +326,7 @@ fn right_jacobian_so3(omega: na::Vector3<f64>) -> na::Matrix3<f64> {
 }
 
 /// Skew-symmetric matrix from vector: [v]_×
-fn skew_symmetric(v: na::Vector3<f64>) -> na::Matrix3<f64> {
+pub fn skew_symmetric(v: na::Vector3<f64>) -> na::Matrix3<f64> {
     na::Matrix3::new(0.0, -v.z, v.y, v.z, 0.0, -v.x, -v.y, v.x, 0.0)
 }
 
