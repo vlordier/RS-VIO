@@ -8,6 +8,7 @@
 use crate::estimator::Frame;
 use crate::imu::ImuMotionPrior;
 use crate::optimization::factors::{BundleAdjustmentFactor, ImuPriorFactor, PnPFactor};
+use crate::optimization::imu_factor::ImuFactorSe3;
 use crate::types::{Matrix3x3, Matrix4x4, Vector3};
 use apex_solver::core::loss_functions::HuberLoss;
 use apex_solver::core::problem::{Problem, VariableEnum};
@@ -236,6 +237,14 @@ impl SlidingWindow {
                 ]);
                 local_initials.push(((*kf_var).clone(), (ManifoldType::SE3, se3_data.cast::<f64>())));
 
+                let velocity = frame.state.velocity;
+                let velocity_data = DVector::from_vec(vec![
+                    velocity[0] as f64,
+                    velocity[1] as f64,
+                    velocity[2] as f64,
+                ]);
+                local_initials.push((format!("KF_V_{}", id_frame), (ManifoldType::RN, velocity_data)));
+
                 let camera_features = [
                     (&frame.left_features, T_Cl_B.clone()),
                     (&frame.right_features, T_Cr_B.clone()),
@@ -324,6 +333,19 @@ impl SlidingWindow {
                 }
             );
 
+        if let Some(last_frame) = self.keyframes.back() {
+            let bg = last_frame.state.gyro_bias;
+            let ba = last_frame.state.accel_bias;
+            initial_values.entry("IMU_BG".to_string()).or_insert((
+                ManifoldType::RN,
+                DVector::from_vec(vec![bg[0] as f64, bg[1] as f64, bg[2] as f64]),
+            ));
+            initial_values.entry("IMU_BA".to_string()).or_insert((
+                ManifoldType::RN,
+                DVector::from_vec(vec![ba[0] as f64, ba[1] as f64, ba[2] as f64]),
+            ));
+        }
+
         // Add already known landmarks (avoid re-computing them in every frame)
         // Use the cache to filter only ACTIVE landmarks
         for (id, lm_var_arc) in &lm_string_cache {
@@ -346,6 +368,27 @@ impl SlidingWindow {
                 } else {
                     problem.add_residual_block(&[&lm_var], Box::new(factor), loss);
                 }
+            }
+        }
+
+        // Add IMU preintegration factors between consecutive keyframes
+        let gravity = na::Vector3::new(0.0, 0.0, -9.81);
+        for idx in 1..self.keyframes.len() {
+            let frame_j = &self.keyframes[idx];
+            if let Some(preint) = frame_j.imu_preintegration.as_ref() {
+                let factor = ImuFactorSe3::new(preint.clone(), gravity);
+                let kf_i_var = format!("KF_{}", idx - 1);
+                let kf_j_var = format!("KF_{}", idx);
+                let v_i_var = format!("KF_V_{}", idx - 1);
+                let v_j_var = format!("KF_V_{}", idx);
+                let bg_var = "IMU_BG".to_string();
+                let ba_var = "IMU_BA".to_string();
+
+                problem.add_residual_block(
+                    &[&kf_i_var, &v_i_var, &kf_j_var, &v_j_var, &bg_var, &ba_var],
+                    Box::new(factor),
+                    None,
+                );
             }
         }
 

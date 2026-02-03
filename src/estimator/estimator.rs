@@ -325,6 +325,17 @@ impl<'a> Estimator<'a> {
             // Update velocity estimator with actual timestamp-based dt calculation
             self.velocity_estimator.update(imu);
 
+            // Update current frame state with latest velocity and bias estimates
+            if self.velocity_estimator.is_initialized() {
+                let v = self.velocity_estimator.get_velocity();
+                current_frame.state.velocity = [v.x as f32, v.y as f32, v.z as f32];
+                self.current_velocity = v;
+
+                let (bg, ba) = self.velocity_estimator.get_biases();
+                current_frame.state.gyro_bias = [bg.x as f32, bg.y as f32, bg.z as f32];
+                current_frame.state.accel_bias = [ba.x as f32, ba.y as f32, ba.z as f32];
+            }
+
             // Accumulate for extrinsic calibration
             if self.sliding_window.is_full() {
                 let keyframe_poses = self.sliding_window.get_keyframe_poses();
@@ -454,6 +465,16 @@ impl<'a> Estimator<'a> {
         // View map points and keyframe poses
         // Bundle adjustment
         if current_frame.is_keyframe {
+            // Attach preintegrated IMU measurements between last keyframe and this keyframe
+            let (bias_g, bias_a) = if self.velocity_estimator.is_initialized() {
+                self.velocity_estimator.get_biases()
+            } else {
+                (self.bias_estimator.gyro_bias, self.bias_estimator.accel_bias)
+            };
+            let preint = self.imu_preintegrator.take_preintegration(bias_g, bias_a);
+            self.current_imu_preintegration = Some(preint.clone());
+            current_frame.imu_preintegration = Some(preint);
+
             let optimization_start = Instant::now();
             self.sliding_window.add_frame(current_frame);
             // Provide IMU motion prior to optimizer when available
