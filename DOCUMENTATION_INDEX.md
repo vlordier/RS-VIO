@@ -1,82 +1,48 @@
 # RS-VIO Documentation Index
 
-**Status**: Phase 3 - Optimization Complete ✅  
-**Current Focus**: Batch processing, SIMD optimization, and real-time performance  
+**Status**: Phase 3 - Batch Processing & SIMD ✅  
+**Active Docs**: 12 essential files (current code only)
 
 ---
 
-## 📖 Essential Documentation
+## 📖 Documentation
 
-### Quick Start (5 minutes)
-1. **[README.md](README.md)** - Project overview
-2. **[QUICKSTART.md](QUICKSTART.md)** - Setup and first run
+### Getting Started
+- **[README.md](README.md)** - Overview & setup
+- **[QUICKSTART.md](QUICKSTART.md)** - First run
 
-### Understanding the System
-- **[IMU_ARCHITECTURE_ANALYSIS.md](IMU_ARCHITECTURE_ANALYSIS.md)** - System architecture and design
-- **[TIGHT_COUPLING_ROADMAP.md](TIGHT_COUPLING_ROADMAP.md)** - Visual-inertial coupling details
-- **[IMU_README.md](IMU_README.md)** - IMU module overview
-- **[IMU_IMPLEMENTATION_COMPLETE.md](IMU_IMPLEMENTATION_COMPLETE.md)** - Implementation status
-- **[IMU_STATUS.md](IMU_STATUS.md)** - Current system status
+### Code Documentation
+- **[IMU_README.md](IMU_README.md)** - IMU module guide
+- **[OPTIMIZATION_BATCH_SIMD.md](OPTIMIZATION_BATCH_SIMD.md)** - Batch processing & SIMD implementation
 
-### Phase 3: Batch Processing & SIMD Optimization
-- **[OPTIMIZATION_BATCH_SIMD.md](OPTIMIZATION_BATCH_SIMD.md)** - Technical deep dive
-- **[BATCH_PROCESSING_GUIDE.md](BATCH_PROCESSING_GUIDE.md)** - API reference and usage
-- **[PHASE3_SUMMARY.md](PHASE3_SUMMARY.md)** - Work summary
-- **[PHASE3_VERIFICATION.md](PHASE3_VERIFICATION.md)** - Verification checklist
+### Operations
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guidelines
+- **[DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md)** - Deployment steps
+- **[CHANGELOG.md](CHANGELOG.md)** - Version history
+- **[DEPENDENCY_MAINTENANCE.md](DEPENDENCY_MAINTENANCE.md)** - Dependency updates
 
-### Operations & Development
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - How to contribute
-- **[DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md)** - Deployment guide
+### Critical Information
 - **[SAFETY.md](SAFETY.md)** - Safety considerations
 - **[SECURITY.md](SECURITY.md)** - Security notes
-
-### Evaluation & Datasets
 - **[DATASETS.md](DATASETS.md)** - Supported datasets
-- **[VERIFICATION_PROOFS.md](VERIFICATION_PROOFS.md)** - Test verification
-- **[TEST_EVALUATION_RESULTS.md](TEST_EVALUATION_RESULTS.md)** - Evaluation results
-
-### Maintenance
-- **[CHANGELOG.md](CHANGELOG.md)** - Version history
-- **[DEPENDENCY_MAINTENANCE.md](DEPENDENCY_MAINTENANCE.md)** - Dependency management
 
 ---
 
-## 🎯 Use Case Navigation
+## 🎯 Quick Navigation
 
-### I want to...
+**New to the project?** → [README.md](README.md) → [QUICKSTART.md](QUICKSTART.md)
 
-**Get started quickly**
-→ [README.md](README.md) → [QUICKSTART.md](QUICKSTART.md)
+**Developing code?** → [CONTRIBUTING.md](CONTRIBUTING.md) → [IMU_README.md](IMU_README.md) → [OPTIMIZATION_BATCH_SIMD.md](OPTIMIZATION_BATCH_SIMD.md)
 
-**Understand the VIO system**
-→ [IMU_ARCHITECTURE_ANALYSIS.md](IMU_ARCHITECTURE_ANALYSIS.md) → [TIGHT_COUPLING_ROADMAP.md](TIGHT_COUPLING_ROADMAP.md)
+**Deploying?** → [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md) → [SAFETY.md](SAFETY.md) → [SECURITY.md](SECURITY.md)
 
-**Use batch processing**
-→ [BATCH_PROCESSING_GUIDE.md](BATCH_PROCESSING_GUIDE.md) → [OPTIMIZATION_BATCH_SIMD.md](OPTIMIZATION_BATCH_SIMD.md)
-
-**Deploy to production**
-→ [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md) → [SAFETY.md](SAFETY.md) → [SECURITY.md](SECURITY.md)
-
-**Evaluate system performance**
-→ [DATASETS.md](DATASETS.md) → [VERIFICATION_PROOFS.md](VERIFICATION_PROOFS.md) → [TEST_EVALUATION_RESULTS.md](TEST_EVALUATION_RESULTS.md)
-
-**Contribute code**
-→ [CONTRIBUTING.md](CONTRIBUTING.md) → [IMU_ARCHITECTURE_ANALYSIS.md](IMU_ARCHITECTURE_ANALYSIS.md)
-
-**Track changes**
-→ [CHANGELOG.md](CHANGELOG.md)
+**Using datasets?** → [DATASETS.md](DATASETS.md)
 
 ---
 
-## 📦 Documentation Structure
+## 📦 What's Archived?
 
-### Core (7 files)
-- Essential architecture and implementation docs
-- Directly relevant to current code
-
-### Phase 3 (4 files)
-- Batch processing and SIMD optimization
-- Current focus of development
+Historical documentation (Phase 2, Phase 3 completion markers, evaluations) is in `.archived/` for reference. Active docs focus on current code implementation.
 
 ### Operations (6 files)
 - Deployment, safety, security
