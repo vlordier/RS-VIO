@@ -781,3 +781,97 @@ impl<'a> Estimator<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_yaml;
+
+    fn make_test_config() -> Config {
+        let yaml_config = r#"
+camera:
+  image_width: 64
+  image_height: 48
+  left_intrinsics: [50.0, 50.0, 32.0, 24.0]
+  left_distortion: [0.0, 0.0, 0.0, 0.0]
+  right_intrinsics: [50.0, 50.0, 32.0, 24.0]
+  right_distortion: [0.0, 0.0, 0.0, 0.0]
+  left_model: pinhole-radtan
+  right_model: pinhole-radtan
+  T_B_Cl: [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+  T_B_Cr: [1.0, 0.0, 0.0, 0.1, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+keyframe_management:
+  keyframe_window_size: 2
+  translation_threshold: 0.0
+  rotation_threshold: 0.0
+feature_detection:
+  grid_size: 4
+  max_features_per_grid: 20
+  optical_flow_max_iterations: 5
+  optical_flow_convergence_threshold: 0.01
+optimization:
+  bundle_adjustment_max_iterations: 2
+  pnp_max_iterations: 2
+  imu_prior_enable: true
+  imu_prior_weight_pos: 1.0
+  imu_prior_weight_rot: 1.0
+  imu_prior_huber_delta: 0.0
+"#;
+        serde_yaml::from_str(yaml_config).expect("Failed to parse test config")
+    }
+
+    fn make_imu_samples(
+        start_ns: i64,
+        count: usize,
+        dt_s: f64,
+        gyro: [f64; 3],
+        accel: [f64; 3],
+    ) -> Vec<ImuData> {
+        (0..count)
+            .map(|i| ImuData {
+                timestamp: start_ns + (i as f64 * dt_s * 1e9) as i64,
+                gyro,
+                accel,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_estimator_imu_preintegration_pipeline() {
+        let config = make_test_config();
+        let mut estimator = Estimator::new(config.clone(), None);
+
+        let img_size = (config.camera.image_width * config.camera.image_height) as usize;
+        let left = vec![0u8; img_size];
+        let right = vec![0u8; img_size];
+
+        let imu_frame1 = make_imu_samples(
+            0,
+            100,
+            0.01,
+            [0.01, -0.02, 0.03],
+            [0.0, 0.0, 9.81],
+        );
+        estimator
+            .process_frame(&left, &right, 0, Some(&imu_frame1))
+            .expect("First frame should process");
+
+        let imu_frame2 = make_imu_samples(
+            1_000_000_000,
+            50,
+            0.01,
+            [0.01, -0.02, 0.03],
+            [0.0, 0.0, 9.81],
+        );
+        estimator
+            .process_frame(&left, &right, 1_000_000_000, Some(&imu_frame2))
+            .expect("Second frame should process");
+
+        assert!(estimator.sliding_window.len() >= 2);
+        let preint = estimator
+            .current_imu_preintegration
+            .as_ref()
+            .expect("Preintegration should be available");
+        assert!(preint.delta_t > 0.0, "Preintegration should accumulate time");
+    }
+}

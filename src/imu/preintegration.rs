@@ -98,6 +98,9 @@ pub struct PreintegratedImu {
 
     /// Noise parameters
     pub noise: ImuNoise,
+
+    /// Count of IMU measurements dropped due to invalid dt
+    dropped_measurements: usize,
 }
 
 impl PreintegratedImu {
@@ -119,6 +122,7 @@ impl PreintegratedImu {
             linearization_point_bg: na::Vector3::zeros(),
             linearization_point_ba: na::Vector3::zeros(),
             noise,
+            dropped_measurements: 0,
         }
     }
 
@@ -137,6 +141,12 @@ impl PreintegratedImu {
         self.J_p_ba = na::Matrix3::zeros();
         self.linearization_point_bg = bg;
         self.linearization_point_ba = ba;
+        self.dropped_measurements = 0;
+    }
+
+    /// Number of IMU samples dropped due to invalid dt
+    pub const fn dropped_measurements(&self) -> usize {
+        self.dropped_measurements
     }
 
     /// Integrate a single IMU measurement
@@ -146,6 +156,8 @@ impl PreintegratedImu {
     pub fn integrate(&mut self, gyro: na::Vector3<f64>, accel: na::Vector3<f64>, dt: f64) {
         if dt <= 0.0 || dt > 1.0 {
             // Skip invalid measurements
+            self.dropped_measurements = self.dropped_measurements.saturating_add(1);
+            log::warn!("[IMU Preintegration] Dropped measurement with invalid dt={:.6}", dt);
             return;
         }
 
@@ -414,6 +426,24 @@ mod tests {
 
         // Covariance should grow due to noise
         assert!(final_trace > initial_trace);
+    }
+
+    #[test]
+    fn test_covariance_psd() {
+        let noise = ImuNoise::default();
+        let mut preint = PreintegratedImu::new(noise);
+        preint.reset(na::Vector3::zeros(), na::Vector3::zeros());
+
+        let gyro = na::Vector3::new(0.01, -0.02, 0.03);
+        let accel = na::Vector3::new(0.1, -0.1, 0.2);
+
+        integrate_constant(&mut preint, gyro, accel, 0.01, 200);
+
+        let cov = na::DMatrix::from_fn(9, 9, |i, j| preint.covariance[(i, j)]);
+        let sym = (&cov + cov.transpose()) * 0.5;
+        let eigen = na::SymmetricEigen::new(sym);
+        let min_eig = eigen.eigenvalues.min();
+        assert!(min_eig > -1e-8, "Covariance should be PSD (min eigenvalue: {})", min_eig);
     }
 
     #[test]
