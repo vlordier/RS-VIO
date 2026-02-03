@@ -14,10 +14,10 @@ use crate::imu::ImuMotionPrior;
 use crate::imu::ImuPreintegrator;
 use crate::imu::PreintegratedImu;
 use crate::imu::VelocityEstimator;
+use crate::fl;
 use crate::types::{Float, Matrix4x4, Vector3};
 use crate::viewers::Viewer;
-use crate::VIOError;
-use anyhow::Result;
+use anyhow::{bail, Result};
 use image::GrayImage;
 use nalgebra as na;
 use std::time::{Duration, Instant};
@@ -118,6 +118,11 @@ impl<'a> Estimator<'a> {
 
         // Initialize IMU components
         let imu_config = ImuConfig::default();
+        
+        // Extract config values before moving config into struct
+        let translation_threshold = fl!(config.keyframe_management.translation_threshold);
+        let rotation_threshold = fl!(config.keyframe_management.rotation_threshold);
+        
         Estimator {
             frame_id_counter: 0,
             frames_since_last_keyframe: 0,
@@ -144,8 +149,8 @@ impl<'a> Estimator<'a> {
             velocity_estimator: VelocityEstimator::new(imu_config.clone()),
             extrinsic_calibrator: ExtrinsicCalibrator::new(T_B_Cl),
             keyframe_selector: ImuAidedKeyframeSelector::new(
-                fl!(config.keyframe_management.translation_threshold),
-                fl!(config.keyframe_management.rotation_threshold),
+                translation_threshold,
+                rotation_threshold,
             ),
             current_imu_preintegration: None,
             last_imu_timestamp: None,
@@ -324,8 +329,8 @@ impl<'a> Estimator<'a> {
                 );
             }
 
-            // Update velocity estimator
-            self.velocity_estimator.update(imu, dt);
+            // Update velocity estimator with actual timestamp-based dt calculation
+            self.velocity_estimator.update(imu);
 
             // Accumulate for extrinsic calibration
             if self.sliding_window.is_full() {
@@ -376,9 +381,7 @@ impl<'a> Estimator<'a> {
                         Some(pose) => pose,
                         None => {
                             log::error!("[Estimator] No keyframe poses available");
-                            return Err(VIOError::Optimization(
-                                "No keyframe poses available".to_string(),
-                            ));
+                            bail!("No keyframe poses available");
                         },
                     };
 
@@ -404,9 +407,7 @@ impl<'a> Estimator<'a> {
                         Some(inv) => inv,
                         None => {
                             log::error!("[Estimator] Matrix inversion failed for T_W_B_last_kf");
-                            return Err(VIOError::Optimization(
-                                "Matrix inversion failed".to_string(),
-                            ));
+                            bail!("Matrix inversion failed");
                         },
                     };
                     let T_rel = T_W_B * T_W_B_last_kf_inv;
@@ -685,8 +686,8 @@ impl<'a> Estimator<'a> {
 
         let gravity = na::Vector3::new(0.0, 0.0, -9.81);
 
-        Some(ImuMotionPrior::from_preintegration(
-            preint,
+        Some(ImuMotionPrior::from_legacy_preintegration(
+            &preint,
             *last_keyframe_pose,
             velocity,
             gravity,
@@ -697,16 +698,6 @@ impl<'a> Estimator<'a> {
     pub fn reset_keyframe_selector(&mut self) {
         self.keyframe_selector.reset();
     }
-
-    /// Get IMU measurement rate (for monitoring)
-    pub fn get_imu_rate(&self) -> f64 {
-        if self.imu_measurement_count > 0 && self.frame_id_counter > 0 {
-            self.imu_measurement_count as f64 / self.frame_id_counter as f64
-        } else {
-            0.0
-        }
-    }
-}
 
     /// Get IMU measurement rate (for monitoring)
     pub fn get_imu_rate(&self) -> f64 {

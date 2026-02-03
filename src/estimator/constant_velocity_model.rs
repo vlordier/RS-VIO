@@ -36,7 +36,7 @@
 //! - Groves, "Principles of GNSS, Inertial, and Multisensor Integrated Navigation Systems", 2013
 //! - Forster et al., "On-Manifold Preintegration for Real-Time Visual-Inertial Odometry", RSS 2017
 
-use crate::Result;
+use anyhow::Result;
 use nalgebra as na;
 use serde::{Deserialize, Serialize};
 
