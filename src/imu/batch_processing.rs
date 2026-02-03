@@ -96,12 +96,12 @@ impl BatchImuProcessor {
     }
 
     /// Add measurement to buffer
+    /// Returns error if buffer is at capacity (caller should integrate and clear)
     #[inline]
-    pub fn push_measurement(&mut self, gyro: na::Vector3<f64>, accel: na::Vector3<f64>, dt: f64) {
+    pub fn push_measurement(&mut self, gyro: na::Vector3<f64>, accel: na::Vector3<f64>, dt: f64) -> Result<(), &'static str> {
         if self.count >= self.measurements.capacity() {
-            // Wrap around (ring buffer)
-            self.write_pos = 0;
-            self.count = 0;
+            // Buffer is full - caller must integrate and clear before adding more
+            return Err("Buffer at capacity - integrate and clear first");
         }
 
         if self.write_pos < self.measurements.len() {
@@ -112,6 +112,7 @@ impl BatchImuProcessor {
 
         self.write_pos += 1;
         self.count += 1;
+        Ok(())
     }
 
     /// Clear buffer
@@ -335,12 +336,13 @@ mod tests {
     fn test_batch_measurement_addition() {
         let mut processor = BatchImuProcessor::new(ImuNoise::default(), 100);
         
-        processor.push_measurement(
+        let res = processor.push_measurement(
             na::Vector3::zeros(),
             na::Vector3::zeros(),
             0.01,
         );
         
+        assert!(res.is_ok());
         assert_eq!(processor.count, 1);
     }
 
@@ -352,7 +354,8 @@ mod tests {
         let accel = na::Vector3::zeros();
         
         for _ in 0..100 {
-            processor.push_measurement(gyro, accel, 0.01);
+            let res = processor.push_measurement(gyro, accel, 0.01);
+            assert!(res.is_ok());
         }
         
         let result = processor.integrate_batch();
