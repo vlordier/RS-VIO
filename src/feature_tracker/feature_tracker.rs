@@ -124,7 +124,7 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
         // Parallelize pyramid construction
         let (current_image_pyramid0, current_image_pyramid1) = rayon::join(
             || build_image_pyramid(greyscale_image0, LEVELS),
-            || build_image_pyramid(greyscale_image1, LEVELS)
+            || build_image_pyramid(greyscale_image1, LEVELS),
         );
 
         // not initialized
@@ -143,20 +143,24 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             let threshold = self.optical_flow_convergence_threshold;
 
             let (new_map0, new_map1) = rayon::join(
-                || track_points::<LEVELS>(
-                    prev_pyr0,
-                    &current_image_pyramid0,
-                    map0,
-                    max_iters,
-                    threshold,
-                ),
-                || track_points::<LEVELS>(
-                    prev_pyr1,
-                    &current_image_pyramid1,
-                    map1,
-                    max_iters,
-                    threshold,
-                )
+                || {
+                    track_points::<LEVELS>(
+                        prev_pyr0,
+                        &current_image_pyramid0,
+                        map0,
+                        max_iters,
+                        threshold,
+                    )
+                },
+                || {
+                    track_points::<LEVELS>(
+                        prev_pyr1,
+                        &current_image_pyramid1,
+                        map1,
+                        max_iters,
+                        threshold,
+                    )
+                },
             );
 
             self.tracked_points_map_cam0 = new_map0;

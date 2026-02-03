@@ -42,6 +42,8 @@ pub struct KeyframeManagementConfig {
     pub translation_threshold: f64,
     #[serde(rename = "rotation_threshold")]
     pub rotation_threshold: f64,
+    #[serde(default = "default_processing_timeout_ms")]
+    pub processing_timeout_ms: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -62,6 +64,14 @@ pub struct OptimizationConfig {
     pub bundle_adjustment_max_iterations: u32,
     #[serde(rename = "pnp_max_iterations")]
     pub pnp_max_iterations: u32,
+    #[serde(default = "default_imu_prior_enable")]
+    pub imu_prior_enable: bool,
+    #[serde(default = "default_imu_prior_weight_pos")]
+    pub imu_prior_weight_pos: f64,
+    #[serde(default = "default_imu_prior_weight_rot")]
+    pub imu_prior_weight_rot: f64,
+    #[serde(default = "default_imu_prior_huber_delta")]
+    pub imu_prior_huber_delta: f64,
 }
 
 impl Config {
@@ -80,4 +90,24 @@ impl Config {
         let config: Config = serde_yaml::from_str(&content)?;
         Ok(config)
     }
+}
+
+fn default_processing_timeout_ms() -> u64 {
+    100
+}
+
+fn default_imu_prior_enable() -> bool {
+    false
+}
+
+fn default_imu_prior_weight_pos() -> f64 {
+    1.0
+}
+
+fn default_imu_prior_weight_rot() -> f64 {
+    1.0
+}
+
+fn default_imu_prior_huber_delta() -> f64 {
+    0.0
 }

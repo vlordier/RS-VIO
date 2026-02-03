@@ -5,6 +5,7 @@ Pn = "Pn"        # PnP algorithm/Point n
 BA = "BA"        # Bundle Adjustment
 ba = "ba"        # Bundle adjustment (lowercase)
 Fo = "Fo"        # Factor/Force variable
+preint = "preint"      # PreintegratedImu variable name
 
 # Technical terms
 patten = "patten"      # Pattern matching context

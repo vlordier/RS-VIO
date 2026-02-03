@@ -2,6 +2,7 @@ use crate::datasets::CameraModelType;
 use crate::datasets::ImuData;
 use crate::estimator::state::State;
 use crate::feature_tracker::Feature;
+use crate::imu::PreintegratedImu;
 use crate::types::Matrix4x4;
 use camera_intrinsic_model::models::opencv5::OpenCVModel5;
 use nalgebra034;
@@ -32,6 +33,9 @@ pub struct Frame {
 
     /// IMU samples since last keyframe.
     pub imu_since_last_keyframe: Vec<ImuData>,
+
+    /// Preintegrated IMU measurements from previous keyframe to this frame.
+    pub imu_preintegration: Option<PreintegratedImu>,
 
     /// Whether this frame is a keyframe.
     pub is_keyframe: bool,
@@ -69,6 +73,7 @@ impl Frame {
             state: State::identity(),
             imu_from_last_frame: Vec::new(),
             imu_since_last_keyframe: Vec::new(),
+            imu_preintegration: None,
             is_keyframe: false,
             left_features: Vec::new(),
             right_features: Vec::new(),
@@ -93,6 +98,7 @@ impl Frame {
             state: State::new(T_B_Cl, T_B_Cr),
             imu_from_last_frame: Vec::new(),
             imu_since_last_keyframe: Vec::new(),
+            imu_preintegration: None,
             is_keyframe: true,
             left_features: Vec::new(),
             right_features: Vec::new(),

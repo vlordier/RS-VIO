@@ -2,9 +2,18 @@ pub mod datasets;
 pub mod estimator;
 pub mod evaluation;
 pub mod feature_tracker;
+pub mod imu;
 pub mod optimization;
 pub mod types;
 pub mod viewers;
+
+#[allow(clippy::crate_in_macro_def)]
+#[macro_export]
+macro_rules! fl {
+    ($val:expr) => {
+        $val as crate::types::Float
+    };
+}
 
 // Re-export commonly used types for convenience
 pub use datasets::config::Config;

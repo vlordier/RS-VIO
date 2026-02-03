@@ -32,16 +32,16 @@ fn benchmark_track_point_at_level_loop() {
     for _ in 0..iterations {
         // Benchmark Pattern52 creation too
         let patch = Pattern52::new(&image, cx, cy);
-        
+
         // Reset transform slightly off to force iterations
         let mut transform = start_transform.clone();
-        
+
         // We track against the same patch/image, it should converge quickly
         let converged = track_point_at_level(
             &image,
             &patch,
             &mut transform,
-            10,   // max iterations
+            10, // max iterations
             0.01,
         );
         if converged {

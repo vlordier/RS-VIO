@@ -6,20 +6,22 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)] // Optimization code - panics indicate data corruption
 
 use crate::estimator::Frame;
-use crate::optimization::factors::{BundleAdjustmentFactor, PnPFactor};
+use crate::imu::ImuMotionPrior;
+use crate::optimization::factors::{BundleAdjustmentFactor, ImuPriorFactor, PnPFactor};
+use crate::optimization::imu_factor::ImuFactorSe3;
 use crate::types::{Matrix3x3, Matrix4x4, Vector3};
 use apex_solver::core::loss_functions::HuberLoss;
 use apex_solver::core::problem::{Problem, VariableEnum};
 use apex_solver::linalg::{LinearSolverType, SchurPreconditioner, SchurVariant};
 use apex_solver::manifold::ManifoldType;
 use apex_solver::optimizer::levenberg_marquardt::{LevenbergMarquardt, LevenbergMarquardtConfig};
-use std::sync::Arc;
 use apex_solver::optimizer::SolverResult;
 use na::{DVector, UnitQuaternion};
 use nalgebra as na;
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::collections::VecDeque;
-use rayon::prelude::*;
+use std::sync::Arc;
 
 /// Sliding window of keyframes for bundle adjustment optimization.
 ///
@@ -164,56 +166,83 @@ impl SlidingWindow {
         Ok(true)
     }
 
-    pub fn build_optimization_problem(&self) -> (Problem, HashMap<String, (ManifoldType, DVector<f64>)>) {
+    pub fn build_optimization_problem(
+        &self,
+    ) -> (Problem, HashMap<String, (ManifoldType, DVector<f64>)>) {
         let mut problem = Problem::new();
 
         // PART 1: Count observations and find first observation frame (Parallel)
         // Map: feature_id -> (left_count, right_count, first_frame_idx)
-        let landmark_stats = self.keyframes.par_iter().enumerate()
+        let landmark_stats = self
+            .keyframes
+            .par_iter()
+            .enumerate()
             .fold(
                 HashMap::new,
                 |mut acc: HashMap<usize, (usize, usize, usize)>, (frame_idx, frame)| {
                     for feat in &frame.left_features {
                         let entry = acc.entry(feat.feature_id).or_insert((0, 0, usize::MAX));
                         entry.0 += 1;
-                        if frame_idx < entry.2 { entry.2 = frame_idx; }
+                        if frame_idx < entry.2 {
+                            entry.2 = frame_idx;
+                        }
                     }
                     for feat in &frame.right_features {
                         let entry = acc.entry(feat.feature_id).or_insert((0, 0, usize::MAX));
                         entry.1 += 1;
-                        if frame_idx < entry.2 { entry.2 = frame_idx; }
+                        if frame_idx < entry.2 {
+                            entry.2 = frame_idx;
+                        }
                     }
                     acc
-                }
+                },
             )
-            .reduce(
-                HashMap::new,
-                |mut map1, map2| {
-                    for (k, (l, r, f)) in map2 {
-                        let entry = map1.entry(k).or_insert((0, 0, usize::MAX));
-                        entry.0 += l;
-                        entry.1 += r;
-                        if f < entry.2 { entry.2 = f; }
+            .reduce(HashMap::new, |mut map1, map2| {
+                for (k, (l, r, f)) in map2 {
+                    let entry = map1.entry(k).or_insert((0, 0, usize::MAX));
+                    entry.0 += l;
+                    entry.1 += r;
+                    if f < entry.2 {
+                        entry.2 = f;
                     }
-                    map1
                 }
-            );
+                map1
+            });
 
         // Pre-generate feature variable strings
         // This avoids calling format!("LM_{}") thousands of times during building
-        let lm_string_cache: HashMap<usize, Arc<String>> = landmark_stats.keys()
-             .map(|&id| (id, Arc::new(format!("LM_{}", id))))
-             .collect();
+        let lm_string_cache: HashMap<usize, Arc<String>> = landmark_stats
+            .keys()
+            .map(|&id| (id, Arc::new(format!("LM_{}", id))))
+            .collect();
 
         // Fetch transforms
-        let first_frame = self.keyframes.front().expect("Keyframes should not be empty");
+        let first_frame = self
+            .keyframes
+            .front()
+            .expect("Keyframes should not be empty");
         #[allow(clippy::unwrap_used, clippy::expect_used)]
-        let T_Cl_B = Arc::new(first_frame.state.T_B_Cl.try_inverse().expect("T_B_Cl should be invertible"));
+        let T_Cl_B = Arc::new(
+            first_frame
+                .state
+                .T_B_Cl
+                .try_inverse()
+                .expect("T_B_Cl should be invertible"),
+        );
         #[allow(clippy::unwrap_used, clippy::expect_used)]
-        let T_Cr_B = Arc::new(first_frame.state.T_B_Cr.try_inverse().expect("T_B_Cr should be invertible"));
+        let T_Cr_B = Arc::new(
+            first_frame
+                .state
+                .T_B_Cr
+                .try_inverse()
+                .expect("T_B_Cr should be invertible"),
+        );
 
         // PART 2: Build Factors (Parallel)
-        let results: Vec<_> = self.keyframes.par_iter().enumerate()
+        let results: Vec<_> = self
+            .keyframes
+            .par_iter()
+            .enumerate()
             .map(|(id_frame, frame)| {
                 // Pre-allocate to avoid re-allocations
                 let mut local_initials = Vec::with_capacity(300);
@@ -221,19 +250,42 @@ impl SlidingWindow {
                 // Use a tuple structure for residuals to avoid allocating Vec<String>
                 // (lm_var, Option<kf_var>, factor, loss)
                 // Stores Arc<String> instead of String to avoid duplication
-                let mut local_residuals: Vec<(Arc<String>, Option<Arc<String>>, BundleAdjustmentFactor, Option<Box<dyn apex_solver::core::loss_functions::LossFunction + Send>>)> = Vec::with_capacity(300);
+                let mut local_residuals: Vec<(
+                    Arc<String>,
+                    Option<Arc<String>>,
+                    BundleAdjustmentFactor,
+                    Option<Box<dyn apex_solver::core::loss_functions::LossFunction + Send>>,
+                )> = Vec::with_capacity(300);
 
                 // Add KF pose
                 let kf_var = Arc::new(format!("KF_{}", id_frame));
                 #[allow(clippy::expect_used)]
-                let T_B_W = frame.state.T_W_B.try_inverse().expect("T_W_B should be invertible");
+                let T_B_W = frame
+                    .state
+                    .T_W_B
+                    .try_inverse()
+                    .expect("T_W_B should be invertible");
                 let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
                 let R_B_W = Matrix3x3::from(T_B_W.fixed_view::<3, 3>(0, 0));
                 let q_B_W = UnitQuaternion::from_matrix(&R_B_W);
                 let se3_data = DVector::from_vec(vec![
                     t_B_W.x, t_B_W.y, t_B_W.z, q_B_W.w, q_B_W.i, q_B_W.j, q_B_W.k,
                 ]);
-                local_initials.push(((*kf_var).clone(), (ManifoldType::SE3, se3_data.cast::<f64>())));
+                local_initials.push((
+                    (*kf_var).clone(),
+                    (ManifoldType::SE3, se3_data.cast::<f64>()),
+                ));
+
+                let velocity = frame.state.velocity;
+                let velocity_data = DVector::from_vec(vec![
+                    velocity[0] as f64,
+                    velocity[1] as f64,
+                    velocity[2] as f64,
+                ]);
+                local_initials.push((
+                    format!("KF_V_{}", id_frame),
+                    (ManifoldType::RN, velocity_data),
+                ));
 
                 let camera_features = [
                     (&frame.left_features, T_Cl_B.clone()),
@@ -243,15 +295,20 @@ impl SlidingWindow {
                 for (features, T_C_B) in camera_features.iter() {
                     for feat in features.iter() {
                         let feature_id = feat.feature_id;
-                        
+
                         // Use stats lookup
-                        if let Some((count_left, count_right, first_frame_idx)) = landmark_stats.get(&feature_id) {
+                        if let Some((count_left, count_right, first_frame_idx)) =
+                            landmark_stats.get(&feature_id)
+                        {
                             if *count_left > 0 && *count_right > 0 {
                                 // Retrieve cached string
-                                let lm_var_arc = lm_string_cache.get(&feature_id).expect("Cache sync error");
+                                let lm_var_arc =
+                                    lm_string_cache.get(&feature_id).expect("Cache sync error");
 
                                 // Initial Value logic: Only if not already known AND this is the first responsible frame
-                                if !self.map_points.contains_key(&feature_id) && id_frame == *first_frame_idx {
+                                if !self.map_points.contains_key(&feature_id)
+                                    && id_frame == *first_frame_idx
+                                {
                                     let p_C = Vector3::new(
                                         feat.undistorted_coord[0] as f64,
                                         feat.undistorted_coord[1] as f64,
@@ -261,25 +318,34 @@ impl SlidingWindow {
                                         frame.state.T_W_B.fixed_view::<3, 3>(0, 0).into_owned(),
                                         frame.state.T_W_B.fixed_view::<3, 1>(0, 3).into_owned(),
                                     );
-                                    let T_B_C = T_C_B.try_inverse().expect("T_C_B should be invertible");
+                                    let T_B_C =
+                                        T_C_B.try_inverse().expect("T_C_B should be invertible");
                                     let (R_B_C, t_B_C) = (
                                         T_B_C.fixed_view::<3, 3>(0, 0).into_owned(),
                                         T_B_C.fixed_view::<3, 1>(0, 3).into_owned(),
                                     );
                                     let p_W = R_W_B * (R_B_C * p_C + t_B_C) + t_W_B;
                                     let data = DVector::from_vec(vec![p_W.x, p_W.y, p_W.z]);
-                                    local_initials.push(((**lm_var_arc).clone(), (ManifoldType::RN, data)));
+                                    local_initials
+                                        .push(((**lm_var_arc).clone(), (ManifoldType::RN, data)));
                                 }
 
                                 // Factor logic
                                 let mut factor = BundleAdjustmentFactor::new(
-                                    na::Vector2::new(feat.undistorted_coord[0], feat.undistorted_coord[1])
-                                        .cast::<f64>(),
+                                    na::Vector2::new(
+                                        feat.undistorted_coord[0],
+                                        feat.undistorted_coord[1],
+                                    )
+                                    .cast::<f64>(),
                                     (*T_C_B).clone(),
                                 );
 
                                 if id_frame == 0 {
-                                    let T_B_W_inv = frame.state.T_W_B.try_inverse().expect("T_W_B should be invertible");
+                                    let T_B_W_inv = frame
+                                        .state
+                                        .T_W_B
+                                        .try_inverse()
+                                        .expect("T_W_B should be invertible");
                                     factor = factor.with_fixed_pose(Arc::new(T_B_W_inv));
                                 }
 
@@ -288,10 +354,21 @@ impl SlidingWindow {
                                 } else {
                                     Some(kf_var.clone())
                                 };
-                                
+
                                 let huber_loss = HuberLoss::new(2.0).ok();
                                 // Store Arc<String>
-                                local_residuals.push((lm_var_arc.clone(), kf_var_opt, factor, huber_loss.map(|l| Box::new(l) as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>)));
+                                local_residuals.push((
+                                    lm_var_arc.clone(),
+                                    kf_var_opt,
+                                    factor,
+                                    huber_loss.map(|l| {
+                                        Box::new(l)
+                                            as Box<
+                                                dyn apex_solver::core::loss_functions::LossFunction
+                                                    + Send,
+                                            >
+                                    }),
+                                ));
                             }
                         }
                     }
@@ -301,39 +378,50 @@ impl SlidingWindow {
             .collect();
 
         // PART 3: Aggregate into Problem and Initial Values
-        let (all_initials_maps, all_residuals_vecs): (Vec<_>, Vec<_>) = results.into_par_iter().unzip();
+        let (all_initials_maps, all_residuals_vecs): (Vec<_>, Vec<_>) =
+            results.into_par_iter().unzip();
 
-        let mut initial_values = all_initials_maps.into_par_iter()
-            .fold(
-                HashMap::new,
-                |mut acc, block_initials| {
-                    for (k, v) in block_initials {
-                        acc.entry(k).or_insert(v);
-                    }
-                    acc
+        let mut initial_values = all_initials_maps
+            .into_par_iter()
+            .fold(HashMap::new, |mut acc, block_initials| {
+                for (k, v) in block_initials {
+                    acc.entry(k).or_insert(v);
                 }
-            )
-            .reduce(
-                HashMap::new,
-                |mut left, right| {
-                    for (k, v) in right {
-                        left.entry(k).or_insert(v);
-                    }
-                    left
+                acc
+            })
+            .reduce(HashMap::new, |mut left, right| {
+                for (k, v) in right {
+                    left.entry(k).or_insert(v);
                 }
-            );
+                left
+            });
+
+        if let Some(last_frame) = self.keyframes.back() {
+            let bg = last_frame.state.gyro_bias;
+            let ba = last_frame.state.accel_bias;
+            initial_values.entry("IMU_BG".to_string()).or_insert((
+                ManifoldType::RN,
+                DVector::from_vec(vec![bg[0] as f64, bg[1] as f64, bg[2] as f64]),
+            ));
+            initial_values.entry("IMU_BA".to_string()).or_insert((
+                ManifoldType::RN,
+                DVector::from_vec(vec![ba[0] as f64, ba[1] as f64, ba[2] as f64]),
+            ));
+        }
 
         // Add already known landmarks (avoid re-computing them in every frame)
         // Use the cache to filter only ACTIVE landmarks
         for (id, lm_var_arc) in &lm_string_cache {
             if let Some(pos) = self.map_points.get(id) {
                 // Only add if not already present (new initial values take precedence if collision - but shouldn't happen due to if check above)
-                initial_values.entry((**lm_var_arc).clone()).or_insert_with(|| {
-                    (
-                        ManifoldType::RN,
-                        DVector::from_vec(vec![pos[0] as f64, pos[1] as f64, pos[2] as f64]),
-                    )
-                });
+                initial_values
+                    .entry((**lm_var_arc).clone())
+                    .or_insert_with(|| {
+                        (
+                            ManifoldType::RN,
+                            DVector::from_vec(vec![pos[0] as f64, pos[1] as f64, pos[2] as f64]),
+                        )
+                    });
             }
         }
 
@@ -348,10 +436,41 @@ impl SlidingWindow {
             }
         }
 
+        // Add IMU preintegration factors between consecutive keyframes
+        let gravity = na::Vector3::new(0.0, 0.0, -9.81);
+        for idx in 1..self.keyframes.len() {
+            let frame_j = &self.keyframes[idx];
+            if let Some(preint) = frame_j.imu_preintegration.as_ref() {
+                let factor = ImuFactorSe3::new(preint.clone(), gravity);
+                let kf_i_var = format!("KF_{}", idx - 1);
+                let kf_j_var = format!("KF_{}", idx);
+                let v_i_var = format!("KF_V_{}", idx - 1);
+                let v_j_var = format!("KF_V_{}", idx);
+                let bg_var = "IMU_BG".to_string();
+                let ba_var = "IMU_BA".to_string();
+
+                problem.add_residual_block(
+                    &[&kf_i_var, &v_i_var, &kf_j_var, &v_j_var, &bg_var, &ba_var],
+                    Box::new(factor),
+                    None,
+                );
+            }
+        }
+
         (problem, initial_values)
     }
 
     pub fn optimize(&mut self) -> Result<bool, std::io::Error> {
+        self.optimize_with_imu(None, None, None)
+    }
+
+    /// Optimize window with optional IMU prior on the latest keyframe pose
+    pub fn optimize_with_imu(
+        &mut self,
+        imu_prior: Option<ImuMotionPrior>,
+        imu_weights: Option<(f64, f64)>,
+        imu_huber_delta: Option<f64>,
+    ) -> Result<bool, std::io::Error> {
         self.check_sliding_window_size_for_optimization()?;
 
         // Save current state before optimization for potential rollback
@@ -363,7 +482,56 @@ impl SlidingWindow {
         let mut solver = LevenbergMarquardt::with_config(self.build_solver_config());
         // solver.add_observer(TerminalObserver::new());
 
-        let (problem, initial_values) = self.build_optimization_problem();
+        let (mut problem, initial_values) = self.build_optimization_problem();
+
+        // If IMU prior is available, add a residual on the latest keyframe pose
+        if let Some(prior) = imu_prior {
+            let last_index = self.keyframes.len().saturating_sub(1);
+            if !self.keyframes.is_empty() {
+                let kf_var = format!("KF_{}", last_index);
+                // Predict pose from IMU prior (world-from-body), then invert to body-from-world
+                let (T_W_B_pred, _v_pred) = prior.predict_state();
+                if let Some(T_B_W_pred) = T_W_B_pred.try_inverse() {
+                    let (w_pos, w_rot) = imu_weights.unwrap_or((1.0, 1.0));
+                    let factor = ImuPriorFactor::new(T_B_W_pred, w_pos, w_rot);
+                    // Optional robust loss
+                    let loss = if let Some(delta) = imu_huber_delta {
+                        if delta > 0.0 {
+                            match HuberLoss::new(delta) {
+                                Ok(l) => Some(Box::new(l)
+                                    as Box<
+                                        dyn apex_solver::core::loss_functions::LossFunction + Send,
+                                    >),
+                                Err(e) => {
+                                    log::warn!(
+                                        "[SlidingWindow] Invalid Huber delta ({}): {}",
+                                        delta,
+                                        e
+                                    );
+                                    None
+                                },
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+                    problem.add_residual_block(&[&kf_var], Box::new(factor), loss);
+                    log::debug!(
+                        "[SlidingWindow] Added IMU prior residual on keyframe {} (pos_weight={:.2}, rot_weight={:.2}, huber_delta={:?})",
+                        last_index,
+                        w_pos,
+                        w_rot,
+                        imu_huber_delta
+                    );
+                } else {
+                    log::warn!(
+                        "[SlidingWindow] IMU prior predicted pose inversion failed; skipping IMU residual"
+                    );
+                }
+            }
+        }
 
         let num_residuals = problem.num_residual_blocks();
         let num_variables = initial_values.len();
@@ -710,5 +878,3 @@ impl SlidingWindow {
         }
     }
 }
-
-
