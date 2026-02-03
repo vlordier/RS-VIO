@@ -10,10 +10,8 @@ Measures performance improvements from:
 """
 
 import subprocess
-import json
 import time
 from dataclasses import dataclass
-from typing import List
 import statistics
 
 @dataclass
@@ -64,7 +62,8 @@ def run_benchmark(name: str, test_binary: str, iterations: int = 1000) -> Benchm
                 try:
                     val = float(line.split(':')[1].split('ms')[0].strip())
                     times.append(val * 1000)  # Convert to microseconds
-                except:
+                except (ValueError, IndexError):
+                    # Skip lines that don't match expected timing format
                     pass
         
         if not times:
