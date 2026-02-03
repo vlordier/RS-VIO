@@ -575,6 +575,46 @@ impl ImuAidedKeyframeSelector {
     }
 }
 
+/// Visual measurement update for tight visual-inertial coupling
+///
+/// Provides orientation (and optionally velocity) from the visual subsystem
+/// to correct the ESKF state.
+#[derive(Debug, Clone)]
+pub struct VisualMeasurement {
+    /// Visual orientation (world-from-body)
+    pub orientation: na::UnitQuaternion<f64>,
+    /// Visual velocity estimate in world frame (optional)
+    pub velocity: Option<na::Vector3<f64>>,
+    /// Velocity measurement covariance (optional)
+    pub velocity_covariance: Option<na::Matrix3<f64>>,
+    /// Measurement timestamp (optional)
+    pub timestamp: Option<i64>,
+}
+
+impl VisualMeasurement {
+    pub fn orientation_only(orientation: na::UnitQuaternion<f64>) -> Self {
+        Self {
+            orientation,
+            velocity: None,
+            velocity_covariance: None,
+            timestamp: None,
+        }
+    }
+
+    pub fn with_velocity(
+        orientation: na::UnitQuaternion<f64>,
+        velocity: na::Vector3<f64>,
+        velocity_covariance: na::Matrix3<f64>,
+    ) -> Self {
+        Self {
+            orientation,
+            velocity: Some(velocity),
+            velocity_covariance: Some(velocity_covariance),
+            timestamp: None,
+        }
+    }
+}
+
 /// IMU motion prior for optimization
 ///
 /// Provides motion constraints from preintegrated IMU measurements
@@ -806,6 +846,37 @@ mod tests {
         estimator.initialize_from_bias_and_orientation(&imu_measurements, &orientation, None);
 
         assert!(estimator.is_initialized());
+    }
+
+    #[test]
+    fn test_visual_update_corrects_velocity() {
+        let config = ImuConfig::default();
+        let mut estimator = VelocityEstimator::new(config);
+
+        let imu_measurements = vec![
+            ImuData {
+                timestamp: 0,
+                gyro: [0.0; 3],
+                accel: [0.0, 0.0, 9.81],
+            },
+            ImuData {
+                timestamp: 10000000,
+                gyro: [0.0; 3],
+                accel: [0.0, 0.0, 9.81],
+            },
+        ];
+
+        let orientation = na::UnitQuaternion::identity();
+        estimator.initialize_from_bias_and_orientation(&imu_measurements, &orientation, None);
+
+        let before = estimator.get_velocity();
+        let measured = na::Vector3::new(1.0, 0.0, 0.0);
+        let covariance = na::Matrix3::identity() * 1e-4;
+
+        estimator.update_velocity_from_visual(measured, covariance);
+        let after = estimator.get_velocity();
+
+        assert!((after - measured).norm() < (before - measured).norm());
     }
 
     #[test]
@@ -1254,6 +1325,31 @@ impl VelocityEstimator {
     /// Get velocity uncertainty (standard deviation)
     pub fn get_velocity_uncertainty(&self) -> na::Vector3<f64> {
         self.eskf.get_velocity_std()
+    }
+
+    /// Update orientation from visual measurement
+    pub fn update_orientation_from_visual(&mut self, orientation: na::UnitQuaternion<f64>) {
+        self.eskf.update_orientation(orientation);
+    }
+
+    /// Update velocity from visual measurement
+    pub fn update_velocity_from_visual(
+        &mut self,
+        velocity: na::Vector3<f64>,
+        covariance: na::Matrix3<f64>,
+    ) {
+        self.eskf.update_velocity(velocity, covariance);
+    }
+
+    /// Apply a full visual measurement update (orientation + optional velocity)
+    pub fn update_from_visual(&mut self, measurement: &VisualMeasurement) {
+        self.eskf.update_orientation(measurement.orientation);
+        if let Some(velocity) = measurement.velocity {
+            let covariance = measurement.velocity_covariance.unwrap_or_else(|| {
+                na::Matrix3::identity() * 0.25
+            });
+            self.eskf.update_velocity(velocity, covariance);
+        }
     }
     
     /// Initialize velocity estimator with bias estimates and orientation

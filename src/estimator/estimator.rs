@@ -74,6 +74,10 @@ pub struct Estimator<'a> {
     bias_estimator: ImuBiasEstimator,
     // Whether system is in initialization phase (collecting IMU for bias estimation)
     is_initializing: bool,
+    // Last visual pose for velocity update
+    last_visual_pose: Option<Matrix4x4>,
+    // Last visual timestamp for velocity update
+    last_visual_timestamp: Option<i64>,
     // Constant velocity motion model (fallback when IMU unavailable)
     #[allow(dead_code)]
     cv_motion_model: ConstantVelocityModel,
@@ -159,6 +163,8 @@ impl<'a> Estimator<'a> {
             velocity_estimator_initialized: false,
             bias_estimator: ImuBiasEstimator::new(imu_config.clone()),
             is_initializing: true,
+            last_visual_pose: None,
+            last_visual_timestamp: None,
             cv_motion_model: ConstantVelocityModel::new(ConstantVelocityConfig::default()),
         }
     }
@@ -379,6 +385,23 @@ impl<'a> Estimator<'a> {
                     // Apply the optimized pose to the current frame
                     current_frame.state.T_W_B = T_W_B;
 
+                    // Visual measurement update (orientation + optional velocity)
+                    let R_obs = na::Rotation3::from_matrix_unchecked(
+                        T_W_B.fixed_view::<3, 3>(0, 0).into_owned(),
+                    );
+                    let R_obs_quat = na::UnitQuaternion::from_rotation_matrix(&R_obs);
+                    self.velocity_estimator.update_orientation_from_visual(R_obs_quat);
+
+                    if let Some((velocity, covariance)) =
+                        self.compute_visual_velocity_measurement(&T_W_B, timestamp_ns)
+                    {
+                        self.velocity_estimator
+                            .update_velocity_from_visual(velocity, covariance);
+                        let v = self.velocity_estimator.get_velocity();
+                        current_frame.state.velocity = [v.x as f32, v.y as f32, v.z as f32];
+                        self.current_velocity = v;
+                    }
+
                     // IMU-aided keyframe selection
                     let keyframe_poses = self.sliding_window.get_keyframe_poses();
                     let T_W_B_last_kf = match keyframe_poses.last() {
@@ -390,13 +413,9 @@ impl<'a> Estimator<'a> {
                     };
 
                     // Compute IMU-visual rotation deviation
-                    let R_obs = na::Rotation3::from_matrix_unchecked(
-                        T_W_B.fixed_view::<3, 3>(0, 0).into_owned(),
-                    );
                     let R_last = na::Rotation3::from_matrix_unchecked(
                         T_W_B_last_kf.fixed_view::<3, 3>(0, 0).into_owned(),
                     );
-                    let R_obs_quat = na::UnitQuaternion::from_rotation_matrix(&R_obs);
                     let R_last_quat = na::UnitQuaternion::from_rotation_matrix(&R_last);
                     let dq = R_last_quat.inverse() * R_obs_quat;
                     let imu_visual_deviation = dq.angle();
@@ -447,7 +466,7 @@ impl<'a> Estimator<'a> {
                         current_frame.is_keyframe = false;
                     }
                     self.view_motion_tracking_results(&T_W_B);
-                },
+                }
                 Ok(None) => {
                     log::warn!(
                         "[Estimator] Motion tracking failed (optimization did not converge)"
@@ -519,6 +538,41 @@ impl<'a> Estimator<'a> {
         );
 
         Ok(())
+    }
+
+    fn compute_visual_velocity_measurement(
+        &mut self,
+        current_pose: &Matrix4x4,
+        timestamp_ns: i64,
+    ) -> Option<(na::Vector3<f64>, na::Matrix3<f64>)> {
+        let (last_pose, last_ts) = match (self.last_visual_pose, self.last_visual_timestamp) {
+            (Some(pose), Some(ts)) => (pose, ts),
+            _ => {
+                self.last_visual_pose = Some(*current_pose);
+                self.last_visual_timestamp = Some(timestamp_ns);
+                return None;
+            }
+        };
+
+        let dt = (timestamp_ns - last_ts) as f64 * 1e-9;
+        if dt <= 0.0 || dt > 0.5 {
+            self.last_visual_pose = Some(*current_pose);
+            self.last_visual_timestamp = Some(timestamp_ns);
+            return None;
+        }
+
+        let p_last = last_pose.fixed_view::<3, 1>(0, 3).into_owned();
+        let p_now = current_pose.fixed_view::<3, 1>(0, 3).into_owned();
+        let velocity = (p_now - p_last) / dt;
+
+        // Conservative covariance for visual velocity (m/s)^2
+        let vel_sigma: f64 = 0.5;
+        let covariance = na::Matrix3::identity() * vel_sigma.powi(2);
+
+        self.last_visual_pose = Some(*current_pose);
+        self.last_visual_timestamp = Some(timestamp_ns);
+
+        Some((velocity, covariance))
     }
 
     /// Helper: set the current frame index on the attached viewer, if any.
