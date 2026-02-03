@@ -1,124 +1,153 @@
 # RS-VIO Documentation Index
 
-**Current Status**: Phase 3 - Optimization Complete ✅
+**Status**: Phase 3 - Optimization Complete ✅  
+**Current Focus**: Batch processing, SIMD optimization, and real-time performance  
 
 ---
 
-## 📚 Essential Documentation
+## 📖 Essential Documentation
 
-### Getting Started
-- **[README.md](README.md)** - Project overview and quick start
-- **[QUICKSTART.md](QUICKSTART.md)** - Fast setup guide
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guidelines
+### Quick Start (5 minutes)
+1. **[README.md](README.md)** - Project overview
+2. **[QUICKSTART.md](QUICKSTART.md)** - Setup and first run
 
-### Core Architecture & Implementation
-- **[src/imu/mod.rs](src/imu/mod.rs)** - IMU module documentation
-- **[IMU_ARCHITECTURE_ANALYSIS.md](IMU_ARCHITECTURE_ANALYSIS.md)** - Detailed architecture
+### Understanding the System
+- **[IMU_ARCHITECTURE_ANALYSIS.md](IMU_ARCHITECTURE_ANALYSIS.md)** - System architecture and design
+- **[TIGHT_COUPLING_ROADMAP.md](TIGHT_COUPLING_ROADMAP.md)** - Visual-inertial coupling details
+- **[IMU_README.md](IMU_README.md)** - IMU module overview
 - **[IMU_IMPLEMENTATION_COMPLETE.md](IMU_IMPLEMENTATION_COMPLETE.md)** - Implementation status
-- **[TIGHT_COUPLING_ROADMAP.md](TIGHT_COUPLING_ROADMAP.md)** - Visual-inertial integration details
+- **[IMU_STATUS.md](IMU_STATUS.md)** - Current system status
 
-### Phase 3: Optimization
-- **[OPTIMIZATION_BATCH_SIMD.md](OPTIMIZATION_BATCH_SIMD.md)** - Batch processing & SIMD technical guide
-- **[BATCH_PROCESSING_GUIDE.md](BATCH_PROCESSING_GUIDE.md)** - API reference and usage patterns
-- **[PHASE3_SUMMARY.md](PHASE3_SUMMARY.md)** - Phase 3 work summary
-- **[PHASE3_VERIFICATION.md](PHASE3_VERIFICATION.md)** - Final verification checklist
-- **[PHASE3_OPTIMIZATION_COMPLETE.md](PHASE3_OPTIMIZATION_COMPLETE.md)** - Executive summary
+### Phase 3: Batch Processing & SIMD Optimization
+- **[OPTIMIZATION_BATCH_SIMD.md](OPTIMIZATION_BATCH_SIMD.md)** - Technical deep dive
+- **[BATCH_PROCESSING_GUIDE.md](BATCH_PROCESSING_GUIDE.md)** - API reference and usage
+- **[PHASE3_SUMMARY.md](PHASE3_SUMMARY.md)** - Work summary
+- **[PHASE3_VERIFICATION.md](PHASE3_VERIFICATION.md)** - Verification checklist
 
-### Feature Implementation
-- **[PHASE_2A_IMPLEMENTATION_GUIDE.md](PHASE_2A_IMPLEMENTATION_GUIDE.md)** - Phase 2A details
-- **[PHASE_2B_COMPLETE.md](PHASE_2B_COMPLETE.md)** - Bias feedback implementation
-
-### Datasets & Evaluation
-- **[DATASETS.md](DATASETS.md)** - Supported datasets
-- **[BENCHMARKING_QUICKSTART.sh](BENCHMARKING_QUICKSTART.sh)** - Benchmark setup
-
-### Operations & Deployment
+### Operations & Development
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - How to contribute
 - **[DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md)** - Deployment guide
-- **[CHANGELOG.md](CHANGELOG.md)** - Version history
 - **[SAFETY.md](SAFETY.md)** - Safety considerations
 - **[SECURITY.md](SECURITY.md)** - Security notes
 
----
+### Evaluation & Datasets
+- **[DATASETS.md](DATASETS.md)** - Supported datasets
+- **[VERIFICATION_PROOFS.md](VERIFICATION_PROOFS.md)** - Test verification
+- **[TEST_EVALUATION_RESULTS.md](TEST_EVALUATION_RESULTS.md)** - Evaluation results
 
-## 🔄 Related Documents
-
-- **[STRATEGY_VALIDATION_PLAN.md](STRATEGY_VALIDATION_PLAN.md)** - System validation strategy
+### Maintenance
+- **[CHANGELOG.md](CHANGELOG.md)** - Version history
 - **[DEPENDENCY_MAINTENANCE.md](DEPENDENCY_MAINTENANCE.md)** - Dependency management
-- **[IMU_STATUS.md](IMU_STATUS.md)** - Current IMU system status
-- **[VERIFICATION_PROOFS.md](VERIFICATION_PROOFS.md)** - Test verification results
 
 ---
 
-## 📦 Archived Documentation
+## 🎯 Use Case Navigation
 
-Historical documents are archived in `.archived/`:
+### I want to...
 
-- `.archived/IMU_IMPLEMENTATION_CRITIQUE.md`
-- `.archived/IMU_DOCUMENTATION_INDEX.md`
-- `.archived/IMU_FINAL_ASSESSMENT.md`
-- `.archived/TIGHT_COUPLING_COMPLETE.md`
-- `.archived/SESSION_CRITIQUE_COMPLETE.md`
-- `.archived/ALL_PRS_VERIFICATION.md`
-- `.archived/COMPLETE_SWE_CRITIQUE_SUMMARY.md`
-- `.archived/COPILOT_FEEDBACK_ANALYSIS.md`
-- `.archived/FIXES_APPLIED_SUMMARY.md`
-- `.archived/INTEGRATION_CAMPAIGN_REPORT.md`
-- `.archived/SESSION_2_PROGRESS.md`
+**Get started quickly**
+→ [README.md](README.md) → [QUICKSTART.md](QUICKSTART.md)
 
-These contain historical context and analysis from earlier development phases.
+**Understand the VIO system**
+→ [IMU_ARCHITECTURE_ANALYSIS.md](IMU_ARCHITECTURE_ANALYSIS.md) → [TIGHT_COUPLING_ROADMAP.md](TIGHT_COUPLING_ROADMAP.md)
 
----
+**Use batch processing**
+→ [BATCH_PROCESSING_GUIDE.md](BATCH_PROCESSING_GUIDE.md) → [OPTIMIZATION_BATCH_SIMD.md](OPTIMIZATION_BATCH_SIMD.md)
 
-## 🎯 Quick Navigation
+**Deploy to production**
+→ [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md) → [SAFETY.md](SAFETY.md) → [SECURITY.md](SECURITY.md)
 
-### By Role
+**Evaluate system performance**
+→ [DATASETS.md](DATASETS.md) → [VERIFICATION_PROOFS.md](VERIFICATION_PROOFS.md) → [TEST_EVALUATION_RESULTS.md](TEST_EVALUATION_RESULTS.md)
 
-**Project Managers / Leadership**
-1. Start: [README.md](README.md)
-2. Then: [PHASE3_SUMMARY.md](PHASE3_SUMMARY.md)
-3. Finally: [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md)
+**Contribute code**
+→ [CONTRIBUTING.md](CONTRIBUTING.md) → [IMU_ARCHITECTURE_ANALYSIS.md](IMU_ARCHITECTURE_ANALYSIS.md)
 
-**Developers**
-1. Start: [QUICKSTART.md](QUICKSTART.md)
-2. Then: [IMU_ARCHITECTURE_ANALYSIS.md](IMU_ARCHITECTURE_ANALYSIS.md)
-3. API Docs: [BATCH_PROCESSING_GUIDE.md](BATCH_PROCESSING_GUIDE.md)
-
-**Researchers / Evaluators**
-1. Start: [DATASETS.md](DATASETS.md)
-2. Then: [BENCHMARKING_QUICKSTART.sh](BENCHMARKING_QUICKSTART.sh)
-3. Results: [VERIFICATION_PROOFS.md](VERIFICATION_PROOFS.md)
-
-**DevOps / Operations**
-1. Start: [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md)
-2. Then: [SAFETY.md](SAFETY.md) and [SECURITY.md](SECURITY.md)
-3. Maintain: [DEPENDENCY_MAINTENANCE.md](DEPENDENCY_MAINTENANCE.md)
+**Track changes**
+→ [CHANGELOG.md](CHANGELOG.md)
 
 ---
 
-## 📊 Current Status
+## 📦 Documentation Structure
 
-**Phase**: 3 - Optimization ✅  
-**Tests**: 100/100 passing  
-**Code Quality**: Enterprise-grade  
-**Backward Compatibility**: 100%  
+### Core (7 files)
+- Essential architecture and implementation docs
+- Directly relevant to current code
 
-### Latest Changes
-- ✅ Batch processing module implemented
-- ✅ SIMD optimization framework added
-- ✅ 33% latency improvement achieved
-- ✅ 3.4x parallel scaling verified
+### Phase 3 (4 files)
+- Batch processing and SIMD optimization
+- Current focus of development
+
+### Operations (6 files)
+- Deployment, safety, security
+- Production concerns
+
+### Evaluation (3 files)
+- Testing and verification
+- Performance evaluation
+
+### Maintenance (3 files)
+- History and dependencies
+- Project management
 
 ---
 
-## 📞 Support
+## 🗂️ Archived Documentation
 
-For questions or issues:
-1. Check relevant documentation above
-2. Review [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines
-3. Check source code documentation in module docstrings
-4. See `.archived/` for historical context if needed
+Historical and phase-specific documentation (48 files) is available in `.archived/` for reference:
+
+- **Implementation phases**: Phase 2 completion, Phase 2A/2B details
+- **Analysis & reviews**: Critical reviews, executive summaries
+- **Proof of concept**: Dataset proofs, performance proof, reruns
+- **Features**: CPU parallelization, feature detection, build migration
+- **Strategies**: Validation plans, benchmark reports
+- **Other**: Cleanup records, session summaries
+
+Access archived docs:
+```bash
+ls .archived/       # List all archived files
+cat .archived/FILE  # View specific archived file
+```
 
 ---
 
+## ✨ Current System
+
+**Architecture**: Tight visual-inertial coupling via bundle adjustment  
+**IMU Integration**: Preintegrated measurements with bias feedback  
+**Optimization**: Batch processing and SIMD-ready operations  
+**Status**: Production-ready, fully tested (100/100 tests passing)  
+
+---
+
+## 🚀 Key Features
+
+- ✅ Real-time visual-inertial odometry
+- ✅ High-rate IMU preintegration
+- ✅ Bundle adjustment with IMU factors
+- ✅ Bias estimation and feedback
+- ✅ Batch processing (33% latency improvement)
+- ✅ SIMD optimization framework
+- ✅ Multi-core parallelization (3.4x scaling)
+
+---
+
+## 📞 Quick Reference
+
+| Need | Document |
+|------|----------|
+| Setup | [QUICKSTART.md](QUICKSTART.md) |
+| Architecture | [IMU_ARCHITECTURE_ANALYSIS.md](IMU_ARCHITECTURE_ANALYSIS.md) |
+| API | [BATCH_PROCESSING_GUIDE.md](BATCH_PROCESSING_GUIDE.md) |
+| Deployment | [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md) |
+| Testing | [VERIFICATION_PROOFS.md](VERIFICATION_PROOFS.md) |
+| Datasets | [DATASETS.md](DATASETS.md) |
+| Contributing | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Status | [IMU_STATUS.md](IMU_STATUS.md) |
+| Changes | [CHANGELOG.md](CHANGELOG.md) |
+
+---
+
+**Total Docs**: 23 active + 48 archived = 71 total  
 **Last Updated**: February 3, 2026  
-**Maintainer**: VIO Development Team
+**Maintained By**: VIO Development Team
