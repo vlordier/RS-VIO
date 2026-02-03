@@ -486,7 +486,9 @@ impl ImuAidedKeyframeSelector {
                 let delta_rot = na::UnitQuaternion::new(gyro * dt);
                 integrated_rot = delta_rot * integrated_rot;
 
-                // Translation integration (assuming constant velocity model)
+                // Translation integration (constant acceleration approximation)
+                // Displacement = 0.5 * a * t^2 (assumes initial velocity = 0)
+                // Note: This is a heuristic for keyframe selection; official VIO uses proper preintegration
                 integrated_trans += accel * dt * dt * fl!(0.5);
 
                 self.imu_delta_time += dt;
