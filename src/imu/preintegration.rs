@@ -153,6 +153,8 @@ impl PreintegratedImu {
         let omega = gyro - self.linearization_point_bg;
         let acc = accel - self.linearization_point_ba;
 
+        let dt2 = dt * dt;
+
         // First-order Euler integration on manifold
         // R_{k+1} = R_k * Exp(ω * dt)
         let delta_R_k = exp_map_so3(omega * dt);
@@ -162,13 +164,14 @@ impl PreintegratedImu {
         let new_delta_v = self.delta_v + self.delta_R * acc * dt;
 
         // p_{k+1} = p_k + v_k * dt + 0.5 * R_k * a * dt²
-        let new_delta_p = self.delta_p + self.delta_v * dt + 0.5 * (self.delta_R * acc) * dt * dt;
+        let new_delta_p = self.delta_p + self.delta_v * dt + 0.5 * (self.delta_R * acc) * dt2;
 
         // Update Jacobians w.r.t. biases (Forster et al. Eqs. 27-32)
         // CRITICAL: Compute using OLD Jacobians to maintain correct chain rule
         // Cache old values before updating J_R_bg
         let Jr = right_jacobian_so3(omega * dt);
         let R_k = self.delta_R.to_rotation_matrix().matrix().clone();  // Clone to avoid temporary borrow
+        let acc_skew = skew_symmetric(acc);
         let J_R_bg_k = self.J_R_bg;  // Cache BEFORE update
         let J_v_bg_k = self.J_v_bg;  // Cache BEFORE update
         let J_v_ba_k = self.J_v_ba;  // Cache BEFORE update
@@ -177,16 +180,16 @@ impl PreintegratedImu {
         self.J_R_bg = delta_R_k.to_rotation_matrix().matrix() * J_R_bg_k - Jr * dt;
 
         // J_{v,bg}^{k+1} = J_{v,bg}^k - R_k * [a]_× * J_{R,bg}^k * dt (Eq. 28, uses J_R_bg at step k)
-        self.J_v_bg = J_v_bg_k - R_k * skew_symmetric(acc) * J_R_bg_k * dt;
+        self.J_v_bg = J_v_bg_k - R_k * acc_skew * J_R_bg_k * dt;
 
         // J_{v,ba}^{k+1} = J_{v,ba}^k - R_k * dt (Eq. 29)
         self.J_v_ba = J_v_ba_k - R_k * dt;
 
         // J_{p,bg}^{k+1} = J_{p,bg}^k + J_{v,bg}^k * dt - 0.5 * R_k * [a]_× * J_{R,bg}^k * dt² (Eq. 30)
-        self.J_p_bg = self.J_p_bg + J_v_bg_k * dt - 0.5 * R_k * skew_symmetric(acc) * J_R_bg_k * dt * dt;
+        self.J_p_bg = self.J_p_bg + J_v_bg_k * dt - 0.5 * R_k * acc_skew * J_R_bg_k * dt2;
 
         // J_{p,ba}^{k+1} = J_{p,ba}^k + J_{v,ba}^k * dt - 0.5 * R_k * dt² (Eq. 31)
-        self.J_p_ba = self.J_p_ba + J_v_ba_k * dt - 0.5 * R_k * dt * dt;
+        self.J_p_ba = self.J_p_ba + J_v_ba_k * dt - 0.5 * R_k * dt2;
 
         // Propagate covariance
         self.propagate_covariance(omega, acc, dt);
@@ -221,6 +224,8 @@ impl PreintegratedImu {
         let R_k_rot = self.delta_R.to_rotation_matrix();
         let R_k = R_k_rot.matrix();
         let Jr = right_jacobian_so3(omega * dt);
+        let dt2 = dt * dt;
+        let acc_skew = skew_symmetric(acc);
 
         let mut A = na::SMatrix::<f64, 9, 9>::identity();
         
@@ -233,7 +238,7 @@ impl PreintegratedImu {
 
         // Velocity-rotation coupling
         A.fixed_view_mut::<3, 3>(3, 0)
-            .copy_from(&(-R_k * skew_symmetric(acc) * dt));
+            .copy_from(&(-R_k * acc_skew * dt));
 
         // Position-velocity coupling
         A.fixed_view_mut::<3, 3>(6, 3)
@@ -241,7 +246,7 @@ impl PreintegratedImu {
 
         // Position-rotation coupling
         A.fixed_view_mut::<3, 3>(6, 0)
-            .copy_from(&(-0.5 * R_k * skew_symmetric(acc) * dt * dt));
+            .copy_from(&(-0.5 * R_k * acc_skew * dt2));
 
         // Noise gain matrix B (9x6)
         // Maps measurement noise to state error: ξ = B * [η_g; η_a]
@@ -252,11 +257,11 @@ impl PreintegratedImu {
         // Gyro noise affects position through rotation error
         // dP/dη_g = -0.5 * R_k * [acc]_× * Jr * dt²
         B.fixed_view_mut::<3, 3>(6, 0)
-            .copy_from(&(-0.5 * R_k * skew_symmetric(acc) * Jr * dt * dt));
+            .copy_from(&(-0.5 * R_k * acc_skew * Jr * dt2));
         
         // Accel noise → position error
         B.fixed_view_mut::<3, 3>(6, 3)
-            .copy_from(&(0.5 * R_k * dt * dt));
+            .copy_from(&(0.5 * R_k * dt2));
 
         // Σ_{k+1} = A * Σ_k * A^T + B * Q * B^T
         self.covariance = A * self.covariance * A.transpose() + B * Q * B.transpose();
