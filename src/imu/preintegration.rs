@@ -220,8 +220,11 @@ impl PreintegratedImu {
         let Jr = right_jacobian_so3(omega * dt);
 
         let mut A = na::SMatrix::<f64, 9, 9>::identity();
-        // Rotation block
-        A.fixed_view_mut::<3, 3>(0, 0).copy_from(&Jr.transpose());
+        
+        // Rotation block: Jr^{-T} for error-state formulation (left Jacobian inverse transpose)
+        // Left Jacobian: Jl(ω) = Jr(-ω), and we use Jl^{-T} for error propagation
+        let Jr_inv_t = Jr.transpose().try_inverse().unwrap_or_else(|| Jr.transpose());
+        A.fixed_view_mut::<3, 3>(0, 0).copy_from(&Jr_inv_t);
 
         // Velocity-rotation coupling
         A.fixed_view_mut::<3, 3>(3, 0)
@@ -239,9 +242,16 @@ impl PreintegratedImu {
         // Maps measurement noise to state error: ξ = B * [η_g; η_a]
         let mut B = na::SMatrix::<f64, 9, 6>::zeros();
         B.fixed_view_mut::<3, 3>(0, 0).copy_from(&Jr);  // Gyro noise → rotation error
-        B.fixed_view_mut::<3, 3>(3, 3).copy_from(&R_k);  // Accel noise → velocity error (positive)
+        B.fixed_view_mut::<3, 3>(3, 3).copy_from(&R_k);  // Accel noise → velocity error
+        
+        // Gyro noise affects position through rotation error
+        // dP/dη_g = -0.5 * R_k * [acc]_× * Jr * dt²
+        B.fixed_view_mut::<3, 3>(6, 0)
+            .copy_from(&(-0.5 * R_k * skew_symmetric(acc) * Jr * dt * dt));
+        
+        // Accel noise → position error
         B.fixed_view_mut::<3, 3>(6, 3)
-            .copy_from(&(0.5 * R_k * dt));  // Accel noise → position error
+            .copy_from(&(0.5 * R_k * dt * dt));
 
         // Σ_{k+1} = A * Σ_k * A^T + B * Q * B^T
         self.covariance = A * self.covariance * A.transpose() + B * Q * B.transpose();
