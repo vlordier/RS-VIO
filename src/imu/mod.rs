@@ -1440,12 +1440,49 @@ impl ImuMotionPredictor {
 
     pub fn predict_feature_displacement(
         &self,
-        _imu_measurements: &[ImuData],
+        imu_measurements: &[ImuData],
         _prev_pixel: (f64, f64),
-        _focal_length: f64,
+        focal_length: f64,
     ) -> (f64, f64) {
-        // Minimal implementation for compatibility
-        (0.0, 0.0)
+        if imu_measurements.is_empty() {
+            return (0.0, 0.0);
+        }
+
+        // Compute IMU-based camera motion estimate using proper velocity integration
+        let mut velocity = na::Vector3::zeros();
+        let mut last_ts = imu_measurements[0].timestamp;
+
+        for imu in imu_measurements {
+            let dt = (imu.timestamp - last_ts) as f64 / 1e9;
+            if dt > 0.0 {
+                let accel = na::Vector3::new(imu.accel[0] as f64, imu.accel[1] as f64, imu.accel[2] as f64);
+                // Accumulate velocity: v = sum(a * dt)
+                velocity += accel * dt;
+            }
+            last_ts = imu.timestamp;
+        }
+
+        // Estimate motion magnitude and project to image plane
+        // Using simplified perspective projection: pixel_motion = (v_x / v_z) * focal_length
+        // For small rotations, v_z ~= 1 (forward-looking assumption)
+        let speed_norm = velocity.norm();
+        if speed_norm < 1e-6 {
+            return (0.0, 0.0);
+        }
+
+        // Normalize velocity to unit magnitude and scale by focal length
+        let v_normalized = velocity / speed_norm;
+        let pixel_motion_scale = focal_length * speed_norm.min(0.1); // Clamp to avoid outliers
+
+        let du = v_normalized[0] * pixel_motion_scale;
+        let dv = v_normalized[1] * pixel_motion_scale;
+
+        // Sanity check: motion should be reasonable (< 50 pixels typical for feature tracking)
+        if du.abs() > 50.0 || dv.abs() > 50.0 {
+            return (0.0, 0.0);
+        }
+
+        (du, dv)
     }
 
     pub fn update(&mut self, _timestamp: i64, _rotation: na::UnitQuaternion<f64>) {
