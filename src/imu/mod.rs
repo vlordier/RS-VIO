@@ -127,6 +127,7 @@
 pub mod initialization;
 pub mod preintegration;
 pub mod eskf;
+pub mod bias_feedback_tests;
 pub mod buffer;
 
 pub use initialization::{
@@ -1157,10 +1158,6 @@ impl VelocityEstimator {
         }
     }
     
-    pub fn get_velocity(&self) -> na::Vector3<f64> {
-        self.eskf.get_velocity()
-    }
-    
     /// Update velocity estimator with IMU measurements
     ///
     /// Uses actual timestamp deltas from measurements rather than constant dt parameter.
@@ -1199,6 +1196,50 @@ impl VelocityEstimator {
     
     pub fn is_initialized(&self) -> bool {
         self.eskf.state.timestamp.is_some()
+    }
+    
+    /// Apply refined bias estimates from optimization
+    ///
+    /// This implements the feedback loop from bundle adjustment optimization
+    /// back to the ESKF. Refined biases improve future IMU predictions.
+    ///
+    /// # Arguments
+    ///
+    /// * `gyro_bias` - Optimized gyro bias [rad/s]
+    /// * `accel_bias` - Optimized accel bias [m/s²]
+    /// * `uncertainty` - Bias uncertainty (standard deviation) from optimization
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // After optimization completes
+    /// let (optimized_bg, optimized_ba) = optimizer.get_refined_biases();
+    /// velocity_estimator.apply_optimized_biases(optimized_bg, optimized_ba, 0.001);
+    /// ```
+    pub fn apply_optimized_biases(
+        &mut self,
+        gyro_bias: na::Vector3<f64>,
+        accel_bias: na::Vector3<f64>,
+        uncertainty: f64,
+    ) {
+        self.eskf.apply_bias_correction(gyro_bias, accel_bias, uncertainty);
+    }
+    
+    /// Get current bias estimates
+    ///
+    /// Returns (gyro_bias, accel_bias) in rad/s and m/s² respectively
+    pub fn get_biases(&self) -> (na::Vector3<f64>, na::Vector3<f64>) {
+        self.eskf.get_biases()
+    }
+    
+    /// Get current velocity estimate
+    pub fn get_velocity(&self) -> na::Vector3<f64> {
+        self.eskf.get_velocity()
+    }
+    
+    /// Get velocity uncertainty (standard deviation)
+    pub fn get_velocity_uncertainty(&self) -> na::Vector3<f64> {
+        self.eskf.get_velocity_std()
     }
     
     /// Initialize velocity estimator with bias estimates and orientation
