@@ -124,22 +124,23 @@
 //! - **Buffer**: Handles out-of-order measurements and interpolation
 //! - **Initialization**: Static period bias estimation
 
-pub mod initialization;
-pub mod preintegration;
-pub mod eskf;
 pub mod bias_feedback_tests;
 pub mod buffer;
+pub mod eskf;
+pub mod initialization;
+pub mod preintegration;
 
+pub use buffer::ImuBuffer;
+pub use eskf::{Eskf, EskfState};
 pub use initialization::{
-    AdaptiveNoiseEstimator, BiasEstimate, ImuInitializationConfig, ImuInitializer, InitializationState,
+    AdaptiveNoiseEstimator, BiasEstimate, ImuInitializationConfig, ImuInitializer,
+    InitializationState,
 };
 pub use preintegration::{ImuNoise, PreintegratedImu};
-pub use eskf::{Eskf, EskfState};
-pub use buffer::ImuBuffer;
 
 use crate::datasets::ImuData;
-use crate::types::Float;
 use crate::fl;
+use crate::types::Float;
 use nalgebra as na;
 
 /// Configuration for IMU processing
@@ -450,7 +451,7 @@ impl ImuAidedKeyframeSelector {
         } else {
             fl!(0.01) // Fallback: assume 100Hz
         };
-        
+
         let gyro = na::Vector3::new(fl!(imu.gyro[0]), fl!(imu.gyro[1]), fl!(imu.gyro[2]));
         let accel = na::Vector3::new(fl!(imu.accel[0]), fl!(imu.accel[1]), fl!(imu.accel[2]));
 
@@ -477,7 +478,8 @@ impl ImuAidedKeyframeSelector {
             let dt = fl!((imu.timestamp - last_ts) as f64 / 1e9);
             if dt > fl!(0.0) {
                 let gyro = na::Vector3::new(fl!(imu.gyro[0]), fl!(imu.gyro[1]), fl!(imu.gyro[2]));
-                let accel = na::Vector3::new(fl!(imu.accel[0]), fl!(imu.accel[1]), fl!(imu.accel[2]));
+                let accel =
+                    na::Vector3::new(fl!(imu.accel[0]), fl!(imu.accel[1]), fl!(imu.accel[2]));
 
                 // Rotation integration
                 let delta_rot = na::UnitQuaternion::new(gyro * dt);
@@ -662,7 +664,7 @@ impl ImuMotionPrior {
             gravity,
         }
     }
-    
+
     /// Create from legacy preintegrated measurements (compatibility)
     pub fn from_legacy_preintegration(
         preint: &LegacyPreintegratedImu,
@@ -1000,13 +1002,13 @@ mod tests {
 pub struct TimeOffsetCalibrator {
     /// Current time offset estimate [nanoseconds]
     pub time_offset: i64,
-    
+
     /// Uncertainty in time offset [nanoseconds]
     pub time_offset_std: f64,
-    
+
     /// Measurements for calibration
     observations: Vec<(i64, i64, f64)>, // (t_cam, t_imu, correlation)
-    
+
     /// Maximum observations to keep
     max_observations: usize,
 }
@@ -1021,7 +1023,7 @@ impl TimeOffsetCalibrator {
             max_observations: 100,
         }
     }
-    
+
     /// Add observation from visual-inertial correlation
     ///
     /// # Arguments
@@ -1030,10 +1032,11 @@ impl TimeOffsetCalibrator {
     /// * `correlation` - Correlation score (higher = better match)
     pub fn add_observation(&mut self, t_cam: i64, t_imu: i64, correlation: f64) {
         self.observations.push((t_cam, t_imu, correlation));
-        
+
         if self.observations.len() > self.max_observations {
             // Remove lowest correlation observation
-            let min_idx = self.observations
+            let min_idx = self
+                .observations
                 .iter()
                 .enumerate()
                 .min_by(|(_, a), (_, b)| a.2.partial_cmp(&b.2).unwrap())
@@ -1041,57 +1044,60 @@ impl TimeOffsetCalibrator {
                 .unwrap();
             self.observations.remove(min_idx);
         }
-        
+
         // Update estimate
         self.estimate_offset();
     }
-    
+
     /// Estimate time offset from observations
     fn estimate_offset(&mut self) {
         if self.observations.is_empty() {
             return;
         }
-        
+
         // Weighted average by correlation
         let total_weight: f64 = self.observations.iter().map(|(_, _, c)| c).sum();
-        
+
         if total_weight < 1e-6 {
             return;
         }
-        
-        let weighted_offset: i64 = self.observations
+
+        let weighted_offset: i64 = self
+            .observations
             .iter()
             .map(|(t_cam, t_imu, corr)| {
                 let offset = t_cam - t_imu;
                 (offset as f64 * corr) as i64
             })
             .sum();
-        
+
         self.time_offset = (weighted_offset as f64 / total_weight) as i64;
-        
+
         // Estimate uncertainty from variance
-        let variance: f64 = self.observations
+        let variance: f64 = self
+            .observations
             .iter()
             .map(|(t_cam, t_imu, corr)| {
                 let offset = (t_cam - t_imu) as f64;
                 let deviation = offset - self.time_offset as f64;
                 deviation * deviation * corr
             })
-            .sum::<f64>() / total_weight;
-        
+            .sum::<f64>()
+            / total_weight;
+
         self.time_offset_std = variance.sqrt();
     }
-    
+
     /// Apply time offset correction to IMU timestamp
     pub fn correct_imu_time(&self, t_imu: i64) -> i64 {
         t_imu + self.time_offset
     }
-    
+
     /// Get current offset estimate [seconds]
     pub fn get_offset_seconds(&self) -> f64 {
         self.time_offset as f64 / 1e9
     }
-    
+
     /// Check if calibration has converged
     pub fn is_converged(&self) -> bool {
         self.observations.len() >= 20 && self.time_offset_std < 1e6 // < 1ms
@@ -1113,6 +1119,7 @@ impl Default for TimeOffsetCalibrator {
 /// **Note**: This is a compatibility shim. New code should use `PreintegratedImu` directly.
 pub struct ImuPreintegrator {
     preint: PreintegratedImu,
+    #[allow(dead_code)]
     config: ImuConfig,
     last_gyro: na::Vector3<f64>,
     last_accel: na::Vector3<f64>,
@@ -1127,7 +1134,7 @@ impl ImuPreintegrator {
             gyro_bias_random_walk: config.gyro_bias_random_walk,
             accel_bias_random_walk: config.accel_bias_random_walk,
         };
-        
+
         Self {
             preint: PreintegratedImu::new(noise),
             config,
@@ -1136,23 +1143,27 @@ impl ImuPreintegrator {
             has_measurement: false,
         }
     }
-    
+
     pub fn propagate(&mut self, imu: &ImuData, dt: f64) {
         let gyro = na::Vector3::new(imu.gyro[0] as f64, imu.gyro[1] as f64, imu.gyro[2] as f64);
-        let accel = na::Vector3::new(imu.accel[0] as f64, imu.accel[1] as f64, imu.accel[2] as f64);
-        
+        let accel = na::Vector3::new(
+            imu.accel[0] as f64,
+            imu.accel[1] as f64,
+            imu.accel[2] as f64,
+        );
+
         if self.has_measurement {
             // Use midpoint
             let gyro_mid = (self.last_gyro + gyro) * 0.5;
             let accel_mid = (self.last_accel + accel) * 0.5;
             self.preint.integrate(gyro_mid, accel_mid, dt);
         }
-        
+
         self.last_gyro = gyro;
         self.last_accel = accel;
         self.has_measurement = true;
     }
-    
+
     pub fn propagate_corrected(
         &mut self,
         gyro_corrected: na::Vector3<f64>,
@@ -1164,16 +1175,16 @@ impl ImuPreintegrator {
             let accel_mid = (self.last_accel + accel_corrected) * 0.5;
             self.preint.integrate(gyro_mid, accel_mid, dt);
         }
-        
+
         self.last_gyro = gyro_corrected;
         self.last_accel = accel_corrected;
         self.has_measurement = true;
     }
-    
+
     pub fn get(&self) -> LegacyPreintegratedImu {
         // Convert SMatrix<9,9> to DMatrix
         let cov_dmat = na::DMatrix::from_fn(9, 9, |i, j| self.preint.covariance[(i, j)]);
-        
+
         LegacyPreintegratedImu {
             delta_rotation: na::UnitQuaternion::from_quaternion(na::Quaternion::new(
                 self.preint.delta_R.w,
@@ -1187,9 +1198,10 @@ impl ImuPreintegrator {
             covariance: cov_dmat,
         }
     }
-    
+
     pub fn reset(&mut self) {
-        self.preint.reset(na::Vector3::zeros(), na::Vector3::zeros());
+        self.preint
+            .reset(na::Vector3::zeros(), na::Vector3::zeros());
         self.has_measurement = false;
     }
 
@@ -1231,18 +1243,14 @@ impl VelocityEstimator {
             gyro_bias_random_walk: config.gyro_bias_random_walk,
             accel_bias_random_walk: config.accel_bias_random_walk,
         };
-        
-        let gravity = na::Vector3::new(
-            config.gravity[0],
-            config.gravity[1],
-            config.gravity[2],
-        );
-        
+
+        let gravity = na::Vector3::new(config.gravity[0], config.gravity[1], config.gravity[2]);
+
         Self {
             eskf: Eskf::new(noise, gravity),
         }
     }
-    
+
     /// Update velocity estimator with IMU measurements
     ///
     /// Uses actual timestamp deltas from measurements rather than constant dt parameter.
@@ -1251,38 +1259,44 @@ impl VelocityEstimator {
         if imu_measurements.is_empty() {
             return;
         }
-        
+
         // Process measurements with actual timestamp spacing
         let mut prev_timestamp = imu_measurements[0].timestamp;
-        
+
         for imu in &imu_measurements[1..] {
             // Compute dt from actual timestamp delta (nanoseconds to seconds)
             let dt_ns = (imu.timestamp - prev_timestamp) as f64;
             let dt_s = dt_ns * 1e-9;
-            
+
             // Sanity check on dt (should be between 1ms and 100ms for typical IMU)
             if dt_s > 0.0 && dt_s < 0.1 {
                 self.eskf.predict(imu, dt_s);
             } else if dt_s <= 0.0 {
                 eprintln!("Warning: Out-of-order or duplicate IMU timestamps detected");
             } else {
-                eprintln!("Warning: Very large IMU timestamp gap: {:.3}s (measurement skipped)", dt_s);
+                eprintln!(
+                    "Warning: Very large IMU timestamp gap: {:.3}s (measurement skipped)",
+                    dt_s
+                );
             }
-            
+
             prev_timestamp = imu.timestamp;
         }
     }
-    
+
     /// Legacy update method (deprecated, use new update signature)
-    #[deprecated(since = "0.2.0", note = "Use update(&imu_measurements) without dt parameter")]
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use update(&imu_measurements) without dt parameter"
+    )]
     pub fn update_legacy(&mut self, imu_measurements: &[ImuData], _dt: f64) {
         self.update(imu_measurements);
     }
-    
+
     pub fn is_initialized(&self) -> bool {
         self.eskf.state.timestamp.is_some()
     }
-    
+
     /// Apply refined bias estimates from optimization
     ///
     /// This implements the feedback loop from bundle adjustment optimization
@@ -1307,21 +1321,22 @@ impl VelocityEstimator {
         accel_bias: na::Vector3<f64>,
         uncertainty: f64,
     ) {
-        self.eskf.apply_bias_correction(gyro_bias, accel_bias, uncertainty);
+        self.eskf
+            .apply_bias_correction(gyro_bias, accel_bias, uncertainty);
     }
-    
+
     /// Get current bias estimates
     ///
     /// Returns (gyro_bias, accel_bias) in rad/s and m/s² respectively
     pub fn get_biases(&self) -> (na::Vector3<f64>, na::Vector3<f64>) {
         self.eskf.get_biases()
     }
-    
+
     /// Get current velocity estimate
     pub fn get_velocity(&self) -> na::Vector3<f64> {
         self.eskf.get_velocity()
     }
-    
+
     /// Get velocity uncertainty (standard deviation)
     pub fn get_velocity_uncertainty(&self) -> na::Vector3<f64> {
         self.eskf.get_velocity_std()
@@ -1345,13 +1360,13 @@ impl VelocityEstimator {
     pub fn update_from_visual(&mut self, measurement: &VisualMeasurement) {
         self.eskf.update_orientation(measurement.orientation);
         if let Some(velocity) = measurement.velocity {
-            let covariance = measurement.velocity_covariance.unwrap_or_else(|| {
-                na::Matrix3::identity() * 0.25
-            });
+            let covariance = measurement
+                .velocity_covariance
+                .unwrap_or_else(|| na::Matrix3::identity() * 0.25);
             self.eskf.update_velocity(velocity, covariance);
         }
     }
-    
+
     /// Initialize velocity estimator with bias estimates and orientation
     ///
     /// For tight visual-inertial coupling, this sets up the ESKF with:
@@ -1366,29 +1381,36 @@ impl VelocityEstimator {
     ) {
         // Set initial orientation from visual system
         self.eskf.update_orientation(*initial_orientation);
-        
+
         // Apply bias estimates from initialization phase if available
         if let Some(bias) = bias_estimate {
             self.eskf.state.gyro_bias = bias.gyro_bias;
             self.eskf.state.accel_bias = bias.accel_bias;
-            
+
             // Set covariance based on bias estimation quality
-            self.eskf.state.covariance
+            self.eskf
+                .state
+                .covariance
                 .fixed_view_mut::<3, 3>(3, 3)
                 .fill_diagonal(bias.gyro_bias_std.powi(2));
-            self.eskf.state.covariance
+            self.eskf
+                .state
+                .covariance
                 .fixed_view_mut::<3, 3>(6, 6)
                 .fill_diagonal(bias.accel_bias_std.powi(2));
         }
-        
+
         // Initialize timestamp from first measurement
         if let Some(first) = imu_measurements.first() {
             self.eskf.state.timestamp = Some(first.timestamp);
         }
     }
-    
+
     /// Legacy initialization method (deprecated, use initialize_from_bias_and_orientation)
-    #[deprecated(since = "0.2.0", note = "Use initialize_from_bias_and_orientation instead")]
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use initialize_from_bias_and_orientation instead"
+    )]
     pub fn initialize_from_imu(
         &mut self,
         imu_measurements: &[ImuData],
@@ -1407,7 +1429,7 @@ impl ImuMotionPredictor {
     pub fn new(config: ImuConfig) -> Self {
         Self { _config: config }
     }
-    
+
     pub fn predict_feature_displacement(
         &self,
         _imu_measurements: &[ImuData],
@@ -1417,7 +1439,7 @@ impl ImuMotionPredictor {
         // Minimal implementation for compatibility
         (0.0, 0.0)
     }
-    
+
     pub fn update(&mut self, _timestamp: i64, _rotation: na::UnitQuaternion<f64>) {
         // No-op in new implementation
     }

@@ -4,8 +4,8 @@ pub mod observer;
 pub mod parallel_factors;
 pub mod result;
 
-pub use result::OptimizationResult;
 pub use imu_factor::ImuFactorSe3;
+pub use result::OptimizationResult;
 
 #[cfg(test)]
 mod tests;

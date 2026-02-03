@@ -1,7 +1,7 @@
 # RS-VIO: IMU Implementation - Complete Guide
 
-**Status**: ✅ All critical bugs fixed, foundation ready for optimization integration  
-**Test Results**: 84/84 tests passing  
+**Status**: ✅ All critical bugs fixed, foundation ready for optimization integration
+**Test Results**: 84/84 tests passing
 **Last Updated**: Current session
 
 ---
@@ -37,7 +37,7 @@ cargo test --lib imu::tests::test_velocity_estimator
 ### Critical Issue #1: Noise Covariance Sign (FIXED ✅)
 **Impact**: Filter covariance was inverted - faster IMU = less uncertainty (backwards!)
 
-**Files**: 
+**Files**:
 - [src/imu/preintegration.rs](src/imu/preintegration.rs#L204) - Multiplication by dt
 - [src/imu/eskf.rs](src/imu/eskf.rs#L201) - Multiplication by dt
 
@@ -330,19 +330,19 @@ cargo test --lib -- --nocapture --test-threads=1
 
 ## FAQ
 
-**Q: Why was the noise covariance sign wrong?**  
+**Q: Why was the noise covariance sign wrong?**
 A: Confusion between continuous-time PSD and discrete-time variance accumulation. Dividing instead of multiplying inverted the filter behavior.
 
-**Q: What if my IMU rate varies wildly?**  
+**Q: What if my IMU rate varies wildly?**
 A: The system now handles it correctly. dt is computed from actual timestamps (nanosecond precision). As long as dt stays in [1ms, 100ms] range, it works.
 
-**Q: Can I use this without optimization?**  
+**Q: Can I use this without optimization?**
 A: Yes! ESKF alone provides velocity estimates. For better accuracy, integrate with optimization (Phase 2A+).
 
-**Q: How do I know if biases are correct?**  
+**Q: How do I know if biases are correct?**
 A: Check that velocity estimates are stable over time. Large fluctuations suggest incorrect biases.
 
-**Q: What about IMU-camera synchronization?**  
+**Q: What about IMU-camera synchronization?**
 A: Currently assumed synchronized. Time offset calibration is in Phase 3.
 
 ---
@@ -415,12 +415,11 @@ cargo fmt
 
 ## Summary
 
-✅ **All critical bugs fixed**  
-✅ **Foundation ready for optimization**  
-✅ **84/84 tests passing**  
+✅ **All critical bugs fixed**
+✅ **Foundation ready for optimization**
+✅ **84/84 tests passing**
 ✅ **Architecture aligned with tight coupling**
 
 **Next step**: Implement Phase 2A (preintegration factors) - 4-6 hours to tight coupling
 
 **Status**: READY FOR OPTIMIZATION INTEGRATION 🚀
-

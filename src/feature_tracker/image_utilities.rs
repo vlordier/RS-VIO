@@ -156,15 +156,19 @@ pub fn detect_key_points(
         .par_iter()
         .flat_map(|&(x, y)| {
             let image_view = image.view(x, y, grid_size, grid_size).to_image();
-            
+
             // Optimization: Run FAST once with minimum threshold (10) instead of iterative loop.
             // This yields a super-set of corners. We then sort by score and take the best ones.
             // This avoids re-scanning the image pixels multiple times in low-contrast observations.
             let mut fast_corners = corners_fast9(&image_view, 10);
-            
+
             #[allow(clippy::unwrap_used)]
             // Sort Descending (Best score first). Original code was Ascending (Bug?), fixed here.
-            fast_corners.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+            fast_corners.sort_by(|a, b| {
+                b.score
+                    .partial_cmp(&a.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
 
             let mut cell_corners = Vec::new();
             for mut point in fast_corners {
@@ -202,9 +206,9 @@ mod tests {
         // Or just random noise with fixed seed (but here we construct manually)
         for (x, y, pixel) in image.enumerate_pixels_mut() {
             if (x % 10 == 0) && (y % 10 == 0) {
-                 *pixel = image::Luma([255u8]);
+                *pixel = image::Luma([255u8]);
             } else {
-                 *pixel = image::Luma([((x + y) % 50) as u8]);
+                *pixel = image::Luma([((x + y) % 50) as u8]);
             }
         }
 
@@ -231,7 +235,10 @@ mod tests {
         }
 
         // Also ensure we actually found something
-        assert!(!corners1.is_empty(), "Should have found corners in synthetic image");
+        assert!(
+            !corners1.is_empty(),
+            "Should have found corners in synthetic image"
+        );
     }
 
     #[test]
@@ -257,7 +264,8 @@ mod tests {
         let current_corners = vec![Corner::new(center_x, center_y, 10.0)];
         let num_points_in_cell = 5;
 
-        let new_corners = detect_key_points(&image, grid_size, &current_corners, num_points_in_cell);
+        let new_corners =
+            detect_key_points(&image, grid_size, &current_corners, num_points_in_cell);
 
         // Should NOT find corners in the top-left cell because it had a corner
         // But might find in others (top-right, bottom-left, bottom-right)
@@ -265,7 +273,10 @@ mod tests {
         for c in new_corners {
             let cx = (c.x - x_start) / grid_size;
             let cy = (c.y - y_start) / grid_size;
-            assert!(!(cx == 0 && cy == 0), "Should not detect corners in occupied cell (0,0)");
+            assert!(
+                !(cx == 0 && cy == 0),
+                "Should not detect corners in occupied cell (0,0)"
+            );
         }
     }
 

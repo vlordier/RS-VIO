@@ -72,7 +72,7 @@ impl Default for ConstantVelocityConfig {
             min_dt: 1e-4,
             max_velocity: 20.0, // m/s
             initial_velocity: [0.0, 0.0, 0.0],
-            velocity_noise_std: 0.1,       // m/s
+            velocity_noise_std: 0.1,          // m/s
             velocity_process_noise_std: 0.01, // m/s² (acceleration noise)
         }
     }
@@ -138,11 +138,7 @@ impl ConstantVelocityModel {
     /// # Arguments
     /// * `pose` - World-to-body transformation (T_w_b)
     /// * `timestamp` - Frame timestamp [ns]
-    pub fn initialize(
-        &mut self,
-        pose: na::Isometry3<f64>,
-        timestamp: i64,
-    ) -> Result<()> {
+    pub fn initialize(&mut self, pose: na::Isometry3<f64>, timestamp: i64) -> Result<()> {
         self.last_pose = pose;
         self.last_timestamp = timestamp;
         self.velocity = na::Vector3::from(self.config.initial_velocity);
@@ -161,11 +157,7 @@ impl ConstantVelocityModel {
     ///
     /// # Returns
     /// Innovation (prediction error) in position [m]
-    pub fn update(
-        &mut self,
-        pose: na::Isometry3<f64>,
-        timestamp: i64,
-    ) -> Result<f64> {
+    pub fn update(&mut self, pose: na::Isometry3<f64>, timestamp: i64) -> Result<f64> {
         let dt = (timestamp - self.last_timestamp) as f64 / 1e9;
 
         // Ensure valid time delta
@@ -389,10 +381,8 @@ mod tests {
         let conf_initial = model.confidence();
 
         for i in 1..=10 {
-            let pose_j = na::Isometry3::new(
-                na::Vector3::new(i as f64, 0.0, 0.0),
-                na::Vector3::zeros(),
-            );
+            let pose_j =
+                na::Isometry3::new(na::Vector3::new(i as f64, 0.0, 0.0), na::Vector3::zeros());
             let _ = model.update(pose_j, (i as i64) * 1_000_000_000);
         }
 
@@ -407,10 +397,12 @@ mod tests {
 
         let pose = na::Isometry3::new(na::Vector3::new(1.0, 0.0, 0.0), na::Vector3::zeros());
         model.initialize(pose, 0).unwrap();
-        model.update(
-            na::Isometry3::new(na::Vector3::new(2.0, 0.0, 0.0), na::Vector3::zeros()),
-            1_000_000_000,
-        ).unwrap();
+        model
+            .update(
+                na::Isometry3::new(na::Vector3::new(2.0, 0.0, 0.0), na::Vector3::zeros()),
+                1_000_000_000,
+            )
+            .unwrap();
 
         assert!(model.speed() > 0.0);
 
@@ -456,10 +448,8 @@ mod tests {
 
         // Multiple updates should accumulate mean innovation
         for i in 1..=3 {
-            let pose_j = na::Isometry3::new(
-                na::Vector3::new(i as f64, 0.0, 0.0),
-                na::Vector3::zeros(),
-            );
+            let pose_j =
+                na::Isometry3::new(na::Vector3::new(i as f64, 0.0, 0.0), na::Vector3::zeros());
             let _ = model.update(pose_j, (i as i64) * 1_000_000_000);
         }
 

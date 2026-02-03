@@ -7,6 +7,7 @@ pub mod optimization;
 pub mod types;
 pub mod viewers;
 
+#[allow(clippy::crate_in_macro_def)]
 #[macro_export]
 macro_rules! fl {
     ($val:expr) => {

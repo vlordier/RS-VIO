@@ -5,7 +5,7 @@
 **Module**: `src/optimization/factors.rs`, `src/estimator/sliding_window.rs`
 
 ## Problem
-The `BundleAdjustmentFactor` struct was storing 4x4 transformation matrices (`Matrix4<f64>`, 128 bytes) by value. 
+The `BundleAdjustmentFactor` struct was storing 4x4 transformation matrices (`Matrix4<f64>`, 128 bytes) by value.
 - **T_C_B** (Camera to Body): Constant for all factors of a specific camera.
 - **fixed_pose**: Optional constant pose for fixed frames.
 

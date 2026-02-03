@@ -15,7 +15,7 @@ pub fn update(&mut self, imu_measurements: &[ImuData], dt: f64) {
 ```
 
 ### The Problem
-- Array of measurements with **different timestamps** 
+- Array of measurements with **different timestamps**
 - Single `dt` parameter that applies to **all** measurements equally
 - Real IMU data: might have 10ms spacing, then 15ms, then 8ms
 - Current: treats all as if equally spaced by `dt`
@@ -25,7 +25,7 @@ pub fn update(&mut self, imu_measurements: &[ImuData], dt: f64) {
 IMU Measurements: [
   {timestamp: 1000, accel: [1, 0, 0]},   // t=1ms
   {timestamp: 2000, accel: [1, 0, 0]},   // t=2ms (Δt=1ms) ✓
-  {timestamp: 3000, accel: [1, 0, 0]},   // t=3ms (Δt=1ms) ✓  
+  {timestamp: 3000, accel: [1, 0, 0]},   // t=3ms (Δt=1ms) ✓
   {timestamp: 3200, accel: [1, 0, 0]},   // t=3.2ms (Δt=0.2ms) ❌ treated as 1ms!
 ]
 
@@ -42,19 +42,19 @@ pub fn update(&mut self, imu_measurements: &[ImuData]) {
     if imu_measurements.is_empty() {
         return;
     }
-    
+
     let mut prev_timestamp = imu_measurements[0].timestamp;
-    
+
     for imu in &imu_measurements[1..] {
         let dt_ns = (imu.timestamp - prev_timestamp) as f64;
         let dt_s = dt_ns * 1e-9;  // nanoseconds to seconds
-        
+
         if dt_s > 0.0 && dt_s < 0.1 {  // Sanity check
             self.eskf.predict(imu, dt_s);
         } else if dt_s <= 0.0 {
             eprintln!("Warning: Out-of-order or duplicate timestamps");
         }
-        
+
         prev_timestamp = imu.timestamp;
     }
 }
@@ -79,7 +79,7 @@ fn propagate_covariance(&mut self, omega: na::Vector3<f64>, acc: na::Vector3<f64
     // ❌ WRONG: Dividing by dt instead of multiplying
     let gyro_cov = self.noise.gyro_noise_density.powi(2) / dt;
     let accel_cov = self.noise.accel_noise_density.powi(2) / dt;
-    
+
     let mut Q = na::SMatrix::<f64, 6, 6>::zeros();
     Q.fixed_view_mut::<3, 3>(0, 0).fill_diagonal(gyro_cov);
     Q.fixed_view_mut::<3, 3>(3, 3).fill_diagonal(accel_cov);
@@ -127,11 +127,11 @@ fn propagate_covariance(&mut self, omega: na::Vector3<f64>, acc: na::Vector3<f64
     // ✓ CORRECT: Multiply by dt for discrete integration
     let gyro_cov = self.noise.gyro_noise_density.powi(2) * dt;
     let accel_cov = self.noise.accel_noise_density.powi(2) * dt;
-    
+
     let mut Q = na::SMatrix::<f64, 6, 6>::zeros();
     Q.fixed_view_mut::<3, 3>(0, 0).fill_diagonal(gyro_cov);
     Q.fixed_view_mut::<3, 3>(3, 3).fill_diagonal(accel_cov);
-    
+
     // ... rest of function
 }
 ```
@@ -154,7 +154,7 @@ Actually, the ESKF code **already multiplies by dt**. Only preintegration divide
 
 ## Issue #3: No Orientation Feedback (CRITICAL)
 
-**File**: `src/imu/eskf.rs` 
+**File**: `src/imu/eskf.rs`
 **Severity**: 🔴 CRITICAL - System is incomplete
 
 ### Current Code
@@ -169,9 +169,9 @@ pub struct Eskf {
 pub fn predict(&mut self, imu: &ImuData, dt: f64) {
     let _gyro = na::Vector3::new(imu.gyro[0], imu.gyro[1], imu.gyro[2]);  // ❌ Ignored!
     let accel = na::Vector3::new(imu.accel[0], imu.accel[1], imu.accel[2]);
-    
+
     let accel_corrected = accel - self.state.accel_bias;
-    
+
     // ❌ Uses constant orientation throughout!
     let accel_world = self.orientation * accel_corrected;
     self.state.velocity += (accel_world + self.gravity) * dt;
@@ -257,7 +257,7 @@ If `self.orientation` stays at identity, then `accel_world ≈ accel_imu`, which
 **Example**: Robot tilted 30° forward
 - True forward velocity: 1 m/s
 - Accelerometer reads: [0, 0, 9.81 + accel_forward] ≈ [0, 0, 9.81]
-- Velocity computed (with identity orientation): v = [0, 0, 9.81*dt] 
+- Velocity computed (with identity orientation): v = [0, 0, 9.81*dt]
 - **Should be**: v = [~1, 0, 0] after rotation by 30°
 - **Actual**: v = [0, 0, ...] (completely wrong direction!)
 
@@ -335,17 +335,17 @@ impl VelocityEstimator {
         bias_estimate: &BiasEstimate,  // ← Use this!
     ) {
         self.eskf.update_orientation(*initial_orientation);
-        
+
         // ✓ Apply bias estimates
         self.eskf.state.gyro_bias = bias_estimate.gyro_bias;
         self.eskf.state.accel_bias = bias_estimate.accel_bias;
-        
+
         // ✓ Set uncertainty based on calibration quality
         self.eskf.state.covariance.fixed_view_mut::<3, 3>(3, 3)
             .fill_diagonal(bias_estimate.gyro_bias_std.powi(2));
         self.eskf.state.covariance.fixed_view_mut::<3, 3>(6, 6)
             .fill_diagonal(bias_estimate.accel_bias_std.powi(2));
-        
+
         if let Some(first) = imu_measurements.first() {
             self.eskf.state.timestamp = Some(first.timestamp);
         }
@@ -365,13 +365,13 @@ impl VelocityEstimator {
 pub fn update_bias(&mut self, new_bg: na::Vector3<f64>, new_ba: na::Vector3<f64>) {
     let d_bg = new_bg - self.linearization_point_bg;
     let d_ba = new_ba - self.linearization_point_ba;
-    
+
     let delta_R_correction = exp_map_so3(self.J_R_bg * d_bg);
     self.delta_R = self.delta_R * delta_R_correction;
-    
+
     self.delta_v = self.delta_v + self.J_v_bg * d_bg + self.J_v_ba * d_ba;
     self.delta_p = self.delta_p + self.J_p_bg * d_bg + self.J_p_ba * d_ba;
-    
+
     self.linearization_point_bg = new_bg;
     self.linearization_point_ba = new_ba;
 }
@@ -394,7 +394,7 @@ loop {
     // 1. Visual features provide position measurements
     // 2. Optimization updates pose and biases
     // 3. Preintegrated IMU factors use the bias Jacobians:
-    
+
     for preint in &mut preintegrated_measurements {
         let optimized_bias = optimizer.get_bias();
         preint.update_bias(optimized_bias.gyro, optimized_bias.accel);
@@ -465,17 +465,17 @@ Measurements correct errors, uncertainty stays bounded.
 pub fn update_position(&mut self, z_position: na::Vector3<f64>, R_meas: na::Matrix3<f64>) {
     // Measurement model: z = x_position (direct)
     let H = create_position_measurement_matrix();  // 3x9, extracts position
-    
+
     // Innovation
     let innovation = z_position - H * state_vector();
-    
+
     // Kalman gain: K = P*H^T / (H*P*H^T + R)
     let S = H * self.covariance * H.transpose() + R_meas;
     let K = self.covariance * H.transpose() * S.try_inverse().unwrap();
-    
+
     // State update
     // (Skip for velocity-only ESKF, but would update pose if available)
-    
+
     // Covariance update
     self.covariance = (Matrix9::identity() - K * H) * self.covariance;
 }
@@ -494,4 +494,3 @@ pub fn update_position(&mut self, z_position: na::Vector3<f64>, R_meas: na::Matr
 | Preintegration update unused | 🟠 | preintegration.rs | 226 | Dead code | Can't optimize biases |
 | No measurement updates | 🔴 | eskf.rs | 145 | Missing | Filter is open-loop |
 | Gyro ignored | 🟠 | eskf.rs | 165 | Logic | No orientation propagation |
-

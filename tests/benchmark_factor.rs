@@ -1,8 +1,8 @@
-use rs_vio::optimization::factors::BundleAdjustmentFactor;
 use apex_solver::factors::Factor;
+use na::{DVector, Matrix4, Vector2, Vector3};
 use nalgebra as na;
+use rs_vio::optimization::factors::BundleAdjustmentFactor;
 use std::time::Instant;
-use na::{Vector2, Matrix4, Vector3, DVector};
 
 #[test]
 fn bench_factor_linearize() {
@@ -15,10 +15,7 @@ fn bench_factor_linearize() {
     // T_B_W (Identity)
     let T_B_W = DVector::from_vec(vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]); // tx,ty,tz, qw,qx,qy,qz
 
-    let params = vec![
-        DVector::from_vec(vec![p_W.x, p_W.y, p_W.z]),
-        T_B_W
-    ];
+    let params = vec![DVector::from_vec(vec![p_W.x, p_W.y, p_W.z]), T_B_W];
 
     // Warmup
     factor.linearize(&params, true);
@@ -30,24 +27,27 @@ fn bench_factor_linearize() {
         let _ = factor.linearize(&params, true);
     }
     let duration = start.elapsed();
-    
-    println!("BENCHMARK: BundleAdjustmentFactor::linearize took: {:?} for {} iterations", duration, iterations);
+
+    println!(
+        "BENCHMARK: BundleAdjustmentFactor::linearize took: {:?} for {} iterations",
+        duration, iterations
+    );
     println!("  Avg: {:?}", duration / iterations as u32);
 }
 
 #[test]
 fn bench_pnp_factor_linearize() {
     use rs_vio::optimization::factors::PnPFactor;
-    
+
     let obs = Vector2::new(0.5, 0.5);
     let T_C_B = Matrix4::identity();
     let p_W = Vector3::new(10.0, 5.0, 20.0);
-    
+
     let factor = PnPFactor::new(obs, T_C_B, p_W);
 
     // Initial guess for T_B_W (Identity)
     // 7 params: tx,ty,tz, qw,qx,qy,qz
-    let T_B_W = DVector::from_vec(vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]); 
+    let T_B_W = DVector::from_vec(vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]);
 
     let params = vec![T_B_W];
 
@@ -60,7 +60,10 @@ fn bench_pnp_factor_linearize() {
         let _ = factor.linearize(&params, true);
     }
     let duration = start.elapsed();
-    
-    println!("BENCHMARK: PnPFactor::linearize took: {:?} for {} iterations", duration, iterations);
+
+    println!(
+        "BENCHMARK: PnPFactor::linearize took: {:?} for {} iterations",
+        duration, iterations
+    );
     println!("  Avg: {:?}", duration / iterations as u32);
 }

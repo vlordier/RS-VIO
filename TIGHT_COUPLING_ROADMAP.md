@@ -68,16 +68,16 @@ Visual Frame + IMU Block → Bundle Adjustment
    pub struct ImuFactor {
        /// Preintegrated measurements between i and j
        preintegration: PreintegratedImu,
-       
+
        /// Keyframe indices
        frame_i: usize,
        frame_j: usize,
-       
+
        /// Reference biases used during preintegration
        ref_bias_g: Vector3,
        ref_bias_a: Vector3,
    }
-   
+
    impl ImuFactor {
        /// Compute residual given poses and velocities
        pub fn residual(
@@ -88,7 +88,7 @@ Visual Frame + IMU Block → Bundle Adjustment
        ) -> Vector12 {  // 3+3+3+3 for ΔR, Δv, Δp, bias errors
            // ...
        }
-       
+
        /// Jacobian w.r.t. variables
        pub fn jacobians(&self, ...) -> (J_R, J_v, J_p, J_bg, J_ba);
    }
@@ -171,7 +171,7 @@ Visual Frame + IMU Block → Bundle Adjustment
        image: ImageData,
        pose: Pose,
        features: Vec<Feature>,
-       
+
        // New: IMU link
        imu_factor: Option<ImuFactor>,  // To previous keyframe
    }
@@ -452,4 +452,3 @@ If you want tight coupling with minimum code:
    - Test optimization runs without errors
 
 **Estimated time**: 4-6 hours to complete Phase 2A
-

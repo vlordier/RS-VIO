@@ -12,10 +12,10 @@
                          │
                          │ (BiasEstimate)
                          │ ❌ UNUSED
-                         ↓ 
+                         ↓
                          ∅ (orphaned)
-                         
-                         
+
+
     VisualOdometry             IMU Measurements
            │                          │
            │                          ▼
@@ -33,7 +33,7 @@
            │                  [Velocity Output]
            │                         │
            │                         ❌ Discarded?
-           │                         
+           │
     PreintegratedImu
     (separate system,
      never connected)
@@ -112,7 +112,7 @@ TRACKING PHASE (Continuous)
                ├─ With current biases
                └─ Computes Jacobians
                   J_R_bg, J_v_bg, etc.
-                  
+
          (Every IMU measurement)
                   │
                   ├─ Also: Gyro integration
@@ -210,7 +210,7 @@ TRACKING PHASE (Continuous)
   • Update Preintegration  [FEEDBACK LOOP]
     with new biases
     (using J_R_bg, J_v_bg)
-    
+
   • Continue IMU
     preintegration
     with updated biases
@@ -242,7 +242,7 @@ TRACKING PHASE (Continuous)
 
 ### Missing Link #1: Bias → ESKF
 **Currently**: BiasEstimate computed, never used
-**Should be**: 
+**Should be**:
 ```rust
 let bias_estimate = initializer.get_bias_estimate();
 velocity_estimator.initialize_with_bias(bias_estimate);
@@ -349,4 +349,3 @@ Extended Kalman Filter fusion
 ```
 
 **Current state**: Hybrid of all three, integrated nowhere.
-
