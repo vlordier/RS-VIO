@@ -138,7 +138,8 @@ impl PreintegratedImu {
 
     /// Integrate a single IMU measurement
     ///
-    /// Uses midpoint integration with proper covariance propagation
+    /// Uses first-order Euler integration with proper covariance propagation
+    /// (Forster et al. 2017 TRO: "On-Manifold Preintegration for Real-Time VIO")
     pub fn integrate(&mut self, gyro: na::Vector3<f64>, accel: na::Vector3<f64>, dt: f64) {
         if dt <= 0.0 || dt > 1.0 {
             // Skip invalid measurements
@@ -149,7 +150,7 @@ impl PreintegratedImu {
         let omega = gyro - self.linearization_point_bg;
         let acc = accel - self.linearization_point_ba;
 
-        // Midpoint integration
+        // First-order Euler integration on manifold
         // R_{k+1} = R_k * Exp(ω * dt)
         let delta_R_k = exp_map_so3(omega * dt);
         let new_delta_R = self.delta_R * delta_R_k;
@@ -160,34 +161,29 @@ impl PreintegratedImu {
         // p_{k+1} = p_k + v_k * dt + 0.5 * R_k * a * dt²
         let new_delta_p = self.delta_p + self.delta_v * dt + 0.5 * (self.delta_R * acc) * dt * dt;
 
-        // Update Jacobians w.r.t. biases
-        // These follow from chain rule differentiation
-
-        // Right Jacobian of SO(3) for omega * dt
+        // Update Jacobians w.r.t. biases (Forster et al. Eqs. 27-32)
+        // CRITICAL: Compute using OLD Jacobians to maintain correct chain rule
+        // Cache old values before updating J_R_bg
         let Jr = right_jacobian_so3(omega * dt);
+        let R_k = self.delta_R.to_rotation_matrix().matrix().clone();  // Clone to avoid temporary borrow
+        let J_R_bg_k = self.J_R_bg;  // Cache BEFORE update
+        let J_v_bg_k = self.J_v_bg;  // Cache BEFORE update
+        let J_v_ba_k = self.J_v_ba;  // Cache BEFORE update
 
-        // J_{R,bg}^{k+1} = J_{R,bg}^k - Jr * dt
-        self.J_R_bg = delta_R_k.to_rotation_matrix().matrix() * self.J_R_bg - Jr * dt;
+        // J_{R,bg}^{k+1} = ΔR_k * J_{R,bg}^k - Jr * dt (Eq. 27)
+        self.J_R_bg = delta_R_k.to_rotation_matrix().matrix() * J_R_bg_k - Jr * dt;
 
-        // J_{v,bg}^{k+1} = J_{v,bg}^k - R_k * [a]_× * J_{R,bg}^k * dt
-        self.J_v_bg = self.J_v_bg
-            - self.delta_R.to_rotation_matrix().matrix() * skew_symmetric(acc) * self.J_R_bg * dt;
+        // J_{v,bg}^{k+1} = J_{v,bg}^k - R_k * [a]_× * J_{R,bg}^k * dt (Eq. 28, uses J_R_bg at step k)
+        self.J_v_bg = J_v_bg_k - R_k * skew_symmetric(acc) * J_R_bg_k * dt;
 
-        // J_{v,ba}^{k+1} = J_{v,ba}^k - R_k * dt
-        self.J_v_ba = self.J_v_ba - self.delta_R.to_rotation_matrix().matrix() * dt;
+        // J_{v,ba}^{k+1} = J_{v,ba}^k - R_k * dt (Eq. 29)
+        self.J_v_ba = J_v_ba_k - R_k * dt;
 
-        // J_{p,bg}^{k+1} = J_{p,bg}^k + J_{v,bg}^k * dt - 0.5 * R_k * [a]_× * J_{R,bg}^k * dt²
-        self.J_p_bg = self.J_p_bg + self.J_v_bg * dt
-            - 0.5
-                * self.delta_R.to_rotation_matrix().matrix()
-                * skew_symmetric(acc)
-                * self.J_R_bg
-                * dt
-                * dt;
+        // J_{p,bg}^{k+1} = J_{p,bg}^k + J_{v,bg}^k * dt - 0.5 * R_k * [a]_× * J_{R,bg}^k * dt² (Eq. 30)
+        self.J_p_bg = self.J_p_bg + J_v_bg_k * dt - 0.5 * R_k * skew_symmetric(acc) * J_R_bg_k * dt * dt;
 
-        // J_{p,ba}^{k+1} = J_{p,ba}^k + J_{v,ba}^k * dt - 0.5 * R_k * dt²
-        self.J_p_ba = self.J_p_ba + self.J_v_ba * dt
-            - 0.5 * self.delta_R.to_rotation_matrix().matrix() * dt * dt;
+        // J_{p,ba}^{k+1} = J_{p,ba}^k + J_{v,ba}^k * dt - 0.5 * R_k * dt² (Eq. 31)
+        self.J_p_ba = self.J_p_ba + J_v_ba_k * dt - 0.5 * R_k * dt * dt;
 
         // Propagate covariance
         self.propagate_covariance(omega, acc, dt);
@@ -201,9 +197,11 @@ impl PreintegratedImu {
 
     /// Propagate covariance using first-order linearization
     ///
-    /// Σ_{k+1} = A * Σ_k * A^T + B * Q * B^T
+    /// Error-state formulation (Forster et al. Eq. 25):
+    /// - Σ = Cov[δφ, δv, δp] (rotation, velocity, position error covariance)
+    /// - Σ_{k+1} = A * Σ_k * A^T + B * Q * B^T
     ///
-    /// Note: Noise covariance is computed by multiplying noise power spectral
+    /// Note: Noise covariance Q is computed by multiplying noise power spectral
     /// density (PSD) by integration interval dt. PSD has units like (rad/s)²/Hz.
     fn propagate_covariance(&mut self, omega: na::Vector3<f64>, acc: na::Vector3<f64>, dt: f64) {
         // ✓ FIXED: Multiply by dt (was dividing - made filter behavior backwards)
