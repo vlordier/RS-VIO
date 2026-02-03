@@ -802,7 +802,7 @@ mod tests {
         ];
 
         let orientation = na::UnitQuaternion::identity();
-        estimator.initialize_from_imu(&imu_measurements, &orientation);
+        estimator.initialize_from_bias_and_orientation(&imu_measurements, &orientation, None);
 
         assert!(estimator.is_initialized());
     }

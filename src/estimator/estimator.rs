@@ -310,18 +310,11 @@ impl<'a> Estimator<'a> {
                 feature.pixel_coord[1] = (feature.pixel_coord[1] as f64 + dv) as f32;
             }
 
-            // Update velocity estimator
-            let dt = if let Some(last_ts) = self.last_imu_timestamp {
-                (timestamp_ns - last_ts) as f64 / 1e9
-            } else {
-                0.01
-            };
-
             // Initialize velocity estimator on first IMU batch
             if !self.velocity_estimator_initialized && !imu.is_empty() {
                 let initial_orientation = na::UnitQuaternion::identity();
                 self.velocity_estimator
-                    .initialize_from_imu(imu, &initial_orientation);
+                    .initialize_from_bias_and_orientation(imu, &initial_orientation, None);
                 self.velocity_estimator_initialized = true;
                 log::debug!(
                     "[Estimator] Velocity estimator initialized with {} IMU samples",
