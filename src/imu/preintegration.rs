@@ -353,6 +353,18 @@ pub fn skew_symmetric(v: na::Vector3<f64>) -> na::Matrix3<f64> {
 mod tests {
     use super::*;
 
+    fn integrate_constant(
+        preint: &mut PreintegratedImu,
+        gyro: na::Vector3<f64>,
+        accel: na::Vector3<f64>,
+        dt: f64,
+        steps: usize,
+    ) {
+        for _ in 0..steps {
+            preint.integrate(gyro, accel, dt);
+        }
+    }
+
     #[test]
     fn test_preintegration_identity() {
         let noise = ImuNoise::default();
@@ -402,5 +414,97 @@ mod tests {
 
         // Covariance should grow due to noise
         assert!(final_trace > initial_trace);
+    }
+
+    #[test]
+    fn test_timestep_splitting_consistency() {
+        let noise = ImuNoise::default();
+
+        let gyro = na::Vector3::new(0.02, -0.01, 0.03);
+        let accel = na::Vector3::new(0.1, -0.2, 0.3);
+
+        let mut coarse = PreintegratedImu::new(noise.clone());
+        coarse.reset(na::Vector3::zeros(), na::Vector3::zeros());
+        integrate_constant(&mut coarse, gyro, accel, 0.01, 100);
+
+        let mut fine = PreintegratedImu::new(noise);
+        fine.reset(na::Vector3::zeros(), na::Vector3::zeros());
+        integrate_constant(&mut fine, gyro, accel, 0.005, 200);
+
+        let rot_err = (coarse.delta_R.inverse() * fine.delta_R).angle();
+        let v_err = (coarse.delta_v - fine.delta_v).norm();
+        let p_err = (coarse.delta_p - fine.delta_p).norm();
+
+        assert!(rot_err < 5e-4, "Rotation should be consistent across dt splits");
+        assert!(v_err < 1e-3, "Velocity should be consistent across dt splits");
+        assert!(p_err < 1e-3, "Position should be consistent across dt splits");
+    }
+
+    #[test]
+    fn test_constant_accel_closed_form() {
+        let noise = ImuNoise::default();
+        let mut preint = PreintegratedImu::new(noise);
+        preint.reset(na::Vector3::zeros(), na::Vector3::zeros());
+
+        let accel = na::Vector3::new(0.3, -0.1, 0.2);
+        let gyro = na::Vector3::zeros();
+
+        let dt = 0.01;
+        let steps = 100;
+        integrate_constant(&mut preint, gyro, accel, dt, steps);
+
+        let total_dt = dt * steps as f64;
+        let expected_v = accel * total_dt;
+        let expected_p = 0.5 * accel * total_dt * total_dt;
+
+        assert!((preint.delta_v - expected_v).norm() < 5e-4);
+        assert!((preint.delta_p - expected_p).norm() < 5e-4);
+    }
+
+    #[test]
+    fn test_bias_jacobians_finite_difference() {
+        let noise = ImuNoise::default();
+        let mut preint = PreintegratedImu::new(noise.clone());
+        preint.reset(na::Vector3::zeros(), na::Vector3::zeros());
+
+        let gyro = na::Vector3::new(0.01, -0.02, 0.03);
+        let accel = na::Vector3::new(0.2, -0.1, 0.15);
+        integrate_constant(&mut preint, gyro, accel, 0.01, 200);
+
+        let d_bg = na::Vector3::new(1e-4, -2e-4, 1.5e-4);
+        let d_ba = na::Vector3::new(-1.2e-4, 8e-5, -6e-5);
+
+        // Re-integrate with perturbed gyro bias
+        let mut preint_bg = PreintegratedImu::new(noise.clone());
+        preint_bg.reset(d_bg, na::Vector3::zeros());
+        integrate_constant(&mut preint_bg, gyro, accel, 0.01, 200);
+
+        // Re-integrate with perturbed accel bias
+        let mut preint_ba = PreintegratedImu::new(noise);
+        preint_ba.reset(na::Vector3::zeros(), d_ba);
+        integrate_constant(&mut preint_ba, gyro, accel, 0.01, 200);
+
+        // Rotation Jacobian check: Log(R_nom^{-1} * R_pert) ≈ J_R_bg * d_bg
+        let rot_err = (preint.delta_R.inverse() * preint_bg.delta_R).scaled_axis();
+        let rot_lin = preint.J_R_bg * d_bg;
+        assert!((rot_err - rot_lin).norm() < 2e-3);
+
+        // Velocity Jacobians check
+        let v_bg_err = preint_bg.delta_v - preint.delta_v;
+        let v_bg_lin = preint.J_v_bg * d_bg;
+        assert!((v_bg_err - v_bg_lin).norm() < 2e-3);
+
+        let v_ba_err = preint_ba.delta_v - preint.delta_v;
+        let v_ba_lin = preint.J_v_ba * d_ba;
+        assert!((v_ba_err - v_ba_lin).norm() < 2e-3);
+
+        // Position Jacobians check
+        let p_bg_err = preint_bg.delta_p - preint.delta_p;
+        let p_bg_lin = preint.J_p_bg * d_bg;
+        assert!((p_bg_err - p_bg_lin).norm() < 5e-3);
+
+        let p_ba_err = preint_ba.delta_p - preint.delta_p;
+        let p_ba_lin = preint.J_p_ba * d_ba;
+        assert!((p_ba_err - p_ba_lin).norm() < 5e-3);
     }
 }
