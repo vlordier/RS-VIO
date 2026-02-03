@@ -474,6 +474,7 @@ impl ImuAidedKeyframeSelector {
         let mut last_ts = imu_measurements[0].timestamp;
         let mut integrated_rot = na::UnitQuaternion::identity();
         let mut integrated_trans = na::Vector3::zeros();
+        let mut integrated_vel = na::Vector3::zeros();  // Track velocity for accurate displacement
 
         for imu in imu_measurements {
             let dt = fl!((imu.timestamp - last_ts) as f64 / 1e9);
@@ -482,14 +483,18 @@ impl ImuAidedKeyframeSelector {
                 let accel =
                     na::Vector3::new(fl!(imu.accel[0]), fl!(imu.accel[1]), fl!(imu.accel[2]));
 
-                // Rotation integration
+                // Rotation integration using exponential map (small angle approximation)
                 let delta_rot = na::UnitQuaternion::new(gyro * dt);
                 integrated_rot = delta_rot * integrated_rot;
 
-                // Translation integration (constant acceleration approximation)
-                // Displacement = 0.5 * a * t^2 (assumes initial velocity = 0)
-                // Note: This is a heuristic for keyframe selection; official VIO uses proper preintegration
-                integrated_trans += accel * dt * dt * fl!(0.5);
+                // Velocity integration: v_new = v_old + a * dt
+                // Tracks cumulative velocity throughout the measurement window
+                integrated_vel += accel * dt;
+
+                // Displacement integration using trapezoid rule: p += (v_prev + v_curr) / 2 * dt
+                // Equivalent to: p += v_curr * dt + 0.5 * a * dt^2
+                // This properly accounts for continuous acceleration between frames, not just rest
+                integrated_trans += integrated_vel * dt - accel * dt * dt * fl!(0.5);
 
                 self.imu_delta_time += dt;
             }
