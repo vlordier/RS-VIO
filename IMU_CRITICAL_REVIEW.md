@@ -53,7 +53,7 @@ pub fn update(&mut self, imu_measurements: &[ImuData]) {
 pub fn predict(&mut self, imu: &ImuData, dt: f64) {
     let _gyro = na::Vector3::new(...);  // ❌ GYRO IGNORED!
     let accel = na::Vector3::new(...);
-    
+
     // State prediction
     let accel_corrected = accel - self.state.accel_bias;
     let accel_world = self.orientation * accel_corrected;  // Uses orientation...
@@ -65,11 +65,11 @@ pub fn predict(&mut self, imu: &ImuData, dt: f64) {
 1. **Orientation initialized to identity** and never updated
    - Call to `update_orientation()` exists but is never invoked
    - VelocityEstimator never receives rotation updates
-   
+
 2. **Gyro measurements completely ignored** (note the `_gyro` prefix)
    - For a VIO system, gyro is essential for orientation tracking
    - Even if relying on visual odometry, gyro should propagate orientation between frames
-   
+
 3. **Physics model breaks when orientation != identity**
    - Equation `v̇ = R * (a - b_a) + g` assumes gravity is constant vector
    - When the rotation frame changes, this becomes `R_i * v̇_i = R_i * a + g_world`
@@ -91,7 +91,7 @@ pub fn predict(&mut self, imu: &ImuData, dt: f64) {
 
 ```
 ImuInitializer (bias estimation) ─→ ❌ outputs BiasEstimate (never used)
-                                       
+
 VelocityEstimator (ESKF) ─→ outputs velocity
         ↓
         └─ Uses preintegration? NO, completely separate
@@ -122,7 +122,7 @@ fn propagate_covariance(&mut self, omega: na::Vector3<f64>, acc: na::Vector3<f64
     // ❌ WRONG: Dividing by dt
     let gyro_cov = self.noise.gyro_noise_density.powi(2) / dt;
     let accel_cov = self.noise.accel_noise_density.powi(2) / dt;
-    
+
     let mut Q = na::SMatrix::<f64, 6, 6>::zeros();
     Q.fixed_view_mut::<3, 3>(0, 0).fill_diagonal(gyro_cov);
     Q.fixed_view_mut::<3, 3>(3, 3).fill_diagonal(accel_cov);
@@ -133,7 +133,7 @@ fn propagate_covariance(&mut self, omega: na::Vector3<f64>, acc: na::Vector3<f64
 - **Noise power density** is given as `σ²_noise_density` in units like `(rad/s)² / √Hz`
 - When integrating over time interval `dt`, the **variance accumulates**: `σ²_discrete = σ²_density * dt`
 - Current code divides by `dt`, making variance **decrease** with longer integration!
-- **Consequence**: 
+- **Consequence**:
   - Short dt → huge Q (wrong!)
   - Long dt → tiny Q (wrong!)
   - System thinks it becomes MORE certain over time instead of less
@@ -156,7 +156,7 @@ let accel_cov = self.noise.accel_noise_density.powi(2) * dt;
 pub fn predict(&mut self, imu: &ImuData, dt: f64) {
     let accel = na::Vector3::new(imu.accel[0], imu.accel[1], imu.accel[2]);
     let accel_corrected = accel - self.state.accel_bias;
-    
+
     // ❌ Assumes orientation is constant
     let accel_world = self.orientation * accel_corrected;
     self.state.velocity += (accel_world + self.gravity) * dt;
@@ -429,7 +429,7 @@ Claims to follow "Quaternion kinematics for error-state KF" but:
 
 ### Phase 1: Fix Critical Issues
 - [ ] Fix `update()` to use actual timestamp deltas
-- [ ] Fix noise covariance sign in preintegration  
+- [ ] Fix noise covariance sign in preintegration
 - [ ] Add measurement update interface to ESKF
 - [ ] Add gyro integration with explicit orientation propagation
 

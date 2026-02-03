@@ -16,7 +16,7 @@ The IMU implementation is **fundamentally broken** at multiple levels. While it 
 - **Fix complexity**: Moderate (API change needed)
 - **File**: `src/imu/mod.rs` line 1063
 
-#### 2. **Noise Covariance Has Sign Error** (Issue #2)  
+#### 2. **Noise Covariance Has Sign Error** (Issue #2)
 - **What happens**: Divides noise density by `dt` instead of multiplying
 - **Impact**: Makes filter behavior opposite to expectation (faster IMU = more uncertain)
 - **Fix complexity**: Easy (one line per module)
@@ -219,7 +219,7 @@ Before implementing fixes, answer these:
 
 ### Phase 1: Fix Critical Bugs (1-2 weeks)
 - [ ] Fix noise covariance signs (EASY)
-- [ ] Fix variable timestamp handling (MODERATE)  
+- [ ] Fix variable timestamp handling (MODERATE)
 - [ ] Add measurement update interface (HARD)
 - [ ] Connect orientation feedback (MODERATE)
 
@@ -298,4 +298,3 @@ For detailed analysis, see:
 - `IMU_IMPLEMENTATION_ISSUES.md` - 6 specific issues with code examples
 - `IMU_ARCHITECTURE_ANALYSIS.md` - Data flow diagrams and architectural critique
 - `IMU_TEST_SUITE_TO_EXPOSE_ISSUES.md` - 7 tests to validate issues
-

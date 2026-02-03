@@ -5,6 +5,7 @@ use crate::estimator::constant_velocity_model::{ConstantVelocityConfig, Constant
 use crate::estimator::sliding_window::SlidingWindow;
 use crate::estimator::Frame;
 use crate::feature_tracker::StereoPatchTracker;
+use crate::fl;
 use crate::imu::ExtrinsicCalibrator;
 use crate::imu::ImuAidedKeyframeSelector;
 use crate::imu::ImuBiasEstimator;
@@ -14,7 +15,6 @@ use crate::imu::ImuMotionPrior;
 use crate::imu::ImuPreintegrator;
 use crate::imu::PreintegratedImu;
 use crate::imu::VelocityEstimator;
-use crate::fl;
 use crate::types::{Float, Matrix4x4, Vector3};
 use crate::viewers::Viewer;
 use anyhow::{bail, Result};
@@ -49,6 +49,7 @@ pub struct Estimator<'a> {
     // Full trajectory of keyframes
     trajectory: Vec<Matrix4x4>,
     // Maximum allowed time for frame processing (for real-time safety)
+    #[allow(dead_code)]
     max_frame_processing_time: Duration,
     // IMU preintegrator for between keyframes
     imu_preintegrator: ImuPreintegrator,
@@ -122,11 +123,11 @@ impl<'a> Estimator<'a> {
 
         // Initialize IMU components
         let imu_config = ImuConfig::default();
-        
+
         // Extract config values before moving config into struct
         let translation_threshold = fl!(config.keyframe_management.translation_threshold);
         let rotation_threshold = fl!(config.keyframe_management.rotation_threshold);
-        
+
         Estimator {
             frame_id_counter: 0,
             frames_since_last_keyframe: 0,
@@ -390,7 +391,8 @@ impl<'a> Estimator<'a> {
                         T_W_B.fixed_view::<3, 3>(0, 0).into_owned(),
                     );
                     let R_obs_quat = na::UnitQuaternion::from_rotation_matrix(&R_obs);
-                    self.velocity_estimator.update_orientation_from_visual(R_obs_quat);
+                    self.velocity_estimator
+                        .update_orientation_from_visual(R_obs_quat);
 
                     if let Some((velocity, covariance)) =
                         self.compute_visual_velocity_measurement(&T_W_B, timestamp_ns)
@@ -466,7 +468,7 @@ impl<'a> Estimator<'a> {
                         current_frame.is_keyframe = false;
                     }
                     self.view_motion_tracking_results(&T_W_B);
-                }
+                },
                 Ok(None) => {
                     log::warn!(
                         "[Estimator] Motion tracking failed (optimization did not converge)"
@@ -488,7 +490,10 @@ impl<'a> Estimator<'a> {
             let (bias_g, bias_a) = if self.velocity_estimator.is_initialized() {
                 self.velocity_estimator.get_biases()
             } else {
-                (self.bias_estimator.gyro_bias, self.bias_estimator.accel_bias)
+                (
+                    self.bias_estimator.gyro_bias,
+                    self.bias_estimator.accel_bias,
+                )
             };
             let preint = self.imu_preintegrator.take_preintegration(bias_g, bias_a);
             self.current_imu_preintegration = Some(preint.clone());
@@ -515,9 +520,9 @@ impl<'a> Estimator<'a> {
             } else {
                 None
             };
-            if let Err(e) = self
-                .sliding_window
-                .optimize_with_imu(imu_prior, imu_weights, imu_huber_delta)
+            if let Err(e) =
+                self.sliding_window
+                    .optimize_with_imu(imu_prior, imu_weights, imu_huber_delta)
             {
                 log::error!("[Estimator] Bundle adjustment optimization failed: {:?}", e);
                 // Continue execution even if optimization fails
@@ -551,7 +556,7 @@ impl<'a> Estimator<'a> {
                 self.last_visual_pose = Some(*current_pose);
                 self.last_visual_timestamp = Some(timestamp_ns);
                 return None;
-            }
+            },
         };
 
         let dt = (timestamp_ns - last_ts) as f64 * 1e-9;

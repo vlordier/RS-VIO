@@ -1,6 +1,6 @@
 # RS-VIO: Tight Visual-Inertial Odometry - Implementation Status
 
-**Last Updated**: Current Session  
+**Last Updated**: Current Session
 **Status**: ✅ **FOUNDATION COMPLETE - READY FOR OPTIMIZATION INTEGRATION**
 
 ---
@@ -122,7 +122,7 @@ The IMU system has been **completely overhauled and fixed**. All critical bugs a
 
 ### Computational Cost (per IMU measurement)
 - Gyro integration: 3×3 matrix mult = ~27 MACs
-- Accel integration: 3×3 matrix mult + vector ops = ~50 MACs  
+- Accel integration: 3×3 matrix mult + vector ops = ~50 MACs
 - Covariance prediction: 9×9 covariance matrix = ~150 MACs
 - **Total**: ~227 MACs per measurement
 - At 400 Hz: ~90k MACs/second = negligible (laptop can do ~10⁹ MACs/s)
@@ -318,27 +318,27 @@ See **[TIGHT_COUPLING_ROADMAP.md](TIGHT_COUPLING_ROADMAP.md)** section "Phase 2A
 
 ### Common Questions
 
-**Q: Why did gyro integration change the API?**  
+**Q: Why did gyro integration change the API?**
 A: It didn't. Gyro integration was an internal ESKF detail. The API change (removing dt) was necessary for correct variable timestamp handling.
 
-**Q: What if my IMU is very noisy?**  
+**Q: What if my IMU is very noisy?**
 A: Increase noise parameters in ImuConfig. The ESKF will grow uncertainty faster, making it less trusting of IMU-only predictions.
 
-**Q: Can I use this with my existing visual odometry?**  
+**Q: Can I use this with my existing visual odometry?**
 A: Yes! The system is modular. ESKF provides velocity estimates that can be used directly, or integrated into optimization (Phase 2A).
 
-**Q: What's the computational overhead?**  
+**Q: What's the computational overhead?**
 A: ~1-2% CPU overhead for gyro integration and covariance updates. Negligible.
 
 ### Next Phase Questions
 
-**Q: When should I run optimization?**  
+**Q: When should I run optimization?**
 A: Every 10-30 keyframes is typical. More frequent = more latency, better accuracy. Less frequent = more drift accumulation.
 
-**Q: How do I weight visual vs IMU?**  
+**Q: How do I weight visual vs IMU?**
 A: Via λ₁ parameter in objective. Start with 1.0, tune based on results.
 
-**Q: What if visual tracking fails?**  
+**Q: What if visual tracking fails?**
 A: IMU provides fallback. Without visual, system drifts at ~0.1% per second (gyro integration + velocity from accel).
 
 ---
@@ -347,11 +347,11 @@ A: IMU provides fallback. Without visual, system drifts at ~0.1% per second (gyr
 
 The foundation for tight visual-inertial odometry is **solid and tested**. The system correctly:
 
-✅ Processes variable-rate IMU measurements  
-✅ Tracks orientation from gyro measurements  
-✅ Estimates velocity with bias compensation  
-✅ Accumulates IMU measurements for optimization  
-✅ Provides measurement update interface  
+✅ Processes variable-rate IMU measurements
+✅ Tracks orientation from gyro measurements
+✅ Estimates velocity with bias compensation
+✅ Accumulates IMU measurements for optimization
+✅ Provides measurement update interface
 
 **Next phase**: Integrate preintegration factors into bundle adjustment optimization to achieve true tight coupling and 5-10× accuracy improvement over loose coupling.
 
@@ -360,4 +360,3 @@ The foundation for tight visual-inertial odometry is **solid and tested**. The s
 ---
 
 **Status**: READY FOR OPTIMIZATION INTEGRATION ✅
-

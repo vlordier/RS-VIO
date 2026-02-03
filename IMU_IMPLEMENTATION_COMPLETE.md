@@ -12,7 +12,7 @@ All critical bugs have been fixed. The system now implements **Option A: Tightly
 
 **Files**: `src/imu/preintegration.rs`, `src/imu/eskf.rs`
 
-**Change**: 
+**Change**:
 ```rust
 // BEFORE (WRONG):
 let gyro_cov = self.noise.gyro_noise_density.powi(2) / dt;
@@ -23,7 +23,7 @@ let gyro_cov = self.noise.gyro_noise_density.powi(2) * dt;
 
 **Reason**: Noise power spectral density integrated over time interval dt requires multiplication, not division. Dividing made filter behavior inverted (faster IMU = more uncertain).
 
-**Impact**: 
+**Impact**:
 - Filter now has correct uncertainty growth
 - Faster IMU rates = more measurements = lower uncertainty ✓
 - Slower IMU rates = fewer measurements = higher uncertainty ✓
@@ -80,7 +80,7 @@ let delta_R = exp_map_so3(gyro_corrected * dt);
 self.orientation = self.orientation * delta_R;
 ```
 
-**Reason**: 
+**Reason**:
 - Gyro provides continuous orientation tracking between visual updates
 - Essential when visual tracking fails (motion blur, low-texture scenes)
 - Gyro integration enables proper acceleration transformation to world frame
@@ -136,7 +136,7 @@ pub fn initialize_from_bias_and_orientation(
 
 **File**: `src/imu/eskf.rs`
 
-**Existing**: The system already had `update_velocity()` method! 
+**Existing**: The system already had `update_velocity()` method!
 
 **Enhanced**:
 ```rust
@@ -431,4 +431,3 @@ The system now correctly implements the mathematical foundations for visual-iner
 - Bias estimation and feedback
 
 The foundation is solid. Integration with bundle adjustment optimization will complete the tight coupling for state-of-the-art VIO performance.
-

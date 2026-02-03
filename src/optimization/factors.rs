@@ -729,7 +729,11 @@ impl Factor for ImuPriorFactor {
         params: &[DVector<f64>],
         compute_jacobian: bool,
     ) -> (DVector<f64>, Option<DMatrix<f64>>) {
-        assert_eq!(params.len(), 1, "ImuPriorFactor requires 1 parameter vector");
+        assert_eq!(
+            params.len(),
+            1,
+            "ImuPriorFactor requires 1 parameter vector"
+        );
         assert_eq!(
             params[0].len(),
             7,
@@ -751,13 +755,15 @@ impl Factor for ImuPriorFactor {
         // Rotation residual: log map of R_pred^T * R_var
         // This gives the axis-angle representation in the tangent space
         let R_err = R_B_W_pred.transpose() * R_B_W_var;
-        let q_err = UnitQuaternion::from_rotation_matrix(&na::Rotation3::from_matrix_unchecked(R_err));
-        
+        let q_err =
+            UnitQuaternion::from_rotation_matrix(&na::Rotation3::from_matrix_unchecked(R_err));
+
         // Extract axis-angle (ω = log(R_err))
         let angle = q_err.angle();
         let rot_vec = if angle > 1e-8 {
             // For non-trivial rotations, extract axis and scale by angle
-            q_err.axis()
+            q_err
+                .axis()
                 .map(|u| u.into_inner() * angle)
                 .unwrap_or(Vector3::zeros())
         } else {
@@ -777,19 +783,21 @@ impl Factor for ImuPriorFactor {
         let jacobian_matrix = if compute_jacobian {
             // Proper SE3 Jacobian using right Jacobian
             // J_SE3 = [∂r/∂ξ] where ξ is the SE3 tangent vector [ω; v]
-            
+
             // Right Jacobian for SO(3) at rot_vec
             let Jr_inv = right_jacobian_so3_inverse(rot_vec);
-            
+
             let mut jac = DMatrix::zeros(6, 6);
-            
+
             // Translation part: ∂(t_var - t_pred)/∂v = I (in SE3 tangent space)
-            jac.fixed_view_mut::<3, 3>(0, 0).fill_diagonal(self.weight_pos);
-            
+            jac.fixed_view_mut::<3, 3>(0, 0)
+                .fill_diagonal(self.weight_pos);
+
             // Rotation part: ∂log(R_pred^T * R_var)/∂ω = Jr_inv
             // This accounts for the manifold structure of SO(3)
-            jac.fixed_view_mut::<3, 3>(3, 3).copy_from(&(Jr_inv * self.weight_rot));
-            
+            jac.fixed_view_mut::<3, 3>(3, 3)
+                .copy_from(&(Jr_inv * self.weight_rot));
+
             Some(jac)
         } else {
             None
@@ -808,27 +816,23 @@ impl Factor for ImuPriorFactor {
 /// Jr_inv(ω) = I + 0.5 * [ω]_× + (1/θ² - (1+cos(θ))/(2θsin(θ))) * [ω]_×²
 fn right_jacobian_so3_inverse(omega: Vector3<f64>) -> Matrix3<f64> {
     let theta = omega.norm();
-    
+
     if theta < 1e-8 {
         // Small angle: Jr_inv ≈ I + 0.5 * [ω]_×
         return Matrix3::identity() + 0.5 * skew_symmetric_matrix(omega);
     }
-    
+
     let theta2 = theta * theta;
     let half_theta = 0.5 * theta;
     let cot_half = half_theta.cos() / half_theta.sin();
-    
+
     let W = skew_symmetric_matrix(omega);
     let W2 = W * W;
-    
+
     Matrix3::identity() + 0.5 * W + ((1.0 / theta2) - cot_half / (2.0 * theta)) * W2
 }
 
 /// Create skew-symmetric matrix from 3D vector
 fn skew_symmetric_matrix(v: Vector3<f64>) -> Matrix3<f64> {
-    Matrix3::new(
-        0.0, -v.z,  v.y,
-        v.z,  0.0, -v.x,
-       -v.y,  v.x,  0.0,
-    )
+    Matrix3::new(0.0, -v.z, v.y, v.z, 0.0, -v.x, -v.y, v.x, 0.0)
 }

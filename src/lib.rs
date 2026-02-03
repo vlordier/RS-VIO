@@ -11,6 +11,7 @@ pub mod macros;
 pub mod nalgebra_macros;
 pub mod type_macros;
 
+#[allow(clippy::crate_in_macro_def)]
 #[macro_export]
 macro_rules! fl {
     ($val:expr) => {

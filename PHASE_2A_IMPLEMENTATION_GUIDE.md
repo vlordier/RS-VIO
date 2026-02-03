@@ -31,24 +31,24 @@ use crate::imu::preintegration::PreintegratedImu;
 pub struct ImuFactor {
     /// Preintegrated IMU measurements and statistics
     pub preintegration: PreintegratedImu,
-    
+
     /// Index of first keyframe (i)
     pub keyframe_i: usize,
-    
+
     /// Index of second keyframe (j)
     pub keyframe_j: usize,
-    
+
     /// Duration between frames (seconds)
     pub dt: f64,
-    
+
     /// Reference gyro bias used during preintegration [rad/s]
     /// Used for first-order bias correction
     pub ref_bias_g: na::Vector3<f64>,
-    
+
     /// Reference accel bias used during preintegration [m/s²]
     /// Used for first-order bias correction
     pub ref_bias_a: na::Vector3<f64>,
-    
+
     /// Weight/information matrix for this factor
     /// Typically inverse of preintegration covariance
     pub information: na::Matrix12<f64>,
@@ -68,7 +68,7 @@ impl ImuFactor {
         let cov = preintegration.covariance();
         let information = cov.try_inverse()
             .unwrap_or_else(|_| na::Matrix12::identity());
-        
+
         Self {
             preintegration,
             keyframe_i,
@@ -79,7 +79,7 @@ impl ImuFactor {
             information,
         }
     }
-    
+
     /// Compute preintegration prediction with bias correction
     ///
     /// This implements the bias update equation from Forster et al. 2017:
@@ -94,7 +94,7 @@ impl ImuFactor {
         // First-order bias correction
         let d_bias_g = bias_g - self.ref_bias_g;
         let d_bias_a = bias_a - self.ref_bias_a;
-        
+
         // Correct rotation (using linearization)
         let delta_R = self.preintegration.delta_R;
         // J_R_bg is 3x3 jacobian of rotation w.r.t. gyro bias
@@ -102,22 +102,22 @@ impl ImuFactor {
             -self.preintegration.J_R_bg * d_bias_g
         );
         let corrected_R = delta_R * d_rotation;
-        
+
         // Correct velocity
         let delta_v = self.preintegration.delta_v;
         let corrected_v = delta_v
             + self.preintegration.J_v_bg * d_bias_g
             + self.preintegration.J_v_ba * d_bias_a;
-        
+
         // Correct position
         let delta_p = self.preintegration.delta_p;
         let corrected_p = delta_p
             + self.preintegration.J_p_bg * d_bias_g
             + self.preintegration.J_p_ba * d_bias_a;
-        
+
         (corrected_R, corrected_v, corrected_p)
     }
-    
+
     /// Compute residual vector (12-dimensional)
     ///
     /// Residual = measured - predicted
@@ -131,12 +131,12 @@ impl ImuFactor {
         R_i: &na::UnitQuaternion<f64>,
         v_i: &na::Vector3<f64>,
         p_i: &na::Vector3<f64>,
-        
+
         // Keyframe j (current)
         R_j: &na::UnitQuaternion<f64>,
         v_j: &na::Vector3<f64>,
         p_j: &na::Vector3<f64>,
-        
+
         // Shared biases
         bias_g: &na::Vector3<f64>,
         bias_a: &na::Vector3<f64>,
@@ -144,24 +144,24 @@ impl ImuFactor {
         // Get bias-corrected predictions
         let (delta_R_pred, delta_v_pred, delta_p_pred) =
             self.predict_with_bias_correction(bias_g, bias_a);
-        
+
         // ==================== Rotation Residual ====================
         // Measurement: R_j^T * R_i * ΔR_pred
         // (What we predict given current poses and preintegration)
         let R_ij_measured = R_j.inverse() * R_i * delta_R_pred;
-        
+
         // Compute rotation error as rotation vector in tangent space
         // log_map of rotation error magnitude
         let rotation_error_quat = self.preintegration.delta_R.inverse() * R_ij_measured;
         let rotation_error_vec = Self::quat_to_rotation_vector(&rotation_error_quat);
-        
+
         // ==================== Velocity Residual ====================
         // Measurement: v_j - (R_i^T * (v_i + ΔR_pred^T * (g*dt + Δv_pred)))
         let g = na::Vector3::new(0.0, 0.0, -9.81);
         let accel_world = g * self.dt + delta_v_pred;
         let v_pred = R_i.inverse() * (v_i + delta_R_pred.inverse() * accel_world);
         let v_error = v_j - v_pred;
-        
+
         // ==================== Position Residual ====================
         // Measurement: p_j - (p_i + v_i*dt + 0.5*g*dt² + R_i^T * Δp_pred)
         let p_pred = p_i
@@ -169,22 +169,22 @@ impl ImuFactor {
             + 0.5 * g * self.dt.powi(2)
             + R_i.inverse() * delta_p_pred;
         let p_error = p_j - p_pred;
-        
+
         // ==================== Bias Residual ====================
         // Biases are assumed constant, so error is just regularization
         // (In full optimization, biases are variables)
         let bias_error = na::Vector3::zeros();  // No direct measurement
-        
+
         // Stack residuals: 3 + 3 + 3 + 3 = 12 dimensional
         let mut residual = na::Vector12::zeros();
         residual.fixed_rows_mut::<3>(0).copy_from(&rotation_error_vec);
         residual.fixed_rows_mut::<3>(3).copy_from(&v_error);
         residual.fixed_rows_mut::<3>(6).copy_from(&p_error);
         residual.fixed_rows_mut::<3>(9).copy_from(&bias_error);
-        
+
         residual
     }
-    
+
     /// Weighted residual (residual^T * Information * residual)
     pub fn weighted_residual(
         &self,
@@ -200,7 +200,7 @@ impl ImuFactor {
         let r = self.residual(R_i, v_i, p_i, R_j, v_j, p_j, bias_g, bias_a);
         (r.transpose() * self.information * r).sum()
     }
-    
+
     /// Compute Jacobians for optimization
     ///
     /// Returns:
@@ -238,9 +238,9 @@ impl ImuFactor {
         let mut J_p_j = na::Matrix12x3::zeros();
         let mut J_bg = na::Matrix12x3::zeros();
         let mut J_ba = na::Matrix12x3::zeros();
-        
+
         let baseline = self.residual(R_i, v_i, p_i, R_j, v_j, p_j, bias_g, bias_a);
-        
+
         // Jacobian w.r.t. rotation of frame i (on manifold)
         for d in 0..3 {
             let mut delta = na::Vector3::zeros();
@@ -249,7 +249,7 @@ impl ImuFactor {
             let perturbed = self.residual(&R_i_pert, v_i, p_i, R_j, v_j, p_j, bias_g, bias_a);
             J_R_i.column_mut(d).copy_from(&((perturbed - &baseline) / eps));
         }
-        
+
         // Jacobian w.r.t. velocity of frame i
         for d in 0..3 {
             let mut v_i_pert = v_i.clone();
@@ -257,13 +257,13 @@ impl ImuFactor {
             let perturbed = self.residual(R_i, &v_i_pert, p_i, R_j, v_j, p_j, bias_g, bias_a);
             J_v_i.column_mut(d).copy_from(&((perturbed - &baseline) / eps));
         }
-        
+
         // Similar for remaining jacobians...
         // (omitted for brevity, but follow same pattern)
-        
+
         (J_R_i, J_v_i, J_p_i, J_R_j, J_v_j, J_p_j, J_bg, J_ba)
     }
-    
+
     /// Convert unit quaternion to rotation vector (log map)
     fn quat_to_rotation_vector(q: &na::UnitQuaternion<f64>) -> na::Vector3<f64> {
         let angle = 2.0 * q.scalar().acos();
@@ -279,7 +279,7 @@ impl ImuFactor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_imu_factor_identity_residual() {
         // Create a factor with zero integrated movement
@@ -288,7 +288,7 @@ mod tests {
             1.0,
             na::Vector3::new(0.0, 0.0, -9.81),
         );
-        
+
         let factor = ImuFactor::new(
             preint,
             0,
@@ -297,21 +297,21 @@ mod tests {
             na::Vector3::zeros(),
             na::Vector3::zeros(),
         );
-        
+
         // Set up poses such that preintegration matches perfectly
         let R_i = na::UnitQuaternion::identity();
         let v_i = na::Vector3::zeros();
         let p_i = na::Vector3::zeros();
-        
+
         let R_j = na::UnitQuaternion::identity();
         let v_j = na::Vector3::new(0.0, 0.0, -9.81); // v_j = v_i + g*dt
         let p_j = na::Vector3::zeros(); // No position change
-        
+
         let bias_g = na::Vector3::zeros();
         let bias_a = na::Vector3::zeros();
-        
+
         let residual = factor.residual(&R_i, &v_i, &p_i, &R_j, &v_j, &p_j, &bias_g, &bias_a);
-        
+
         // Residual should be small (gravity causes velocity change)
         println!("Residual: {}", residual);
         assert!(residual.norm() < 0.1, "Expected small residual for identity motion");
@@ -348,10 +348,10 @@ use crate::optimization::ImuFactor;
 
 pub struct OptimizationProblem {
     // ... visual factors ...
-    
+
     /// IMU preintegration factors
     imu_factors: Vec<ImuFactor>,
-    
+
     /// Weight for IMU factors in objective
     imu_weight: f64,
 }
@@ -360,14 +360,14 @@ impl OptimizationProblem {
     pub fn add_imu_factor(&mut self, factor: ImuFactor) {
         self.imu_factors.push(factor);
     }
-    
+
     /// Build optimization objective including IMU factors
     pub fn build_objective(&self) -> f64 {
         let mut objective = 0.0;
-        
+
         // Visual reprojection errors (existing)
         objective += self.visual_objective();
-        
+
         // IMU preintegration errors (NEW)
         for factor in &self.imu_factors {
             let imu_error = factor.weighted_residual(
@@ -382,7 +382,7 @@ impl OptimizationProblem {
             );
             objective += self.imu_weight * imu_error;
         }
-        
+
         objective
     }
 }
@@ -410,7 +410,7 @@ pub fn create_keyframe_with_imu(
         features,
         timestamp: image.timestamp,
     };
-    
+
     // Create IMU factor if we have IMU measurements
     let imu_factor = if imu_buffer.is_empty() {
         None
@@ -422,7 +422,7 @@ pub fn create_keyframe_with_imu(
             na::Vector3::zeros(),
             na::Vector3::new(0.0, 0.0, -9.81),
         );
-        
+
         Some(ImuFactor::new(
             preint,
             last_keyframe.id,
@@ -432,7 +432,7 @@ pub fn create_keyframe_with_imu(
             na::Vector3::zeros(),
         ))
     };
-    
+
     (keyframe, imu_factor)
 }
 ```
@@ -449,14 +449,14 @@ mod imu_factor_tests {
     use super::*;
     use crate::imu::preintegration::PreintegratedImu;
     use crate::imu::ImuNoise;
-    
+
     #[test]
     fn test_imu_factor_residual_zero_motion() {
         // Setup preintegration (zero motion)
         let noise = ImuNoise::default();
         let gravity = na::Vector3::new(0.0, 0.0, -9.81);
         let mut preint = PreintegratedImu::new(noise, 1.0, gravity);
-        
+
         let factor = ImuFactor::new(
             preint,
             0,
@@ -465,35 +465,35 @@ mod imu_factor_tests {
             na::Vector3::zeros(),
             na::Vector3::zeros(),
         );
-        
+
         // Poses consistent with zero motion
         let R = na::UnitQuaternion::identity();
         let v_i = na::Vector3::zeros();
         let v_j = gravity;  // Only gravity effect
         let p = na::Vector3::zeros();
-        
+
         let bias_g = na::Vector3::zeros();
         let bias_a = na::Vector3::zeros();
-        
+
         let residual = factor.residual(&R, &v_i, &p, &R, &v_j, &p, &bias_g, &bias_a);
-        
+
         // Should be small
         assert!(residual.norm() < 0.1, "Zero motion should have small residual");
     }
-    
+
     #[test]
     fn test_imu_factor_jacobian_numerical() {
         // Verify analytical jacobians against numerical differentiation
         let noise = ImuNoise::default();
         let gravity = na::Vector3::new(0.0, 0.0, -9.81);
         let preint = PreintegratedImu::new(noise, 1.0, gravity);
-        
+
         let factor = ImuFactor::new(
             preint, 0, 1, 1.0,
             na::Vector3::zeros(),
             na::Vector3::zeros(),
         );
-        
+
         // Test point
         let R_i = na::UnitQuaternion::identity();
         let v_i = na::Vector3::zeros();
@@ -503,11 +503,11 @@ mod imu_factor_tests {
         let p_j = na::Vector3::zeros();
         let bias_g = na::Vector3::zeros();
         let bias_a = na::Vector3::zeros();
-        
+
         let (J_R_i, _, _, _, _, _, _, _) = factor.jacobians(
             &R_i, &v_i, &p_i, &R_j, &v_j, &p_j, &bias_g, &bias_a
         );
-        
+
         // All jacobians should be finite
         assert!(J_R_i.iter().all(|x| x.is_finite()));
     }
@@ -559,4 +559,3 @@ The residual computation follows Forster et al. 2017 closely:
 - Velocity error: Predicted vs measured velocity update
 - Position error: Predicted vs measured position update
 - Uses first-order bias correction for non-reference biases
-

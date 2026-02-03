@@ -282,7 +282,10 @@ impl SlidingWindow {
                     velocity[1] as f64,
                     velocity[2] as f64,
                 ]);
-                local_initials.push((format!("KF_V_{}", id_frame), (ManifoldType::RN, velocity_data)));
+                local_initials.push((
+                    format!("KF_V_{}", id_frame),
+                    (ManifoldType::RN, velocity_data),
+                ));
 
                 let camera_features = [
                     (&frame.left_features, T_Cl_B.clone()),
@@ -496,7 +499,9 @@ impl SlidingWindow {
                         if delta > 0.0 {
                             match HuberLoss::new(delta) {
                                 Ok(l) => Some(Box::new(l)
-                                    as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>),
+                                    as Box<
+                                        dyn apex_solver::core::loss_functions::LossFunction + Send,
+                                    >),
                                 Err(e) => {
                                     log::warn!(
                                         "[SlidingWindow] Invalid Huber delta ({}): {}",
@@ -504,7 +509,7 @@ impl SlidingWindow {
                                         e
                                     );
                                     None
-                                }
+                                },
                             }
                         } else {
                             None
