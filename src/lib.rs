@@ -11,6 +11,13 @@ pub mod macros;
 pub mod nalgebra_macros;
 pub mod type_macros;
 
+#[macro_export]
+macro_rules! fl {
+    ($val:expr) => {
+        $val as crate::types::Float
+    };
+}
+
 // Re-export commonly used types for convenience
 pub use datasets::config::Config;
 pub use datasets::euroc_player::EurocPlayer;

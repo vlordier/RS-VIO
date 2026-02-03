@@ -8,7 +8,6 @@ use anyhow::{Context, Result};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
-<<<<<<< HEAD
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -17,20 +16,6 @@ pub struct FourSeasonsPlayer;
 impl Default for FourSeasonsPlayer {
     fn default() -> Self {
         Self::new()
-=======
-use std::sync::Mutex;
-
-#[derive(Default)]
-pub struct FourSeasonsPlayer {
-    imu_cache: Mutex<Vec<ImuData>>,
-}
-
-impl FourSeasonsPlayer {
-    pub fn new() -> Self {
-        FourSeasonsPlayer {
-            imu_cache: Mutex::new(Vec::new()),
-        }
->>>>>>> 1e93ebd0 (Implement IMU data caching and retrieval)
     }
 }
 
@@ -268,7 +253,6 @@ impl FourSeasonsPlayer {
         let mut imu_file = Path::new(dataset_path).join("imu.txt");
 
         if !imu_file.exists() {
-<<<<<<< HEAD
             let imu_csv = Path::new(dataset_path).join("imu.csv");
             if imu_csv.exists() {
                 log::debug!(
@@ -284,26 +268,13 @@ impl FourSeasonsPlayer {
                 );
                 return Ok(Vec::new());
             }
-=======
-            log::info!(
-                "[FourSeasonsPlayer] No IMU file found at {}",
-                imu_file.display()
-            );
-            // Clear cache when file doesn't exist
-            *self.imu_cache.lock().unwrap() = Vec::new();
-            return Ok(());
->>>>>>> 1e93ebd0 (Implement IMU data caching and retrieval)
         }
 
         let file = File::open(&imu_file)
             .with_context(|| format!("Cannot open IMU file: {}", imu_file.display()))?;
 
         let reader = BufReader::new(file);
-<<<<<<< HEAD
         let mut imu_data = Vec::new();
-=======
-        let mut imu_data_vec = Vec::new();
->>>>>>> 1e93ebd0 (Implement IMU data caching and retrieval)
 
         for (line_num, line) in reader.lines().enumerate() {
             let line = line?;
@@ -313,7 +284,6 @@ impl FourSeasonsPlayer {
                 continue;
             }
 
-<<<<<<< HEAD
             // Try to parse both space-separated and comma-separated formats
             let parts: Vec<&str> = if line.contains(',') {
                 line.split(',').map(|s| s.trim()).collect()
@@ -350,103 +320,6 @@ impl FourSeasonsPlayer {
                         }
                     } else {
                         log::debug!("[FourSeasonsPlayer] Skipped malformed IMU line {}: invalid numeric values", line_num);
-=======
-            // Parse timestamp (nanoseconds)
-            let timestamp: i64 = parts[0].trim().parse().unwrap_or(0);
-
-            // Parse gyroscope (rad/s)
-            let gyro_x: f64 = parts[1].trim().parse().unwrap_or(0.0);
-            let gyro_y: f64 = parts[2].trim().parse().unwrap_or(0.0);
-            let gyro_z: f64 = parts[3].trim().parse().unwrap_or(0.0);
-
-            // Parse accelerometer (m/s^2)
-            let accel_x: f64 = parts[4].trim().parse().unwrap_or(0.0);
-            let accel_y: f64 = parts[5].trim().parse().unwrap_or(0.0);
-            let accel_z: f64 = parts[6].trim().parse().unwrap_or(0.0);
-
-            imu_data_vec.push(ImuData {
-                timestamp,
-                gyro: [gyro_x, gyro_y, gyro_z],
-                accel: [accel_x, accel_y, accel_z],
-            });
-        }
-
-        // Store in cache
-        *self.imu_cache.lock().unwrap() = imu_data_vec;
-
-        log::info!(
-            "[FourSeasonsPlayer] Loaded {} IMU samples",
-            self.imu_cache.lock().unwrap().len()
-        );
-        Ok(())
-    }
-
-    fn get_imu_data_between_frames(
-        &self,
-        previous_timestamp: i64,
-        current_timestamp: i64,
-    ) -> Vec<ImuData> {
-        let cache = self.imu_cache.lock().unwrap();
-        cache
-            .iter()
-            .filter(|imu| imu.timestamp > previous_timestamp && imu.timestamp <= current_timestamp)
-            .cloned()
-            .collect()
-    }
-
-    fn process_single_frame(
-        &self,
-        estimator: &mut Estimator,
-        context: &mut FrameContext,
-        image_data: &[ImageData],
-        dataset_path: &str,
-    ) -> Result<f64> {
-        crate::datasets::player_trait::process_single_frame_common(
-            estimator,
-            context,
-            image_data,
-            dataset_path,
-            |ds_path, filename, cam_id| self.load_image(ds_path, filename, cam_id),
-            |ds_path, filename, cam_id| self.load_image(ds_path, filename, cam_id),
-            |prev_ts, curr_ts| self.get_imu_data_between_frames(prev_ts, curr_ts),
-        )
-    }
-
-    fn save_statistics(&self, result: &PlayerResult, stats_path: &Path) {
-        crate::datasets::player_trait::save_statistics_common(result, stats_path);
-    }
-
-    fn save_trajectories(&self, estimator: &Estimator, context: &FrameContext, dataset_path: &str) {
-        let trajectory_path = Path::new(dataset_path).join("trajectory.txt");
-
-        match std::fs::File::create(&trajectory_path) {
-            Ok(mut file) => {
-                use std::io::Write;
-                let trajectory = estimator.get_trajectory();
-                let mut count = 0;
-
-                for pose in trajectory.iter() {
-                    let timestamp_s = context.previous_frame_timestamp as f64 / 1e9;
-
-                    // Extract translation
-                    let tx = pose[(0, 3)] as f64;
-                    let ty = pose[(1, 3)] as f64;
-                    let tz = pose[(2, 3)] as f64;
-
-                    // Extract rotation as quaternion
-                    let r = pose.fixed_view::<3, 3>(0, 0);
-                    let rotmat = nalgebra::Rotation3::from_matrix_unchecked(r.into_owned());
-                    let q = nalgebra::UnitQuaternion::from_rotation_matrix(&rotmat);
-
-                    if writeln!(
-                        file,
-                        "{:.9} {:.6} {:.6} {:.6} {:.9} {:.9} {:.9} {:.9}",
-                        timestamp_s, tx, ty, tz, q.i, q.j, q.k, q.w
-                    )
-                    .is_ok()
-                    {
-                        count += 1;
->>>>>>> 1e93ebd0 (Implement IMU data caching and retrieval)
                     }
                 } else {
                     log::debug!(
@@ -665,10 +538,5 @@ not_a_timestamp 0 0 0 0 0 0\n\
 
         let between = FourSeasonsPlayer::get_imu_data_between_frames(3, 3, &imu_data);
         assert!(between.is_empty());
-=======
-    fn initialize_estimator(&self, _estimator: &mut Estimator, _image_data: &[ImageData]) {
-        // FourSeasons starts at identity pose - estimator already initialized with identity
-        log::debug!("[FourSeasonsPlayer] Estimator initialized with identity pose");
->>>>>>> 99a3ba3a (Implement TODO comments: IMU loading, trajectory saving, and initial pose)
     }
 }

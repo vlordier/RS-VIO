@@ -1,4 +1,5 @@
 use apex_solver::factors::Factor;
+use apex_solver::manifold::se3;
 use na::{DMatrix, DVector, Matrix3, Matrix4, Quaternion, UnitQuaternion, Vector2, Vector3};
 use nalgebra as na;
 use std::sync::Arc;
@@ -695,10 +696,13 @@ impl Factor for PnPFactor {
     }
 }
 
-/// IMU prior factor
+/// IMU prior factor with proper SE3 manifold Jacobians
+///
 /// Data: Predicted body-from-world pose `T_B_W_pred` from IMU preintegration
-/// Variables: System pose `T_B_W` (SE3)
-/// Residual: 6D vector combining position error and rotation error (axis-angle)
+/// Variables: System pose `T_B_W` (SE3, 6-DOF tangent space)
+/// Residual: 6D vector [position_error; rotation_error_axis_angle]
+///
+/// Uses proper SE3 left/right Jacobians for manifold optimization
 #[derive(Debug, Clone)]
 pub struct ImuPriorFactor {
     /// Predicted body-from-world pose from IMU preintegration
@@ -732,32 +736,34 @@ impl Factor for ImuPriorFactor {
             "System pose must have 7 parameters (tx, ty, tz, qw, qx, qy, qz)",
         );
 
-        // Variable pose (body-from-world)
+        // Variable pose (body-from-world) from SE3 parametrization
         let T_B_W_var = se3::SE3::from(params[0].clone());
-        let R_B_W_var: na::Matrix3<f64> = T_B_W_var.rotation_so3().rotation_matrix();
-        let t_B_W_var: na::Vector3<f64> = T_B_W_var.translation();
+        let R_B_W_var: Matrix3<f64> = T_B_W_var.rotation_so3().rotation_matrix();
+        let t_B_W_var: Vector3<f64> = T_B_W_var.translation();
 
         // Predicted pose components
         let R_B_W_pred = self.T_B_W_pred.fixed_view::<3, 3>(0, 0).into_owned();
         let t_B_W_pred = self.T_B_W_pred.fixed_view::<3, 1>(0, 3).into_owned();
 
-        // Position residual
+        // Position residual (Euclidean difference)
         let t_err = t_B_W_var - t_B_W_pred;
 
-        // Rotation residual: axis-angle from R_pred^T * R_var
+        // Rotation residual: log map of R_pred^T * R_var
+        // This gives the axis-angle representation in the tangent space
         let R_err = R_B_W_pred.transpose() * R_B_W_var;
-        let q_err = na::UnitQuaternion::from_rotation_matrix(&na::Rotation3::from_matrix_unchecked(R_err));
+        let q_err = UnitQuaternion::from_rotation_matrix(&na::Rotation3::from_matrix_unchecked(R_err));
+        
+        // Extract axis-angle (ω = log(R_err))
         let angle = q_err.angle();
-        // For small angles, axis might be ill-defined; handle gracefully
-        let axis = if angle > 1e-12 {
-            q_err
-                .axis()
-                .map(|u| u.into_inner())
-                .unwrap_or(na::Vector3::zeros())
+        let rot_vec = if angle > 1e-8 {
+            // For non-trivial rotations, extract axis and scale by angle
+            q_err.axis()
+                .map(|u| u.into_inner() * angle)
+                .unwrap_or(Vector3::zeros())
         } else {
-            na::Vector3::zeros()
+            // Small angle: use quaternion imaginary part * 2
+            Vector3::new(q_err.i, q_err.j, q_err.k) * 2.0
         };
-        let rot_vec = axis * angle;
 
         // Build 6D residual [pos; rot] with weights
         let mut residuals = DVector::zeros(6);
@@ -769,16 +775,21 @@ impl Factor for ImuPriorFactor {
         residuals[5] = self.weight_rot * rot_vec.z;
 
         let jacobian_matrix = if compute_jacobian {
-            // Approximate Jacobian w.r.t. SE3 tangent as identity scaled by weights
+            // Proper SE3 Jacobian using right Jacobian
+            // J_SE3 = [∂r/∂ξ] where ξ is the SE3 tangent vector [ω; v]
+            
+            // Right Jacobian for SO(3) at rot_vec
+            let Jr_inv = right_jacobian_so3_inverse(rot_vec);
+            
             let mut jac = DMatrix::zeros(6, 6);
-            // Position components map primarily to translation tangent
-            jac[(0, 0)] = self.weight_pos;
-            jac[(1, 1)] = self.weight_pos;
-            jac[(2, 2)] = self.weight_pos;
-            // Rotation components map to rotation tangent
-            jac[(3, 3)] = self.weight_rot;
-            jac[(4, 4)] = self.weight_rot;
-            jac[(5, 5)] = self.weight_rot;
+            
+            // Translation part: ∂(t_var - t_pred)/∂v = I (in SE3 tangent space)
+            jac.fixed_view_mut::<3, 3>(0, 0).fill_diagonal(self.weight_pos);
+            
+            // Rotation part: ∂log(R_pred^T * R_var)/∂ω = Jr_inv
+            // This accounts for the manifold structure of SO(3)
+            jac.fixed_view_mut::<3, 3>(3, 3).copy_from(&(Jr_inv * self.weight_rot));
+            
             Some(jac)
         } else {
             None
@@ -790,4 +801,34 @@ impl Factor for ImuPriorFactor {
     fn get_dimension(&self) -> usize {
         6 // 3 position + 3 rotation
     }
+}
+
+/// Compute inverse of right Jacobian of SO(3)
+///
+/// Jr_inv(ω) = I + 0.5 * [ω]_× + (1/θ² - (1+cos(θ))/(2θsin(θ))) * [ω]_×²
+fn right_jacobian_so3_inverse(omega: Vector3<f64>) -> Matrix3<f64> {
+    let theta = omega.norm();
+    
+    if theta < 1e-8 {
+        // Small angle: Jr_inv ≈ I + 0.5 * [ω]_×
+        return Matrix3::identity() + 0.5 * skew_symmetric_matrix(omega);
+    }
+    
+    let theta2 = theta * theta;
+    let half_theta = 0.5 * theta;
+    let cot_half = half_theta.cos() / half_theta.sin();
+    
+    let W = skew_symmetric_matrix(omega);
+    let W2 = W * W;
+    
+    Matrix3::identity() + 0.5 * W + ((1.0 / theta2) - cot_half / (2.0 * theta)) * W2
+}
+
+/// Create skew-symmetric matrix from 3D vector
+fn skew_symmetric_matrix(v: Vector3<f64>) -> Matrix3<f64> {
+    Matrix3::new(
+        0.0, -v.z,  v.y,
+        v.z,  0.0, -v.x,
+       -v.y,  v.x,  0.0,
+    )
 }

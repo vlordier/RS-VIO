@@ -6577,7 +6577,7 @@ dependencies = [
  "ort-sys",
  "smallvec",
  "tracing",
- "ureq 3.2.0",
+ "ureq 3.1.4",
 ]
 
 [[package]]
@@ -6588,7 +6588,7 @@ checksum = "06503bb33f294c5f1ba484011e053bfa6ae227074bdb841e9863492dc5960d4b"
 dependencies = [
  "hmac-sha256",
  "lzma-rust2",
- "ureq 3.2.0",
+ "ureq 3.1.4",
 ]
 
 [[package]]
@@ -11256,9 +11256,9 @@ dependencies = [
 
 [[package]]
 name = "ureq"
-version = "3.2.0"
+version = "3.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fdc97a28575b85cfedf2a7e7d3cc64b3e11bd8ac766666318003abbacc7a21fc"
+checksum = "d39cb1dbab692d82a977c0392ffac19e188bd9186a9f32806f0aaa859d75585a"
 dependencies = [
  "base64 0.22.1",
  "der",
@@ -11705,9 +11705,9 @@ dependencies = [
 
 [[package]]
 name = "webpki-root-certs"
-version = "1.0.6"
+version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "804f18a4ac2676ffb4e8b5b5fa9ae38af06df08162314f96a68d2a363e21a8ca"
+checksum = "36a29fc0408b113f68cf32637857ab740edfafdf460c326cd2afaa2d84cc05dc"
 dependencies = [
  "rustls-pki-types",
 ]

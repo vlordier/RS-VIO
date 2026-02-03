@@ -25,7 +25,7 @@
 //! - Solà et al., "Quaternion kinematics for the error-state Kalman filter", 2017
 
 use crate::datasets::ImuData;
-use crate::{Result, VIOError};
+use anyhow::{bail, Result};
 use nalgebra as na;
 use serde::{Deserialize, Serialize};
 
@@ -154,11 +154,11 @@ impl ImuInitializer {
     /// Process a single IMU measurement during initialization
     pub fn add_measurement(&mut self, imu: &ImuData) -> Result<()> {
         if self.state == InitializationState::Failed {
-            return Err(VIOError::Config("Initialization failed".to_string()));
+            bail!("Initialization failed");
         }
 
         if self.state == InitializationState::Initialized {
-            return Err(VIOError::Config("Already initialized".to_string()));
+            bail!("Already initialized");
         }
 
         self.state = InitializationState::Initializing;
@@ -178,7 +178,7 @@ impl ImuInitializer {
     /// Estimate gyroscope and accelerometer biases
     fn estimate_biases(&mut self) -> Result<()> {
         if self.measurements.is_empty() {
-            return Err(VIOError::Config("No measurements for bias estimation".to_string()));
+            bail!("No measurements for bias estimation");
         }
 
         // Gyroscope bias: mean of all gyroscope measurements (assuming static)
@@ -223,7 +223,7 @@ impl ImuInitializer {
     /// Estimate gravity direction from accelerometer measurements
     fn estimate_gravity(&mut self) -> Result<()> {
         if self.measurements.is_empty() {
-            return Err(VIOError::Config("No measurements for gravity estimation".to_string()));
+            bail!("No measurements for gravity estimation");
         }
 
         // Average accelerometer reading
@@ -238,7 +238,7 @@ impl ImuInitializer {
         let accel_magnitude = accel_mean.norm();
 
         if accel_magnitude < 1e-6 {
-            return Err(VIOError::Config("Accelerometer readings too small for gravity estimation".to_string()));
+            bail!("Accelerometer readings too small for gravity estimation");
         }
 
         // Normalize to expected gravity magnitude
