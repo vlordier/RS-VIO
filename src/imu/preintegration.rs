@@ -108,7 +108,9 @@ impl PreintegratedImu {
             delta_v: na::Vector3::zeros(),
             delta_p: na::Vector3::zeros(),
             delta_t: 0.0,
-            covariance: na::SMatrix::zeros(),
+            // Initialize with small prior uncertainty (1e-12 * I) to avoid degenerate covariance
+            // Zero covariance would cause the first integration to skip propagation through A matrix
+            covariance: na::SMatrix::from_diagonal_element(1e-12),
             J_R_bg: na::Matrix3::zeros(),
             J_v_bg: na::Matrix3::zeros(),
             J_v_ba: na::Matrix3::zeros(),
@@ -126,7 +128,8 @@ impl PreintegratedImu {
         self.delta_v = na::Vector3::zeros();
         self.delta_p = na::Vector3::zeros();
         self.delta_t = 0.0;
-        self.covariance = na::SMatrix::zeros();
+        // Reset covariance to small prior uncertainty (1e-12 * I)
+        self.covariance = na::SMatrix::from_diagonal_element(1e-12);
         self.J_R_bg = na::Matrix3::zeros();
         self.J_v_bg = na::Matrix3::zeros();
         self.J_v_ba = na::Matrix3::zeros();
@@ -223,7 +226,9 @@ impl PreintegratedImu {
         
         // Rotation block: Jr^{-T} for error-state formulation (left Jacobian inverse transpose)
         // Left Jacobian: Jl(ω) = Jr(-ω), and we use Jl^{-T} for error propagation
-        let Jr_inv_t = Jr.transpose().try_inverse().unwrap_or_else(|| Jr.transpose());
+        let Jr_inv_t = Jr.transpose()
+            .try_inverse()
+            .expect("Jr^T should always be invertible for SO(3); if this fails, check numerical stability");
         A.fixed_view_mut::<3, 3>(0, 0).copy_from(&Jr_inv_t);
 
         // Velocity-rotation coupling
