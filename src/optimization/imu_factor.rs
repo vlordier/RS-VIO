@@ -115,6 +115,48 @@ impl ImuFactor {
         
         (corrected_delta_R, corrected_delta_v, corrected_delta_p)
     }
+
+    /// Compute weighted residual for given states and biases
+    #[allow(clippy::too_many_arguments)]
+    fn compute_weighted_residual(
+        &self,
+        R_i: UnitQuaternion<f64>,
+        v_i: Vector3<f64>,
+        p_i: Vector3<f64>,
+        R_j: UnitQuaternion<f64>,
+        v_j: Vector3<f64>,
+        p_j: Vector3<f64>,
+        bias_g: Vector3<f64>,
+        bias_a: Vector3<f64>,
+    ) -> DVector<f64> {
+        let (corrected_delta_R, corrected_delta_v, corrected_delta_p) =
+            self.correct_for_bias(&bias_g, &bias_a);
+
+        let dt = self.preintegration.delta_t;
+
+        // ==================== Rotation Residual ====================
+        let predicted_R_ij = R_i.inverse() * R_j;
+        let rotation_error_quat = corrected_delta_R.inverse() * predicted_R_ij;
+        let r_R = Self::quat_to_rotation_vector(&rotation_error_quat);
+
+        // ==================== Velocity Residual ====================
+        let predicted_dv_world = v_j - v_i - self.gravity * dt;
+        let predicted_dv_i = R_i.inverse() * predicted_dv_world;
+        let r_v = predicted_dv_i - corrected_delta_v;
+
+        // ==================== Position Residual ====================
+        let predicted_dp_world = p_j - p_i - v_i * dt - 0.5 * self.gravity * dt.powi(2);
+        let predicted_dp_i = R_i.inverse() * predicted_dp_world;
+        let r_p = predicted_dp_i - corrected_delta_p;
+
+        let mut residual = na::SVector::<f64, 9>::zeros();
+        residual.rows_mut(0, 3).copy_from(&r_R);
+        residual.rows_mut(3, 3).copy_from(&r_v);
+        residual.rows_mut(6, 3).copy_from(&r_p);
+
+        let weighted = self.sqrt_information * residual;
+        DVector::from_vec(weighted.as_slice().to_vec())
+    }
     
     /// Convert unit quaternion to rotation vector (Log map)
     ///
@@ -194,45 +236,9 @@ impl Factor for ImuFactor {
         let bias_g = Vector3::new(params[6][0], params[6][1], params[6][2]);
         let bias_a = Vector3::new(params[7][0], params[7][1], params[7][2]);
         
-        // Get bias-corrected preintegration
-        let (corrected_delta_R, corrected_delta_v, corrected_delta_p) =
-            self.correct_for_bias(&bias_g, &bias_a);
-        
-        let dt = self.preintegration.delta_t;
-        
-        // ==================== Rotation Residual ====================
-        // Predicted rotation change: R_i^T * R_j
-        // Measured rotation change (bias-corrected): corrected_delta_R
-        // Error: Log(ΔR_measured^T * R_i^T * R_j)
-        let predicted_R_ij = R_i.inverse() * R_j;
-        let rotation_error_quat = corrected_delta_R.inverse() * predicted_R_ij;
-        let r_R = Self::quat_to_rotation_vector(&rotation_error_quat);
-        
-        // ==================== Velocity Residual ====================
-        // Predicted: R_i^T * (v_j - v_i - g*dt)
-        // Measured: corrected_delta_v
-        let predicted_dv_world = v_j - v_i - self.gravity * dt;
-        let predicted_dv_i = R_i.inverse() * predicted_dv_world;
-        let r_v = predicted_dv_i - corrected_delta_v;
-        
-        // ==================== Position Residual ====================
-        // Predicted: R_i^T * (p_j - p_i - v_i*dt - 0.5*g*dt²)
-        // Measured: corrected_delta_p
-        let predicted_dp_world = p_j - p_i - v_i * dt - 0.5 * self.gravity * dt.powi(2);
-        let predicted_dp_i = R_i.inverse() * predicted_dp_world;
-        let r_p = predicted_dp_i - corrected_delta_p;
-        
-        // Stack residuals into 9D vector
-        let mut residual = na::SVector::<f64, 9>::zeros();
-        residual.rows_mut(0, 3).copy_from(&r_R);
-        residual.rows_mut(3, 3).copy_from(&r_v);
-        residual.rows_mut(6, 3).copy_from(&r_p);
-        
-        // Apply square root information weighting
-        let weighted = self.sqrt_information * residual;
-        
-        // Convert to DVector for return
-        let weighted_residual = DVector::from_vec(weighted.as_slice().to_vec());
+        let weighted_residual = self.compute_weighted_residual(
+            R_i, v_i, p_i, R_j, v_j, p_j, bias_g, bias_a,
+        );
         
         // Compute Jacobians if requested
         let jacobian = if compute_jacobian {
@@ -318,6 +324,129 @@ impl Factor for ImuFactor {
             None
         };
         
+        (weighted_residual, jacobian)
+    }
+}
+
+/// IMU preintegration factor using SE3 pose variables
+///
+/// Parameter blocks:
+/// - params[0]: T_B_W_i (SE3, 7D: t, q)
+/// - params[1]: v_i (3D)
+/// - params[2]: T_B_W_j (SE3, 7D: t, q)
+/// - params[3]: v_j (3D)
+/// - params[4]: b_g (3D)
+/// - params[5]: b_a (3D)
+#[derive(Debug, Clone)]
+pub struct ImuFactorSe3 {
+    inner: ImuFactor,
+}
+
+impl ImuFactorSe3 {
+    /// Create new IMU factor (SE3 version)
+    pub fn new(preintegration: PreintegratedImu, gravity: Vector3<f64>) -> Self {
+        Self {
+            inner: ImuFactor::new(preintegration, gravity),
+        }
+    }
+
+    fn pose_from_se3(param: &DVector<f64>) -> (UnitQuaternion<f64>, Vector3<f64>) {
+        let t_B_W = Vector3::new(param[0], param[1], param[2]);
+        let q_B_W = UnitQuaternion::from_quaternion(na::Quaternion::new(
+            param[3], param[4], param[5], param[6],
+        ));
+        let q_W_B = q_B_W.inverse();
+        let p_W_B = -(q_W_B.transform_vector(&t_B_W));
+        (q_W_B, p_W_B)
+    }
+}
+
+impl Factor for ImuFactorSe3 {
+    fn get_dimension(&self) -> usize {
+        9
+    }
+
+    fn linearize(
+        &self,
+        params: &[DVector<f64>],
+        compute_jacobian: bool,
+    ) -> (DVector<f64>, Option<DMatrix<f64>>) {
+        assert_eq!(params.len(), 6, "ImuFactorSe3 requires 6 parameter blocks");
+        assert_eq!(params[0].len(), 7, "T_B_W_i must be 7D (t, q)");
+        assert_eq!(params[1].len(), 3, "v_i must be 3D");
+        assert_eq!(params[2].len(), 7, "T_B_W_j must be 7D (t, q)");
+        assert_eq!(params[3].len(), 3, "v_j must be 3D");
+        assert_eq!(params[4].len(), 3, "b_g must be 3D");
+        assert_eq!(params[5].len(), 3, "b_a must be 3D");
+
+        let (R_i, p_i) = Self::pose_from_se3(&params[0]);
+        let v_i = Vector3::new(params[1][0], params[1][1], params[1][2]);
+        let (R_j, p_j) = Self::pose_from_se3(&params[2]);
+        let v_j = Vector3::new(params[3][0], params[3][1], params[3][2]);
+        let bias_g = Vector3::new(params[4][0], params[4][1], params[4][2]);
+        let bias_a = Vector3::new(params[5][0], params[5][1], params[5][2]);
+
+        let weighted_residual = self.inner.compute_weighted_residual(
+            R_i, v_i, p_i, R_j, v_j, p_j, bias_g, bias_a,
+        );
+
+        let jacobian = if compute_jacobian {
+            let eps = 1e-7;
+            let mut jac = DMatrix::zeros(9, 26);
+
+            for i in 0..7 {
+                let mut params_perturbed = params.to_vec();
+                params_perturbed[0][i] += eps;
+                let (r_pert, _) = self.linearize(&params_perturbed, false);
+                let col = (r_pert - &weighted_residual) / eps;
+                jac.column_mut(i).copy_from(&col);
+            }
+
+            for i in 0..3 {
+                let mut params_perturbed = params.to_vec();
+                params_perturbed[1][i] += eps;
+                let (r_pert, _) = self.linearize(&params_perturbed, false);
+                let col = (r_pert - &weighted_residual) / eps;
+                jac.column_mut(7 + i).copy_from(&col);
+            }
+
+            for i in 0..7 {
+                let mut params_perturbed = params.to_vec();
+                params_perturbed[2][i] += eps;
+                let (r_pert, _) = self.linearize(&params_perturbed, false);
+                let col = (r_pert - &weighted_residual) / eps;
+                jac.column_mut(10 + i).copy_from(&col);
+            }
+
+            for i in 0..3 {
+                let mut params_perturbed = params.to_vec();
+                params_perturbed[3][i] += eps;
+                let (r_pert, _) = self.linearize(&params_perturbed, false);
+                let col = (r_pert - &weighted_residual) / eps;
+                jac.column_mut(17 + i).copy_from(&col);
+            }
+
+            for i in 0..3 {
+                let mut params_perturbed = params.to_vec();
+                params_perturbed[4][i] += eps;
+                let (r_pert, _) = self.linearize(&params_perturbed, false);
+                let col = (r_pert - &weighted_residual) / eps;
+                jac.column_mut(20 + i).copy_from(&col);
+            }
+
+            for i in 0..3 {
+                let mut params_perturbed = params.to_vec();
+                params_perturbed[5][i] += eps;
+                let (r_pert, _) = self.linearize(&params_perturbed, false);
+                let col = (r_pert - &weighted_residual) / eps;
+                jac.column_mut(23 + i).copy_from(&col);
+            }
+
+            Some(jac)
+        } else {
+            None
+        };
+
         (weighted_residual, jacobian)
     }
 }
@@ -418,5 +547,48 @@ mod tests {
         // Check that Jacobian is not all zeros
         let jac_norm = jac.norm();
         assert!(jac_norm > 1e-10, "Jacobian should not be degenerate");
+    }
+
+    #[test]
+    fn test_imu_factor_se3_residual_finite() {
+        let noise = ImuNoise::default();
+        let preint = PreintegratedImu::new(noise);
+
+        let gravity = Vector3::new(0.0, 0.0, -9.81);
+        let factor = ImuFactorSe3::new(preint, gravity);
+
+        let t_B_W_i = Vector3::zeros();
+        let q_B_W_i = UnitQuaternion::identity();
+        let t_B_W_j = Vector3::zeros();
+        let q_B_W_j = UnitQuaternion::identity();
+
+        let v_i = Vector3::zeros();
+        let v_j = Vector3::zeros();
+        let bias_g = Vector3::zeros();
+        let bias_a = Vector3::zeros();
+
+        let params = vec![
+            DVector::from_vec(vec![
+                t_B_W_i.x, t_B_W_i.y, t_B_W_i.z,
+                q_B_W_i.w, q_B_W_i.i, q_B_W_i.j, q_B_W_i.k,
+            ]),
+            DVector::from_vec(vec![v_i.x, v_i.y, v_i.z]),
+            DVector::from_vec(vec![
+                t_B_W_j.x, t_B_W_j.y, t_B_W_j.z,
+                q_B_W_j.w, q_B_W_j.i, q_B_W_j.j, q_B_W_j.k,
+            ]),
+            DVector::from_vec(vec![v_j.x, v_j.y, v_j.z]),
+            DVector::from_vec(vec![bias_g.x, bias_g.y, bias_g.z]),
+            DVector::from_vec(vec![bias_a.x, bias_a.y, bias_a.z]),
+        ];
+
+        let (residual, jacobian) = factor.linearize(&params, true);
+        assert_eq!(residual.len(), 9);
+        assert!(residual.iter().all(|x| x.is_finite()));
+
+        let jac = jacobian.expect("Jacobian should be computed");
+        assert_eq!(jac.nrows(), 9);
+        assert_eq!(jac.ncols(), 26);
+        assert!(jac.iter().all(|x| x.is_finite()));
     }
 }

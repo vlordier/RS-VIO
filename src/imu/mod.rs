@@ -1121,6 +1121,20 @@ impl ImuPreintegrator {
         self.preint.reset(na::Vector3::zeros(), na::Vector3::zeros());
         self.has_measurement = false;
     }
+
+    /// Take the current preintegration and reset for the next keyframe segment
+    ///
+    /// Resets the internal preintegration with the provided bias linearization point.
+    pub fn take_preintegration(
+        &mut self,
+        gyro_bias: na::Vector3<f64>,
+        accel_bias: na::Vector3<f64>,
+    ) -> PreintegratedImu {
+        let preint = self.preint.clone();
+        self.preint.reset(gyro_bias, accel_bias);
+        self.has_measurement = false;
+        preint
+    }
 }
 
 /// Legacy PreintegratedImu structure
