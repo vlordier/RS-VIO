@@ -6,24 +6,10 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DATASETS_DIR="${DATASETS_DIR:-/tmp/rs-vio-samples}"
-COLOR_GREEN='\033[0;32m'
-COLOR_BLUE='\033[0;34m'
-COLOR_YELLOW='\033[1;33m'
-COLOR_RED='\033[0;31m'
-NC='\033[0m'
 
-log_section() {
-  echo ""
-  echo -e "${COLOR_BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
-  echo -e "${COLOR_BLUE}║${NC} $1"
-  echo -e "${COLOR_BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
-  echo ""
-}
-
-log_success() { echo -e "${COLOR_GREEN}✓ $*${NC}"; }
-log_error() { echo -e "${COLOR_RED}✗ $*${NC}"; }
-log_info() { echo -e "${COLOR_BLUE}→ $*${NC}"; }
-log_warn() { echo -e "${COLOR_YELLOW}! $*${NC}"; }
+# Load shared logging utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/logging.sh"
 
 usage() {
   cat << 'EOF'

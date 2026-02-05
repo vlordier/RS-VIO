@@ -6,13 +6,11 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)] // Optimization code - panics indicate data corruption
 
 use crate::estimator::Frame;
-use crate::imu::ImuMotionPrior;
-use crate::optimization::factors::{BundleAdjustmentFactor, ImuPriorFactor, PnPFactor};
-use crate::optimization::imu_factor::ImuFactorSe3;
+use crate::optimization::factors::{BundleAdjustmentFactor, PnPFactor};
 use crate::types::{Matrix3x3, Matrix4x4, Vector3};
 use apex_solver::core::loss_functions::HuberLoss;
 use apex_solver::core::problem::{Problem, VariableEnum};
-use apex_solver::linalg::{LinearSolverType, SchurPreconditioner, SchurVariant};
+use apex_solver::linalg::LinearSolverType;
 use apex_solver::manifold::ManifoldType;
 use apex_solver::optimizer::levenberg_marquardt::{LevenbergMarquardt, LevenbergMarquardtConfig};
 use apex_solver::optimizer::SolverResult;
@@ -22,6 +20,15 @@ use rayon::prelude::*;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::sync::Arc;
+
+/// Type alias for bundle adjustment residual tuples to improve readability
+/// (landmark_var, keyframe_var, factor, loss_function)
+type ResidualTuple = (
+    Arc<String>,
+    Option<Arc<String>>,
+    BundleAdjustmentFactor,
+    Option<Box<dyn apex_solver::core::loss_functions::LossFunction + Send>>,
+);
 
 /// Sliding window of keyframes for bundle adjustment optimization.
 ///
@@ -134,9 +141,7 @@ impl SlidingWindow {
 
     fn build_solver_config(&self) -> LevenbergMarquardtConfig {
         LevenbergMarquardtConfig::new()
-            .with_linear_solver_type(LinearSolverType::SparseSchurComplement)
-            .with_schur_variant(SchurVariant::Sparse)
-            .with_schur_preconditioner(SchurPreconditioner::BlockDiagonal)
+            .with_linear_solver_type(LinearSolverType::SparseCholesky)
             .with_max_iterations(20)
             .with_cost_tolerance(1e-6)
             .with_parameter_tolerance(1e-9)
@@ -250,12 +255,7 @@ impl SlidingWindow {
                 // Use a tuple structure for residuals to avoid allocating Vec<String>
                 // (lm_var, Option<kf_var>, factor, loss)
                 // Stores Arc<String> instead of String to avoid duplication
-                let mut local_residuals: Vec<(
-                    Arc<String>,
-                    Option<Arc<String>>,
-                    BundleAdjustmentFactor,
-                    Option<Box<dyn apex_solver::core::loss_functions::LossFunction + Send>>,
-                )> = Vec::with_capacity(300);
+                let mut local_residuals: Vec<ResidualTuple> = Vec::with_capacity(300);
 
                 // Add KF pose
                 let kf_var = Arc::new(format!("KF_{}", id_frame));
@@ -274,17 +274,6 @@ impl SlidingWindow {
                 local_initials.push((
                     (*kf_var).clone(),
                     (ManifoldType::SE3, se3_data.cast::<f64>()),
-                ));
-
-                let velocity = frame.state.velocity;
-                let velocity_data = DVector::from_vec(vec![
-                    velocity[0] as f64,
-                    velocity[1] as f64,
-                    velocity[2] as f64,
-                ]);
-                local_initials.push((
-                    format!("KF_V_{}", id_frame),
-                    (ManifoldType::RN, velocity_data),
                 ));
 
                 let camera_features = [
@@ -396,19 +385,6 @@ impl SlidingWindow {
                 left
             });
 
-        if let Some(last_frame) = self.keyframes.back() {
-            let bg = last_frame.state.gyro_bias;
-            let ba = last_frame.state.accel_bias;
-            initial_values.entry("IMU_BG".to_string()).or_insert((
-                ManifoldType::RN,
-                DVector::from_vec(vec![bg[0] as f64, bg[1] as f64, bg[2] as f64]),
-            ));
-            initial_values.entry("IMU_BA".to_string()).or_insert((
-                ManifoldType::RN,
-                DVector::from_vec(vec![ba[0] as f64, ba[1] as f64, ba[2] as f64]),
-            ));
-        }
-
         // Add already known landmarks (avoid re-computing them in every frame)
         // Use the cache to filter only ACTIVE landmarks
         for (id, lm_var_arc) in &lm_string_cache {
@@ -436,41 +412,10 @@ impl SlidingWindow {
             }
         }
 
-        // Add IMU preintegration factors between consecutive keyframes
-        let gravity = na::Vector3::new(0.0, 0.0, -9.81);
-        for idx in 1..self.keyframes.len() {
-            let frame_j = &self.keyframes[idx];
-            if let Some(preint) = frame_j.imu_preintegration.as_ref() {
-                let factor = ImuFactorSe3::new(preint.clone(), gravity);
-                let kf_i_var = format!("KF_{}", idx - 1);
-                let kf_j_var = format!("KF_{}", idx);
-                let v_i_var = format!("KF_V_{}", idx - 1);
-                let v_j_var = format!("KF_V_{}", idx);
-                let bg_var = "IMU_BG".to_string();
-                let ba_var = "IMU_BA".to_string();
-
-                problem.add_residual_block(
-                    &[&kf_i_var, &v_i_var, &kf_j_var, &v_j_var, &bg_var, &ba_var],
-                    Box::new(factor),
-                    None,
-                );
-            }
-        }
-
         (problem, initial_values)
     }
 
     pub fn optimize(&mut self) -> Result<bool, std::io::Error> {
-        self.optimize_with_imu(None, None, None)
-    }
-
-    /// Optimize window with optional IMU prior on the latest keyframe pose
-    pub fn optimize_with_imu(
-        &mut self,
-        imu_prior: Option<ImuMotionPrior>,
-        imu_weights: Option<(f64, f64)>,
-        imu_huber_delta: Option<f64>,
-    ) -> Result<bool, std::io::Error> {
         self.check_sliding_window_size_for_optimization()?;
 
         // Save current state before optimization for potential rollback
@@ -482,56 +427,7 @@ impl SlidingWindow {
         let mut solver = LevenbergMarquardt::with_config(self.build_solver_config());
         // solver.add_observer(TerminalObserver::new());
 
-        let (mut problem, initial_values) = self.build_optimization_problem();
-
-        // If IMU prior is available, add a residual on the latest keyframe pose
-        if let Some(prior) = imu_prior {
-            let last_index = self.keyframes.len().saturating_sub(1);
-            if !self.keyframes.is_empty() {
-                let kf_var = format!("KF_{}", last_index);
-                // Predict pose from IMU prior (world-from-body), then invert to body-from-world
-                let (T_W_B_pred, _v_pred) = prior.predict_state();
-                if let Some(T_B_W_pred) = T_W_B_pred.try_inverse() {
-                    let (w_pos, w_rot) = imu_weights.unwrap_or((1.0, 1.0));
-                    let factor = ImuPriorFactor::new(T_B_W_pred, w_pos, w_rot);
-                    // Optional robust loss
-                    let loss = if let Some(delta) = imu_huber_delta {
-                        if delta > 0.0 {
-                            match HuberLoss::new(delta) {
-                                Ok(l) => Some(Box::new(l)
-                                    as Box<
-                                        dyn apex_solver::core::loss_functions::LossFunction + Send,
-                                    >),
-                                Err(e) => {
-                                    log::warn!(
-                                        "[SlidingWindow] Invalid Huber delta ({}): {}",
-                                        delta,
-                                        e
-                                    );
-                                    None
-                                },
-                            }
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    };
-                    problem.add_residual_block(&[&kf_var], Box::new(factor), loss);
-                    log::debug!(
-                        "[SlidingWindow] Added IMU prior residual on keyframe {} (pos_weight={:.2}, rot_weight={:.2}, huber_delta={:?})",
-                        last_index,
-                        w_pos,
-                        w_rot,
-                        imu_huber_delta
-                    );
-                } else {
-                    log::warn!(
-                        "[SlidingWindow] IMU prior predicted pose inversion failed; skipping IMU residual"
-                    );
-                }
-            }
-        }
+        let (problem, initial_values) = self.build_optimization_problem();
 
         let num_residuals = problem.num_residual_blocks();
         let num_variables = initial_values.len();
@@ -561,47 +457,86 @@ impl SlidingWindow {
         // Initialize variables in the problem
         problem.initialize_variables(&initial_values);
 
-        // Try optimization with Schur complement first
-        let opt_result = match solver.optimize(&problem, &initial_values) {
-            Ok(result) => result,
-            Err(e) => {
-                // Check if it's a linear solve failure (singular matrix)
-                let error_str = format!("{:?}", e);
-                if error_str.contains("LinearSolveFailed") || error_str.contains("Singular matrix")
-                {
-                    log::warn!("[SlidingWindow] Schur complement failed with singular matrix, trying fallback solver (SparseCholesky)");
+        let landmark_variables = initial_values
+            .keys()
+            .filter(|k| k.starts_with("LM_"))
+            .count();
+        if landmark_variables == 0 {
+            log::warn!("[SlidingWindow] No landmark variables found; skipping optimization");
+            return Ok(false);
+        }
 
-                    // Create fallback solver with direct Cholesky
-                    let mut fallback_solver = LevenbergMarquardt::with_config(
-                        LevenbergMarquardtConfig::new()
-                            .with_linear_solver_type(LinearSolverType::SparseCholesky)
-                            .with_max_iterations(20)
-                            .with_cost_tolerance(1e-6)
-                            .with_parameter_tolerance(1e-9)
-                            .with_jacobi_scaling(false),
-                    );
-
-                    match fallback_solver.optimize(&problem, &initial_values) {
-                        Ok(result) => {
-                            log::debug!("[SlidingWindow] Fallback solver succeeded");
-                            result
-                        },
-                        Err(e2) => {
-                            log::error!("[SlidingWindow] Both Schur complement and fallback solver failed: {:?} - reverting to previous state", e2);
-                            self.revert_to_saved_state(&saved_keyframe_poses, &saved_map_points);
-                            return Ok(false);
-                        },
-                    }
-                } else {
-                    // Other optimization errors - revert to saved state
-                    log::error!(
-                        "[SlidingWindow] Optimization error: {:?} - reverting to previous state",
-                        e
-                    );
+        // Try optimization with Schur complement first (fallback to SparseCholesky as needed)
+        let has_landmarks = landmark_variables > 0;
+        let opt_result = if !has_landmarks {
+            log::warn!(
+                "[SlidingWindow] No landmark variables found; using fallback solver (SparseCholesky)"
+            );
+            let mut fallback_solver = LevenbergMarquardt::with_config(
+                LevenbergMarquardtConfig::new()
+                    .with_linear_solver_type(LinearSolverType::SparseCholesky)
+                    .with_max_iterations(20)
+                    .with_cost_tolerance(1e-6)
+                    .with_parameter_tolerance(1e-9)
+                    .with_jacobi_scaling(false),
+            );
+            match fallback_solver.optimize(&problem, &initial_values) {
+                Ok(result) => {
+                    log::debug!("[SlidingWindow] Fallback solver succeeded");
+                    result
+                },
+                Err(e2) => {
+                    log::error!("[SlidingWindow] Fallback solver failed: {:?} - reverting to previous state", e2);
                     self.revert_to_saved_state(&saved_keyframe_poses, &saved_map_points);
                     return Ok(false);
-                }
-            },
+                },
+            }
+        } else {
+            match solver.optimize(&problem, &initial_values) {
+                Ok(result) => result,
+                Err(e) => {
+                    // Check if it's a linear solve failure (singular matrix)
+                    let error_str = format!("{:?}", e);
+                    if error_str.contains("LinearSolveFailed")
+                        || error_str.contains("Singular matrix")
+                    {
+                        log::warn!("[SlidingWindow] Schur complement failed with singular matrix, trying fallback solver (SparseCholesky)");
+
+                        // Create fallback solver with direct Cholesky
+                        let mut fallback_solver = LevenbergMarquardt::with_config(
+                            LevenbergMarquardtConfig::new()
+                                .with_linear_solver_type(LinearSolverType::SparseCholesky)
+                                .with_max_iterations(20)
+                                .with_cost_tolerance(1e-6)
+                                .with_parameter_tolerance(1e-9)
+                                .with_jacobi_scaling(false),
+                        );
+
+                        match fallback_solver.optimize(&problem, &initial_values) {
+                            Ok(result) => {
+                                log::debug!("[SlidingWindow] Fallback solver succeeded");
+                                result
+                            },
+                            Err(e2) => {
+                                log::error!("[SlidingWindow] Both Schur complement and fallback solver failed: {:?} - reverting to previous state", e2);
+                                self.revert_to_saved_state(
+                                    &saved_keyframe_poses,
+                                    &saved_map_points,
+                                );
+                                return Ok(false);
+                            },
+                        }
+                    } else {
+                        // Other optimization errors - revert to saved state
+                        log::error!(
+                            "[SlidingWindow] Optimization error: {:?} - reverting to previous state",
+                            e
+                        );
+                        self.revert_to_saved_state(&saved_keyframe_poses, &saved_map_points);
+                        return Ok(false);
+                    }
+                },
+            }
         };
 
         // Check if optimization was successful based on status

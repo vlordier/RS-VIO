@@ -19,7 +19,7 @@ fn benchmark_track_point_at_level_loop() {
 
     let cx = 320.0;
     let cy = 240.0;
-    let patch = Pattern52::new(&image, cx, cy);
+    let _patch = Pattern52::new(&image, cx, cy);
 
     let mut start_transform = na::Affine2::identity();
     start_transform.matrix_mut_unchecked()[(0, 2)] = cx + 0.5;
@@ -34,7 +34,7 @@ fn benchmark_track_point_at_level_loop() {
         let patch = Pattern52::new(&image, cx, cy);
 
         // Reset transform slightly off to force iterations
-        let mut transform = start_transform.clone();
+        let mut transform = start_transform;
 
         // We track against the same patch/image, it should converge quickly
         let converged = track_point_at_level(

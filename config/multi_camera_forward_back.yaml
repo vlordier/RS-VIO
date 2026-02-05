@@ -1,0 +1,61 @@
+%YAML:1.0
+---
+# Example 2: Forward + Back cameras (drone with front and rear sensors)
+# Two independent cameras looking in opposite directions
+# No stereo relationship, fully independent intrinsics
+
+image_width: 512
+image_height: 512
+
+cameras:
+  - id: forward
+    intrinsics: [200.0, 200.0, 256.0, 256.0]
+    distortion: [0.01, 0.001, -0.002, 0.0001, 0.0]
+    model: "opencv5"
+    # Forward looking: identity rotation
+    T_B_C: [1.0, 0.0, 0.0, 0.05, 
+             0.0, 1.0, 0.0, 0.0, 
+             0.0, 0.0, 1.0, 0.0, 
+             0.0, 0.0, 0.0, 1.0]
+
+  - id: backward
+    intrinsics: [180.0, 180.0, 256.0, 256.0]
+    distortion: [0.015, 0.0012, -0.0025, 0.00015, 0.0]
+    model: "opencv5"
+    # Backward looking: 180° rotation around y-axis
+    T_B_C: [-1.0, 0.0, 0.0, -0.05, 
+              0.0, 1.0, 0.0, 0.0, 
+              0.0, 0.0, -1.0, 0.0, 
+              0.0, 0.0, 0.0, 1.0]
+
+# No stereo groups - each camera is independent
+# (Could define groups for shared regularization, but not required)
+
+keyframe_management:
+  keyframe_window_size: 15
+  translation_threshold: 0.3
+  rotation_threshold: 0.2
+
+feature_detection:
+  grid_size: 30
+  max_features_per_grid: 1
+  optical_flow_max_iterations: 10
+  optical_flow_convergence_threshold: 0.01
+
+depth:
+  min_depth: 0.1
+  max_depth: 150.0
+
+optimization:
+  pnp_max_iterations: 10
+  bundle_adjustment_max_iterations: 20
+
+# Refine each camera independently
+calibration:
+  optimize_intrinsics: true
+  optimize_focal_length: true
+  optimize_principal_point: false
+  optimize_distortion: false
+  intrinsics_refinement_frequency: 5
+  max_intrinsics_change_per_update: 0.5
+  intrinsics_regularization_weight: 0.01

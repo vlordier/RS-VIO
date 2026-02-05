@@ -1,3 +1,4 @@
+pub mod calibration;
 pub mod datasets;
 pub mod estimator;
 pub mod evaluation;

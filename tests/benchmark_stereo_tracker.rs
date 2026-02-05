@@ -12,7 +12,7 @@ fn create_test_image(width: u32, height: u32, pattern_offset: u32) -> GrayImage 
             // Shift pattern with offset to simulate motion
             let check_x = (x + pattern_offset) / 30;
             let check_y = (y + pattern_offset) / 30;
-            let val: u8 = if (check_x + check_y) % 2 == 0 {
+            let val: u8 = if (check_x + check_y).is_multiple_of(2) {
                 200
             } else {
                 50
@@ -50,8 +50,8 @@ fn bench_stereo_tracker_process_frame() {
     for i in 0..iterations {
         let mut f = Frame::new((i * 100) as i64, i as i32);
         // Change images slightly to force tracking
-        let curr0 = create_test_image(width, height, i as u32);
-        let curr1 = create_test_image(width, height, i as u32 + 5);
+        let curr0 = create_test_image(width, height, i);
+        let curr1 = create_test_image(width, height, i + 5);
         tracker.process_frame(&curr0, &curr1, &mut f);
         total_features += f.left_features.len();
     }

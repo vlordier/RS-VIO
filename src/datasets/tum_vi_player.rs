@@ -157,12 +157,6 @@ impl TUMVIPlayer {
             }
         }
 
-        // Save results
-        if config.enable_statistics {
-            Self::save_trajectories(&estimator, &context, &config.dataset_path);
-            Self::save_statistics(&result, &config.dataset_path);
-        }
-
         // Calculate final statistics
         result.success = true;
         result.processed_frames = context.processed_frames;
@@ -178,6 +172,12 @@ impl TUMVIPlayer {
             );
         }
 
+        // Save results (after final statistics are computed)
+        if config.enable_statistics {
+            Self::save_trajectories(&estimator, &context, &config.dataset_path);
+            Self::save_statistics(&result, &config.dataset_path);
+        }
+
         // Display final statistics summary
         if config.enable_console_statistics && result.success {
             log::info!("════════════════════════════════════════════════════════════════════");
@@ -191,7 +191,11 @@ impl TUMVIPlayer {
                 " Average Processing Time: {:.2}ms",
                 result.average_processing_time_ms
             );
-            let fps = 1000.0 / result.average_processing_time_ms;
+            let fps = if result.average_processing_time_ms > 0.0 {
+                1000.0 / result.average_processing_time_ms
+            } else {
+                0.0
+            };
             log::info!(" Average Frame Rate: {:.1}fps", fps);
             log::info!("════════════════════════════════════════════════════════════════════");
         }
@@ -359,7 +363,11 @@ impl TUMVIPlayer {
                 result.average_processing_time_ms
             )
             .ok();
-            let fps = 1000.0 / result.average_processing_time_ms;
+            let fps = if result.average_processing_time_ms > 0.0 {
+                1000.0 / result.average_processing_time_ms
+            } else {
+                0.0
+            };
             writeln!(file, " Average Frame Rate: {:.1}fps", fps).ok();
             writeln!(
                 file,

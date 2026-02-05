@@ -8,7 +8,7 @@ fn bench_optimization_build() {
 
     // Add 8 frames
     for i in 0..8 {
-        let mut frame = Frame::new((i * 100) as i64, i as i32);
+        let mut frame = Frame::new((i * 100) as i64, i);
         frame.is_keyframe = true;
 
         // Add 2000 features per frame to stress test
