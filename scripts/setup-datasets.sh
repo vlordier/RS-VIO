@@ -16,16 +16,9 @@ fi
 
 CHECK_ONLY="${CHECK_ONLY:-0}"
 CHECKSUM_FILE="${CHECKSUM_FILE:-"$PROJECT_ROOT/scripts/dataset_checksums.sha256"}"
-COLOR_GREEN='\033[0;32m'
-COLOR_BLUE='\033[0;34m'
-COLOR_YELLOW='\033[1;33m'
-COLOR_RED='\033[0;31m'
-NC='\033[0m' # No Color
 
-log_info() { echo -e "${COLOR_BLUE}[INFO]${NC} $*"; }
-log_success() { echo -e "${COLOR_GREEN}[✓]${NC} $*"; }
-log_warn() { echo -e "${COLOR_YELLOW}[!]${NC} $*"; }
-log_error() { echo -e "${COLOR_RED}[✗]${NC} $*"; }
+# Load shared logging utilities
+source "$SCRIPT_DIR/logging.sh"
 
 mkdir -p "$DATASETS_DIR"
 cd "$DATASETS_DIR"

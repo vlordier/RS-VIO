@@ -1,0 +1,71 @@
+%YAML:1.0
+---
+# Example 1: Classic stereo pair (backward compatible)
+# Two synchronized cameras with shared focal length
+
+image_width: 512
+image_height: 512
+
+# Multi-camera definitions
+cameras:
+  - id: left
+    intrinsics: [190.978477, 190.973307, 254.931706, 256.897443]
+    distortion: [0.0034823894022493434, 0.0007150348452162257, -0.0020532361418706202, 0.00020293673591811182, 0.0]
+    model: "opencv5"
+    # Identity + no baseline
+    T_B_C: [1.0, 0.0, 0.0, 0.0, 
+             0.0, 1.0, 0.0, 0.0, 
+             0.0, 0.0, 1.0, 0.0, 
+             0.0, 0.0, 0.0, 1.0]
+
+  - id: right
+    intrinsics: [190.442370, 190.434438, 252.599497, 254.917231]
+    distortion: [0.0034003170790442797, 0.001766278153469831, -0.00266312569781606, 0.0003299517423931039, 0.0]
+    model: "opencv5"
+    # Baseline ~10cm along x-axis
+    T_B_C: [1.0, 0.0, 0.0, -0.10, 
+             0.0, 1.0, 0.0, 0.0, 
+             0.0, 0.0, 1.0, 0.0, 
+             0.0, 0.0, 0.0, 1.0]
+
+# Camera groups define stereo pairs and sharing policies
+camera_groups:
+  - name: main_stereo
+    cameras: ["left", "right"]
+    is_stereo: true
+    stereo_baseline: 0.10
+    # Share focal length across stereo pair (both cameras should see same scene)
+    share_focal_length: full
+    # Principal points can differ slightly
+    share_principal_point: none
+    # Distortion is camera-specific
+    share_distortion: none
+
+keyframe_management:
+  keyframe_window_size: 10
+  translation_threshold: 0.4
+  rotation_threshold: 0.25
+
+feature_detection:
+  grid_size: 30
+  max_features_per_grid: 1
+  optical_flow_max_iterations: 10
+  optical_flow_convergence_threshold: 0.01
+
+depth:
+  min_depth: 0.1
+  max_depth: 100.0
+
+optimization:
+  pnp_max_iterations: 10
+  bundle_adjustment_max_iterations: 20
+
+# Online intrinsics refinement on both cameras
+calibration:
+  optimize_intrinsics: true
+  optimize_focal_length: true       # Refine fx, fy
+  optimize_principal_point: false   # Keep cx, cy fixed
+  optimize_distortion: false
+  intrinsics_refinement_frequency: 5
+  max_intrinsics_change_per_update: 0.5
+  intrinsics_regularization_weight: 0.01

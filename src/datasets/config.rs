@@ -8,6 +8,8 @@ pub struct Config {
     #[serde(rename = "feature_detection")]
     pub feature_detection: FeatureDetectionConfig,
     pub optimization: OptimizationConfig,
+    #[serde(rename = "calibration", default)]
+    pub calibration: Option<CalibrationRefinementConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,6 +66,68 @@ pub struct OptimizationConfig {
     pub pnp_max_iterations: u32,
 }
 
+/// Online intrinsics refinement configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CalibrationRefinementConfig {
+    /// Enable online intrinsics refinement during VIO
+    #[serde(rename = "optimize_intrinsics", default)]
+    pub optimize_intrinsics: bool,
+    /// Optimize focal length (fx, fy)
+    #[serde(rename = "optimize_focal_length", default = "default_true")]
+    pub optimize_focal_length: bool,
+    /// Optimize principal point (cx, cy)
+    #[serde(rename = "optimize_principal_point", default)]
+    pub optimize_principal_point: bool,
+    /// Optimize distortion parameters
+    #[serde(rename = "optimize_distortion", default)]
+    pub optimize_distortion: bool,
+    /// Refine intrinsics every N keyframes
+    #[serde(rename = "intrinsics_refinement_frequency", default = "default_five")]
+    pub intrinsics_refinement_frequency: usize,
+    /// Max change per update (pixels, regularization)
+    #[serde(
+        rename = "max_intrinsics_change_per_update",
+        default = "default_max_change"
+    )]
+    pub max_intrinsics_change_per_update: f64,
+    /// Weight of regularization to original intrinsics
+    #[serde(
+        rename = "intrinsics_regularization_weight",
+        default = "default_reg_weight"
+    )]
+    pub intrinsics_regularization_weight: f64,
+}
+
+impl Default for CalibrationRefinementConfig {
+    fn default() -> Self {
+        Self {
+            optimize_intrinsics: false,
+            optimize_focal_length: true,
+            optimize_principal_point: false,
+            optimize_distortion: false,
+            intrinsics_refinement_frequency: 5,
+            max_intrinsics_change_per_update: 0.5,
+            intrinsics_regularization_weight: 0.01,
+        }
+    }
+}
+
+const fn default_true() -> bool {
+    true
+}
+
+const fn default_five() -> usize {
+    5
+}
+
+const fn default_max_change() -> f64 {
+    0.5
+}
+
+const fn default_reg_weight() -> f64 {
+    0.01
+}
+
 impl Config {
     pub fn load(path: &str) -> anyhow::Result<Self> {
         let content = std::fs::read_to_string(path)?;
@@ -79,5 +143,78 @@ impl Config {
         };
         let config: Config = serde_yaml::from_str(&content)?;
         Ok(config)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_calibration_refinement_config_defaults() {
+        let config = CalibrationRefinementConfig::default();
+
+        assert!(!config.optimize_intrinsics);
+        assert!(config.optimize_focal_length);
+        assert!(!config.optimize_principal_point);
+        assert!(!config.optimize_distortion);
+        assert_eq!(config.intrinsics_refinement_frequency, 5);
+        assert!((config.max_intrinsics_change_per_update - 0.5).abs() < f64::EPSILON);
+        assert!((config.intrinsics_regularization_weight - 0.01).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_default_helper_functions() {
+        assert_eq!(default_five(), 5);
+        assert!((default_max_change() - 0.5).abs() < f64::EPSILON);
+        assert!((default_reg_weight() - 0.01).abs() < f64::EPSILON);
+        assert!(default_true());
+    }
+
+    #[test]
+    fn test_camera_config_intrinsics() {
+        let camera = CameraConfig {
+            image_width: 640,
+            image_height: 480,
+            left_intrinsics: vec![500.0, 500.0, 320.0, 240.0],
+            left_distortion: vec![0.0, 0.0],
+            right_intrinsics: vec![505.0, 505.0, 320.0, 240.0],
+            right_distortion: vec![0.0, 0.0],
+            left_model: Some("EUCM".to_string()),
+            right_model: Some("EUCM".to_string()),
+            T_B_Cl: vec![1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+            T_B_Cr: vec![1.0, 0.0, 0.0, -0.12, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+        };
+
+        assert_eq!(camera.image_width, 640);
+        assert_eq!(camera.image_height, 480);
+        assert!((camera.left_intrinsics[0] - 500.0).abs() < f64::EPSILON);
+        assert!((camera.right_intrinsics[0] - 505.0).abs() < f64::EPSILON);
+        assert_eq!(camera.left_model, Some("EUCM".to_string()));
+    }
+
+    #[test]
+    fn test_keyframe_management_config() {
+        let kf_config = KeyframeManagementConfig {
+            keyframe_window_size: 10,
+            translation_threshold: 0.1,
+            rotation_threshold: 0.05,
+        };
+
+        assert_eq!(kf_config.keyframe_window_size, 10);
+        assert!(kf_config.translation_threshold > 0.0);
+        assert!(kf_config.rotation_threshold > 0.0);
+    }
+
+    #[test]
+    fn test_optimization_config() {
+        let opt_config = OptimizationConfig {
+            bundle_adjustment_max_iterations: 100,
+            pnp_max_iterations: 50,
+        };
+
+        assert_eq!(opt_config.bundle_adjustment_max_iterations, 100);
+        assert_eq!(opt_config.pnp_max_iterations, 50);
+        assert!(opt_config.bundle_adjustment_max_iterations > opt_config.pnp_max_iterations);
     }
 }

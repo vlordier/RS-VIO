@@ -1,5 +1,5 @@
 use apex_solver::factors::Factor;
-use na::{DMatrix, DVector, Matrix3, Matrix4, Vector2, Vector3, UnitQuaternion, Quaternion};
+use na::{DMatrix, DVector, Matrix3, Matrix4, Quaternion, UnitQuaternion, Vector2, Vector3};
 use nalgebra as na;
 use std::sync::Arc;
 
@@ -365,10 +365,15 @@ impl Factor for BundleAdjustmentFactor {
                 7,
                 "System pose must have 7 parameters (tx, ty, tz, qw, qx, qy, qz)"
             );
-            
+
             // Optimized extraction avoiding heap allocation and cloning
             let t_B_W = Vector3::new(params[1][0], params[1][1], params[1][2]);
-            let quat = UnitQuaternion::new_normalize(Quaternion::new(params[1][3], params[1][4], params[1][5], params[1][6]));
+            let quat = UnitQuaternion::new_normalize(Quaternion::new(
+                params[1][3],
+                params[1][4],
+                params[1][5],
+                params[1][6],
+            ));
             (quat.to_rotation_matrix().into_inner(), t_B_W)
         };
 
@@ -441,9 +446,9 @@ impl Factor for BundleAdjustmentFactor {
                 let x = p_W.x;
                 let y = p_W.y;
                 let z = p_W.z;
-                
+
                 let mut jac_r_wrt_rot = na::Matrix2x3::<f64>::zeros();
-                
+
                 // Row 0
                 let j00 = jac_r_wrt_p_W[(0, 0)];
                 let j01 = jac_r_wrt_p_W[(0, 1)];
@@ -547,7 +552,7 @@ impl Factor for PnPFactor {
             7,
             "System pose must have 7 parameters (tx, ty, tz, qw, qx, qy, qz)"
         );
-        
+
         // OPTIMIZATION: Manually extract params to avoid SE3 allocation
         // let T_B_W = se3::SE3::from(params[0].clone());
         let tx = params[0][0];
@@ -561,7 +566,7 @@ impl Factor for PnPFactor {
         // Construct rotation/translation manually
         let t_B_W = Vector3::new(tx, ty, tz);
         // We assume valid unit quaternion from solver
-        let q_B_W = UnitQuaternion::new_unchecked(Quaternion::new(qw, qx, qy, qz)); 
+        let q_B_W = UnitQuaternion::new_unchecked(Quaternion::new(qw, qx, qy, qz));
         let R_B_W = q_B_W.to_rotation_matrix();
 
         // Pre-compute camera transform components (reused in jacobian)
@@ -586,38 +591,54 @@ impl Factor for PnPFactor {
             // Dense multiplication optimization: Expand jac_proj * R_C_B manually
             // R_C_B is 3x3, jac_proj is 2x3.
             // R_C_B columns
-            let r00 = R_C_B[(0,0)]; let r01 = R_C_B[(0,1)]; let r02 = R_C_B[(0,2)];
-            let r10 = R_C_B[(1,0)]; let r11 = R_C_B[(1,1)]; let r12 = R_C_B[(1,2)];
-            let r20 = R_C_B[(2,0)]; let r21 = R_C_B[(2,1)]; let r22 = R_C_B[(2,2)];
+            let r00 = R_C_B[(0, 0)];
+            let r01 = R_C_B[(0, 1)];
+            let r02 = R_C_B[(0, 2)];
+            let r10 = R_C_B[(1, 0)];
+            let r11 = R_C_B[(1, 1)];
+            let r12 = R_C_B[(1, 2)];
+            let r20 = R_C_B[(2, 0)];
+            let r21 = R_C_B[(2, 1)];
+            let r22 = R_C_B[(2, 2)];
 
             // jac_proj elements
-            let j00 = jac_proj[(0,0)]; let j01 = jac_proj[(0,1)]; let j02 = jac_proj[(0,2)];
-            let j10 = jac_proj[(1,0)]; let j11 = jac_proj[(1,1)]; let j12 = jac_proj[(1,2)];
+            let j00 = jac_proj[(0, 0)];
+            let j01 = jac_proj[(0, 1)];
+            let j02 = jac_proj[(0, 2)];
+            let j10 = jac_proj[(1, 0)];
+            let j11 = jac_proj[(1, 1)];
+            let j12 = jac_proj[(1, 2)];
 
             // jac_proj_R_C_B = jac_proj * R_C_B
-            let jpR00 = j00*r00 + j01*r10 + j02*r20;
-            let jpR01 = j00*r01 + j01*r11 + j02*r21;
-            let jpR02 = j00*r02 + j01*r12 + j02*r22;
+            let jpR00 = j00 * r00 + j01 * r10 + j02 * r20;
+            let jpR01 = j00 * r01 + j01 * r11 + j02 * r21;
+            let jpR02 = j00 * r02 + j01 * r12 + j02 * r22;
 
-            let jpR10 = j10*r00 + j11*r10 + j12*r20;
-            let jpR11 = j10*r01 + j11*r11 + j12*r21;
-            let jpR12 = j10*r02 + j11*r12 + j12*r22;
+            let jpR10 = j10 * r00 + j11 * r10 + j12 * r20;
+            let jpR11 = j10 * r01 + j11 * r11 + j12 * r21;
+            let jpR12 = j10 * r02 + j11 * r12 + j12 * r22;
 
             // Transpose R_B_W for multiplication if needed, but we need jac * R_B_W
             // R_B_W (3x3)
-            let rb00 = R_B_W[(0,0)]; let rb01 = R_B_W[(0,1)]; let rb02 = R_B_W[(0,2)];
-            let rb10 = R_B_W[(1,0)]; let rb11 = R_B_W[(1,1)]; let rb12 = R_B_W[(1,2)];
-            let rb20 = R_B_W[(2,0)]; let rb21 = R_B_W[(2,1)]; let rb22 = R_B_W[(2,2)];
+            let rb00 = R_B_W[(0, 0)];
+            let rb01 = R_B_W[(0, 1)];
+            let rb02 = R_B_W[(0, 2)];
+            let rb10 = R_B_W[(1, 0)];
+            let rb11 = R_B_W[(1, 1)];
+            let rb12 = R_B_W[(1, 2)];
+            let rb20 = R_B_W[(2, 0)];
+            let rb21 = R_B_W[(2, 1)];
+            let rb22 = R_B_W[(2, 2)];
 
             // Translation Jacobian: ∂r/∂t = jac_proj * R_C_B * R_B_W
             // = [jpR] * [R_B_W] (2x3 * 3x3 = 2x3)
-            let jt00 = jpR00*rb00 + jpR01*rb10 + jpR02*rb20;
-            let jt01 = jpR00*rb01 + jpR01*rb11 + jpR02*rb21;
-            let jt02 = jpR00*rb02 + jpR01*rb12 + jpR02*rb22;
+            let jt00 = jpR00 * rb00 + jpR01 * rb10 + jpR02 * rb20;
+            let jt01 = jpR00 * rb01 + jpR01 * rb11 + jpR02 * rb21;
+            let jt02 = jpR00 * rb02 + jpR01 * rb12 + jpR02 * rb22;
 
-            let jt10 = jpR10*rb00 + jpR11*rb10 + jpR12*rb20;
-            let jt11 = jpR10*rb01 + jpR11*rb11 + jpR12*rb21;
-            let jt12 = jpR10*rb02 + jpR11*rb12 + jpR12*rb22;
+            let jt10 = jpR10 * rb00 + jpR11 * rb10 + jpR12 * rb20;
+            let jt11 = jpR10 * rb01 + jpR11 * rb11 + jpR12 * rb21;
+            let jt12 = jpR10 * rb02 + jpR11 * rb12 + jpR12 * rb22;
 
             // Rotation Jacobian: ∂r/∂ω = jac_proj * R_C_B * (-R_B_W * [p_W]×)
             // = (Jacobian_t) * (-1 * [p_W]x)
@@ -632,27 +653,35 @@ impl Factor for PnPFactor {
                 [jt00 jt01 jt02] * [ 0  z -y]
                 [jt10 jt11 jt12]   [-z  0  x]
                                    [ y -x  0]
-                
+
                 col0 = jt00(0) + jt01(-z) + jt02(y)
                 col1 = jt00(z) + jt01(0) + jt02(-x)
                 col2 = jt00(-y) + jt01(x) + jt02(0)
             */
-            let jr00 = -jt01*pz + jt02*py;
-            let jr01 =  jt00*pz - jt02*px;
-            let jr02 = -jt00*py + jt01*px;
+            let jr00 = -jt01 * pz + jt02 * py;
+            let jr01 = jt00 * pz - jt02 * px;
+            let jr02 = -jt00 * py + jt01 * px;
 
-            let jr10 = -jt11*pz + jt12*py;
-            let jr11 =  jt10*pz - jt12*px;
-            let jr12 = -jt10*py + jt11*px;
+            let jr10 = -jt11 * pz + jt12 * py;
+            let jr11 = jt10 * pz - jt12 * px;
+            let jr12 = -jt10 * py + jt11 * px;
 
             let mut jac = DMatrix::zeros(2, 6);
             // Translate part
-            jac[(0,0)] = jt00; jac[(0,1)] = jt01; jac[(0,2)] = jt02;
-            jac[(1,0)] = jt10; jac[(1,1)] = jt11; jac[(1,2)] = jt12;
+            jac[(0, 0)] = jt00;
+            jac[(0, 1)] = jt01;
+            jac[(0, 2)] = jt02;
+            jac[(1, 0)] = jt10;
+            jac[(1, 1)] = jt11;
+            jac[(1, 2)] = jt12;
             // Rotate part
-            jac[(0,3)] = jr00; jac[(0,4)] = jr01; jac[(0,5)] = jr02;
-            jac[(1,3)] = jr10; jac[(1,4)] = jr11; jac[(1,5)] = jr12;
-            
+            jac[(0, 3)] = jr00;
+            jac[(0, 4)] = jr01;
+            jac[(0, 5)] = jr02;
+            jac[(1, 3)] = jr10;
+            jac[(1, 4)] = jr11;
+            jac[(1, 5)] = jr12;
+
             Some(jac)
         } else {
             None

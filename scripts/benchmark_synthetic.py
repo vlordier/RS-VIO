@@ -18,24 +18,10 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict
 
+from logging_utils import Colors, log_info, log_header
+
 PROJECT_ROOT = Path(__file__).parent.parent
 RESULTS_DIR = PROJECT_ROOT / "benchmark_results"
-
-class Colors:
-    GREEN = '\033[0;32m'
-    YELLOW = '\033[1;33m'
-    RED = '\033[0;31m'
-    CYAN = '\033[0;36m'
-    BLUE = '\033[0;34m'
-    RESET = '\033[0m'
-
-def log_info(msg: str):
-    print(f"{Colors.GREEN}✓{Colors.RESET} {msg}")
-
-def log_header(msg: str):
-    print(f"\n{Colors.BLUE}{'═' * 60}{Colors.RESET}")
-    print(f"{Colors.BLUE}{msg:^60}{Colors.RESET}")
-    print(f"{Colors.BLUE}{'═' * 60}{Colors.RESET}\n")
 
 def run_unit_tests() -> bool:
     """Run all unit tests for feature_tracker module."""

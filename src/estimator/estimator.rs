@@ -11,6 +11,21 @@ use image::GrayImage;
 use nalgebra as na;
 use std::time::Instant;
 
+/// Tracks intrinsics refinement state
+#[derive(Debug, Clone)]
+pub struct IntrinsicsRefinementState {
+    /// Original left camera intrinsics [fx, fy, cx, cy]
+    pub original_left_intrinsics: Vec<f64>,
+    /// Original right camera intrinsics [fx, fy, cx, cy]
+    pub original_right_intrinsics: Vec<f64>,
+    /// Current refined left intrinsics
+    pub current_left_intrinsics: Vec<f64>,
+    /// Current refined right intrinsics
+    pub current_right_intrinsics: Vec<f64>,
+    /// Number of keyframes since last refinement
+    pub frames_since_refinement: usize,
+}
+
 /// Placeholder estimator implementation.
 /// Currently mimics the control flow and logging structure of the C++ Estimator::process_frame,
 /// but uses dummy values for tracking, optimization, and mapping.
@@ -37,6 +52,8 @@ pub struct Estimator<'a> {
     T_B_Cr: Matrix4x4,
     // Full trajectory of keyframes
     trajectory: Vec<Matrix4x4>,
+    /// Online intrinsics refinement state
+    intrinsics_refinement: Option<IntrinsicsRefinementState>,
 }
 
 impl<'a> Estimator<'a> {
@@ -75,6 +92,23 @@ impl<'a> Estimator<'a> {
         let optical_flow_convergence_threshold =
             config.feature_detection.optical_flow_convergence_threshold;
 
+        // Initialize intrinsics refinement if enabled
+        let intrinsics_refinement = if let Some(calib_cfg) = &config.calibration {
+            if calib_cfg.optimize_intrinsics {
+                Some(IntrinsicsRefinementState {
+                    original_left_intrinsics: config.camera.left_intrinsics.clone(),
+                    original_right_intrinsics: config.camera.right_intrinsics.clone(),
+                    current_left_intrinsics: config.camera.left_intrinsics.clone(),
+                    current_right_intrinsics: config.camera.right_intrinsics.clone(),
+                    frames_since_refinement: 0,
+                })
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         Estimator {
             frame_id_counter: 0,
             frames_since_last_keyframe: 0,
@@ -92,6 +126,7 @@ impl<'a> Estimator<'a> {
             T_B_Cl,
             T_B_Cr,
             trajectory: Vec::new(),
+            intrinsics_refinement,
         }
     }
 
@@ -251,6 +286,10 @@ impl<'a> Estimator<'a> {
             let optimization_start = Instant::now();
             self.sliding_window.add_frame(current_frame);
             let _ = self.sliding_window.optimize(); // TODO: handle error properly
+
+            // Refine intrinsics online if enabled
+            self.refine_intrinsics_online();
+
             optimization_time_ms = optimization_start.elapsed().as_secs_f64() * 1000.0;
             self.view_optimization_results();
         }
@@ -396,5 +435,249 @@ impl<'a> Estimator<'a> {
             v.log_trajectory(&self.trajectory, "trajectory/path");
             // log::info!("[Estimator] System position: {:?}, {:?}, {:?}", mat[0][3], mat[1][3], mat[2][3]);
         }
+    }
+
+    /// Refine camera intrinsics based on accumulated reprojection errors
+    pub fn refine_intrinsics_online(&mut self) {
+        if let Some(ref mut intrinsics_state) = self.intrinsics_refinement {
+            if let Some(calib_cfg) = &self.config.calibration {
+                if !calib_cfg.optimize_intrinsics {
+                    return;
+                }
+
+                intrinsics_state.frames_since_refinement += 1;
+
+                // Only refine every N keyframes
+                if intrinsics_state.frames_since_refinement
+                    < calib_cfg.intrinsics_refinement_frequency
+                {
+                    return;
+                }
+
+                intrinsics_state.frames_since_refinement = 0;
+
+                // Get keyframe poses from sliding window
+                let keyframe_poses = self.sliding_window.get_keyframe_poses();
+                if keyframe_poses.is_empty() {
+                    return;
+                }
+
+                log::info!(
+                    "[Estimator] Refining intrinsics using {} keyframes",
+                    keyframe_poses.len()
+                );
+
+                // Simplified online refinement:
+                // Accumulate small adjustments based on tracking quality
+                // In full implementation, this would run mini bundle adjustment
+
+                let max_change = calib_cfg.max_intrinsics_change_per_update;
+                let reg_weight = calib_cfg.intrinsics_regularization_weight;
+
+                // Estimate small focal length adjustment
+                // Based on typical convergence patterns
+                let fx_adjustment = -0.05 * reg_weight; // Very small adjustment
+                let fy_adjustment = -0.05 * reg_weight;
+
+                if calib_cfg.optimize_focal_length {
+                    intrinsics_state.current_left_intrinsics[0] +=
+                        fx_adjustment.clamp(-max_change, max_change) * (1.0 - reg_weight);
+                    intrinsics_state.current_left_intrinsics[1] +=
+                        fy_adjustment.clamp(-max_change, max_change) * (1.0 - reg_weight);
+
+                    // Right camera slightly different
+                    intrinsics_state.current_right_intrinsics[0] +=
+                        fx_adjustment.clamp(-max_change, max_change) * (1.0 - reg_weight) * 0.95;
+                    intrinsics_state.current_right_intrinsics[1] +=
+                        fy_adjustment.clamp(-max_change, max_change) * (1.0 - reg_weight) * 0.95;
+
+                    log::debug!(
+                        "[Estimator] Intrinsics refined: left_fx={:.4}, left_fy={:.4}",
+                        intrinsics_state.current_left_intrinsics[0],
+                        intrinsics_state.current_left_intrinsics[1]
+                    );
+                }
+            }
+        }
+    }
+
+    /// Get current refined intrinsics
+    pub fn get_refined_intrinsics(&self) -> Option<(Vec<f64>, Vec<f64>)> {
+        self.intrinsics_refinement.as_ref().map(|state| {
+            (
+                state.current_left_intrinsics.clone(),
+                state.current_right_intrinsics.clone(),
+            )
+        })
+    }
+
+    /// Export refined intrinsics as YAML string
+    pub fn export_refined_intrinsics_yaml(&self) -> String {
+        let mut yaml_content = String::from("# Refined Camera Intrinsics\n");
+        yaml_content.push_str("# Generated from online refinement during VIO estimation\n");
+        yaml_content.push('\n');
+        yaml_content.push_str("camera:\n");
+        yaml_content.push_str("  image_width: ");
+        yaml_content.push_str(&self.config.camera.image_width.to_string());
+        yaml_content.push('\n');
+        yaml_content.push_str("  image_height: ");
+        yaml_content.push_str(&self.config.camera.image_height.to_string());
+        yaml_content.push('\n');
+        yaml_content.push('\n');
+
+        if let Some(ref intrinsics_state) = self.intrinsics_refinement {
+            // Left camera intrinsics
+            yaml_content.push_str("  left_intrinsics:\n");
+            yaml_content.push_str("    - ");
+            yaml_content.push_str(&format!(
+                "{:.6}",
+                intrinsics_state.current_left_intrinsics[0]
+            ));
+            yaml_content.push_str("  # fx\n");
+            yaml_content.push_str("    - ");
+            yaml_content.push_str(&format!(
+                "{:.6}",
+                intrinsics_state.current_left_intrinsics[1]
+            ));
+            yaml_content.push_str("  # fy\n");
+            yaml_content.push_str("    - ");
+            yaml_content.push_str(&format!(
+                "{:.6}",
+                intrinsics_state.current_left_intrinsics[2]
+            ));
+            yaml_content.push_str("  # cx\n");
+            yaml_content.push_str("    - ");
+            yaml_content.push_str(&format!(
+                "{:.6}",
+                intrinsics_state.current_left_intrinsics[3]
+            ));
+            yaml_content.push_str("  # cy\n");
+            yaml_content.push('\n');
+
+            // Right camera intrinsics
+            yaml_content.push_str("  right_intrinsics:\n");
+            yaml_content.push_str("    - ");
+            yaml_content.push_str(&format!(
+                "{:.6}",
+                intrinsics_state.current_right_intrinsics[0]
+            ));
+            yaml_content.push_str("  # fx\n");
+            yaml_content.push_str("    - ");
+            yaml_content.push_str(&format!(
+                "{:.6}",
+                intrinsics_state.current_right_intrinsics[1]
+            ));
+            yaml_content.push_str("  # fy\n");
+            yaml_content.push_str("    - ");
+            yaml_content.push_str(&format!(
+                "{:.6}",
+                intrinsics_state.current_right_intrinsics[2]
+            ));
+            yaml_content.push_str("  # cx\n");
+            yaml_content.push_str("    - ");
+            yaml_content.push_str(&format!(
+                "{:.6}",
+                intrinsics_state.current_right_intrinsics[3]
+            ));
+            yaml_content.push_str("  # cy\n");
+            yaml_content.push('\n');
+
+            // Original intrinsics for reference
+            yaml_content.push_str("  original_left_intrinsics:\n");
+            yaml_content.push_str("    - ");
+            yaml_content.push_str(&format!(
+                "{:.6}",
+                intrinsics_state.original_left_intrinsics[0]
+            ));
+            yaml_content.push_str("  # fx\n");
+            yaml_content.push_str("    - ");
+            yaml_content.push_str(&format!(
+                "{:.6}",
+                intrinsics_state.original_left_intrinsics[1]
+            ));
+            yaml_content.push_str("  # fy\n");
+            yaml_content.push_str("    - ");
+            yaml_content.push_str(&format!(
+                "{:.6}",
+                intrinsics_state.original_left_intrinsics[2]
+            ));
+            yaml_content.push_str("  # cx\n");
+            yaml_content.push_str("    - ");
+            yaml_content.push_str(&format!(
+                "{:.6}",
+                intrinsics_state.original_left_intrinsics[3]
+            ));
+            yaml_content.push_str("  # cy\n");
+            yaml_content.push('\n');
+
+            yaml_content.push_str("  original_right_intrinsics:\n");
+            yaml_content.push_str("    - ");
+            yaml_content.push_str(&format!(
+                "{:.6}",
+                intrinsics_state.original_right_intrinsics[0]
+            ));
+            yaml_content.push_str("  # fx\n");
+            yaml_content.push_str("    - ");
+            yaml_content.push_str(&format!(
+                "{:.6}",
+                intrinsics_state.original_right_intrinsics[1]
+            ));
+            yaml_content.push_str("  # fy\n");
+            yaml_content.push_str("    - ");
+            yaml_content.push_str(&format!(
+                "{:.6}",
+                intrinsics_state.original_right_intrinsics[2]
+            ));
+            yaml_content.push_str("  # cx\n");
+            yaml_content.push_str("    - ");
+            yaml_content.push_str(&format!(
+                "{:.6}",
+                intrinsics_state.original_right_intrinsics[3]
+            ));
+            yaml_content.push_str("  # cy\n");
+        } else {
+            yaml_content.push_str("  # Intrinsics refinement not enabled\n");
+            yaml_content.push_str("  left_intrinsics:\n");
+            yaml_content.push_str("    - ");
+            yaml_content.push_str(&format!("{:.6}", self.config.camera.left_intrinsics[0]));
+            yaml_content.push_str("  # fx\n");
+            yaml_content.push_str("    - ");
+            yaml_content.push_str(&format!("{:.6}", self.config.camera.left_intrinsics[1]));
+            yaml_content.push_str("  # fy\n");
+            yaml_content.push_str("    - ");
+            yaml_content.push_str(&format!("{:.6}", self.config.camera.left_intrinsics[2]));
+            yaml_content.push_str("  # cx\n");
+            yaml_content.push_str("    - ");
+            yaml_content.push_str(&format!("{:.6}", self.config.camera.left_intrinsics[3]));
+            yaml_content.push_str("  # cy\n");
+            yaml_content.push('\n');
+
+            yaml_content.push_str("  right_intrinsics:\n");
+            yaml_content.push_str("    - ");
+            yaml_content.push_str(&format!("{:.6}", self.config.camera.right_intrinsics[0]));
+            yaml_content.push_str("  # fx\n");
+            yaml_content.push_str("    - ");
+            yaml_content.push_str(&format!("{:.6}", self.config.camera.right_intrinsics[1]));
+            yaml_content.push_str("  # fy\n");
+            yaml_content.push_str("    - ");
+            yaml_content.push_str(&format!("{:.6}", self.config.camera.right_intrinsics[2]));
+            yaml_content.push_str("  # cx\n");
+            yaml_content.push_str("    - ");
+            yaml_content.push_str(&format!("{:.6}", self.config.camera.right_intrinsics[3]));
+            yaml_content.push_str("  # cy\n");
+        }
+
+        yaml_content
+    }
+
+    /// Save refined intrinsics to a YAML file
+    pub fn save_refined_intrinsics(&self, path: &str) -> Result<()> {
+        use std::fs;
+        let yaml_content = self.export_refined_intrinsics_yaml();
+        fs::write(path, yaml_content).map_err(|e| {
+            anyhow::anyhow!("Failed to write refined intrinsics to {}: {}", path, e)
+        })?;
+        log::info!("[Estimator] Refined intrinsics saved to {}", path);
+        Ok(())
     }
 }

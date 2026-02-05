@@ -10,16 +10,25 @@ use crate::optimization::factors::{BundleAdjustmentFactor, PnPFactor};
 use crate::types::{Matrix3x3, Matrix4x4, Vector3};
 use apex_solver::core::loss_functions::HuberLoss;
 use apex_solver::core::problem::{Problem, VariableEnum};
-use apex_solver::linalg::{LinearSolverType, SchurPreconditioner, SchurVariant};
+use apex_solver::linalg::LinearSolverType;
 use apex_solver::manifold::ManifoldType;
 use apex_solver::optimizer::levenberg_marquardt::{LevenbergMarquardt, LevenbergMarquardtConfig};
-use std::sync::Arc;
 use apex_solver::optimizer::SolverResult;
 use na::{DVector, UnitQuaternion};
 use nalgebra as na;
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::collections::VecDeque;
-use rayon::prelude::*;
+use std::sync::Arc;
+
+/// Type alias for bundle adjustment residual tuples to improve readability
+/// (landmark_var, keyframe_var, factor, loss_function)
+type ResidualTuple = (
+    Arc<String>,
+    Option<Arc<String>>,
+    BundleAdjustmentFactor,
+    Option<Box<dyn apex_solver::core::loss_functions::LossFunction + Send>>,
+);
 
 /// Sliding window of keyframes for bundle adjustment optimization.
 ///
@@ -132,9 +141,7 @@ impl SlidingWindow {
 
     fn build_solver_config(&self) -> LevenbergMarquardtConfig {
         LevenbergMarquardtConfig::new()
-            .with_linear_solver_type(LinearSolverType::SparseSchurComplement)
-            .with_schur_variant(SchurVariant::Sparse)
-            .with_schur_preconditioner(SchurPreconditioner::BlockDiagonal)
+            .with_linear_solver_type(LinearSolverType::SparseCholesky)
             .with_max_iterations(20)
             .with_cost_tolerance(1e-6)
             .with_parameter_tolerance(1e-9)
@@ -164,56 +171,83 @@ impl SlidingWindow {
         Ok(true)
     }
 
-    pub fn build_optimization_problem(&self) -> (Problem, HashMap<String, (ManifoldType, DVector<f64>)>) {
+    pub fn build_optimization_problem(
+        &self,
+    ) -> (Problem, HashMap<String, (ManifoldType, DVector<f64>)>) {
         let mut problem = Problem::new();
 
         // PART 1: Count observations and find first observation frame (Parallel)
         // Map: feature_id -> (left_count, right_count, first_frame_idx)
-        let landmark_stats = self.keyframes.par_iter().enumerate()
+        let landmark_stats = self
+            .keyframes
+            .par_iter()
+            .enumerate()
             .fold(
                 HashMap::new,
                 |mut acc: HashMap<usize, (usize, usize, usize)>, (frame_idx, frame)| {
                     for feat in &frame.left_features {
                         let entry = acc.entry(feat.feature_id).or_insert((0, 0, usize::MAX));
                         entry.0 += 1;
-                        if frame_idx < entry.2 { entry.2 = frame_idx; }
+                        if frame_idx < entry.2 {
+                            entry.2 = frame_idx;
+                        }
                     }
                     for feat in &frame.right_features {
                         let entry = acc.entry(feat.feature_id).or_insert((0, 0, usize::MAX));
                         entry.1 += 1;
-                        if frame_idx < entry.2 { entry.2 = frame_idx; }
+                        if frame_idx < entry.2 {
+                            entry.2 = frame_idx;
+                        }
                     }
                     acc
-                }
+                },
             )
-            .reduce(
-                HashMap::new,
-                |mut map1, map2| {
-                    for (k, (l, r, f)) in map2 {
-                        let entry = map1.entry(k).or_insert((0, 0, usize::MAX));
-                        entry.0 += l;
-                        entry.1 += r;
-                        if f < entry.2 { entry.2 = f; }
+            .reduce(HashMap::new, |mut map1, map2| {
+                for (k, (l, r, f)) in map2 {
+                    let entry = map1.entry(k).or_insert((0, 0, usize::MAX));
+                    entry.0 += l;
+                    entry.1 += r;
+                    if f < entry.2 {
+                        entry.2 = f;
                     }
-                    map1
                 }
-            );
+                map1
+            });
 
         // Pre-generate feature variable strings
         // This avoids calling format!("LM_{}") thousands of times during building
-        let lm_string_cache: HashMap<usize, Arc<String>> = landmark_stats.keys()
-             .map(|&id| (id, Arc::new(format!("LM_{}", id))))
-             .collect();
+        let lm_string_cache: HashMap<usize, Arc<String>> = landmark_stats
+            .keys()
+            .map(|&id| (id, Arc::new(format!("LM_{}", id))))
+            .collect();
 
         // Fetch transforms
-        let first_frame = self.keyframes.front().expect("Keyframes should not be empty");
+        let first_frame = self
+            .keyframes
+            .front()
+            .expect("Keyframes should not be empty");
         #[allow(clippy::unwrap_used, clippy::expect_used)]
-        let T_Cl_B = Arc::new(first_frame.state.T_B_Cl.try_inverse().expect("T_B_Cl should be invertible"));
+        let T_Cl_B = Arc::new(
+            first_frame
+                .state
+                .T_B_Cl
+                .try_inverse()
+                .expect("T_B_Cl should be invertible"),
+        );
         #[allow(clippy::unwrap_used, clippy::expect_used)]
-        let T_Cr_B = Arc::new(first_frame.state.T_B_Cr.try_inverse().expect("T_B_Cr should be invertible"));
+        let T_Cr_B = Arc::new(
+            first_frame
+                .state
+                .T_B_Cr
+                .try_inverse()
+                .expect("T_B_Cr should be invertible"),
+        );
 
         // PART 2: Build Factors (Parallel)
-        let results: Vec<_> = self.keyframes.par_iter().enumerate()
+        let results: Vec<_> = self
+            .keyframes
+            .par_iter()
+            .enumerate()
             .map(|(id_frame, frame)| {
                 // Pre-allocate to avoid re-allocations
                 let mut local_initials = Vec::with_capacity(300);
@@ -221,19 +255,26 @@ impl SlidingWindow {
                 // Use a tuple structure for residuals to avoid allocating Vec<String>
                 // (lm_var, Option<kf_var>, factor, loss)
                 // Stores Arc<String> instead of String to avoid duplication
-                let mut local_residuals: Vec<(Arc<String>, Option<Arc<String>>, BundleAdjustmentFactor, Option<Box<dyn apex_solver::core::loss_functions::LossFunction + Send>>)> = Vec::with_capacity(300);
+                let mut local_residuals: Vec<ResidualTuple> = Vec::with_capacity(300);
 
                 // Add KF pose
                 let kf_var = Arc::new(format!("KF_{}", id_frame));
                 #[allow(clippy::expect_used)]
-                let T_B_W = frame.state.T_W_B.try_inverse().expect("T_W_B should be invertible");
+                let T_B_W = frame
+                    .state
+                    .T_W_B
+                    .try_inverse()
+                    .expect("T_W_B should be invertible");
                 let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
                 let R_B_W = Matrix3x3::from(T_B_W.fixed_view::<3, 3>(0, 0));
                 let q_B_W = UnitQuaternion::from_matrix(&R_B_W);
                 let se3_data = DVector::from_vec(vec![
                     t_B_W.x, t_B_W.y, t_B_W.z, q_B_W.w, q_B_W.i, q_B_W.j, q_B_W.k,
                 ]);
-                local_initials.push(((*kf_var).clone(), (ManifoldType::SE3, se3_data.cast::<f64>())));
+                local_initials.push((
+                    (*kf_var).clone(),
+                    (ManifoldType::SE3, se3_data.cast::<f64>()),
+                ));
 
                 let camera_features = [
                     (&frame.left_features, T_Cl_B.clone()),
@@ -243,15 +284,20 @@ impl SlidingWindow {
                 for (features, T_C_B) in camera_features.iter() {
                     for feat in features.iter() {
                         let feature_id = feat.feature_id;
-                        
+
                         // Use stats lookup
-                        if let Some((count_left, count_right, first_frame_idx)) = landmark_stats.get(&feature_id) {
+                        if let Some((count_left, count_right, first_frame_idx)) =
+                            landmark_stats.get(&feature_id)
+                        {
                             if *count_left > 0 && *count_right > 0 {
                                 // Retrieve cached string
-                                let lm_var_arc = lm_string_cache.get(&feature_id).expect("Cache sync error");
+                                let lm_var_arc =
+                                    lm_string_cache.get(&feature_id).expect("Cache sync error");
 
                                 // Initial Value logic: Only if not already known AND this is the first responsible frame
-                                if !self.map_points.contains_key(&feature_id) && id_frame == *first_frame_idx {
+                                if !self.map_points.contains_key(&feature_id)
+                                    && id_frame == *first_frame_idx
+                                {
                                     let p_C = Vector3::new(
                                         feat.undistorted_coord[0] as f64,
                                         feat.undistorted_coord[1] as f64,
@@ -261,25 +307,34 @@ impl SlidingWindow {
                                         frame.state.T_W_B.fixed_view::<3, 3>(0, 0).into_owned(),
                                         frame.state.T_W_B.fixed_view::<3, 1>(0, 3).into_owned(),
                                     );
-                                    let T_B_C = T_C_B.try_inverse().expect("T_C_B should be invertible");
+                                    let T_B_C =
+                                        T_C_B.try_inverse().expect("T_C_B should be invertible");
                                     let (R_B_C, t_B_C) = (
                                         T_B_C.fixed_view::<3, 3>(0, 0).into_owned(),
                                         T_B_C.fixed_view::<3, 1>(0, 3).into_owned(),
                                     );
                                     let p_W = R_W_B * (R_B_C * p_C + t_B_C) + t_W_B;
                                     let data = DVector::from_vec(vec![p_W.x, p_W.y, p_W.z]);
-                                    local_initials.push(((**lm_var_arc).clone(), (ManifoldType::RN, data)));
+                                    local_initials
+                                        .push(((**lm_var_arc).clone(), (ManifoldType::RN, data)));
                                 }
 
                                 // Factor logic
                                 let mut factor = BundleAdjustmentFactor::new(
-                                    na::Vector2::new(feat.undistorted_coord[0], feat.undistorted_coord[1])
-                                        .cast::<f64>(),
+                                    na::Vector2::new(
+                                        feat.undistorted_coord[0],
+                                        feat.undistorted_coord[1],
+                                    )
+                                    .cast::<f64>(),
                                     (*T_C_B).clone(),
                                 );
 
                                 if id_frame == 0 {
-                                    let T_B_W_inv = frame.state.T_W_B.try_inverse().expect("T_W_B should be invertible");
+                                    let T_B_W_inv = frame
+                                        .state
+                                        .T_W_B
+                                        .try_inverse()
+                                        .expect("T_W_B should be invertible");
                                     factor = factor.with_fixed_pose(Arc::new(T_B_W_inv));
                                 }
 
@@ -288,10 +343,21 @@ impl SlidingWindow {
                                 } else {
                                     Some(kf_var.clone())
                                 };
-                                
+
                                 let huber_loss = HuberLoss::new(2.0).ok();
                                 // Store Arc<String>
-                                local_residuals.push((lm_var_arc.clone(), kf_var_opt, factor, huber_loss.map(|l| Box::new(l) as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>)));
+                                local_residuals.push((
+                                    lm_var_arc.clone(),
+                                    kf_var_opt,
+                                    factor,
+                                    huber_loss.map(|l| {
+                                        Box::new(l)
+                                            as Box<
+                                                dyn apex_solver::core::loss_functions::LossFunction
+                                                    + Send,
+                                            >
+                                    }),
+                                ));
                             }
                         }
                     }
@@ -301,39 +367,37 @@ impl SlidingWindow {
             .collect();
 
         // PART 3: Aggregate into Problem and Initial Values
-        let (all_initials_maps, all_residuals_vecs): (Vec<_>, Vec<_>) = results.into_par_iter().unzip();
+        let (all_initials_maps, all_residuals_vecs): (Vec<_>, Vec<_>) =
+            results.into_par_iter().unzip();
 
-        let mut initial_values = all_initials_maps.into_par_iter()
-            .fold(
-                HashMap::new,
-                |mut acc, block_initials| {
-                    for (k, v) in block_initials {
-                        acc.entry(k).or_insert(v);
-                    }
-                    acc
+        let mut initial_values = all_initials_maps
+            .into_par_iter()
+            .fold(HashMap::new, |mut acc, block_initials| {
+                for (k, v) in block_initials {
+                    acc.entry(k).or_insert(v);
                 }
-            )
-            .reduce(
-                HashMap::new,
-                |mut left, right| {
-                    for (k, v) in right {
-                        left.entry(k).or_insert(v);
-                    }
-                    left
+                acc
+            })
+            .reduce(HashMap::new, |mut left, right| {
+                for (k, v) in right {
+                    left.entry(k).or_insert(v);
                 }
-            );
+                left
+            });
 
         // Add already known landmarks (avoid re-computing them in every frame)
         // Use the cache to filter only ACTIVE landmarks
         for (id, lm_var_arc) in &lm_string_cache {
             if let Some(pos) = self.map_points.get(id) {
                 // Only add if not already present (new initial values take precedence if collision - but shouldn't happen due to if check above)
-                initial_values.entry((**lm_var_arc).clone()).or_insert_with(|| {
-                    (
-                        ManifoldType::RN,
-                        DVector::from_vec(vec![pos[0] as f64, pos[1] as f64, pos[2] as f64]),
-                    )
-                });
+                initial_values
+                    .entry((**lm_var_arc).clone())
+                    .or_insert_with(|| {
+                        (
+                            ManifoldType::RN,
+                            DVector::from_vec(vec![pos[0] as f64, pos[1] as f64, pos[2] as f64]),
+                        )
+                    });
             }
         }
 
@@ -393,47 +457,86 @@ impl SlidingWindow {
         // Initialize variables in the problem
         problem.initialize_variables(&initial_values);
 
-        // Try optimization with Schur complement first
-        let opt_result = match solver.optimize(&problem, &initial_values) {
-            Ok(result) => result,
-            Err(e) => {
-                // Check if it's a linear solve failure (singular matrix)
-                let error_str = format!("{:?}", e);
-                if error_str.contains("LinearSolveFailed") || error_str.contains("Singular matrix")
-                {
-                    log::warn!("[SlidingWindow] Schur complement failed with singular matrix, trying fallback solver (SparseCholesky)");
+        let landmark_variables = initial_values
+            .keys()
+            .filter(|k| k.starts_with("LM_"))
+            .count();
+        if landmark_variables == 0 {
+            log::warn!("[SlidingWindow] No landmark variables found; skipping optimization");
+            return Ok(false);
+        }
 
-                    // Create fallback solver with direct Cholesky
-                    let mut fallback_solver = LevenbergMarquardt::with_config(
-                        LevenbergMarquardtConfig::new()
-                            .with_linear_solver_type(LinearSolverType::SparseCholesky)
-                            .with_max_iterations(20)
-                            .with_cost_tolerance(1e-6)
-                            .with_parameter_tolerance(1e-9)
-                            .with_jacobi_scaling(false),
-                    );
-
-                    match fallback_solver.optimize(&problem, &initial_values) {
-                        Ok(result) => {
-                            log::debug!("[SlidingWindow] Fallback solver succeeded");
-                            result
-                        },
-                        Err(e2) => {
-                            log::error!("[SlidingWindow] Both Schur complement and fallback solver failed: {:?} - reverting to previous state", e2);
-                            self.revert_to_saved_state(&saved_keyframe_poses, &saved_map_points);
-                            return Ok(false);
-                        },
-                    }
-                } else {
-                    // Other optimization errors - revert to saved state
-                    log::error!(
-                        "[SlidingWindow] Optimization error: {:?} - reverting to previous state",
-                        e
-                    );
+        // Try optimization with Schur complement first (fallback to SparseCholesky as needed)
+        let has_landmarks = landmark_variables > 0;
+        let opt_result = if !has_landmarks {
+            log::warn!(
+                "[SlidingWindow] No landmark variables found; using fallback solver (SparseCholesky)"
+            );
+            let mut fallback_solver = LevenbergMarquardt::with_config(
+                LevenbergMarquardtConfig::new()
+                    .with_linear_solver_type(LinearSolverType::SparseCholesky)
+                    .with_max_iterations(20)
+                    .with_cost_tolerance(1e-6)
+                    .with_parameter_tolerance(1e-9)
+                    .with_jacobi_scaling(false),
+            );
+            match fallback_solver.optimize(&problem, &initial_values) {
+                Ok(result) => {
+                    log::debug!("[SlidingWindow] Fallback solver succeeded");
+                    result
+                },
+                Err(e2) => {
+                    log::error!("[SlidingWindow] Fallback solver failed: {:?} - reverting to previous state", e2);
                     self.revert_to_saved_state(&saved_keyframe_poses, &saved_map_points);
                     return Ok(false);
-                }
-            },
+                },
+            }
+        } else {
+            match solver.optimize(&problem, &initial_values) {
+                Ok(result) => result,
+                Err(e) => {
+                    // Check if it's a linear solve failure (singular matrix)
+                    let error_str = format!("{:?}", e);
+                    if error_str.contains("LinearSolveFailed")
+                        || error_str.contains("Singular matrix")
+                    {
+                        log::warn!("[SlidingWindow] Schur complement failed with singular matrix, trying fallback solver (SparseCholesky)");
+
+                        // Create fallback solver with direct Cholesky
+                        let mut fallback_solver = LevenbergMarquardt::with_config(
+                            LevenbergMarquardtConfig::new()
+                                .with_linear_solver_type(LinearSolverType::SparseCholesky)
+                                .with_max_iterations(20)
+                                .with_cost_tolerance(1e-6)
+                                .with_parameter_tolerance(1e-9)
+                                .with_jacobi_scaling(false),
+                        );
+
+                        match fallback_solver.optimize(&problem, &initial_values) {
+                            Ok(result) => {
+                                log::debug!("[SlidingWindow] Fallback solver succeeded");
+                                result
+                            },
+                            Err(e2) => {
+                                log::error!("[SlidingWindow] Both Schur complement and fallback solver failed: {:?} - reverting to previous state", e2);
+                                self.revert_to_saved_state(
+                                    &saved_keyframe_poses,
+                                    &saved_map_points,
+                                );
+                                return Ok(false);
+                            },
+                        }
+                    } else {
+                        // Other optimization errors - revert to saved state
+                        log::error!(
+                            "[SlidingWindow] Optimization error: {:?} - reverting to previous state",
+                            e
+                        );
+                        self.revert_to_saved_state(&saved_keyframe_poses, &saved_map_points);
+                        return Ok(false);
+                    }
+                },
+            }
         };
 
         // Check if optimization was successful based on status
@@ -710,5 +813,3 @@ impl SlidingWindow {
         }
     }
 }
-
-

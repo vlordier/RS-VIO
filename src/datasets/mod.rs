@@ -2,6 +2,7 @@ pub mod config;
 pub mod euroc_player;
 pub mod fourseasons_player;
 pub mod io;
+pub mod multi_camera_config;
 pub mod tum_vi_player;
 
 use crate::datasets::config::Config;

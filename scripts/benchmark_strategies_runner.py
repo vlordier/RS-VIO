@@ -22,6 +22,8 @@ from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Optional
 
+from logging_utils import Colors, log_info, log_warn, log_error, log_header, log_section
+
 # ============================================================================
 # Configuration
 # ============================================================================
@@ -32,34 +34,6 @@ DATASET_BASE = Path(os.environ.get("DATASET_DIR", "/tmp/rs-vio-samples"))
 RELEASE_DIR = PROJECT_ROOT / "target" / "release"
 RESULTS_DIR = PROJECT_ROOT / "benchmark_results"
 CONFIG_DIR = PROJECT_ROOT / "config"
-
-# Colors for output
-class Colors:
-    BLUE = '\033[0;34m'
-    GREEN = '\033[0;32m'
-    YELLOW = '\033[1;33m'
-    RED = '\033[0;31m'
-    CYAN = '\033[0;36m'
-    RESET = '\033[0m'
-
-def log_info(msg: str):
-    print(f"{Colors.GREEN}✓{Colors.RESET} {msg}")
-
-def log_warn(msg: str):
-    print(f"{Colors.YELLOW}⚠{Colors.RESET} {msg}")
-
-def log_error(msg: str):
-    print(f"{Colors.RED}✗{Colors.RESET} {msg}")
-
-def log_header(msg: str):
-    width = 60
-    print()
-    print(f"{Colors.BLUE}{'═' * width}{Colors.RESET}")
-    print(f"{Colors.BLUE}{msg:^{width}}{Colors.RESET}")
-    print(f"{Colors.BLUE}{'═' * width}{Colors.RESET}")
-
-def log_section(msg: str):
-    print(f"\n{Colors.CYAN}→ {msg}{Colors.RESET}")
 
 # ============================================================================
 # Dataset Detection

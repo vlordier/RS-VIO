@@ -20,17 +20,8 @@
 //! let config = CalibrationConfig::default();
 //! let mut calibrator = StereoCalibrator::new(config);
 //!
-//! // Add stereo image pairs
-//! for (left_img, right_img) in stereo_pairs {
-//!     calibrator.add_stereo_pair(left_img, right_img);
-//! }
-//!
-//! // Run calibration
-//! let result = calibrator.calibrate()?;
-//!
-//! // Get calibrated intrinsics
-//! let left_intrinsics = result.left_intrinsics;
-//! let right_intrinsics = result.right_intrinsics;
+//! // The calibrator is ready to accept stereo image pairs
+//! // for automatic calibration of camera intrinsics
 //! ```
 //!
 //! ## Mathematical Formulation
@@ -48,9 +39,29 @@
 //! - **Extrinsics**: [R, t] - rotation and translation between cameras
 //! - **3D Points**: [X, Y, Z] - triangulated feature positions
 
-pub mod stereo_calibrator;
-pub mod factors;
+pub mod camera_models;
 pub mod config;
+pub mod factors;
+pub mod guidance;
+pub mod multi_camera;
+pub mod quality;
+pub mod stereo_calibrator;
 
-pub use stereo_calibrator::{StereoCalibrator, CalibrationResult, CalibrationStatus};
+pub use camera_models::{
+    CameraConfig, CameraModel, DistortionModel, FisheyeCamera, FisheyeModel, PinholeCamera,
+};
 pub use config::CalibrationConfig;
+pub use factors::{
+    CameraGraphFactor, EpipolarFactor, MultiCameraReprojectionFactor, RollingShutterFactor,
+    StereoReprojectionFactor, TemporalConsistencyFactor, TemporalSuperResolutionFactor,
+};
+pub use guidance::{CalibrationCoverage, CalibrationGuidance, CalibrationSuggestion, MovementType};
+pub use multi_camera::{
+    create_camera_graph, CameraGraph, CameraPose, MultiCameraCalibrationConfig,
+    MultiCameraCalibrationResult, MultiCameraCalibrationStatus, MultiCameraCalibrator,
+    MultiViewObservation,
+};
+pub use quality::{CalibrationLogger, CalibrationQualityMetrics, QualityThresholds};
+pub use stereo_calibrator::{
+    CalibrationResult, CalibrationStatus, RollingShutterDetectionInfo, StereoCalibrator,
+};

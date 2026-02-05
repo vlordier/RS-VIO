@@ -28,12 +28,9 @@ RESULTS_DIR="$PROJECT_ROOT/benchmark_results"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 RESULTS_FILE="$RESULTS_DIR/strategies_${TIMESTAMP}.csv"
 
-# Color output
-COLOR_BLUE='\033[0;34m'
-COLOR_GREEN='\033[0;32m'
-COLOR_YELLOW='\033[1;33m'
-COLOR_RED='\033[0;31m'
-NC='\033[0m'
+# Load shared logging utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/logging.sh"
 
 # Available strategies
 STRATEGIES=("BasicRANSAC" "IMUGuided" "TemporalConsistency" "HybridOpticalFlow")
@@ -42,25 +39,6 @@ DATASETS=()
 # ============================================================================
 # Functions
 # ============================================================================
-
-log_info() {
-    echo -e "${COLOR_GREEN}✓${NC} $1"
-}
-
-log_warn() {
-    echo -e "${COLOR_YELLOW}⚠${NC} $1"
-}
-
-log_error() {
-    echo -e "${COLOR_RED}✗${NC} $1"
-}
-
-log_header() {
-    echo ""
-    echo -e "${COLOR_BLUE}═══════════════════════════════════════════════════════════${NC}"
-    echo -e "${COLOR_BLUE}$1${NC}"
-    echo -e "${COLOR_BLUE}═══════════════════════════════════════════════════════════${NC}"
-}
 
 usage() {
     cat << EOF
