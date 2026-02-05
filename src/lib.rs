@@ -3,7 +3,10 @@ pub mod viewers;
 pub mod estimator;
 pub mod feature_tracker;
 pub mod optimization;
-pub mod types; 
+pub mod types;
+pub mod macros;
+pub mod nalgebra_macros;
+pub mod type_macros; 
 
 // Re-export commonly used types for convenience
 pub use datasets::config::Config;
