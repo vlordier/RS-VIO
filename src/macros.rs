@@ -45,7 +45,9 @@ macro_rules! assert_config {
     };
 }
 
-/// Macro for safe downcast with logging
+/// Macro for safe downcast with logging.
+///
+/// The type check ensures the unwrap is safe (no panics on type mismatch).
 ///
 /// # Example
 /// ```ignore
@@ -56,7 +58,8 @@ macro_rules! downcast_or_log {
     ($obj:expr, $target:ty, $msg:expr) => {
         match $obj as &dyn std::any::Any {
             obj if obj.is::<$target>() => {
-                Some(obj.downcast_ref::<$target>().unwrap())
+                // Safe because we checked is::<$target>() above
+                obj.downcast_ref::<$target>()
             }
             _ => {
                 log::warn!("{}", $msg);
@@ -299,20 +302,26 @@ macro_rules! try_with_context {
     };
 }
 
-/// Macro for parsing with descriptive error messages
+/// Macro for parsing with descriptive error messages.
+///
+/// Works with both `anyhow::Error` and `String` error types. Use in Result
+/// contexts where error conversion is needed.
 ///
 /// # Example
 /// ```ignore
-/// let value: f64 = parse_or_err!(parts[0], "timestamp");
-/// let count: usize = parse_or_err!(input, "count", usize);
+/// fn parse_data() -> anyhow::Result<()> {
+///     let value: f64 = parse_or_err!(parts[0], "timestamp");
+///     let count: usize = parse_or_err!(input, "count", usize);
+///     Ok(())
+/// }
 /// ```
 #[macro_export]
 macro_rules! parse_or_err {
     ($value:expr, $field:expr) => {
-        $value.parse().map_err(|_| format!("Invalid {}: {}", $field, $value))?
+        $value.parse().map_err(|e| format!("Invalid {}: {} ({})", $field, $value, e))?
     };
     ($value:expr, $field:expr, $ty:ty) => {
-        $value.parse::<$ty>().map_err(|_| format!("Invalid {}: {}", $field, $value))?
+        $value.parse::<$ty>().map_err(|e| format!("Invalid {}: {} ({})", $field, $value, e))?
     };
 }
 
@@ -380,19 +389,29 @@ macro_rules! scoped_timer_result {
     }};
 }
 
-/// Macro for safe mutex lock with context
+/// Macro for safe mutex lock with context.
+///
+/// Returns `Result` for proper error handling instead of panicking.
+/// Recommended usage: `safe_lock!(my_mutex)?` in Result context.
 ///
 /// # Example
 /// ```ignore
-/// let data = safe_lock!(my_mutex, "failed to lock data");
+/// fn access_data() -> anyhow::Result<()> {
+///     let data = safe_lock!(my_mutex)?;
+///     // use data
+///     Ok(())
+/// }
+/// // Or with explicit error message:
+/// let data = safe_lock!(my_mutex, "failed to lock data")
+///     .expect("lock failed");
 /// ```
 #[macro_export]
 macro_rules! safe_lock {
     ($mutex:expr) => {
-        $mutex.lock().expect("Mutex poisoned")
+        $mutex.lock().map_err(|e| anyhow::anyhow!("Mutex poisoned: {}", e))
     };
     ($mutex:expr, $msg:expr) => {
-        $mutex.lock().expect($msg)
+        $mutex.lock().map_err(|e| anyhow::anyhow!("{}: {}", $msg, e))
     };
 }
 
@@ -602,7 +621,7 @@ mod tests {
     fn test_safe_lock() {
         use std::sync::Mutex;
         let mutex = Mutex::new(42);
-        let value = safe_lock!(mutex);
+        let value = safe_lock!(mutex).expect("failed to lock");
         assert_eq!(*value, 42);
     }
 
