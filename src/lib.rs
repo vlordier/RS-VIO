@@ -17,4 +17,7 @@ pub use evaluation::{
     calculate_ate, calculate_rpe, EstimatedTrajectory, GroundTruthPose, GroundTruthTrajectory,
     TrajectoryEvaluation,
 };
-pub use logging::{PerformanceMetrics, StructuredLogger};
+pub use logging::{
+    PerformanceMetrics, StructuredLogger, init_tracing_logging, LoggingGuard, TelemetryCounters,
+    TelemetryReport,
+};

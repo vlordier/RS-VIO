@@ -1,17 +1,20 @@
 //! Real-time logging system with structured output and performance metrics
 //!
 //! Provides:
-//! - Structured logging with context and metadata
+//! - Structured logging with context and metadata (custom module)
 //! - Real-time metrics aggregation (FPS, latency, throughput)
+//! - Tracing-based structured logging with spans (production-grade)
+//! - Non-blocking I/O for real-time systems
+//! - Atomic counters for hot-loop telemetry
 //! - Log rotation and archival
-//! - Thread-safe logging with minimal overhead
-//! - Performance sampling and statistics
 
 pub mod metrics;
 pub mod structured;
+pub mod tracing_config;
 
 pub use metrics::PerformanceMetrics;
 pub use structured::{LogContext, StructuredLogger};
+pub use tracing_config::{init_tracing_logging, LoggingGuard, TelemetryCounters, TelemetryReport};
 
 use anyhow::Result;
 use std::sync::{Arc, Mutex};
