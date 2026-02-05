@@ -1,8 +1,8 @@
 //! Real-time logging example demonstrating structured logging and performance metrics
 
 use rs_vio::{PerformanceMetrics, StructuredLogger};
-use std::time::Duration;
 use std::thread;
+use std::time::Duration;
 
 fn main() -> anyhow::Result<()> {
     println!("═══════════════════════════════════════════════════════");
@@ -20,7 +20,7 @@ fn main() -> anyhow::Result<()> {
     println!("─────────────────────────────────────────────\n");
 
     logger.info("Application started");
-    
+
     let ctx = rs_vio::logging::LogContext::new("estimator", "process_frame", "vio");
     logger.set_context(ctx);
     logger.add_metadata("frame_id", "1");
@@ -45,8 +45,10 @@ fn main() -> anyhow::Result<()> {
         metrics.record_throughput(throughput);
 
         if frame_id % 10 == 0 {
-            println!("  [Frame {}] FPS: {:.2}, Latency: {:.2}ms", 
-                     frame_id, fps, latency_ms);
+            println!(
+                "  [Frame {}] FPS: {:.2}, Latency: {:.2}ms",
+                frame_id, fps, latency_ms
+            );
         }
 
         // Small delay to simulate frame processing

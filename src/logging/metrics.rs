@@ -142,11 +142,7 @@ impl PerformanceMetrics {
             let max = values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
             let mean = values.iter().sum::<f64>() / count;
 
-            let variance = values
-                .iter()
-                .map(|v| (v - mean).powi(2))
-                .sum::<f64>()
-                / count;
+            let variance = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / count;
             let std_dev = variance.sqrt();
 
             Some(MetricStats {

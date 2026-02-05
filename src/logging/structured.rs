@@ -1,7 +1,7 @@
 //! Structured logging with context metadata and real-time streaming
 
-use anyhow::{Result, anyhow};
-use log::{info, warn, error, debug};
+use anyhow::{anyhow, Result};
+use log::{debug, error, info, warn};
 use std::collections::BTreeMap;
 use std::fs::OpenOptions;
 use std::io::Write;

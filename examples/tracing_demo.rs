@@ -25,7 +25,11 @@ fn main() -> anyhow::Result<()> {
     println!("\n▶ Example 1: Structured Logging with Tracing Spans");
     println!("─────────────────────────────────────────────────────");
 
-    info!(module = "estimator", operation = "vio_init", "Initializing VIO estimator");
+    info!(
+        module = "estimator",
+        operation = "vio_init",
+        "Initializing VIO estimator"
+    );
 
     // Example 2: No logging in hot loop - use atomic counters
     println!("\n▶ Example 2: Atomic Counters (Zero Logging in Hot Loop)");
@@ -125,7 +129,9 @@ fn main() -> anyhow::Result<()> {
 
     info!(
         total_frames = final_report.frames + final_report.frames_dropped,
-        success_rate = (final_report.frames as f64 / (final_report.frames + final_report.frames_dropped).max(1) as f64 * 100.0),
+        success_rate = (final_report.frames as f64
+            / (final_report.frames + final_report.frames_dropped).max(1) as f64
+            * 100.0),
         "session_complete"
     );
 

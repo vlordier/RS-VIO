@@ -18,6 +18,6 @@ pub use evaluation::{
     TrajectoryEvaluation,
 };
 pub use logging::{
-    PerformanceMetrics, StructuredLogger, init_tracing_logging, LoggingGuard, TelemetryCounters,
+    init_tracing_logging, LoggingGuard, PerformanceMetrics, StructuredLogger, TelemetryCounters,
     TelemetryReport,
 };

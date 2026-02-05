@@ -25,11 +25,11 @@ pub fn init_realtime_logging(
     log_file: Option<&str>,
 ) -> Result<Arc<Mutex<StructuredLogger>>> {
     let logger = StructuredLogger::new(log_file)?;
-    
+
     if enable_metrics {
         logger.enable_metrics();
     }
-    
+
     Ok(Arc::new(Mutex::new(logger)))
 }
 
