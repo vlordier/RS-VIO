@@ -7,11 +7,14 @@
 //! - Logging and metrics
 //! - Type-safe builders and factories
 
-/// Macro for validating configuration bounds with descriptive error messages
+/// Macro for validating configuration bounds with descriptive error messages.
+///
+/// Returns `Ok(())` on success or an `anyhow::Error` on validation failure.
+/// Must be used in a context that returns `Result`.
 ///
 /// # Example
 /// ```ignore
-/// validate_bounds!(value, 0.0, 1.0, "probability");
+/// validate_bounds!(value, 0.0, 1.0, "probability")?;
 /// ```
 #[macro_export]
 macro_rules! validate_bounds {
@@ -238,7 +241,7 @@ macro_rules! assert_in_range {
     };
 }
 
-/// Macro for bench-marking code blocks
+/// Macro for benchmarking code blocks
 ///
 /// # Example
 /// ```ignore
@@ -255,19 +258,29 @@ macro_rules! bench_block {
     }};
 }
 
-/// Macro for creating camera config validation closures
+/// Macro for validating camera configuration with error reporting.
+///
+/// Evaluates validation checks and logs errors for failed checks.
+/// Returns a `Vec<bool>` where `true` indicates passed validation.
 ///
 /// # Example
 /// ```ignore
-/// camera_validator!(width > 640, "width", height > 480, "height");
+/// let results = camera_validator!(width > 640, "width", height > 480, "height");
+/// if results.iter().all(|&x| x) { /* all valid */ }
 /// ```
 #[macro_export]
 macro_rules! camera_validator {
-    ($($check:expr, $name:expr),+ $(,)?) => {
-        {
-            vec![$($check),+]
-        }
-    };
+    ($($check:expr, $name:expr),+ $(,)?) => {{
+        let mut results = Vec::new();
+        $(
+            let passed = $check;
+            if !passed {
+                log::error!("Camera validation check failed for {}", $name);
+            }
+            results.push(passed);
+        )+
+        results
+    }};
 }
 
 /// Macro for error propagation with context
@@ -319,15 +332,18 @@ macro_rules! map_err_fmt {
 
 /// Macro for defining feature-gated code blocks
 ///
+/// Note: Due to Rust's procedural macro limitations, requires a literal string,
+/// not an expression, for the feature name.
+///
 /// # Example
 /// ```ignore
-/// feature_gate!(feature = "matching-imu-guided", {
+/// feature_gate!("matching-imu-guided", {
 ///     // IMU-guided matching code
 /// });
 /// ```
 #[macro_export]
 macro_rules! feature_gate {
-    (feature = $feat:expr, $block:block) => {
+    ($feat:literal, $block:block) => {
         #[cfg(feature = $feat)]
         {
             $block
@@ -446,11 +462,20 @@ macro_rules! unwrap_or_return {
     };
 }
 
-/// Macro for parameter validation in functions
+/// Macro for parameter validation in functions.
+///
+/// Must be used in a context that returns `Result` since it uses `anyhow::bail!`.
+/// Each failed check will return early with the provided error message.
 ///
 /// # Example
 /// ```ignore
-/// validate_params!(width > 0 => "width must be positive", height > 0 => "height must be positive");
+/// fn process(width: u32, height: u32) -> Result<()> {
+///     validate_params!(
+///         width > 0 => "width must be positive",
+///         height > 0 => "height must be positive"
+///     );
+///     Ok(())
+/// }
 /// ```
 #[macro_export]
 macro_rules! validate_params {
@@ -478,7 +503,10 @@ macro_rules! singleton {
     };
 }
 
-/// Macro for creating default builders with validation
+/// Macro for constructing builder instances with default field values.
+///
+/// Note: This macro does not perform validation - it only constructs the builder.
+/// Validation should be done separately via builder methods.
 ///
 /// # Example
 /// ```ignore
