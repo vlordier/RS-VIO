@@ -1,3 +1,4 @@
+# shellcheck disable=all
 # RS-VIO automation via just
 set shell := ["bash", "-euo", "pipefail", "-c"]
 

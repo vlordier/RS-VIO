@@ -13,7 +13,7 @@ Usage:
 """
 
 import argparse
-import yaml
+import yaml  # type: ignore
 from pathlib import Path
 from typing import List, Tuple
 import numpy as np
@@ -36,7 +36,7 @@ def extract_frames_from_vio_run(
     if not cam0_data.exists():
         raise FileNotFoundError(f"Cannot find {cam0_data}")
 
-    frames = []
+    frames: List[Tuple[str, str, str]] = []
     with open(cam0_data) as f:
         for line_num, line in enumerate(f):
             if line_num == 0:  # Skip header
