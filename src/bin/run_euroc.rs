@@ -1,15 +1,10 @@
 use clap::Parser;
 use env_logger::{Builder, Env};
 use log::{error, info, LevelFilter};
-use rand::rngs::StdRng;
-use rand::SeedableRng;
 use rs_vio::{EurocPlayer, PlayerConfig};
 use std::process;
 
 fn main() {
-    // Set random seed for reproducibility
-    let _rng = StdRng::seed_from_u64(42);
-
     // Initialize logger for immediate colored output
     Builder::from_env(Env::default().default_filter_or("debug"))
         // Silence rerun noise unless it's a warning or worse

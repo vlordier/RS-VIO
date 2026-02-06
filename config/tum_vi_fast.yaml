@@ -19,7 +19,6 @@ keyframe_management:
   keyframe_window_size: 10          # smaller window
   translation_threshold: 0.08       # fewer keyframes
   rotation_threshold: 0.08
-  processing_timeout_ms: 5000
 
 feature_detection:
   grid_size: 16                     # fewer grid cells

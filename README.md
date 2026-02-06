@@ -11,9 +11,8 @@ This project is a stereo visual-inertial odometry (VIO) system, written fully in
 - **PnP motion tracking**: Perspective-n-Point pose estimation for inter-frame tracking between keyframes.
 - **Keyframe selection**: Automatic keyframe selection based on translation and rotation thresholds.
 - **Async Pipeline Processing**: Non-blocking frame processing with concurrent bundle adjustment offload for real-time performance (19.7x speedup, <100 bytes/frame memory usage).
-- **Multi-camera model support**: Supports pinhole-radtan and EUCM camera models with distortion handling, more camera models can be integrated easily.
+- **Camera model support**: Supports pinhole-radtan and EUCM camera models with distortion handling, more camera models can be integrated easily.
 - **Self-calibrating stereo VIO**: Three complementary intrinsics refinement strategies (online, offline, and baseline) with 61.7% error reduction on TUM-VI.
-- **Multi-camera architecture**: N-camera configuration system with flexible orientations and parameter sharing policies.
 - **Dataset support**: Players for EuRoC, TUM-VI, and 4Seasons datasets with configurable parameters.
 - **3D visualization**: Real-time visualization of trajectories, map points, and camera frustums using Rerun.
 

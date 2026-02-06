@@ -18,7 +18,6 @@ keyframe_management:
   keyframe_window_size: 22
   translation_threshold: 0.03
   rotation_threshold: 0.03
-  processing_timeout_ms: 20000
 
 feature_detection:
   grid_size: 24

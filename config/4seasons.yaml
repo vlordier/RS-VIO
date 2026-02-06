@@ -4,18 +4,18 @@
 # Camera Parameters (4Seasons dataset specific)
 # Image dimensions and processing parameters
 camera:
-  image_width: 800            # Image width in pixels (EuRoC standard)
-  image_height: 400           # Image height in pixels (EuRoC standard)
+  image_width: 800            # Image width in pixels (4Seasons)
+  image_height: 400           # Image height in pixels (4Seasons)
 
   # Left camera (cam0) intrinsics
   left_intrinsics: [501.475791931, 501.475791931, 421.7953735163109 , 167.65799492501083]
-  left_distortion: [0., 0, 0, 0]  # [alpha, beta]
+  left_distortion: [0., 0, 0, 0]  # [k1, k2, p1, p2]
   left_model: "pinhole-radtan"
 
 
   # Right camera (cam1) intrinsics
   right_intrinsics: [501.475791931, 501.475791931, 421.7953735163109 , 167.65799492501083  ]  # [fx, fy, cx, cy]
-  right_distortion: [0., 0, 0, 0]  # [alpha, beta]
+  right_distortion: [0., 0, 0, 0]  # [k1, k2, p1, p2]
   right_model: "pinhole-radtan"
 
   # Left camera extrinsics (T_BC - camera to body transform)

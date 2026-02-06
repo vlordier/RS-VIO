@@ -87,7 +87,7 @@ impl ImuFactor {
     ///
     /// Uses first-order approximation from Forster et al. 2017:
     /// ```text
-    /// ΔR' = ΔR * Exp(-J_R_bg * δb_g)
+    /// ΔR' = ΔR * Exp(J_R_bg * δb_g)
     /// Δv' = Δv - J_v_bg * δb_g - J_v_ba * δb_a
     /// Δp' = Δp - J_p_bg * δb_g - J_p_ba * δb_a
     /// ```
@@ -100,8 +100,9 @@ impl ImuFactor {
         let d_bias_g = bias_g - self.preintegration.linearization_point_bg;
         let d_bias_a = bias_a - self.preintegration.linearization_point_ba;
 
-        // Correct rotation: ΔR' = ΔR * Exp(-J_R_bg * δb_g)
-        let delta_R_correction = exp_map_so3(-self.preintegration.J_R_bg * d_bias_g);
+        // Correct rotation: ΔR' = ΔR * Exp(J_R_bg * δb_g)
+        // J_R_bg already encodes the negative sign from ∂Exp((ω-bg)dt)/∂bg
+        let delta_R_correction = exp_map_so3(self.preintegration.J_R_bg * d_bias_g);
         let corrected_delta_R = self.preintegration.delta_R * delta_R_correction;
 
         // Correct velocity: Δv' = Δv - J_v_bg * δb_g - J_v_ba * δb_a

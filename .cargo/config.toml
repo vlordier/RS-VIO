@@ -1,6 +1,4 @@
 # Cargo configuration for RS-VIO build system
-# Note: Metal framework linking is now conditional in build.rs
-# and only applied when the "gpu" feature is enabled on macOS.
 
 [build]
 # Incremental compilation cache (enabled by default in dev)

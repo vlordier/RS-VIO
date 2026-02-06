@@ -19,7 +19,6 @@ keyframe_management:
   keyframe_window_size: 8            # very small to minimize marginalization
   translation_threshold: 0.10        # aggressive spacing to few KFs
   rotation_threshold: 0.10
-  processing_timeout_ms: 5000
 
 feature_detection:
   grid_size: 12                      # fewer features

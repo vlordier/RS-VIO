@@ -642,14 +642,13 @@ impl SlidingWindow {
             }
             // Update keyframe poses
             else if let Some(frame_id_str) = var_name.strip_prefix("KF_") {
-                if let Ok(frame_id) = frame_id_str.parse::<i32>() {
+                if let Ok(frame_id) = frame_id_str.parse::<usize>() {
                     let mat = apex_solver::manifold::se3::SE3::from(value.to_vector()).matrix();
-                    // println!("KF_{} optimized pose: {:?}", frame_id, mat);
-                    self.keyframes
-                        .get_mut(frame_id as usize)
-                        .unwrap()
-                        .state
-                        .T_W_B = mat.try_inverse().expect("T_W_B should be invertible");
+                    let Some(kf) = self.keyframes.get_mut(frame_id) else {
+                        log::warn!("Optimizer returned unknown keyframe index {frame_id}");
+                        return;
+                    };
+                    kf.state.T_W_B = mat.try_inverse().expect("T_W_B should be invertible");
                 }
             }
         });

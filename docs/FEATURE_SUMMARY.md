@@ -1,7 +1,6 @@
-# Feature: Self-Calibrating Stereo VIO with Multi-Camera Support
+# Feature: Self-Calibrating Stereo VIO
 
-**Branch:** `feature/stereo-calibration`
-**Status:** Work in progress — core BA and tracking work, calibration refinement is stubbed
+**Status:** Core BA and tracking work, calibration refinement is stubbed
 **Date:** February 5, 2026
 
 ---
@@ -242,12 +241,12 @@ python tools/post_process_calibration.py \
 
 ## Cleanup Notes
 
-**What's Excluded from Branch:**
+**External / Temporary (not committed):**
 - `/tmp/rs-vio-samples/tum_vi/` (dataset, external)
 - `/tmp/tum_vi_validation/` (output, temporary)
 - `target/` directory (build artifacts)
 
-**What's Included:**
+**Included:**
 - All source code (Rust + Python)
 - All configuration files
 - All documentation
@@ -300,4 +299,4 @@ python tools/post_process_calibration.py \
 
 ---
 
-**Status:** ⚠️ **Work in progress — see cleanup notes above**
+**Status:** Calibration refinement is stubbed — see cleanup notes above

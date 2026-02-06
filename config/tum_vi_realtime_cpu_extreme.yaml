@@ -25,7 +25,6 @@ keyframe_management:
   keyframe_window_size: 8
   translation_threshold: 0.08
   rotation_threshold: 0.08
-  processing_timeout_ms: 3000
 
 feature_detection:
   grid_size: 12              # fewer cells than realtime_cpu

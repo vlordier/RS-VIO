@@ -193,45 +193,6 @@ docker-push:
     echo "Push complete."
 
 # ---------------------------------------------------------------------------
-# Visualization
-# ---------------------------------------------------------------------------
-viz: viz-plots viz-plots-tum
-    echo "All visualizations generated."
-
-viz-install-python:
-    echo "Installing Python plotting dependencies..."
-    if command -v pip3 >/dev/null 2>&1; then \
-      pip3 install pandas matplotlib numpy; \
-    elif command -v pip >/dev/null 2>&1; then \
-      pip install pandas matplotlib numpy; \
-    else \
-      echo "pip not found. Please install Python 3."; \
-      exit 1; \
-    fi
-
-viz-plots:
-    echo "Generating plots from demo data..."
-    if [ -f "./plot_output/plot_comparisons.py" ]; then \
-      cd plot_output && python3 plot_comparisons.py; \
-      echo "Plots generated in ./plot_output/"; \
-      ls -lh ./plot_output/*.png 2>/dev/null || echo "No PNG files generated (check for errors)"; \
-    else \
-      echo "Demo data not found. Run 'just viz-demo' first."; \
-      exit 1; \
-    fi
-
-viz-plots-tum:
-    echo "Generating plots from TUM-VI data..."
-    if [ -f "./tum_vi_results/plot_comparisons.py" ]; then \
-      cd tum_vi_results && python3 plot_comparisons.py; \
-      echo "Plots generated in ./tum_vi_results/"; \
-      ls -lh ./tum_vi_results/*.png 2>/dev/null || echo "No PNG files generated (check for errors)"; \
-    else \
-      echo "TUM-VI data not found. Run 'just viz-tum' first."; \
-      exit 1; \
-    fi
-
-# ---------------------------------------------------------------------------
 # Cleanup
 # ---------------------------------------------------------------------------
 clean:
