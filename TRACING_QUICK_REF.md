@@ -112,7 +112,7 @@ use tracing::instrument;
 // Automatic span around function
 #[instrument(skip(imu))]
 fn integrate_imu(imu: &ImuBuffer) {
-    // Logged as: integerate_imu{imu_count=42} event
+    // Logged as: integrate_imu{imu_count=42} event
     tracing::debug!("processing IMU");
 }
 

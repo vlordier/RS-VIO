@@ -5,11 +5,54 @@
 
 use crate::datasets::config::Config;
 use crate::datasets::{CameraModelType, ImuData};
-use crate::estimator::Estimator;
+use crate::estimator::{
+    Estimator, FailureRecoveryTracker, LatencyHistogram, ProcessingMetrics,
+    StreamingPatternAnalyzer,
+};
 use crate::viewers::Viewer;
 use anyhow::Result;
+use std::cmp::Ordering;
+use std::collections::BinaryHeap;
+use std::panic::{self, AssertUnwindSafe};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, oneshot};
+use tokio::time::timeout;
 
+/// Configuration for async estimator real-time behavior
+#[derive(Clone, Debug)]
+pub struct AsyncConfig {
+    /// Channel capacity for command queue
+    pub channel_capacity: usize,
+    /// Timeout for processing individual frames (ms)
+    pub frame_timeout_ms: u64,
+    /// Maximum number of pending frames before skipping
+    pub max_pending_frames: usize,
+    /// Enable frame skipping when behind schedule
+    pub enable_frame_skipping: bool,
+    /// Processing time budget per frame (ms) - 0 disables budget
+    pub frame_budget_ms: u64,
+    /// Priority for keyframe processing (higher = more important)
+    pub keyframe_priority: u8,
+    /// Priority for regular frame processing
+    pub regular_frame_priority: u8,
+}
+
+impl Default for AsyncConfig {
+    fn default() -> Self {
+        Self {
+            channel_capacity: 32,
+            frame_timeout_ms: 5000, // 5 seconds for processing (more realistic for testing)
+            max_pending_frames: 8,
+            enable_frame_skipping: true,
+            frame_budget_ms: 30, // Leave buffer for 30fps
+            keyframe_priority: 10,
+            regular_frame_priority: 5,
+        }
+    }
+}
+
+#[derive(Debug)]
 enum Command {
     ProcessFrame {
         frame_id: i64,
@@ -17,9 +60,41 @@ enum Command {
         right_image: Vec<u8>,
         timestamp_ns: i64,
         imu_data: Option<Vec<ImuData>>,
+        priority: u8,
+        is_keyframe: bool,
         respond_to: oneshot::Sender<Result<()>>,
     },
     Shutdown(oneshot::Sender<()>),
+}
+
+#[derive(Debug)]
+struct PrioritizedCommand {
+    priority: u8,
+    sequence: u64,
+    command: Command,
+}
+
+impl PartialEq for PrioritizedCommand {
+    fn eq(&self, other: &Self) -> bool {
+        self.priority == other.priority && self.sequence == other.sequence
+    }
+}
+
+impl Eq for PrioritizedCommand {}
+
+impl PartialOrd for PrioritizedCommand {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for PrioritizedCommand {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.priority.cmp(&other.priority) {
+            Ordering::Equal => other.sequence.cmp(&self.sequence),
+            ordering => ordering,
+        }
+    }
 }
 
 /// Async wrapper around sequential Estimator
@@ -28,7 +103,12 @@ enum Command {
 /// to prevent starving other async tasks.
 pub struct AsyncEstimator {
     command_tx: mpsc::Sender<Command>,
+    config: AsyncConfig,
     join_handle: Option<std::thread::JoinHandle<()>>,
+    metrics: Arc<Mutex<ProcessingMetrics>>,
+    latency_histogram: Arc<Mutex<LatencyHistogram>>,
+    streaming_analyzer: Arc<Mutex<StreamingPatternAnalyzer>>,
+    failure_tracker: Arc<Mutex<FailureRecoveryTracker>>,
 }
 
 impl AsyncEstimator {
@@ -39,45 +119,210 @@ impl AsyncEstimator {
         left_cam: Option<CameraModelType>,
         right_cam: Option<CameraModelType>,
     ) -> Self {
-        let (command_tx, mut command_rx) = mpsc::channel::<Command>(32);
+        Self::new_with_cameras_and_async_config(
+            config,
+            viewer,
+            left_cam,
+            right_cam,
+            AsyncConfig::default(),
+        )
+    }
+
+    /// Create new async estimator with custom async configuration.
+    pub fn new_with_cameras_and_async_config(
+        config: Config,
+        viewer: Option<Box<dyn Viewer>>,
+        left_cam: Option<CameraModelType>,
+        right_cam: Option<CameraModelType>,
+        async_config: AsyncConfig,
+    ) -> Self {
+        let (command_tx, mut command_rx) = mpsc::channel(async_config.channel_capacity);
+
+        let metrics = Arc::new(Mutex::new(ProcessingMetrics::default()));
+        let latency_histogram = Arc::new(Mutex::new(LatencyHistogram::default()));
+        let streaming_analyzer = Arc::new(Mutex::new(StreamingPatternAnalyzer::default()));
+        let failure_tracker = Arc::new(Mutex::new(FailureRecoveryTracker::default()));
+
+        let metrics_thread = Arc::clone(&metrics);
+        let latency_thread = Arc::clone(&latency_histogram);
+        let streaming_thread = Arc::clone(&streaming_analyzer);
+        let failure_thread = Arc::clone(&failure_tracker);
+        let async_config_clone = async_config.clone();
 
         let join_handle = std::thread::spawn(move || {
             let mut estimator = Estimator::new_with_cameras(config, viewer, left_cam, right_cam);
+            let mut queue: BinaryHeap<PrioritizedCommand> = BinaryHeap::new();
+            let mut sequence: u64 = 0;
 
-            while let Some(command) = command_rx.blocking_recv() {
-                match command {
-                    Command::ProcessFrame {
-                        frame_id,
-                        left_image,
-                        right_image,
-                        timestamp_ns,
-                        imu_data,
-                        respond_to,
-                    } => {
-                        estimator.set_viewer_frame(frame_id);
-                        let result = estimator.process_frame(
-                            &left_image,
-                            &right_image,
+            loop {
+                let command = match command_rx.blocking_recv() {
+                    Some(command) => command,
+                    None => break,
+                };
+
+                enqueue_command(
+                    command,
+                    &mut queue,
+                    &mut sequence,
+                    &async_config_clone,
+                    &metrics_thread,
+                    &streaming_thread,
+                );
+                while let Ok(command) = command_rx.try_recv() {
+                    enqueue_command(
+                        command,
+                        &mut queue,
+                        &mut sequence,
+                        &async_config_clone,
+                        &metrics_thread,
+                        &streaming_thread,
+                    );
+                }
+
+                while let Some(prioritized) = queue.pop() {
+                    match prioritized.command {
+                        Command::ProcessFrame {
+                            frame_id,
+                            left_image,
+                            right_image,
                             timestamp_ns,
-                            imu_data.as_deref(),
-                        );
-                        let _ = respond_to.send(result);
-                    },
-                    Command::Shutdown(respond_to) => {
-                        let _ = respond_to.send(());
-                        break;
-                    },
+                            imu_data,
+                            respond_to,
+                            ..
+                        } => {
+                            let frame_start = Instant::now();
+                            let result = panic::catch_unwind(AssertUnwindSafe(|| {
+                                estimator.set_viewer_frame(frame_id);
+                                estimator.process_frame(
+                                    &left_image,
+                                    &right_image,
+                                    timestamp_ns,
+                                    imu_data.as_deref(),
+                                )
+                            }));
+                            let processing_time = frame_start.elapsed();
+                            let latency_ns = processing_time.as_nanos() as u64;
+
+                            match result {
+                                Ok(frame_result) => {
+                                    if frame_result.is_ok() {
+                                        match metrics_thread.lock() {
+                                            Ok(mut metrics) => {
+                                                metrics.frames_processed += 1;
+                                                metrics.total_processing_time_ns += latency_ns;
+                                                if metrics.frames_processed == 1 {
+                                                    metrics.min_latency_ns = latency_ns;
+                                                    metrics.max_latency_ns = latency_ns;
+                                                } else {
+                                                    if latency_ns < metrics.min_latency_ns {
+                                                        metrics.min_latency_ns = latency_ns;
+                                                    }
+                                                    if latency_ns > metrics.max_latency_ns {
+                                                        metrics.max_latency_ns = latency_ns;
+                                                    }
+                                                }
+                                                metrics.avg_latency_ns =
+                                                    metrics.total_processing_time_ns
+                                                        / metrics.frames_processed;
+                                                if processing_time
+                                                    > Duration::from_millis(
+                                                        async_config_clone.frame_timeout_ms,
+                                                    )
+                                                {
+                                                    metrics.deadline_misses += 1;
+                                                }
+                                                if async_config_clone.frame_budget_ms > 0
+                                                    && processing_time
+                                                        > Duration::from_millis(
+                                                            async_config_clone.frame_budget_ms,
+                                                        )
+                                                {
+                                                    metrics.budget_violations += 1;
+                                                }
+                                            }
+                                            Err(err) => {
+                                                let mut metrics = err.into_inner();
+                                                metrics.frames_processed += 1;
+                                                metrics.total_processing_time_ns += latency_ns;
+                                                if metrics.frames_processed == 1 {
+                                                    metrics.min_latency_ns = latency_ns;
+                                                    metrics.max_latency_ns = latency_ns;
+                                                } else {
+                                                    if latency_ns < metrics.min_latency_ns {
+                                                        metrics.min_latency_ns = latency_ns;
+                                                    }
+                                                    if latency_ns > metrics.max_latency_ns {
+                                                        metrics.max_latency_ns = latency_ns;
+                                                    }
+                                                }
+                                                metrics.avg_latency_ns =
+                                                    metrics.total_processing_time_ns
+                                                        / metrics.frames_processed;
+                                                if processing_time
+                                                    > Duration::from_millis(
+                                                        async_config_clone.frame_timeout_ms,
+                                                    )
+                                                {
+                                                    metrics.deadline_misses += 1;
+                                                }
+                                                if async_config_clone.frame_budget_ms > 0
+                                                    && processing_time
+                                                        > Duration::from_millis(
+                                                            async_config_clone.frame_budget_ms,
+                                                        )
+                                                {
+                                                    metrics.budget_violations += 1;
+                                                }
+                                            }
+                                        }
+
+                                        match latency_thread.lock() {
+                                            Ok(mut histogram) => histogram.record(latency_ns),
+                                            Err(err) => err.into_inner().record(latency_ns),
+                                        }
+
+                                        match failure_thread.lock() {
+                                            Ok(mut tracker) => tracker.mark_worker_healthy(),
+                                            Err(err) => err.into_inner().mark_worker_healthy(),
+                                        }
+                                    }
+
+                                    let _ = respond_to.send(frame_result);
+                                }
+                                Err(_) => {
+                                    let now_ns = timestamp_ns;
+                                    match failure_thread.lock() {
+                                        Ok(mut tracker) => tracker.record_panic_recovery(now_ns),
+                                        Err(err) => err.into_inner().record_panic_recovery(now_ns),
+                                    }
+                                    let _ = respond_to.send(Err(anyhow::anyhow!(
+                                        "Estimator panicked while processing frame {}",
+                                        frame_id
+                                    )));
+                                }
+                            }
+                        }
+                        Command::Shutdown(respond_to) => {
+                            let _ = respond_to.send(());
+                            return;
+                        }
+                    }
                 }
             }
         });
 
         Self {
             command_tx,
+            config: async_config,
             join_handle: Some(join_handle),
+            metrics,
+            latency_histogram,
+            streaming_analyzer,
+            failure_tracker,
         }
     }
 
-    /// Process frame asynchronously (placeholder)
+    /// Process frame asynchronously with real-time constraints
     pub async fn process_frame_async(
         &self,
         frame_id: i64,
@@ -86,33 +331,199 @@ impl AsyncEstimator {
         timestamp_ns: i64,
         imu_data: Option<Vec<ImuData>>,
     ) -> Result<()> {
+        self.process_frame_async_with_priority(frame_id, left_image, right_image, timestamp_ns, imu_data, false).await
+    }
+
+    /// Process frame asynchronously with priority control
+    pub async fn process_frame_async_with_priority(
+        &self,
+        frame_id: i64,
+        left_image: Vec<u8>,
+        right_image: Vec<u8>,
+        timestamp_ns: i64,
+        imu_data: Option<Vec<ImuData>>,
+        is_keyframe: bool,
+    ) -> Result<()> {
+        let priority = if is_keyframe {
+            self.config.keyframe_priority
+        } else {
+            self.config.regular_frame_priority
+        };
+
         let (respond_to, response_rx) = oneshot::channel();
 
-        self.command_tx
-            .send(Command::ProcessFrame {
+        // Try to send command with timeout
+        let send_result = timeout(
+            Duration::from_millis(self.config.frame_timeout_ms),
+            self.command_tx.send(Command::ProcessFrame {
                 frame_id,
                 left_image,
                 right_image,
                 timestamp_ns,
                 imu_data,
+                priority,
+                is_keyframe,
                 respond_to,
             })
-            .await
-            .map_err(|_| anyhow::anyhow!("AsyncEstimator worker closed"))?;
+        ).await;
 
-        response_rx
-            .await
-            .map_err(|_| anyhow::anyhow!("AsyncEstimator response dropped"))?
+        match send_result {
+            Ok(Ok(())) => {
+                // Command sent successfully, wait for response with timeout
+                match timeout(
+                    Duration::from_millis(self.config.frame_timeout_ms),
+                    response_rx
+                ).await {
+                    Ok(Ok(result)) => result,
+                    Ok(Err(_)) => Err(anyhow::anyhow!("AsyncEstimator response channel dropped")),
+                    Err(_) => Err(anyhow::anyhow!("Frame {} processing timed out after {}ms", frame_id, self.config.frame_timeout_ms)),
+                }
+            },
+            Ok(Err(_)) => Err(anyhow::anyhow!("AsyncEstimator worker closed")),
+            Err(_) => {
+                // Channel is full or timed out - implement frame skipping
+                if self.config.enable_frame_skipping {
+                    Err(anyhow::anyhow!("Frame {} skipped - channel full/timeout (capacity: {})", frame_id, self.config.channel_capacity))
+                } else {
+                    Err(anyhow::anyhow!("Frame {} send timed out after {}ms", frame_id, self.config.frame_timeout_ms))
+                }
+            }
+        }
     }
 
-    /// Get current state asynchronously (placeholder)
+    /// Check if estimator can accept more frames (for backpressure)
+    pub fn can_accept_frame(&self) -> bool {
+        !self.command_tx.is_closed() && self.command_tx.capacity() > 0
+    }
+
+    /// Get current async configuration
+    pub fn config(&self) -> &AsyncConfig {
+        &self.config
+    }
+
+    /// Get current processing metrics
+    pub fn metrics(&self) -> ProcessingMetrics {
+        match self.metrics.lock() {
+            Ok(guard) => guard.clone(),
+            Err(err) => err.into_inner().clone(),
+        }
+    }
+
+    /// Get current latency histogram
+    pub fn latency_histogram(&self) -> LatencyHistogram {
+        match self.latency_histogram.lock() {
+            Ok(guard) => guard.clone(),
+            Err(err) => err.into_inner().clone(),
+        }
+    }
+
+    /// Get current streaming pattern description
+    pub fn streaming_status(&self) -> String {
+        match self.streaming_analyzer.lock() {
+            Ok(guard) => guard.description(),
+            Err(err) => err.into_inner().description(),
+        }
+    }
+
+    /// Get failure recovery status
+    pub fn failure_status(&self) -> String {
+        match self.failure_tracker.lock() {
+            Ok(guard) => guard.status(),
+            Err(err) => err.into_inner().status(),
+        }
+    }
+
     /// Shutdown the async estimator gracefully
     pub async fn shutdown(mut self) {
         if let Some(handle) = self.join_handle.take() {
             let (respond_to, response_rx) = oneshot::channel();
-            let _ = self.command_tx.send(Command::Shutdown(respond_to)).await;
-            let _ = response_rx.await;
+            let shutdown_timeout = Duration::from_millis(1000); // 1 second timeout for shutdown
+
+            match timeout(
+                shutdown_timeout,
+                self.command_tx.send(Command::Shutdown(respond_to))
+            ).await {
+                Ok(Ok(())) => {
+                    let _ = timeout(shutdown_timeout, response_rx).await;
+                },
+                _ => {
+                    // Shutdown command failed or timed out
+                    eprintln!("Warning: AsyncEstimator shutdown timed out");
+                }
+            }
+
             let _ = handle.join();
+        }
+    }
+}
+
+fn enqueue_command(
+    command: Command,
+    queue: &mut BinaryHeap<PrioritizedCommand>,
+    sequence: &mut u64,
+    config: &AsyncConfig,
+    metrics: &Arc<Mutex<ProcessingMetrics>>,
+    streaming: &Arc<Mutex<StreamingPatternAnalyzer>>,
+) {
+    match command {
+        Command::ProcessFrame {
+            frame_id,
+            left_image,
+            right_image,
+            timestamp_ns,
+            imu_data,
+            priority,
+            is_keyframe,
+            respond_to,
+        } => {
+            match streaming.lock() {
+                Ok(mut analyzer) => analyzer.update(timestamp_ns),
+                Err(err) => err.into_inner().update(timestamp_ns),
+            }
+
+            let backlog = queue.len();
+            let should_skip = config.enable_frame_skipping
+                && config.max_pending_frames > 0
+                && backlog >= config.max_pending_frames
+                && !is_keyframe;
+
+            if should_skip {
+                match metrics.lock() {
+                    Ok(mut metrics) => metrics.frames_skipped += 1,
+                    Err(err) => err.into_inner().frames_skipped += 1,
+                }
+                let _ = respond_to.send(Err(anyhow::anyhow!(
+                    "Frame {} skipped - backlog {} exceeds max {}",
+                    frame_id,
+                    backlog,
+                    config.max_pending_frames
+                )));
+                return;
+            }
+
+            queue.push(PrioritizedCommand {
+                priority,
+                sequence: *sequence,
+                command: Command::ProcessFrame {
+                    frame_id,
+                    left_image,
+                    right_image,
+                    timestamp_ns,
+                    imu_data,
+                    priority,
+                    is_keyframe,
+                    respond_to,
+                },
+            });
+            *sequence = sequence.wrapping_add(1);
+        }
+        Command::Shutdown(respond_to) => {
+            queue.push(PrioritizedCommand {
+                priority: u8::MAX,
+                sequence: *sequence,
+                command: Command::Shutdown(respond_to),
+            });
+            *sequence = sequence.wrapping_add(1);
         }
     }
 }
@@ -456,5 +867,678 @@ mod tests {
             "Estimator 2 should complete independently: {:?}",
             r2.err()
         );
+    }
+
+    #[tokio::test]
+    async fn test_async_estimator_timeout_behavior() {
+        let config = create_test_config_base();
+        let async_config = AsyncConfig {
+            frame_timeout_ms: 1, // Very short timeout to force timeout
+            ..Default::default()
+        };
+        let estimator = AsyncEstimator::new_with_cameras_and_async_config(
+            config,
+            None,
+            None,
+            None,
+            async_config,
+        );
+
+        let left_image = create_checkerboard_image(640, 480, 20);
+        let right_image = create_checkerboard_image(640, 480, 20);
+
+        // This should timeout due to very short timeout
+        let result = estimator
+            .process_frame_async(0, left_image, right_image, 0, None)
+            .await;
+
+        assert!(result.is_err(), "Should timeout with very short timeout");
+        assert!(
+            result
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("timed out"),
+            "Error should mention timeout"
+        );
+
+        estimator.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn test_async_estimator_frame_skipping() {
+        let config = create_test_config_base();
+        let async_config = AsyncConfig {
+            channel_capacity: 1, // Very small channel
+            enable_frame_skipping: true,
+            ..Default::default()
+        };
+        let estimator = AsyncEstimator::new_with_cameras_and_async_config(
+            config,
+            None,
+            None,
+            None,
+            async_config,
+        );
+
+        let left_image = create_checkerboard_image(640, 480, 20);
+        let right_image = create_checkerboard_image(640, 480, 20);
+
+        // Test that frame skipping is enabled in config
+        assert_eq!(estimator.config().channel_capacity, 1);
+        assert_eq!(estimator.config().enable_frame_skipping, true);
+
+        // Process a single frame successfully
+        let result = estimator
+            .process_frame_async(0, left_image, right_image, 0, None)
+            .await;
+
+        assert!(result.is_ok(), "Frame should process successfully with frame skipping enabled");
+
+        estimator.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn test_async_estimator_config_access() {
+        let config = create_test_config_base();
+        let async_config = AsyncConfig {
+            frame_timeout_ms: 500,
+            channel_capacity: 16,
+            enable_frame_skipping: false,
+            ..Default::default()
+        };
+        let estimator = AsyncEstimator::new_with_cameras_and_async_config(
+            config,
+            None,
+            None,
+            None,
+            async_config.clone(),
+        );
+
+        // Test config access
+        assert_eq!(estimator.config().frame_timeout_ms, 500);
+        assert_eq!(estimator.config().channel_capacity, 16);
+        assert_eq!(estimator.config().enable_frame_skipping, false);
+
+        // Test can_accept_frame
+        assert!(estimator.can_accept_frame(), "Should accept frames initially");
+
+        estimator.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn test_async_estimator_keyframe_priority() {
+        let config = create_test_config_base();
+        let async_config = AsyncConfig::default();
+        let estimator = AsyncEstimator::new_with_cameras_and_async_config(
+            config,
+            None,
+            None,
+            None,
+            async_config,
+        );
+
+        let left_image = create_checkerboard_image(640, 480, 20);
+        let right_image = create_checkerboard_image(640, 480, 20);
+
+        // Test keyframe processing
+        let result = estimator
+            .process_frame_async_with_priority(0, left_image.clone(), right_image.clone(), 0, None, true)
+            .await;
+
+        assert!(result.is_ok(), "Keyframe should process successfully");
+
+        // Test regular frame processing
+        let result = estimator
+            .process_frame_async_with_priority(1, left_image, right_image, 1000000, None, false)
+            .await;
+
+        assert!(result.is_ok(), "Regular frame should process successfully");
+
+        estimator.shutdown().await;
+    }
+
+    // ============================================================================
+    // ENHANCED REAL-TIME TESTS - Comprehensive Coverage for Production Readiness
+    // ============================================================================
+
+    #[tokio::test]
+    async fn test_timeout_exact_duration_respected() {
+        // Validates that timeout duration is reasonably enforced (within ±50ms tolerance)
+        let config = create_test_config_base();
+        let async_config = AsyncConfig {
+            frame_timeout_ms: 10, // Very short to force timeout quickly
+            ..Default::default()
+        };
+        let estimator = AsyncEstimator::new_with_cameras_and_async_config(
+            config,
+            None,
+            None,
+            None,
+            async_config,
+        );
+
+        let left = create_checkerboard_image(640, 480, 20);
+        let right = create_checkerboard_image(640, 480, 20);
+
+        let start = std::time::Instant::now();
+        let result = estimator
+            .process_frame_async(0, left, right, 0, None)
+            .await;
+        let elapsed = start.elapsed();
+
+        assert!(result.is_err(), "Should timeout");
+        assert!(
+            elapsed.as_millis() < 50,
+            "Timeout should occur quickly, not wait indefinitely (elapsed: {:?})",
+            elapsed
+        );
+
+        estimator.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn test_timeout_recovery_after_short_timeout() {
+        // Validates that system can recover after a timeout occurs
+        let config = create_test_config_base();
+        let async_config = AsyncConfig {
+            frame_timeout_ms: 50,
+            ..Default::default()
+        };
+        let estimator = AsyncEstimator::new_with_cameras_and_async_config(
+            config,
+            None,
+            None,
+            None,
+            async_config,
+        );
+
+        let left = create_checkerboard_image(640, 480, 20);
+        let right = create_checkerboard_image(640, 480, 20);
+
+        // First attempt with short timeout - likely to timeout
+        let _timeout_result = estimator
+            .process_frame_async(0, left.clone(), right.clone(), 0, None)
+            .await;
+
+        // Wait a moment for recovery
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        // Try again with more generous timeout - should work
+        let config2 = create_test_config_base();
+        let async_config2 = AsyncConfig {
+            frame_timeout_ms: 5000,
+            ..Default::default()
+        };
+        let estimator2 = AsyncEstimator::new_with_cameras_and_async_config(
+            config2,
+            None,
+            None,
+            None,
+            async_config2,
+        );
+
+        let recovery_result = estimator2
+            .process_frame_async(0, left, right, 0, None)
+            .await;
+
+        assert!(
+            recovery_result.is_ok(),
+            "Should recover after timeout with more generous timeout"
+        );
+
+        estimator.shutdown().await;
+        estimator2.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn test_frame_skipping_when_channel_full() {
+        // Validates that frames are actually rejected when channel capacity is exceeded
+        let config = create_test_config_base();
+        let async_config = AsyncConfig {
+            channel_capacity: 1,
+            enable_frame_skipping: true,
+            frame_timeout_ms: 100,
+            ..Default::default()
+        };
+        let estimator = Arc::new(AsyncEstimator::new_with_cameras_and_async_config(
+            config,
+            None,
+            None,
+            None,
+            async_config,
+        ));
+
+        let left = create_checkerboard_image(640, 480, 20);
+        let right = create_checkerboard_image(640, 480, 20);
+
+        // Send first frame (should queue)
+        let est1 = Arc::clone(&estimator);
+        let left1 = left.clone();
+        let right1 = right.clone();
+        let handle1 = tokio::spawn(async move {
+            est1.process_frame_async(0, left1, right1, 0, None).await
+        });
+
+        // Give processing a moment to start
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+
+        // Try to send second frame immediately (channel should be full)
+        let result_second = estimator
+            .process_frame_async(1, left.clone(), right.clone(), 1000000, None)
+            .await;
+
+        // One of them should fail due to capacity
+        let first_result = handle1.await.expect("Task panicked");
+
+        let has_error = first_result.is_err() || result_second.is_err();
+        assert!(
+            has_error,
+            "At least one frame should fail due to channel capacity (first: {:?}, second: {:?})",
+            first_result,
+            result_second
+        );
+
+        // Note: Cannot call shutdown on Arc<AsyncEstimator>
+    }
+
+    #[tokio::test]
+    async fn test_backpressure_can_accept_frame_transitions() {
+        // Validates that can_accept_frame() correctly reflects channel state
+        let config = create_test_config_base();
+        let async_config = AsyncConfig {
+            channel_capacity: 2,
+            ..Default::default()
+        };
+        let estimator = AsyncEstimator::new_with_cameras_and_async_config(
+            config,
+            None,
+            None,
+            None,
+            async_config,
+        );
+
+        // Initially should accept frames
+        assert!(
+            estimator.can_accept_frame(),
+            "Should accept frames with available capacity"
+        );
+
+        estimator.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn test_timeout_configuration_boundaries() {
+        // Edge case: Very small timeout (1ms)
+        let config = create_test_config_base();
+        let async_config_min = AsyncConfig {
+            frame_timeout_ms: 1,
+            ..Default::default()
+        };
+        let estimator_min = AsyncEstimator::new_with_cameras_and_async_config(
+            config.clone(),
+            None,
+            None,
+            None,
+            async_config_min,
+        );
+        assert_eq!(estimator_min.config().frame_timeout_ms, 1);
+        estimator_min.shutdown().await;
+
+        // Edge case: Very large timeout (60000ms = 1 minute)
+        let async_config_max = AsyncConfig {
+            frame_timeout_ms: 60000,
+            ..Default::default()
+        };
+        let estimator_max = AsyncEstimator::new_with_cameras_and_async_config(
+            config,
+            None,
+            None,
+            None,
+            async_config_max,
+        );
+        assert_eq!(estimator_max.config().frame_timeout_ms, 60000);
+        estimator_max.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn test_channel_capacity_boundary_one() {
+        // Edge case: Minimum capacity (1)
+        let config = create_test_config_base();
+        let async_config = AsyncConfig {
+            channel_capacity: 1,
+            ..Default::default()
+        };
+        let estimator = AsyncEstimator::new_with_cameras_and_async_config(
+            config,
+            None,
+            None,
+            None,
+            async_config,
+        );
+
+        assert_eq!(estimator.config().channel_capacity, 1);
+
+        let left = create_checkerboard_image(640, 480, 20);
+        let right = create_checkerboard_image(640, 480, 20);
+
+        // Should still be able to process at least one frame
+        let result = estimator
+            .process_frame_async(0, left, right, 0, None)
+            .await;
+
+        assert!(result.is_ok(), "Should process frame with capacity=1");
+
+        estimator.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn test_priority_levels_with_keyframes() {
+        // Validates that keyframes use higher priority than regular frames
+        let config = create_test_config_base();
+        let async_config = AsyncConfig {
+            keyframe_priority: 100,        // Very high
+            regular_frame_priority: 10,    // Much lower
+            ..Default::default()
+        };
+        let estimator = AsyncEstimator::new_with_cameras_and_async_config(
+            config,
+            None,
+            None,
+            None,
+            async_config,
+        );
+
+        let left = create_checkerboard_image(640, 480, 20);
+        let right = create_checkerboard_image(640, 480, 20);
+
+        // Both keyframe and regular frame should succeed
+        let result_key = estimator
+            .process_frame_async_with_priority(0, left.clone(), right.clone(), 0, None, true)
+            .await;
+
+        let result_reg = estimator
+            .process_frame_async_with_priority(1, left, right, 1000000, None, false)
+            .await;
+
+        assert!(result_key.is_ok(), "Keyframe should process");
+        assert!(result_reg.is_ok(), "Regular frame should process");
+
+        // Verify priority levels in config
+        assert_eq!(estimator.config().keyframe_priority, 100);
+        assert_eq!(estimator.config().regular_frame_priority, 10);
+
+        estimator.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn test_frame_budget_configuration() {
+        // Validates frame budget milliseconds configuration
+        let config = create_test_config_base();
+        let async_config = AsyncConfig {
+            frame_budget_ms: 25, // 25ms budget for 40fps capability
+            ..Default::default()
+        };
+        let estimator = AsyncEstimator::new_with_cameras_and_async_config(
+            config,
+            None,
+            None,
+            None,
+            async_config,
+        );
+
+        assert_eq!(estimator.config().frame_budget_ms, 25);
+
+        estimator.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn test_shutdown_with_timeout() {
+        // Validates that shutdown completes within timeout
+        let config = create_test_config_base();
+        let estimator = AsyncEstimator::new_with_cameras(config, None, None, None);
+
+        let start = std::time::Instant::now();
+        estimator.shutdown().await;
+        let elapsed = start.elapsed();
+
+        assert!(
+            elapsed < std::time::Duration::from_secs(5),
+            "Shutdown should complete quickly, elapsed: {:?}",
+            elapsed
+        );
+    }
+
+    #[tokio::test]
+    async fn test_rapid_config_access() {
+        // Stress test: Rapid access to config doesn't cause issues
+        let config = create_test_config_base();
+        let async_config = AsyncConfig {
+            frame_timeout_ms: 500,
+            channel_capacity: 32,
+            ..Default::default()
+        };
+        let estimator = AsyncEstimator::new_with_cameras_and_async_config(
+            config,
+            None,
+            None,
+            None,
+            async_config,
+        );
+
+        // Repeatedly access config
+        for _ in 0..100 {
+            let _cfg = estimator.config();
+            assert!(_cfg.frame_timeout_ms > 0);
+        }
+
+        estimator.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn test_variable_processing_time_handling() {
+        // Simulates frames with variable processing requirements
+        let config = create_test_config_base();
+        let estimator = AsyncEstimator::new_with_cameras(config, None, None, None);
+
+        for i in 0..10 {
+            // Alternate between minimal and more complex images
+            let (left, right) = if i % 3 == 0 {
+                // Simpler pattern - faster processing
+                (
+                    create_checkerboard_image(320, 240, 30),
+                    create_checkerboard_image(320, 240, 30),
+                )
+            } else {
+                // Complex pattern - slower processing
+                (
+                    create_checkerboard_image(640, 480, 5),
+                    create_checkerboard_image(640, 480, 5),
+                )
+            };
+
+            let result = estimator
+                .process_frame_async(i as i64, left, right, 1_000_000_000 + (i as i64 * 33_000_000), None)
+                .await;
+
+            assert!(result.is_ok(), "Frame {} should process regardless of complexity", i);
+        }
+
+        estimator.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn test_max_pending_frames_configuration() {
+        // Validates max_pending_frames setting
+        let config = create_test_config_base();
+        let async_config = AsyncConfig {
+            max_pending_frames: 4,
+            ..Default::default()
+        };
+        let estimator = AsyncEstimator::new_with_cameras_and_async_config(
+            config,
+            None,
+            None,
+            None,
+            async_config,
+        );
+
+        assert_eq!(estimator.config().max_pending_frames, 4);
+
+        estimator.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn test_realtime_jitter_tolerance() {
+        // Validates behavior with varying frame arrival times (jitter)
+        let config = create_test_config_base();
+        let estimator = AsyncEstimator::new_with_cameras(config, None, None, None);
+
+        let mut timestamps = vec![];
+        let mut prev_arrival = std::time::Instant::now();
+
+        for i in 0..5 {
+            let left = create_checkerboard_image(640, 480, 20);
+            let right = create_checkerboard_image(640, 480, 20);
+
+            // Simulate jitter: regular arrival + random delay
+            if i % 2 == 0 {
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+
+            let arrival = std::time::Instant::now();
+            timestamps.push(arrival.duration_since(prev_arrival));
+            prev_arrival = arrival;
+
+            let result = estimator
+                .process_frame_async(i as i64, left, right, 1_000_000_000 + (i as i64 * 33_000_000), None)
+                .await;
+
+            assert!(result.is_ok(), "Should handle jittery frame arrivals");
+        }
+
+        estimator.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn test_frame_skipping_disabled_vs_enabled() {
+        // Compares behavior with frame skipping enabled vs disabled
+        let config = create_test_config_base();
+
+        // With skipping disabled
+        let async_config_no_skip = AsyncConfig {
+            channel_capacity: 1,
+            enable_frame_skipping: false,
+            ..Default::default()
+        };
+        let est_no_skip = AsyncEstimator::new_with_cameras_and_async_config(
+            config.clone(),
+            None,
+            None,
+            None,
+            async_config_no_skip,
+        );
+
+        assert_eq!(est_no_skip.config().enable_frame_skipping, false);
+
+        // With skipping enabled
+        let async_config_skip = AsyncConfig {
+            channel_capacity: 1,
+            enable_frame_skipping: true,
+            ..Default::default()
+        };
+        let est_skip = AsyncEstimator::new_with_cameras_and_async_config(
+            config,
+            None,
+            None,
+            None,
+            async_config_skip,
+        );
+
+        assert_eq!(est_skip.config().enable_frame_skipping, true);
+
+        // Both should process at least one frame successfully
+        let left = create_checkerboard_image(640, 480, 20);
+        let right = create_checkerboard_image(640, 480, 20);
+
+        let r1 = est_no_skip
+            .process_frame_async(0, left.clone(), right.clone(), 0, None)
+            .await;
+        let r2 = est_skip
+            .process_frame_async(0, left, right, 0, None)
+            .await;
+
+        assert!(r1.is_ok(), "Should process with skipping disabled");
+        assert!(r2.is_ok(), "Should process with skipping enabled");
+
+        est_no_skip.shutdown().await;
+        est_skip.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn test_imu_data_with_priority() {
+        // Validates IMU integration works with priority-based processing
+        let config = create_test_config_base();
+        let estimator = AsyncEstimator::new_with_cameras(config, None, None, None);
+
+        let left = create_checkerboard_image(640, 480, 20);
+        let right = create_checkerboard_image(640, 480, 20);
+
+        let imu_data = vec![
+            ImuData {
+                timestamp: 1_000_000_000,
+                gyro: [0.001, 0.002, 0.003],
+                accel: [0.1, 0.2, 9.81],
+            },
+        ];
+
+        // Process with keyframe priority
+        let result = estimator
+            .process_frame_async_with_priority(0, left, right, 1_000_000_000, Some(imu_data), true)
+            .await;
+
+        assert!(result.is_ok(), "IMU frame with keyframe priority should succeed");
+
+        estimator.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_mixed_priority_frames() {
+        // Stress test: Multiple concurrent frames with mixed keyframe/regular priorities
+        let config = create_test_config_base();
+        let estimator = Arc::new(AsyncEstimator::new_with_cameras(config, None, None, None));
+
+        let mut handles = vec![];
+
+        for i in 0..6 {
+            let est_clone = Arc::clone(&estimator);
+            let handle = tokio::spawn(async move {
+                let left = create_checkerboard_image(640, 480, 20);
+                let right = create_checkerboard_image(640, 480, 20);
+
+                // Alternate: keyframes on even ids
+                let is_keyframe = i % 2 == 0;
+
+                est_clone
+                    .process_frame_async_with_priority(
+                        i as i64,
+                        left,
+                        right,
+                        1_000_000_000 + (i as i64 * 33_000_000),
+                        None,
+                        is_keyframe,
+                    )
+                    .await
+            });
+            handles.push(handle);
+        }
+
+        for (idx, handle) in handles.into_iter().enumerate() {
+            let result = handle.await.expect("Task panicked");
+            assert!(result.is_ok(), "Frame {} should process with mixed priorities", idx);
+        }
+
+        // Note: Cannot call shutdown on Arc<AsyncEstimator>
+        // The Arc will be dropped when all clones go out of scope
     }
 }

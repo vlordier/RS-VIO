@@ -1,3 +1,4 @@
+pub mod async_enhancements;
 pub mod async_optimization;
 pub mod async_wrapper;
 pub mod concurrent;
@@ -10,6 +11,10 @@ pub mod sliding_window;
 pub mod state;
 
 pub use async_optimization::AsyncOptimizer;
+pub use async_enhancements::{
+    DeadlineTracker, FailureRecoveryTracker, LatencyHistogram, ProcessingMetrics,
+    PriorityFrameEntry, StreamingPatternAnalyzer,
+};
 pub use async_wrapper::AsyncEstimator;
 pub use concurrent::{ConcurrentVIOPipeline, OptimizationResult, SequencedFrame};
 pub use constant_velocity_model::{ConstantVelocityConfig, ConstantVelocityModel};
