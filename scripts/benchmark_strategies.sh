@@ -30,6 +30,7 @@ RESULTS_FILE="$RESULTS_DIR/strategies_${TIMESTAMP}.csv"
 
 # Load shared logging utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/logging.sh"
 
 # Available strategies
@@ -126,7 +127,8 @@ run_benchmark() {
     local dataset=$2
     local dataset_path=$3
     local config_file=$4
-    local start_time=$(date +%s)
+    local start_time
+    start_time=$(date +%s)
 
     echo -n "  Testing $strategy on ${dataset^^}... "
 
@@ -149,14 +151,17 @@ run_benchmark() {
 
     # Run with timeout and capture output
     local output
-    output=$(timeout 120 $cmd 2>&1 || true)
+    output=$(timeout 120 "$cmd" 2>&1 || true)
 
-    local end_time=$(date +%s)
+    local end_time
+    end_time=$(date +%s)
     local elapsed=$((end_time - start_time))
 
     # Extract metrics from output
-    local frames=$(echo "$output" | grep -oP 'Processed \K[0-9]+' | head -1)
-    local avg_time=$(echo "$output" | grep -oP 'average \K[0-9.]+' | head -1)
+    local frames
+    local avg_time
+    frames=$(echo "$output" | grep -oP 'Processed \K[0-9]+' | head -1)
+    avg_time=$(echo "$output" | grep -oP 'average \K[0-9.]+' | head -1)
 
     frames=${frames:-"N/A"}
     avg_time=${avg_time:-"N/A"}
@@ -314,7 +319,7 @@ main() {
                     ;;
                 4seasons)
                     config_file="$PROJECT_ROOT/config/4seasons.yaml"
-                    dataset_path=$(ls -d "$DATASET_DIR"/4seasons/recording_* 2>/dev/null | head -1)
+                    dataset_path=$(find "$DATASET_DIR/4seasons" -maxdepth 1 -type d -name 'recording_*' 2>/dev/null | head -1)
                     if [ -z "$dataset_path" ]; then
                         log_warn "4Seasons dataset not found, skipping"
                         continue

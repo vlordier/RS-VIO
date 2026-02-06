@@ -16,6 +16,7 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_ROOT"
 
 # Colors
+# shellcheck disable=SC2034
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -75,11 +76,12 @@ fi
 
 # Run tests with DHAT
 # DHAT outputs to a JSON file on drop
-export DHAT="file=$OUTPUT_DIR/dhat-$(date +%Y%m%d-%H%M%S).json"
+DHAT="file=$OUTPUT_DIR/dhat-$(date +%Y%m%d-%H%M%S).json"
+export DHAT
 
 log_info "Executing tests with heap profiling..."
 
-cargo test --features dhat --release $TEST_ARGS 2>&1 | tee "$OUTPUT_DIR/test-output.log"
+cargo test --features dhat --release "$TEST_ARGS" 2>&1 | tee "$OUTPUT_DIR/test-output.log"
 
 log_info "Heap profiling complete!"
 log_info ""
@@ -95,7 +97,7 @@ echo "  - Number of allocations"
 echo ""
 
 # Print summary of output files
-if ls "$OUTPUT_DIR"/*.json &>/dev/null; then
+if find "$OUTPUT_DIR" -maxdepth 1 -name '*.json' &>/dev/null; then
     echo "Generated DHAT files:"
-    ls -lh "$OUTPUT_DIR"/*.json | awk '{print "  " $9 " (" $5 ")"}'
+    find "$OUTPUT_DIR" -maxdepth 1 -name '*.json' -exec ls -lh {} + | awk '{print "  " $9 " (" $5 ")"}'
 fi

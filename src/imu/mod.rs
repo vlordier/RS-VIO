@@ -54,7 +54,7 @@
 //!
 //! ## Data Flow for Tight Coupling
 //!
-//! ```
+//! ```text
 //! ┌─ INITIALIZATION (First 1-2 seconds)
 //! │
 //! ├─ ImuInitializer: Detect static, estimate biases

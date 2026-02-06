@@ -2,7 +2,7 @@
 //!
 //! This module provides advanced features built on top of AsyncEstimator:
 //! - Priority queue-based frame scheduling
-//! - Processing metrics and performance monitoring  
+//! - Processing metrics and performance monitoring
 //! - Latency histograms and deadline tracking
 //! - Worker thread panic recovery
 //! - Advanced streaming pattern support
@@ -110,7 +110,10 @@ impl LatencyHistogram {
         if total == 0 {
             return 0;
         }
-        let target = (total as f64 * p / 100.0) as u64;
+        let mut target = (total as f64 * p / 100.0).ceil() as u64;
+        if target == 0 {
+            target = 1;
+        }
         let mut cumulative = 0;
         for (idx, &count) in self.buckets.iter().enumerate() {
             cumulative += count;
@@ -128,7 +131,9 @@ impl LatencyHistogram {
             return "No latency data".to_string();
         }
 
-        let bounds = ["<1ms", "1-2ms", "2-5ms", "5-10ms", "10-33ms", "33-100ms", ">100ms"];
+        let bounds = [
+            "<1ms", "1-2ms", "2-5ms", "5-10ms", "10-33ms", "33-100ms", ">100ms",
+        ];
         let mut summary = String::new();
         for (idx, &count) in self.buckets.iter().enumerate() {
             let pct = (count as f64 / total as f64) * 100.0;
@@ -163,7 +168,8 @@ impl PartialOrd for PriorityFrameEntry {
 impl Ord for PriorityFrameEntry {
     fn cmp(&self, other: &Self) -> Ordering {
         // Higher priority first (BinaryHeap is max-heap, so higher values come first)
-        self.priority.cmp(&other.priority)
+        self.priority
+            .cmp(&other.priority)
             .then_with(|| self.timestamp_ns.cmp(&other.timestamp_ns))
     }
 }
@@ -203,8 +209,12 @@ impl DeadlineTracker {
 /// Streaming pattern analyzer for buffer management
 #[derive(Clone, Debug, Default)]
 pub struct StreamingPatternAnalyzer {
-    /// Frame arrival times (last 10 frames)
-    pub recent_arrivals_ns: Vec<i64>,
+    /// Frame arrival times ring buffer (last 10 frames)
+    pub recent_arrivals_ns: [i64; 10],
+    /// Number of valid samples in the ring buffer
+    pub recent_count: usize,
+    /// Next insertion index in the ring buffer
+    pub recent_index: usize,
     /// Detected burst activity
     pub is_burst: bool,
     /// Average inter-frame interval (nanoseconds)
@@ -216,33 +226,48 @@ pub struct StreamingPatternAnalyzer {
 impl StreamingPatternAnalyzer {
     /// Update with new frame arrival
     pub fn update(&mut self, timestamp_ns: i64) {
-        self.recent_arrivals_ns.push(timestamp_ns);
-        if self.recent_arrivals_ns.len() > 10 {
-            self.recent_arrivals_ns.remove(0);
+        self.recent_arrivals_ns[self.recent_index] = timestamp_ns;
+        self.recent_index = (self.recent_index + 1) % self.recent_arrivals_ns.len();
+        if self.recent_count < self.recent_arrivals_ns.len() {
+            self.recent_count += 1;
         }
 
-        if self.recent_arrivals_ns.len() >= 3 {
-            let intervals: Vec<i64> = self.recent_arrivals_ns.windows(2)
-                .map(|w| w[1] - w[0])
-                .collect();
+        if self.recent_count >= 3 {
+            let interval_count = self.recent_count - 1;
+            let mut sum_intervals: i64 = 0;
+            for i in 0..interval_count {
+                let interval = self.sample_at(i + 1) - self.sample_at(i);
+                sum_intervals += interval;
+            }
 
-            let avg: i64 = intervals.iter().sum::<i64>() as i64 / intervals.len() as i64;
+            let avg: i64 = sum_intervals / interval_count as i64;
             self.avg_interval_ns = avg as u64;
 
-            // Calculate jitter
-            let variance: i64 = intervals.iter()
-                .map(|&i| (i - avg).pow(2))
-                .sum::<i64>() / intervals.len() as i64;
+            // Calculate jitter without per-update allocations.
+            let mut variance_sum: i128 = 0;
+            for i in 0..interval_count {
+                let interval = self.sample_at(i + 1) - self.sample_at(i);
+                let diff = interval - avg;
+                variance_sum += (diff as i128) * (diff as i128);
+            }
+            let variance = variance_sum / interval_count as i128;
             self.jitter_ns = (variance as f64).sqrt() as u64;
 
-            // Detect burst: high jitter or rapid arrivals
-            self.is_burst = self.jitter_ns > avg as u64 / 2 || self.avg_interval_ns < 5_000_000; // 5ms
+            // Detect burst: high jitter or rapid arrivals (5ms threshold)
+            self.is_burst = self.jitter_ns > avg as u64 / 2 || self.avg_interval_ns < 5_000_000;
         }
+    }
+
+    fn sample_at(&self, index: usize) -> i64 {
+        let len = self.recent_arrivals_ns.len();
+        let oldest = (self.recent_index + len - self.recent_count) % len;
+        let pos = (oldest + index) % len;
+        self.recent_arrivals_ns[pos]
     }
 
     /// Get description of current streaming pattern
     pub fn description(&self) -> String {
-        if self.recent_arrivals_ns.len() < 2 {
+        if self.recent_count < 2 {
             return "Insufficient data".to_string();
         }
         format!(
@@ -313,15 +338,21 @@ mod tests {
             deadline_misses: 5,
             budget_violations: 8,
             total_processing_time_ns: 3_300_000_000, // 3.3 seconds
-            min_latency_ns: 20_000_000,               // 20ms
-            max_latency_ns: 50_000_000,               // 50ms
-            avg_latency_ns: 33_000_000,               // 33ms
+            min_latency_ns: 20_000_000,              // 20ms
+            max_latency_ns: 50_000_000,              // 50ms
+            avg_latency_ns: 33_000_000,              // 33ms
         };
 
         assert!((metrics.avg_fps() - 30.3).abs() < 0.1, "FPS calculation");
         assert!((metrics.skip_rate() - 9.09).abs() < 0.1, "Skip rate");
-        assert!((metrics.deadline_miss_rate() - 5.0).abs() < 0.1, "Deadline miss rate");
-        assert!((metrics.budget_violation_rate() - 8.0).abs() < 0.1, "Budget violation rate");
+        assert!(
+            (metrics.deadline_miss_rate() - 5.0).abs() < 0.1,
+            "Deadline miss rate"
+        );
+        assert!(
+            (metrics.budget_violation_rate() - 8.0).abs() < 0.1,
+            "Budget violation rate"
+        );
     }
 
     #[test]
@@ -329,13 +360,13 @@ mod tests {
         let mut histogram = LatencyHistogram::default();
 
         // Add samples to different buckets
-        histogram.record(500_000);       // 0.5ms -> bucket 0
-        histogram.record(1_500_000);     // 1.5ms -> bucket 1
-        histogram.record(3_000_000);     // 3ms -> bucket 2
-        histogram.record(7_000_000);     // 7ms -> bucket 3
-        histogram.record(20_000_000);    // 20ms -> bucket 4
-        histogram.record(50_000_000);    // 50ms -> bucket 5
-        histogram.record(150_000_000);   // 150ms -> bucket 6
+        histogram.record(500_000); // 0.5ms -> bucket 0
+        histogram.record(1_500_000); // 1.5ms -> bucket 1
+        histogram.record(3_000_000); // 3ms -> bucket 2
+        histogram.record(7_000_000); // 7ms -> bucket 3
+        histogram.record(20_000_000); // 20ms -> bucket 4
+        histogram.record(50_000_000); // 50ms -> bucket 5
+        histogram.record(150_000_000); // 150ms -> bucket 6
 
         assert_eq!(histogram.buckets[0], 1);
         assert_eq!(histogram.buckets[1], 1);
@@ -344,6 +375,16 @@ mod tests {
         assert_eq!(histogram.buckets[4], 1);
         assert_eq!(histogram.buckets[5], 1);
         assert_eq!(histogram.buckets[6], 1);
+    }
+
+    #[test]
+    fn test_latency_histogram_percentile_single_sample() {
+        let mut histogram = LatencyHistogram::default();
+
+        histogram.record(150_000_000); // 150ms -> bucket 6
+
+        assert_eq!(histogram.percentile(50.0), 6);
+        assert_eq!(histogram.percentile(99.0), 6);
     }
 
     #[test]
@@ -387,6 +428,21 @@ mod tests {
         analyzer.update(base_time + 3 * interval);
 
         assert!(!analyzer.is_burst);
+        assert!(analyzer.avg_interval_ns > 0);
+    }
+
+    #[test]
+    fn test_streaming_pattern_ring_buffer_wraps() {
+        let mut analyzer = StreamingPatternAnalyzer::default();
+
+        let base_time = 1_000_000_000i64;
+        let interval = 20_000_000i64;
+
+        for i in 0..12 {
+            analyzer.update(base_time + (i * interval));
+        }
+
+        assert_eq!(analyzer.recent_count, 10);
         assert!(analyzer.avg_interval_ns > 0);
     }
 

@@ -1,6 +1,6 @@
 # AsyncEstimator Test Suite - Quick Reference
 
-**Total Tests**: 30 | **Pass Rate**: 100% | **Runtime**: 4.21s  
+**Total Tests**: 30 | **Pass Rate**: 100% | **Runtime**: 4.21s
 **Status**: ✅ Production-Ready for Real-Time VIO
 
 ---
@@ -34,7 +34,7 @@
 | `test_timeout_configuration_boundaries` | Edge cases: 1ms and 60000ms |
 | `test_shutdown_with_timeout` | Graceful shutdown completes <5s |
 
-**Key Validations**: 
+**Key Validations**:
 - ✅ Timeout occurs when expected
 - ✅ Timing accuracy (±50ms tolerance)
 - ✅ System recovery capability
@@ -158,7 +158,7 @@ estimator.process_frame_async_with_priority(
 ).await
 ```
 
-### Pattern 4: Concurrent Testing  
+### Pattern 4: Concurrent Testing
 ```rust
 let estimator = Arc::new(estimator);
 let est_clone = Arc::clone(&estimator);
@@ -195,7 +195,7 @@ cargo test --lib async_wrapper
 # Timeout tests
 cargo test --lib async_wrapper timeout
 
-# Priority tests  
+# Priority tests
 cargo test --lib async_wrapper priority
 
 # Backpressure tests

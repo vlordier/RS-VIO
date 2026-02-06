@@ -18,6 +18,7 @@ CHECK_ONLY="${CHECK_ONLY:-0}"
 CHECKSUM_FILE="${CHECKSUM_FILE:-"$PROJECT_ROOT/scripts/dataset_checksums.sha256"}"
 
 # Load shared logging utilities
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/logging.sh"
 
 mkdir -p "$DATASETS_DIR"
@@ -314,7 +315,7 @@ setup_4seasons() {
 
   local temp_dir
   temp_dir=$(mktemp -d)
-  trap "rm -rf \"$temp_dir\"" EXIT
+  trap 'rm -rf "$temp_dir"' EXIT
 
   # Download IMU data
   log_info "Downloading 4Seasons IMU/GNSS data (6.1MB)..."
@@ -347,7 +348,9 @@ setup_4seasons() {
   log_info "Extracting archives..."
   unzip -q -o "$temp_dir/imu.zip" -d "$extract_dir" || true
   unzip -q -o "$temp_dir/stereo.zip" -d "$extract_dir" || true
-  [ -f "$temp_dir/poses.zip" ] && unzip -q -o "$temp_dir/poses.zip" -d "$extract_dir" || true
+  if [ -f "$temp_dir/poses.zip" ]; then
+    unzip -q -o "$temp_dir/poses.zip" -d "$extract_dir" || true
+  fi
 
   # Reorganize to EuRoC format: mav0/cam0/, mav0/cam1/, mav0/imu0/
   log_info "Organizing to EuRoC format..."
