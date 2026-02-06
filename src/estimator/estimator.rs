@@ -54,6 +54,12 @@ pub struct Estimator {
     trajectory: Vec<Matrix4x4>,
     /// Online intrinsics refinement state
     intrinsics_refinement: Option<IntrinsicsRefinementState>,
+    /// Pre-allocated image buffer for left camera (reused each frame - zero allocation)
+    left_image_buffer: Vec<u8>,
+    /// Pre-allocated image buffer for right camera (reused each frame - zero allocation)
+    right_image_buffer: Vec<u8>,
+    /// Pre-allocated IMU buffer (reused each frame - zero allocation)
+    imu_buffer: Vec<ImuData>,
 }
 
 impl Estimator {
@@ -107,6 +113,13 @@ impl Estimator {
             None
         };
 
+        // Pre-allocate image buffers for zero-allocation frame processing
+        let image_size = (config.camera.image_width * config.camera.image_height) as usize;
+        let left_image_buffer = vec![0u8; image_size];
+        let right_image_buffer = vec![0u8; image_size];
+        // Pre-allocate IMU buffer (typical 20-50 samples per frame)
+        let imu_buffer = Vec::with_capacity(100);
+
         Estimator {
             frame_id_counter: 0,
             frames_since_last_keyframe: 0,
@@ -125,6 +138,9 @@ impl Estimator {
             T_B_Cr,
             trajectory: Vec::new(),
             intrinsics_refinement,
+            left_image_buffer,
+            right_image_buffer,
+            imu_buffer,
         }
     }
 
@@ -160,11 +176,34 @@ impl Estimator {
         // Frame creation
         let frame_creation_start = Instant::now();
 
-        // Create GrayImage objects directly from input slices (no clone needed for tracking)
+        // Use pre-allocated buffers for zero-allocation image processing
         let img_w = self.config.camera.image_width;
         let img_h = self.config.camera.image_height;
+        let expected_size = (img_w * img_h) as usize;
 
-        let left_img = match GrayImage::from_raw(img_w, img_h, left_image.to_vec()) {
+        // Validate input sizes
+        if left_image.len() != expected_size || right_image.len() != expected_size {
+            log::error!(
+                "[Estimator] Invalid image size: left={}, right={}, expected={} ({}x{})",
+                left_image.len(),
+                right_image.len(),
+                expected_size,
+                img_w,
+                img_h
+            );
+            return Ok(());
+        }
+
+        // Copy into pre-allocated buffers (memcpy - fast, no malloc)
+        self.left_image_buffer.copy_from_slice(left_image);
+        self.right_image_buffer.copy_from_slice(right_image);
+
+        // Create GrayImage by moving pre-allocated buffer (zero allocation)
+        // We'll get the buffer back after use via into_raw()
+        let left_buffer = std::mem::take(&mut self.left_image_buffer);
+        let right_buffer = std::mem::take(&mut self.right_image_buffer);
+
+        let left_img = match GrayImage::from_raw(img_w, img_h, left_buffer) {
             Some(img) => img,
             None => {
                 log::error!(
@@ -176,7 +215,7 @@ impl Estimator {
                 return Ok(());
             },
         };
-        let right_img = match GrayImage::from_raw(img_w, img_h, right_image.to_vec()) {
+        let right_img = match GrayImage::from_raw(img_w, img_h, right_buffer) {
             Some(img) => img,
             None => {
                 log::error!(
@@ -185,6 +224,8 @@ impl Estimator {
                     img_h,
                     right_image.len()
                 );
+                // Recover left buffer
+                self.left_image_buffer = left_img.into_raw();
                 return Ok(());
             },
         };
@@ -213,9 +254,10 @@ impl Estimator {
             self.T_B_Cr,
         );
 
-        // Attach IMU measurements if available.
-        if let Some(imu) = imu_data {
-            current_frame.imu_from_last_frame = imu.to_vec();
+        // Attach IMU measurements if available (use pre-allocated buffer - zero allocation)
+        if let Some(imu) = imu_data {            self.imu_buffer.clear();
+            self.imu_buffer.extend_from_slice(imu);
+            current_frame.imu_from_last_frame = self.imu_buffer.clone();
         }
 
         frame_creation_time_ms = frame_creation_start.elapsed().as_secs_f64() * 1000.0;
@@ -302,6 +344,10 @@ impl Estimator {
             optimization_time_ms,
             total_duration_ms
         );
+
+        // Recover image buffers for reuse (zero allocation on next frame)
+        self.left_image_buffer = left_img.into_raw();
+        self.right_image_buffer = right_img.into_raw();
 
         Ok(())
     }

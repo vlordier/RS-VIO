@@ -1342,9 +1342,9 @@ mod tests {
         let left = create_checkerboard_image(1920, 1080, 10);
         let right = create_checkerboard_image(1920, 1080, 10);
 
-        // Send frames rapidly in sequence to fill the backlog before processing
+        // Send many frames concurrently (no await) to fill the backlog before any processing
         let mut handles = vec![];
-        for i in 0..3 {
+        for i in 0..10 {
             let est = Arc::clone(&estimator);
             let left = left.clone();
             let right = right.clone();
@@ -1360,8 +1360,7 @@ mod tests {
                 )
                 .await
             }));
-            // Small delay to ensure ordering but allow backlog to build
-            tokio::time::sleep(tokio::time::Duration::from_micros(10)).await;
+            // No delay - send all concurrently to force backlog
         }
 
         let mut results = vec![];
@@ -1518,10 +1517,11 @@ mod tests {
         // Validates that a keyframe can preempt queued regular frames
         let config = create_test_config_base();
         let async_config = AsyncConfig {
-            channel_capacity: 8,
-            max_pending_frames: 8,
+            channel_capacity: 16, // Increased to handle more concurrent frames (buffer pool made processing faster)
+            max_pending_frames: 16,
             enable_frame_skipping: false,
             frame_timeout_ms: 5000,
+            frame_budget_ms: 200, // Slow budget to keep frames in queue (buffer pool made processing faster)
             keyframe_priority: 100,
             regular_frame_priority: 1,
             ..Default::default()
@@ -1538,7 +1538,9 @@ mod tests {
         let right = create_checkerboard_image(1920, 1080, 10);
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
-        for i in 0..5 {
+        // Send enough frames to create backlog (buffer pool optimizations made processing faster)
+        // Use more frames than channel capacity to ensure backlog when keyframe arrives
+        for i in 0..12 {
             let est = Arc::clone(&estimator);
             let tx = tx.clone();
             let left = left.clone();
@@ -1551,8 +1553,7 @@ mod tests {
             });
         }
 
-        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
-
+        // No delay - send keyframe immediately while regular frames are queuing
         let est = Arc::clone(&estimator);
         let tx_key = tx.clone();
         tokio::spawn(async move {
