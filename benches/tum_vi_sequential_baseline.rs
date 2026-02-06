@@ -86,8 +86,8 @@ fn load_tumvi_frames(max_frames: usize) -> Option<(Vec<StereoFrame>, Config)> {
 }
 
 fn bench_tumvi_sequential_baseline(c: &mut Criterion) {
-    // Load dataset once
-    let Some((frames, vio_cfg)) = load_tumvi_frames(500) else {
+    // Load dataset once - increased to 1000 frames for better measurement
+    let Some((frames, vio_cfg)) = load_tumvi_frames(1000) else {
         println!("Skipping tumvi_sequential_baseline: set RS_VIO_TUMVI_PATH to a TUM-VI sequence root (contains mav0/)");
         return;
     };
@@ -101,7 +101,7 @@ fn bench_tumvi_sequential_baseline(c: &mut Criterion) {
         ..Default::default()
     };
 
-    c.bench_function("tumvi_sequential_baseline_500_frames", |b| {
+    c.bench_function("tumvi_sequential_baseline_1000_frames", |b| {
         b.iter(|| {
             // Fresh detector and sliding window each iteration to avoid state carryover
             let detector = EnhancedFeatureDetector::new(detector_config.clone());

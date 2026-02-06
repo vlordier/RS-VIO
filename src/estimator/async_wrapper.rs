@@ -315,9 +315,8 @@ impl AsyncEstimator {
                                         Ok(mut tracker) => tracker.record_panic_recovery(now_ns),
                                         Err(err) => err.into_inner().record_panic_recovery(now_ns),
                                     }
-                                    let _ = respond_to.send(Err(anyhow::anyhow!(
-                                        ESTIMATOR_PANIC_ERROR
-                                    )));
+                                    let _ = respond_to
+                                        .send(Err(anyhow::anyhow!(ESTIMATOR_PANIC_ERROR)));
                                     return;
                                 },
                             }
@@ -341,9 +340,7 @@ impl AsyncEstimator {
                                         Ok(mut tracker) => tracker.record_panic_recovery(0),
                                         Err(err) => err.into_inner().record_panic_recovery(0),
                                     }
-                                    let _ = respond_to.send(Err(anyhow::anyhow!(
-                                        TEST_PANIC_ERROR
-                                    )));
+                                    let _ = respond_to.send(Err(anyhow::anyhow!(TEST_PANIC_ERROR)));
                                     return;
                                 },
                             }

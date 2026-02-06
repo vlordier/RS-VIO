@@ -2,8 +2,8 @@
 
 ## Executive Summary
 
-**Review Date:** 2026-02-06  
-**Branch:** feature/async-pipeline  
+**Review Date:** 2026-02-06
+**Branch:** feature/async-pipeline
 **Status:** ✅ Async wrapper fixed, 🔴 Core estimator needs work
 
 ### Allocation Budget Analysis
@@ -78,7 +78,7 @@ impl ImageBufferPool {
             right_buffer: vec![0u8; width * height],
         }
     }
-    
+
     pub fn load_images(&mut self, left_src: &[u8], right_src: &[u8]) {
         self.left_buffer.copy_from_slice(left_src);
         self.right_buffer.copy_from_slice(right_src);
@@ -184,8 +184,8 @@ Impact on embedded systems:
 
 ## Test Results
 
-**All tests passing:** ✅ 212 library tests + 36 integration tests  
-**Pre-commit hooks:** ✅ All passed (rustfmt, clippy, shellcheck)  
+**All tests passing:** ✅ 212 library tests + 36 integration tests
+**Pre-commit hooks:** ✅ All passed (rustfmt, clippy, shellcheck)
 **Allocations verified:** Manual code review (dhat profiling recommended)
 
 ## Files Modified

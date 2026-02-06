@@ -3,15 +3,15 @@
 ## ✅ FIXED Critical Issues
 
 ### 1. **String Allocation in Worker Thread** ✅ FIXED
-**Location:** `src/estimator/async_wrapper.rs:611`  
-**Problem:** `anyhow::anyhow!()` with `format!()` allocated a String on every dropped frame.  
-**Impact:** Unpredictable latency spikes when frames are dropped due to backlog.  
+**Location:** `src/estimator/async_wrapper.rs:611`
+**Problem:** `anyhow::anyhow!()` with `format!()` allocated a String on every dropped frame.
+**Impact:** Unpredictable latency spikes when frames are dropped due to backlog.
 **Fix Applied:** Use static error constant `BACKLOG_ERROR` - **NO ALLOCATION**.
 
 ### 2. **BinaryHeap Growth Allocations** ✅ FIXED
-**Location:** `src/estimator/async_wrapper.rs:158`  
-**Problem:** Heap started with capacity 0 and reallocated as it grew.  
-**Impact:** Unpredictable allocation latency during queue growth.  
+**Location:** `src/estimator/async_wrapper.rs:158`
+**Problem:** Heap started with capacity 0 and reallocated as it grew.
+**Impact:** Unpredictable allocation latency during queue growth.
 **Fix Applied:** Pre-allocate with `BinaryHeap::with_capacity(max_pending_frames)` - **NO RUNTIME ALLOCATION**.
 
 ## 🔴 NEW Critical Issues Found
@@ -22,9 +22,9 @@
 let left_img = GrayImage::from_raw(img_w, img_h, left_image.to_vec())?;
 let right_img = GrayImage::from_raw(img_w, img_h, right_image.to_vec())?;
 ```
-**Problem:** `to_vec()` clones entire image buffers (1920x1080 = ~2MB per frame for stereo).  
-**Impact:** **SEVERE** - Allocates ~4MB heap memory **ON EVERY FRAME**. Causes GC pressure and unpredictable latency.  
-**Priority:** **CRITICAL** - This is the biggest real-time violation in the codebase.  
+**Problem:** `to_vec()` clones entire image buffers (1920x1080 = ~2MB per frame for stereo).
+**Impact:** **SEVERE** - Allocates ~4MB heap memory **ON EVERY FRAME**. Causes GC pressure and unpredictable latency.
+**Priority:** **CRITICAL** - This is the biggest real-time violation in the codebase.
 **Proposed Fix Options:**
 1. Use `GrayImage::from_raw()` with a wrapper that doesn't require ownership
 2. Modify GrayImage API to accept borrowed slices
@@ -36,8 +36,8 @@ let right_img = GrayImage::from_raw(img_w, img_h, right_image.to_vec())?;
 ```rust
 current_frame.imu_from_last_frame = imu.to_vec();
 ```
-**Problem:** Clones IMU data on every frame.  
-**Impact:** Small allocation (~200-500 bytes typical), but still avoidable.  
+**Problem:** Clones IMU data on every frame.
+**Impact:** Small allocation (~200-500 bytes typical), but still avoidable.
 **Fix:** Consider pre-allocating IMU buffer or using slices.
 
 ### 5. **Panic Error Allocations (Low Priority)**
@@ -45,8 +45,8 @@ current_frame.imu_from_last_frame = imu.to_vec();
 ```rust
 Err(anyhow::anyhow!("Estimator panicked while processing frame {}", frame_id))
 ```
-**Problem:** Allocates formatted strings during panic recovery.  
-**Impact:** Low - only happens during panics (abnormal path).  
+**Problem:** Allocates formatted strings during panic recovery.
+**Impact:** Low - only happens during panics (abnormal path).
 **Status:** ACCEPTABLE - Panic recovery paths are not real-time critical.
 
 ## Acceptable Allocations (Cold Paths)
@@ -97,7 +97,7 @@ Command::ProcessFrame { left_image, right_image, imu_data, ... }
 
 ### Current Status
 - **Async Wrapper:** ✅ Allocation-free in hot path (fixed)
-- **Priority Queue:** ✅ Pre-allocated, no runtime growth (fixed)  
+- **Priority Queue:** ✅ Pre-allocated, no runtime growth (fixed)
 - **Telemetry:** ✅ Lock-free ring buffers
 - **Estimator Core:** 🔴 **CRITICAL ISSUE** - 4MB allocation per frame
 - **Estimator Core:** ✅ **FIXED** - 0 bytes per frame (buffer pool + zero-copy)
@@ -111,14 +111,14 @@ Per-Frame Allocation Budget:
 ├─ Priority queue operations:     0 bytes  ✅ (fixed)
 ├─ Telemetry updates:              0 bytes  ✅
 ├─ Image cloning:            ~4,000,000 bytes  🔴 CRITICAL
-├─ IMU data:                    ~500 bytes  ⚠️ 
+├─ IMU data:                    ~500 bytes  ⚠️
 └─────────────────────────────────────────────
    TOTAL:                   ~4,000,500 bytes
 
 TARGET: <100 bytes per frame for embedded real-time
 ```
 Per-Frame Allocation Budget (POST-FIX):
-├─ AsyncEstimator wrapper:        0 bytes  ✅  
+├─ AsyncEstimator wrapper:        0 bytes  ✅
 ├─ Priority queue operations:     0 bytes  ✅
 ├─ Telemetry updates:              0 bytes  ✅
 ├─ Image cloning:                  0 bytes  ✅ (buffer pool)
@@ -186,11 +186,11 @@ impl ImageBufferPool {
             available: VecDeque::from(buffers),
         }
     }
-    
+
     pub fn acquire(&mut self) -> Option<(Vec<u8>, Vec<u8>)> {
         self.available.pop_front()
     }
-    
+
     pub fn release(&mut self, buffers: (Vec<u8>, Vec<u8>)) {
         self.available.push_back(buffers);
     }
@@ -239,7 +239,7 @@ static ALLOC: dhat::Alloc = dhat::Alloc;
 fn test_zero_allocation_frame_processing() {
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
-    
+
     // Process single frame
     // Verify allocation count = 0
 }
@@ -274,7 +274,7 @@ fn test_deterministic_latency() {
 **For Embedded Real-Time Safety:**
 - Implement image buffer pool or zero-copy wrappers
 - Pre-allocate all working buffers at startup
-- Verify with dhat heap profiler  
+- Verify with dhat heap profiler
 - Target: <100 bytes allocation per frame
 
 **Next Steps:**
@@ -290,8 +290,8 @@ fn test_deterministic_latency() {
 Err(anyhow::anyhow!("Estimator panicked while processing frame {}", frame_id))
 Err(anyhow::anyhow!("AsyncEstimator test panic triggered"))
 ```
-**Problem:** Allocates formatted strings during panic recovery.  
-**Impact:** Low - only happens during panics (abnormal path).  
+**Problem:** Allocates formatted strings during panic recovery.
+**Impact:** Low - only happens during panics (abnormal path).
 **Fix:** Consider static message or accept allocation in panic path.
 
 ## Acceptable Allocations (Cold Paths)
@@ -333,7 +333,7 @@ Command::ProcessFrame { left_image, right_image, imu_data, ... }
 ## Real-Time Safety Recommendations
 
 1. **CRITICAL:** Fix backlog error allocation (issue #1)
-2. **HIGH:** Pre-allocate BinaryHeap (issue #2)  
+2. **HIGH:** Pre-allocate BinaryHeap (issue #2)
 3. **MEDIUM:** Consider static panic messages (issue #3)
 4. **VERIFY:** Ensure underlying Estimator::process_frame has no allocations
 5. **MONITOR:** Add allocation tracking in benchmarks (dhat-heap feature)
@@ -374,6 +374,6 @@ if over_limit {
 
 ### Fix #2: Pre-allocate Queue
 ```rust
-let mut queue: BinaryHeap<PrioritizedCommand> = 
+let mut queue: BinaryHeap<PrioritizedCommand> =
     BinaryHeap::with_capacity(async_config_clone.max_pending_frames);
 ```

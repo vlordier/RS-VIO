@@ -77,17 +77,23 @@ async fn test_deterministic_latency_30fps() {
     let deadline_misses = latencies.iter().filter(|&l| l > &target_latency).count();
     let miss_rate = (deadline_misses as f64 / latencies.len() as f64) * 100.0;
 
-    println!("  Deadline misses: {}/100 ({:.1}%)", deadline_misses, miss_rate);
+    println!(
+        "  Deadline misses: {}/100 ({:.1}%)",
+        deadline_misses, miss_rate
+    );
 
     // For real-time embedded: aim for < 1% deadline misses
     // This is a soft check - actual embedded systems should be tested on target hardware
-    println!("  Real-time readiness: {}",  if miss_rate < 5.0 {
-        "GOOD (< 5% misses)"
-    } else if miss_rate < 20.0 {
-        "ACCEPTABLE (< 20% misses)"
-    } else {
-        "NEEDS IMPROVEMENT (>= 20% misses)"
-    });
+    println!(
+        "  Real-time readiness: {}",
+        if miss_rate < 5.0 {
+            "GOOD (< 5% misses)"
+        } else if miss_rate < 20.0 {
+            "ACCEPTABLE (< 20% misses)"
+        } else {
+            "NEEDS IMPROVEMENT (>= 20% misses)"
+        }
+    );
 }
 
 #[tokio::test]
@@ -151,15 +157,18 @@ async fn test_latency_jitter_analysis() {
     println!("  CV:           {:.2}%", cv);
 
     // For real-time systems, CV should be low (< 15% is good)
-    println!("  Jitter assessment: {}", if cv < 10.0 {
-        "EXCELLENT (< 10%)"
-    } else if cv < 20.0 {
-        "GOOD (< 20%)"
-    } else if cv < 40.0 {
-        "ACCEPTABLE (< 40%)"
-    } else {
-        "HIGH JITTER (>= 40%)"
-    });
+    println!(
+        "  Jitter assessment: {}",
+        if cv < 10.0 {
+            "EXCELLENT (< 10%)"
+        } else if cv < 20.0 {
+            "GOOD (< 20%)"
+        } else if cv < 40.0 {
+            "ACCEPTABLE (< 40%)"
+        } else {
+            "HIGH JITTER (>= 40%)"
+        }
+    );
 
     // High jitter (>50%) would indicate non-deterministic allocations or GC
     assert!(
@@ -227,7 +236,7 @@ async fn test_no_gc_pauses() {
 
     println!("GC pause detection:");
     println!("  Median latency: {:?}", median);
-    println!("  Spike threshold (3x median): {:?}", spike_threshold );
+    println!("  Spike threshold (3x median): {:?}", spike_threshold);
     println!("  Spikes detected: {}/200", spikes.len());
 
     if !spikes.is_empty() {

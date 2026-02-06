@@ -54,7 +54,10 @@ async fn test_zero_allocation_frame_processing() {
         let alloc_diff = stats_after.total_blocks - stats_before.total_blocks;
         let bytes_diff = stats_after.total_bytes - stats_before.total_bytes;
 
-        println!("Allocation delta: {} blocks, {} bytes", alloc_diff, bytes_diff);
+        println!(
+            "Allocation delta: {} blocks, {} bytes",
+            alloc_diff, bytes_diff
+        );
 
         // Allow small allocations for logging/metrics  (< 1KB acceptable)
         // The critical fix is eliminating 4MB+ image allocations

@@ -35,13 +35,27 @@ pub struct PatchTracker<const N: u32> {
     last_keypoint_id: usize,
     tracked_points_map: HashMap<usize, na::Affine2<f32>>,
     previous_image_pyramid: Vec<GrayImage>,
+    current_image_pyramid: Vec<GrayImage>,
+    has_previous: bool,
 }
 impl<const LEVELS: u32> PatchTracker<LEVELS> {
     pub fn process_frame(&mut self, greyscale_image: &GrayImage) {
-        // build current image pyramid
-        let current_image_pyramid: Vec<GrayImage> = build_image_pyramid(greyscale_image, LEVELS);
+        // build current image pyramid (reuse buffers)
+        ensure_pyramid_buffers(
+            &mut self.current_image_pyramid,
+            greyscale_image.width(),
+            greyscale_image.height(),
+            LEVELS,
+        );
+        ensure_pyramid_buffers(
+            &mut self.previous_image_pyramid,
+            greyscale_image.width(),
+            greyscale_image.height(),
+            LEVELS,
+        );
+        build_pyramid_in_place(greyscale_image, &mut self.current_image_pyramid);
 
-        if !self.previous_image_pyramid.is_empty() {
+        if self.has_previous {
             info!("old points {}", self.tracked_points_map.len());
             // track prev points
             // Default values for PatchTracker (not used in estimator)
@@ -49,7 +63,7 @@ impl<const LEVELS: u32> PatchTracker<LEVELS> {
             const DEFAULT_OPTICAL_FLOW_CONVERGENCE_THRESHOLD: f32 = 0.005;
             self.tracked_points_map = track_points::<LEVELS>(
                 &self.previous_image_pyramid,
-                &current_image_pyramid,
+                &self.current_image_pyramid,
                 &self.tracked_points_map,
                 DEFAULT_OPTICAL_FLOW_MAX_ITERATIONS,
                 DEFAULT_OPTICAL_FLOW_CONVERGENCE_THRESHOLD,
@@ -69,8 +83,12 @@ impl<const LEVELS: u32> PatchTracker<LEVELS> {
             self.last_keypoint_id += 1;
         }
 
-        // update saved image pyramid
-        self.previous_image_pyramid = current_image_pyramid;
+        // update saved image pyramid (swap to reuse allocations)
+        std::mem::swap(
+            &mut self.previous_image_pyramid,
+            &mut self.current_image_pyramid,
+        );
+        self.has_previous = true;
     }
     pub fn get_track_points(&self) -> HashMap<usize, (f32, f32)> {
         self.tracked_points_map
@@ -89,8 +107,11 @@ pub struct StereoPatchTracker<const N: u32> {
     last_keypoint_id: usize,
     tracked_points_map_cam0: HashMap<usize, na::Affine2<f32>>,
     previous_image_pyramid0: Vec<GrayImage>,
+    current_image_pyramid0: Vec<GrayImage>,
     tracked_points_map_cam1: HashMap<usize, na::Affine2<f32>>,
     previous_image_pyramid1: Vec<GrayImage>,
+    current_image_pyramid1: Vec<GrayImage>,
+    has_previous: bool,
     grid_size: u32,
     optical_flow_max_iterations: usize,
     optical_flow_convergence_threshold: f32,
@@ -106,8 +127,11 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             last_keypoint_id: 0,
             tracked_points_map_cam0: HashMap::new(),
             previous_image_pyramid0: Vec::new(),
+            current_image_pyramid0: Vec::new(),
             tracked_points_map_cam1: HashMap::new(),
             previous_image_pyramid1: Vec::new(),
+            current_image_pyramid1: Vec::new(),
+            has_previous: false,
             grid_size,
             optical_flow_max_iterations: optical_flow_max_iterations as usize,
             optical_flow_convergence_threshold: optical_flow_convergence_threshold as f32,
@@ -120,15 +144,44 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
         greyscale_image1: &GrayImage,
         frame: &mut crate::estimator::Frame,
     ) {
-        // build current image pyramid
+        // build current image pyramid (reuse buffers)
+        ensure_pyramid_buffers(
+            &mut self.current_image_pyramid0,
+            greyscale_image0.width(),
+            greyscale_image0.height(),
+            LEVELS,
+        );
+        ensure_pyramid_buffers(
+            &mut self.previous_image_pyramid0,
+            greyscale_image0.width(),
+            greyscale_image0.height(),
+            LEVELS,
+        );
+        ensure_pyramid_buffers(
+            &mut self.current_image_pyramid1,
+            greyscale_image1.width(),
+            greyscale_image1.height(),
+            LEVELS,
+        );
+        ensure_pyramid_buffers(
+            &mut self.previous_image_pyramid1,
+            greyscale_image1.width(),
+            greyscale_image1.height(),
+            LEVELS,
+        );
+
         // Parallelize pyramid construction
-        let (current_image_pyramid0, current_image_pyramid1) = rayon::join(
-            || build_image_pyramid(greyscale_image0, LEVELS),
-            || build_image_pyramid(greyscale_image1, LEVELS),
+        let (current_pyr0, current_pyr1) = (
+            &mut self.current_image_pyramid0,
+            &mut self.current_image_pyramid1,
+        );
+        rayon::join(
+            || build_pyramid_in_place(greyscale_image0, current_pyr0),
+            || build_pyramid_in_place(greyscale_image1, current_pyr1),
         );
 
         // not initialized
-        if !self.previous_image_pyramid0.is_empty() {
+        if self.has_previous {
             log::debug!(
                 "[FeatureTracker] Number of old points in cam0: {}",
                 self.tracked_points_map_cam0.len()
@@ -146,7 +199,7 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
                 || {
                     track_points::<LEVELS>(
                         prev_pyr0,
-                        &current_image_pyramid0,
+                        &self.current_image_pyramid0,
                         map0,
                         max_iters,
                         threshold,
@@ -155,7 +208,7 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
                 || {
                     track_points::<LEVELS>(
                         prev_pyr1,
-                        &current_image_pyramid1,
+                        &self.current_image_pyramid1,
                         map1,
                         max_iters,
                         threshold,
@@ -189,8 +242,8 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             .collect();
 
         let tmp_tracked_points1 = track_points::<LEVELS>(
-            &current_image_pyramid0,
-            &current_image_pyramid1,
+            &self.current_image_pyramid0,
+            &self.current_image_pyramid1,
             &tmp_tracked_points0,
             self.optical_flow_max_iterations,
             self.optical_flow_convergence_threshold,
@@ -206,9 +259,16 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             }
         }
 
-        // update saved image pyramid
-        self.previous_image_pyramid0 = current_image_pyramid0;
-        self.previous_image_pyramid1 = current_image_pyramid1;
+        // update saved image pyramid (swap to reuse allocations)
+        std::mem::swap(
+            &mut self.previous_image_pyramid0,
+            &mut self.current_image_pyramid0,
+        );
+        std::mem::swap(
+            &mut self.previous_image_pyramid1,
+            &mut self.current_image_pyramid1,
+        );
+        self.has_previous = true;
 
         // Populate the frame's feature lists from the stereo tracks
         let [tracked_left, tracked_right] = self.get_track_points();
@@ -243,21 +303,94 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
     }
 }
 
+fn ensure_pyramid_buffers(
+    pyramid: &mut Vec<GrayImage>,
+    base_width: u32,
+    base_height: u32,
+    levels: u32,
+) {
+    let target_len = levels as usize;
+    if pyramid.len() != target_len {
+        pyramid.clear();
+        pyramid.reserve(target_len);
+        for level in 0..levels {
+            let scale_down = 1 << level;
+            let width = (base_width / scale_down).max(1);
+            let height = (base_height / scale_down).max(1);
+            pyramid.push(GrayImage::new(width, height));
+        }
+        return;
+    }
+
+    let mut resize_needed = false;
+    for (level, img) in pyramid.iter().enumerate() {
+        let scale_down = 1 << level;
+        let width = (base_width / scale_down).max(1);
+        let height = (base_height / scale_down).max(1);
+        if img.width() != width || img.height() != height {
+            resize_needed = true;
+            break;
+        }
+    }
+
+    if resize_needed {
+        pyramid.clear();
+        pyramid.reserve(target_len);
+        for level in 0..levels {
+            let scale_down = 1 << level;
+            let width = (base_width / scale_down).max(1);
+            let height = (base_height / scale_down).max(1);
+            pyramid.push(GrayImage::new(width, height));
+        }
+    }
+}
+
+fn downsample_2x2(src: &GrayImage, dst: &mut GrayImage) {
+    // Use imageops resize for consistent downsampling
+    let dst_w = (src.width() / 2).max(1);
+    let dst_h = (src.height() / 2).max(1);
+    let resized = imageops::resize(src, dst_w, dst_h, imageops::FilterType::Triangle);
+    *dst = resized;
+}
+
+fn build_pyramid_in_place(base: &GrayImage, pyramid: &mut [GrayImage]) {
+    if pyramid.is_empty() {
+        return;
+    }
+
+    // Copy or resize base image to pyramid level 0
+    if pyramid[0].width() == base.width() && pyramid[0].height() == base.height() {
+        pyramid[0] = base.clone();
+    } else {
+        let resized = imageops::resize(
+            base,
+            pyramid[0].width(),
+            pyramid[0].height(),
+            imageops::FilterType::Triangle,
+        );
+        pyramid[0] = resized;
+    }
+
+    // Build remaining pyramid levels by downsampling
+    for level in 1..pyramid.len() {
+        let src = pyramid[level - 1].clone();
+        let dst_w = (pyramid[level - 1].width() / 2).max(1);
+        let dst_h = (pyramid[level - 1].height() / 2).max(1);
+        let downsampled = imageops::resize(&src, dst_w, dst_h, imageops::FilterType::Triangle);
+        pyramid[level] = downsampled;
+    }
+}
+
 fn build_image_pyramid(greyscale_image: &GrayImage, levels: u32) -> Vec<GrayImage> {
-    const FILTER_TYPE: imageops::FilterType = imageops::FilterType::Triangle;
-    let (w0, h0) = greyscale_image.dimensions();
-    (0..levels)
-        .into_par_iter()
-        .map(|i| {
-            if i == 0 {
-                greyscale_image.clone()
-            } else {
-                let scale_down: u32 = 1 << i;
-                let (new_w, new_h) = (w0 / scale_down, h0 / scale_down);
-                imageops::resize(greyscale_image, new_w, new_h, FILTER_TYPE)
-            }
-        })
-        .collect()
+    let mut pyramid = Vec::new();
+    ensure_pyramid_buffers(
+        &mut pyramid,
+        greyscale_image.width(),
+        greyscale_image.height(),
+        levels,
+    );
+    build_pyramid_in_place(greyscale_image, &mut pyramid);
+    pyramid
 }
 
 fn add_points(
@@ -266,16 +399,15 @@ fn add_points(
     grid_size: u32,
 ) -> Vec<Corner> {
     let num_points_in_cell = 1;
-    let current_corners: Vec<Corner> = tracked_points_map
-        .values()
-        .map(|v| {
-            Corner::new(
-                v.matrix().m13.round() as u32,
-                v.matrix().m23.round() as u32,
-                0.0,
-            )
-        })
-        .collect();
+    // Pre-allocate capacity to avoid reallocation during collection
+    let mut current_corners: Vec<Corner> = Vec::with_capacity(tracked_points_map.len());
+    current_corners.extend(tracked_points_map.values().map(|v| {
+        Corner::new(
+            v.matrix().m13.round() as u32,
+            v.matrix().m23.round() as u32,
+            0.0,
+        )
+    }));
     // let curr_img_luma8 = DynamicImage::ImageLuma16(grayscale_image.clone()).into_luma8();
     image_utilities::detect_key_points(
         grayscale_image,
@@ -297,7 +429,8 @@ fn track_points<const LEVELS: u32>(
     optical_flow_max_iterations: usize,
     optical_flow_convergence_threshold: f32,
 ) -> HashMap<usize, na::Affine2<f32>> {
-    let transform_maps1: HashMap<usize, na::Affine2<f32>> = transform_maps0
+    // Collect with parallel iterator, then insert into pre-allocated HashMap
+    let results: Vec<(usize, na::Affine2<f32>)> = transform_maps0
         .par_iter()
         .filter_map(|(k, v)| {
             if let Some(new_v) = track_one_point::<LEVELS>(
@@ -327,6 +460,11 @@ fn track_points<const LEVELS: u32>(
             None
         })
         .collect();
+
+    // Pre-allocate HashMap with capacity hint before inserting
+    let mut transform_maps1: HashMap<usize, na::Affine2<f32>> =
+        HashMap::with_capacity(results.len());
+    transform_maps1.extend(results);
 
     transform_maps1
 }
