@@ -220,12 +220,6 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             .collect();
         [tracked_pts0, tracked_pts1]
     }
-    pub fn remove_id(&mut self, ids: &[usize]) {
-        for id in ids {
-            self.tracked_points_map_cam0.remove(id);
-            self.tracked_points_map_cam1.remove(id);
-        }
-    }
 }
 
 fn ensure_pyramid_buffers(

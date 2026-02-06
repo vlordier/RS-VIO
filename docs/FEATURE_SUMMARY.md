@@ -36,16 +36,8 @@ Also introduces **multi-camera architecture** supporting N cameras with arbitrar
 - Integration with YAML configuration loading
 - ~76 lines added
 
-#### 3. **src/datasets/multi_camera_config.rs** (Multi-Camera Support)
-- New file: Complete N-camera configuration system
-- `CameraDefinition` struct for individual cameras
-- `CameraGroup` struct for camera relationships (stereo pairs, etc.)
-- `SharingPolicy` enum: None/Ratio/K1K2/Full parameter sharing
-- `MultiCameraConfig` system with validation
-- ~400 lines
-
-#### 4. **src/datasets/mod.rs**
-- Added `pub mod multi_camera_config` declaration
+#### 3. **src/datasets/mod.rs**
+- Dataset player and config module declarations
 
 ---
 
@@ -246,11 +238,7 @@ python tools/post_process_calibration.py \
 ## Files Added/Modified Summary
 
 ### New Files (Production)
-- `src/datasets/multi_camera_config.rs` (400 lines)
 - `tools/post_process_calibration.py` (310 lines, enhanced)
-- `config/multi_camera_stereo.yaml`
-- `config/multi_camera_forward_back.yaml`
-- `config/multi_camera_quad.yaml`
 - `config/tum_vi_self_calibrating_from_baseline.yaml`
 
 ### New Files (Validation/Tools)
@@ -262,7 +250,6 @@ python tools/post_process_calibration.py \
 ### Modified Files (Core)
 - `src/estimator/estimator.rs` (+190 lines)
 - `src/datasets/config.rs` (+76 lines)
-- `src/datasets/mod.rs` (added multi_camera_config export)
 
 ### Modified Files (Documentation)
 - `Cargo.toml` (versions/dependencies)
@@ -283,14 +270,9 @@ python tools/post_process_calibration.py \
 - All documentation
 - All validation scripts and tools
 
-**Demo Files (Can Remove if Needed):**
-- `examples/adaptive_guidance_demo.rs`
+**Demo Files:**
 - `examples/calibration_demo.rs`
-- `examples/multi_camera_demo.rs`
-- `examples/rolling_shutter_demo.rs`
-- `examples/temporal_super_resolution_demo.rs`
-
-These are example/reference implementations. Decision: Keep for reference, or remove if cleaning up?
+- `examples/realtime_logging_demo.rs`
 
 ---
 
@@ -327,7 +309,7 @@ These are example/reference implementations. Decision: Keep for reference, or re
 
 ✅ **Calibration Error Reduction:** 61.7% (0.407% → 0.156%)
 ✅ **Three Complementary Strategies:** All working and validated
-✅ **Multi-Camera Support:** N cameras with flexible configuration
+- **Multi-Camera Support:** Removed (was scaffolding only)
 ✅ **Advanced Techniques:** Temporal super-resolution + adaptive guidance
 ✅ **Intelligent Processing:** Convergence-based stopping
 ✅ **Production Quality:** Type-safe Rust + robust Python

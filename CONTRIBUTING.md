@@ -104,7 +104,7 @@ RS-VIO enforces strict safety standards suitable for embedded systems. All code 
 ```rust
 // ❌ DO NOT (will fail compilation)
 fn process() -> Result<Data> {
-    let value = some_operation().expect("failed");  // expect_used = deny
+    let value = some_operation().expect("failed");  // expect_used = warn (tightening toward deny)
     todo!("implement later");  // todo = deny
 }
 

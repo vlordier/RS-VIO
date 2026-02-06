@@ -10,18 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Safety lint configuration** for embedded and safety-critical systems
 - **SAFETY.md**: Comprehensive safety documentation
-- **Build profiles**: Three-tier strategy (release, embedded-safe, ultra-critical)
 - **Deny-level lints**: todo, unimplemented, box_collection, rc_buffer
-- **Sanitizer support**: Memory, thread, and address sanitizers for pre-deployment testing
 
 ### Changed
 - Promoted unsafe_code to forbid in Cargo.toml
-- Enhanced integer overflow protection in all build profiles
-- Updated description to emphasize safety-critical capabilities
 
 ### Security
-- **unsafe_code = forbid**: 100% safe Rust guarantee
-- **expect_used/unwrap_used = warn**: Gradually tightening toward deny
+- **unsafe_code = forbid**: Safe Rust only
+- **expect_used/unwrap_used = warn**: Tightening toward deny
 
 ## [Unreleased]
 
