@@ -113,10 +113,10 @@ impl PerformanceMetrics {
                 while samples.len() > self.max_samples {
                     samples.pop_front();
                 }
-            }
+            },
             Err(e) => {
                 log::error!("Failed to acquire metrics samples lock: {}", e);
-            }
+            },
         }
     }
 
@@ -129,11 +129,11 @@ impl PerformanceMetrics {
                 }
                 let sum: f64 = samples.iter().map(|s| s.value).sum();
                 Some(sum / samples.len() as f64)
-            }
+            },
             Err(e) => {
                 log::error!("Failed to acquire metrics samples lock for average: {}", e);
                 None
-            }
+            },
         }
     }
 
@@ -162,11 +162,11 @@ impl PerformanceMetrics {
                     std_dev,
                     count: values.len(),
                 })
-            }
+            },
             Err(e) => {
                 log::error!("Failed to acquire metrics samples lock for stats: {}", e);
                 None
-            }
+            },
         }
     }
 }

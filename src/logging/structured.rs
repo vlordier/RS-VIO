@@ -145,10 +145,10 @@ impl StructuredLogger {
                 Ok(mut f) => {
                     let _ = writeln!(f, "{}", message);
                     let _ = f.flush();
-                }
+                },
                 Err(e) => {
                     log::error!("Failed to acquire log file lock: {}", e);
-                }
+                },
             }
         }
     }

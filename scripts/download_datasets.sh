@@ -37,7 +37,10 @@ fetch() {
   local url="$1" out="$2"
   echo "Downloading $url -> $out"
   mkdir -p "$(dirname "$out")"
-  curl -L --fail --retry 5 --retry-delay 5 --retry-all-errors --continue-at - "$url" -o "$out"
+  curl -L --fail --retry 5 --retry-delay 5 --retry-all-errors --continue-at - "$url" -o "$out" || {
+    echo "Error: Download failed for $url" >&2
+    exit 1
+  }
 }
 
 extract_zip() {

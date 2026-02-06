@@ -290,14 +290,14 @@ impl Estimator {
                     drop(sliding_window);
                     (Ok(None), 0.0)
                 }
-            }
+            },
             Err(std::sync::TryLockError::WouldBlock) => {
                 log::debug!("Sliding window busy, skipping motion tracking");
                 (Ok(None), 0.0)
-            }
+            },
             Err(std::sync::TryLockError::Poisoned(e)) => {
                 return Err(anyhow::anyhow!("Sliding window mutex is poisoned: {}", e));
-            }
+            },
         };
 
         match motion_tracking_result.0 {
@@ -383,17 +383,18 @@ impl Estimator {
             let sliding_window = Arc::clone(&self.sliding_window);
             let in_flight = Arc::clone(&self.optimization_in_flight);
 
-            std::thread::spawn(move || {
-                match sliding_window.lock() {
-                    Ok(mut window) => {
-                        let _ = window.optimize();
-                        in_flight.store(false, Ordering::Relaxed);
-                    }
-                    Err(e) => {
-                        log::error!("Failed to acquire sliding window lock for optimization: {}", e);
-                        in_flight.store(false, Ordering::Relaxed);
-                    }
-                }
+            std::thread::spawn(move || match sliding_window.lock() {
+                Ok(mut window) => {
+                    let _ = window.optimize();
+                    in_flight.store(false, Ordering::Relaxed);
+                },
+                Err(e) => {
+                    log::error!(
+                        "Failed to acquire sliding window lock for optimization: {}",
+                        e
+                    );
+                    in_flight.store(false, Ordering::Relaxed);
+                },
             });
         }
     }
