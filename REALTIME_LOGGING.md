@@ -36,12 +36,12 @@ use rs_vio::StructuredLogger;
 fn main() -> anyhow::Result<()> {
     // Create logger
     let mut logger = StructuredLogger::new(None)?;
-    
+
     // Log with levels
     logger.info("Application started");
     logger.warn("Configuration loading delayed");
     logger.error("Failed to connect to device");
-    
+
     Ok(())
 }
 ```
@@ -53,19 +53,19 @@ use rs_vio::{StructuredLogger, LogContext};
 
 fn main() -> anyhow::Result<()> {
     let mut logger = StructuredLogger::new(None)?;
-    
+
     // Set context for related operations
     let ctx = LogContext::new("estimator", "vio_processing", "feature_tracker");
     logger.set_context(ctx);
-    
+
     // Add metadata to log entry
     logger.add_metadata("frame_id", "42");
     logger.add_metadata("num_features", "256");
     logger.info("Processing frame");
-    
+
     // Clear metadata for next entry
     logger.clear_metadata();
-    
+
     Ok(())
 }
 ```
@@ -79,18 +79,18 @@ use std::time::Duration;
 fn main() {
     // Create metrics collector (10-second window, max 1000 samples)
     let metrics = PerformanceMetrics::new(Duration::from_secs(10), 1000);
-    
+
     // Record measurements
     metrics.record_fps(30.5);
     metrics.record_latency(33.2); // milliseconds
     metrics.record_throughput(30.5); // frames/sec
-    
+
     // Get statistics
     if let Some(stats) = metrics.fps_stats() {
         println!("FPS: avg={:.2}, min={:.2}, max={:.2}, σ={:.2}",
                  stats.mean, stats.min, stats.max, stats.std_dev);
     }
-    
+
     // Generate comprehensive report
     let report = metrics.report();
     println!("{}", report);
@@ -226,23 +226,23 @@ use std::time::Instant;
 fn process_frame(frame_id: u64) -> anyhow::Result<()> {
     let mut logger = StructuredLogger::new(None)?;
     let metrics = PerformanceMetrics::new(std::time::Duration::from_secs(10), 1000);
-    
+
     let ctx = LogContext::new("estimator", "process_frame", "vio");
     logger.set_context(ctx);
-    
+
     let start = Instant::now();
-    
+
     logger.add_metadata("frame_id", &frame_id.to_string());
     logger.info("Frame processing started");
-    
+
     // Process frame...
-    
+
     let elapsed = start.elapsed().as_secs_f64() * 1000.0; // Convert to ms
     metrics.record_latency(elapsed);
-    
+
     logger.add_metadata("latency_ms", &format!("{:.2}", elapsed));
     logger.info("Frame processing completed");
-    
+
     Ok(())
 }
 ```
@@ -255,15 +255,15 @@ use std::time::Duration;
 
 fn run_optimization(num_iterations: usize) {
     let metrics = PerformanceMetrics::new(Duration::from_secs(60), 1000);
-    
+
     for i in 0..num_iterations {
         let start = std::time::Instant::now();
-        
+
         // Run optimization iteration...
-        
+
         let elapsed = start.elapsed().as_millis() as f64;
         metrics.record_latency(elapsed);
-        
+
         if i % 100 == 0 {
             if let Some(stats) = metrics.latency_stats() {
                 println!("Iteration {}: avg latency = {:.2}ms (σ={:.2})",
@@ -282,11 +282,11 @@ use std::time::Duration;
 
 fn monitor_pipeline() {
     let metrics = PerformanceMetrics::new(Duration::from_secs(10), 10000);
-    
+
     // In frame loop:
     let fps = calculate_current_fps();
     metrics.record_fps(fps);
-    
+
     // Every second, print summary
     if should_print() {
         if let Some(avg_fps) = metrics.avg_fps() {

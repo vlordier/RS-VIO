@@ -13,7 +13,7 @@ use rs_vio::init_tracing_logging;
 fn main() -> anyhow::Result<()> {
     // Non-blocking rolling logs to ./logs/vio.log.*
     let _guard = init_tracing_logging("./logs", "vio")?;
-    
+
     tracing::info!("VIO starting");
     run_vio();
     Ok(())
@@ -33,7 +33,7 @@ for frame in frames {
     counters.record_frame();
     counters.record_features_detected(256);
     counters.record_imu_measurement();
-    
+
     process_frame(frame);  // 33 ms @ 30 fps
 }
 ```
@@ -46,9 +46,9 @@ let counters_clone = Arc::clone(&counters);
 std::thread::spawn(move || {
     loop {
         std::thread::sleep(Duration::from_secs(1));  // 1 Hz
-        
+
         let report = counters_clone.swap_and_report();
-        
+
         // This CAN block on I/O, but only happens every 1 second
         tracing::info!(
             frames = report.frames,

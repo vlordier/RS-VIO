@@ -105,7 +105,7 @@ camera.frame_stride: 1  # Process every 1st frame (default)
                        # 2 = process every 2nd frame (50% throughput)
 ```
 
-**PR Scope**: 
+**PR Scope**:
 - Configuration parameter addition
 - Frame skip logic in feature tracker
 - Benchmark documentation

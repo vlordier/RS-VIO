@@ -47,7 +47,7 @@ use rs_vio::init_tracing_logging;
 fn main() -> anyhow::Result<()> {
     // Non-blocking rolling daily logs in ./logs/vio.log.*
     let _guard = init_tracing_logging("./logs", "vio")?;
-    
+
     tracing::info!("VIO starting");
     Ok(())
 }
@@ -92,7 +92,7 @@ std::thread::spawn(move || {
 std::thread::spawn(move || {
     loop {
         std::thread::sleep(Duration::from_secs(1));
-        
+
         let report = counters.swap_and_report();
         tracing::info!(
             frames = report.frames,
@@ -269,18 +269,18 @@ pub struct Estimator {
 impl Estimator {
     pub fn process_frame(&mut self, image: &Image) -> Result<Pose> {
         self.telemetry.record_frame();
-        
+
         let features = self.detect_features(image);
         self.telemetry.record_features_detected(features.len() as u64);
-        
+
         let tracked = self.track_features(&features);
         self.telemetry.record_features_tracked(tracked as u64);
-        
+
         // Process IMU
         for _ in 0..self.imu_buffer.len() {
             self.telemetry.record_imu_measurement();
         }
-        
+
         // ... rest of VIO processing
         Ok(pose)
     }
@@ -292,16 +292,16 @@ impl Estimator {
 ```rust
 fn main() -> anyhow::Result<()> {
     let _log_guard = init_tracing_logging("./logs", "vio")?;
-    
+
     let mut estimator = create_estimator();
     let counters = Arc::new(TelemetryCounters::new());
-    
+
     // Telemetry reporting (low priority)
     let telemetry_counters = Arc::clone(&counters);
     std::thread::spawn(move || {
         loop {
             std::thread::sleep(Duration::from_secs(1));
-            
+
             let report = telemetry_counters.swap_and_report();
             tracing::info!(
                 frames = report.frames,
@@ -311,12 +311,12 @@ fn main() -> anyhow::Result<()> {
             );
         }
     });
-    
+
     // Main VIO loop (hot path)
     for image in image_stream {
         estimator.process_frame(&image, &counters)?;
     }
-    
+
     Ok(())
 }
 ```

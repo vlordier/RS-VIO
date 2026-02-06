@@ -1,8 +1,8 @@
 //! Tests for intrinsics refinement functionality in the estimator
 
 use rs_vio::datasets::config::{
-    CalibrationRefinementConfig, CameraConfig, Config, FeatureDetectionConfig, KeyframeManagementConfig,
-    OptimizationConfig,
+    CalibrationRefinementConfig, CameraConfig, Config, FeatureDetectionConfig,
+    KeyframeManagementConfig, OptimizationConfig,
 };
 
 #[test]
@@ -48,7 +48,9 @@ fn test_camera_config_intrinsics_validity() {
         right_distortion: vec![0.0, 0.0, 0.0, 0.0],
         left_model: Some("EUCM".to_string()),
         right_model: Some("EUCM".to_string()),
-        T_B_Cl: vec![1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+        T_B_Cl: vec![
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        ],
         T_B_Cr: vec![
             1.0, 0.0, 0.0, -0.12, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
         ],
@@ -76,7 +78,9 @@ fn test_stereo_baseline_intrinsics() {
         right_distortion: vec![0.0, 0.0],
         left_model: Some("EUCM".to_string()),
         right_model: Some("EUCM".to_string()),
-        T_B_Cl: vec![1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+        T_B_Cl: vec![
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        ],
         T_B_Cr: vec![
             1.0, 0.0, 0.0, -0.12, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
         ],
@@ -131,7 +135,9 @@ fn test_multi_config_instance() {
         right_distortion: vec![0.0, 0.0],
         left_model: Some("EUCM".to_string()),
         right_model: Some("EUCM".to_string()),
-        T_B_Cl: vec![1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+        T_B_Cl: vec![
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        ],
         T_B_Cr: vec![
             1.0, 0.0, 0.0, -0.12, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
         ],
@@ -180,7 +186,9 @@ fn test_calibration_disabled_config() {
         right_distortion: vec![0.0, 0.0],
         left_model: None,
         right_model: None,
-        T_B_Cl: vec![1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+        T_B_Cl: vec![
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        ],
         T_B_Cr: vec![
             1.0, 0.0, 0.0, -0.12, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
         ],
@@ -220,10 +228,10 @@ fn test_calibration_disabled_config() {
 fn test_intrinsics_transformation_matrices() {
     // Test that transformation matrices have proper structure
     let T_B_C: Vec<f64> = vec![
-        1.0, 0.0, 0.0, 0.0,   // First row
-        0.0, 1.0, 0.0, 0.0,   // Second row
-        0.0, 0.0, 1.0, 0.0,   // Third row
-        0.0, 0.0, 0.0, 1.0,   // Fourth row (homogeneous)
+        1.0, 0.0, 0.0, 0.0, // First row
+        0.0, 1.0, 0.0, 0.0, // Second row
+        0.0, 0.0, 1.0, 0.0, // Third row
+        0.0, 0.0, 0.0, 1.0, // Fourth row (homogeneous)
     ];
 
     // Should be 4x4 matrix
@@ -238,8 +246,12 @@ fn test_intrinsics_transformation_matrices() {
 
 #[test]
 fn test_stereo_transformation_structure() {
-    let T_B_Cl: Vec<f64> = vec![1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0];
-    let T_B_Cr: Vec<f64> = vec![1.0, 0.0, 0.0, -0.12, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0];
+    let T_B_Cl: Vec<f64> = vec![
+        1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+    ];
+    let T_B_Cr: Vec<f64> = vec![
+        1.0, 0.0, 0.0, -0.12, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+    ];
 
     // Both should be 4x4
     assert_eq!(T_B_Cl.len(), 16);

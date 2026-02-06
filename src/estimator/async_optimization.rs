@@ -5,8 +5,8 @@
 //! The design uses Arc<Mutex<>> to share state across async tasks while
 //! maintaining Rust's safety guarantees.
 
-use anyhow::Result;
 use crate::estimator::sliding_window::SlidingWindow;
+use anyhow::Result;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::Mutex;

@@ -1,7 +1,7 @@
 # Feature Branch Cleanup & Merge Checklist
 
-**Branch:** `feature/stereo-calibration`  
-**Status:** Ready for Merge  
+**Branch:** `feature/stereo-calibration`
+**Status:** Ready for Merge
 **Date:** February 5, 2026
 
 ---

@@ -37,7 +37,7 @@ fetch() {
   local url="$1" out="$2"
   echo "Downloading $url -> $out"
   mkdir -p "$(dirname "$out")"
-  curl -L --fail --retry 3 --retry-delay 2 "$url" -o "$out"
+  curl -L --fail --retry 5 --retry-delay 5 --retry-all-errors --continue-at - "$url" -o "$out"
 }
 
 extract_zip() {
@@ -53,27 +53,35 @@ fetch_euroc() {
   echo "Note: EuRoC requires registration at https://projects.asl.ethz.ch/datasets/euroc-mav/"
   echo "Please download MH_01_easy.zip manually and extract to: $root"
 
-  if [ -f "/tmp/MH_01_easy.zip" ]; then
-    extract_zip "/tmp/MH_01_easy.zip" "$root"
-    rm "/tmp/MH_01_easy.zip"
+  local archive="$1/.archives/MH_01_easy.zip"
+  if [ -f "$archive" ]; then
+    extract_zip "$archive" "$root"
+    rm "$archive"
     echo "EuRoC MH_01_easy extracted to $root"
   else
-    echo "Skipping EuRoC (requires manual download)"
+    echo "Skipping EuRoC (requires manual download to $archive)"
   fi
 }
 
 fetch_tum() {
   local root="$1/tum_vi"
-  echo "=== TUM RGB-D freiburg3_walking_xyz ==="
-  local url="http://download.tum.de/rgbd/dataset/freiburg3/rgbd-dataset_freiburg3_walking_xyz.tgz"
-  local archive="/tmp/tum_vi.tgz"
+  local archives_dir="$1/.archives"
+  echo "=== TUM-VI room1 (512_16) ==="
+  local base_url="https://cdn2.vision.in.tum.de/tumvi/exported/euroc/512_16"
+  local url="$base_url/dataset-room1_512_16.tar"
+  local archive="$archives_dir/tum_vi_room1.tar"
+  local out_dir="$root/room1"
+
+  mkdir -p "$archives_dir" "$out_dir"
+
+  if [ -d "$out_dir/mav0" ]; then
+    echo "TUM-VI room1 already exists at $out_dir"
+    return 0
+  fi
 
   fetch "$url" "$archive"
-  mkdir -p "$root"
-  tar -xzf "$archive" -C "$root" --strip-components=1
-  rm "$archive"
-
-  echo "TUM dataset extracted to $root"
+  tar -xf "$archive" -C "$out_dir" --strip-components=1
+  echo "TUM-VI room1 extracted to $out_dir"
 }
 
 fetch_4seasons() {

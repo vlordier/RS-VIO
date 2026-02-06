@@ -198,9 +198,9 @@ Instead of processing fixed frames, the system:
 pub fn refine_intrinsics_online(&mut self) {
     // Very small adjustment per keyframe
     let fx_adjustment = -0.05 * reg_weight;
-    
+
     // Apply with regularization (conservative)
-    intrinsics_state.current_left_intrinsics[0] += 
+    intrinsics_state.current_left_intrinsics[0] +=
         fx_adjustment.clamp(-max_change, max_change) * (1.0 - reg_weight);
 }
 ```

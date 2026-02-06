@@ -2,3 +2,14 @@
 # Note: Metal framework linking is now conditional in build.rs
 # and only applied when the "gpu" feature is enabled on macOS.
 
+[build]
+# Incremental compilation cache (enabled by default in dev)
+incremental = true
+
+# Use faster linker on macOS (if lld is installed: brew install llvm)
+# Uncomment if lld is available
+# [target.x86_64-apple-darwin]
+# rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+#
+# [target.aarch64-apple-darwin]
+# rustflags = ["-C", "link-arg=-fuse-ld=lld"]

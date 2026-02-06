@@ -92,7 +92,7 @@ After running validation, you'll have:
 ## 📊 Expected Results
 
 ### Baseline Error
-**Left Camera (fx):** `+0.407%` (0.777 pixels)  
+**Left Camera (fx):** `+0.407%` (0.777 pixels)
 **Right Camera (fx):** `+0.359%` (0.683 pixels)
 
 ### Strategy Comparison

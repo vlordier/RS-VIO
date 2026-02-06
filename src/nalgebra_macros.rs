@@ -14,7 +14,7 @@ macro_rules! vector3 {
         let x = $x as f64;
         let y = $y as f64;
         let z = $z as f64;
-        
+
         if !x.is_finite() || !y.is_finite() || !z.is_finite() {
             log::warn!("Non-finite value in Vector3: ({}, {}, {})", x, y, z);
         }
@@ -28,7 +28,7 @@ macro_rules! vector2 {
     ($x:expr, $y:expr) => {{
         let x = $x as f64;
         let y = $y as f64;
-        
+
         if !x.is_finite() || !y.is_finite() {
             log::warn!("Non-finite value in Vector2: ({}, {})", x, y);
         }
@@ -53,7 +53,7 @@ macro_rules! mat4_try_inverse {
             None => {
                 log::warn!("Matrix inversion failed: {}", $context);
                 na::Matrix4::<f64>::identity()
-            }
+            },
         }
     };
 }
@@ -103,7 +103,9 @@ macro_rules! is_visible_normalized {
     }};
     ($point:expr, margin = $margin:expr) => {{
         let m = $margin as f64;
-        $point.x.abs() <= (1.0 + m) && $point.y.abs() <= (1.0 + m) && $point.iter().all(|x| x.is_finite())
+        $point.x.abs() <= (1.0 + m)
+            && $point.y.abs() <= (1.0 + m)
+            && $point.iter().all(|x| x.is_finite())
     }};
 }
 
@@ -112,12 +114,20 @@ macro_rules! is_visible_normalized {
 macro_rules! is_in_bounds {
     ($point:expr, width=$w:expr, height=$h:expr) => {{
         let p = $point;
-        p.x >= 0.0 && p.x < $w as f64 && p.y >= 0.0 && p.y < $h as f64 && p.iter().all(|x| x.is_finite())
+        p.x >= 0.0
+            && p.x < $w as f64
+            && p.y >= 0.0
+            && p.y < $h as f64
+            && p.iter().all(|x| x.is_finite())
     }};
     ($point:expr, width=$w:expr, height=$h:expr, border=$border:expr) => {{
         let p = $point;
         let b = $border as f64;
-        p.x >= b && p.x < ($w as f64 - b) && p.y >= b && p.y < ($h as f64 - b) && p.iter().all(|x| x.is_finite())
+        p.x >= b
+            && p.x < ($w as f64 - b)
+            && p.y >= b
+            && p.y < ($h as f64 - b)
+            && p.iter().all(|x| x.is_finite())
     }};
 }
 
@@ -151,7 +161,13 @@ macro_rules! project_pinhole {
     }};
     ($point:expr, $intrinsics:expr) => {{
         // intrinsics = [fx, fy, cx, cy]
-        project_pinhole!($point, fx=$intrinsics[0], fy=$intrinsics[1], cx=$intrinsics[2], cy=$intrinsics[3])
+        project_pinhole!(
+            $point,
+            fx = $intrinsics[0],
+            fy = $intrinsics[1],
+            cx = $intrinsics[2],
+            cy = $intrinsics[3]
+        )
     }};
 }
 
@@ -212,7 +228,7 @@ macro_rules! relative_transform {
             None => {
                 log::warn!("Failed to invert transformation matrix");
                 na::Matrix4::identity()
-            }
+            },
         }
     }};
 }
@@ -365,7 +381,7 @@ mod tests {
     #[test]
     fn test_project_pinhole() {
         let point = na::Vector3::new(1.0, 0.5, 2.0);
-        let proj = project_pinhole!(point, fx=500.0, fy=500.0, cx=320.0, cy=240.0);
+        let proj = project_pinhole!(point, fx = 500.0, fy = 500.0, cx = 320.0, cy = 240.0);
 
         assert!(proj.is_some());
         let p = proj.unwrap();
@@ -378,7 +394,7 @@ mod tests {
     #[test]
     fn test_project_pinhole_behind_camera() {
         let point = na::Vector3::new(1.0, 0.5, -2.0);
-        let proj = project_pinhole!(point, fx=500.0, fy=500.0, cx=320.0, cy=240.0);
+        let proj = project_pinhole!(point, fx = 500.0, fy = 500.0, cx = 320.0, cy = 240.0);
         assert!(proj.is_none());
     }
 

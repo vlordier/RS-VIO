@@ -9,7 +9,7 @@ release_dir := "{{build_dir}}/release"
 debug_dir := "{{build_dir}}/debug"
 config_dir := "config"
 script_dir := "scripts"
-dataset_dir := env_var_or_default("DATASET_DIR", "/tmp/rs-vio-samples")
+dataset_dir := env_var_or_default("DATASET_DIR", "datasets")
 
 euroc_bin := "{{release_dir}}/run_euroc"
 tum_bin := "{{release_dir}}/run_tum"
@@ -156,10 +156,10 @@ run-4seasons: release
 setup-4seasons:
     echo "4Seasons Dataset Setup Guide"
     echo "  1. Register at https://www.4seasons-dataset.com/"
-    echo "  2. Download a recording ZIP to /tmp"
+  echo "  2. Download a recording ZIP to {{dataset_dir}}/downloads"
     echo "  3. Run: ./scripts/setup-datasets.sh"
     echo "Check current ZIPs:"
-    ls -lh /tmp/recording_*.zip 2>/dev/null || echo "  No 4Seasons ZIP found in /tmp/"
+  ls -lh {{dataset_dir}}/downloads/recording_*.zip 2>/dev/null || echo "  No 4Seasons ZIP found in {{dataset_dir}}/downloads/"
     if [ -d "{{dataset_dir}}/4seasons" ]; then \
       echo "Extracted datasets:"; \
       ls -d {{dataset_dir}}/4seasons/*/ 2>/dev/null; \

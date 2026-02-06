@@ -35,9 +35,9 @@
 //! - **CPU Utilization**: 85% (vs 40% sequential)
 //! - **Memory Peak**: Bounded by pipeline depth (default 4 frames in flight)
 
-use anyhow::Result;
 use crate::datasets::ImuData;
 use crate::estimator::Frame;
+use anyhow::Result;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 

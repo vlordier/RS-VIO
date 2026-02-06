@@ -154,10 +154,10 @@ pub struct Estimator {
 impl Estimator {
     pub fn process_frame(&mut self, image: &Image) -> Result<Pose> {
         self.telemetry.record_frame();
-        
+
         let features = self.detect_features(image);
         self.telemetry.record_features_detected(features.len() as u64);
-        
+
         // ... rest of processing
         Ok(pose)
     }
@@ -244,7 +244,7 @@ head logs/vio_demo.log.*
 
 ---
 
-**Session Date**: 2026-02-05  
-**Branch**: develop  
-**Status**: ✅ Complete and tested (62/62 tests passing)  
+**Session Date**: 2026-02-05
+**Branch**: develop
+**Status**: ✅ Complete and tested (62/62 tests passing)
 **Ready for**: Production integration

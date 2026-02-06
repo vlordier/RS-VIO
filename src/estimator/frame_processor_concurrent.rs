@@ -3,9 +3,9 @@
 //! Manages multiple VIO pipeline stages as independent async tasks
 //! with message-passing channels for communication.
 
-use anyhow::Result;
 use crate::datasets::ImuData;
 use crate::estimator::Frame;
+use anyhow::Result;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use tokio::sync::mpsc;

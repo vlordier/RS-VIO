@@ -314,7 +314,7 @@ setup_4seasons() {
 
   local temp_dir
   temp_dir=$(mktemp -d)
-  trap 'rm -rf "$temp_dir"' EXIT
+  trap "rm -rf \"$temp_dir\"" EXIT
 
   # Download IMU data
   log_info "Downloading 4Seasons IMU/GNSS data (6.1MB)..."

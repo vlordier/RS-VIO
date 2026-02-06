@@ -157,7 +157,7 @@ pub struct ConcurrentVIOPipeline { }
 pub struct ConcurrentFrameProcessor { }
 
 // Configuration
-pub struct ConcurrentConfig { 
+pub struct ConcurrentConfig {
     pub pipeline_depth: usize,
     pub maintain_order: bool,
     pub timeout_ms: u64,
@@ -189,15 +189,15 @@ async fn main() {
         maintain_order: true,
         ..Default::default()
     };
-    
+
     let mut processor = ConcurrentFrameProcessor::new(config);
-    
+
     // Submit frames
     let frame_id = processor.submit_frame(frame, None).await.unwrap();
-    
+
     // Get results
     let result = processor.recv_result().await.unwrap();
-    
+
     println!("Processed frame {}", result.frame_id);
 }
 ```
@@ -279,6 +279,6 @@ This branch delivers **Phase 4 async concurrency** for RS-VIO:
 
 ---
 
-**Last Updated**: February 5, 2026  
-**Branch**: `feature/async-pipeline`  
+**Last Updated**: February 5, 2026
+**Branch**: `feature/async-pipeline`
 **Path**: /Users/vincent/Work/RS-VIO

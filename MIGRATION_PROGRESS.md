@@ -9,7 +9,7 @@
    - Merged successfully
    - Adds calibration-specific and tuning parameters
 
-2. **PR #37** - TUM-VI specific parameters  
+2. **PR #37** - TUM-VI specific parameters
    - Merged successfully
    - Dataset-optimized configurations
 
@@ -22,7 +22,7 @@
    - 571 lines of new config files
    - 8 new configuration profiles
    - Status: Open for review
-   
+
 5. **PR #40** - Migration strategy analysis
    - 153 lines of documentation
    - Comprehensive analysis of remaining 170 commits
@@ -128,17 +128,17 @@
 
 1. **Cherry-pick is hard** when modules are deleted
    - Solution: Manual recreation for specific features
-   
+
 2. **Test file conflicts** prevent clean merges
    - Solution: Separate PRs for config-only changes
-   
+
 3. **Clear architectural analysis helps**
    - Focus on design intent rather than code preservation
-   
+
 4. **Strategic porting beats bulk integration**
    - Smaller PRs → easier review → better code quality
    - Each PR justifiable independently
-   
+
 5. **Documentation is critical**
    - MIGRATION_STRATEGY_ANALYSIS.md provides roadmap
    - Reduces future confusion

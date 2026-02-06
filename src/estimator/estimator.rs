@@ -29,7 +29,7 @@ pub struct IntrinsicsRefinementState {
 /// Placeholder estimator implementation.
 /// Currently mimics the control flow and logging structure of the C++ Estimator::process_frame,
 /// but uses dummy values for tracking, optimization, and mapping.
-pub struct Estimator<'a> {
+pub struct Estimator {
     frame_id_counter: u64,
     frames_since_last_keyframe: u64,
     /// When true, emit detailed per-frame logs (equivalent to Config::m_enable_debug_output).
@@ -40,8 +40,8 @@ pub struct Estimator<'a> {
     stereo_patch_tracker: StereoPatchTracker<6>,
     /// Sliding window of keyframes for bundle adjustment optimization.
     sliding_window: SlidingWindow,
-    /// Optional viewer used for visualization; outlives the estimator.
-    viewer: Option<&'a mut dyn Viewer>,
+    /// Optional viewer used for visualization; owned by the estimator.
+    viewer: Option<Box<dyn Viewer>>,
     /// Left camera model with intrinsics and distortion.
     left_cam: CameraModelType,
     /// Right camera model with intrinsics and distortion.
@@ -56,24 +56,22 @@ pub struct Estimator<'a> {
     intrinsics_refinement: Option<IntrinsicsRefinementState>,
 }
 
-impl<'a> Estimator<'a> {
+impl Estimator {
     #![allow(non_snake_case)]
 
     /// Create a new estimator configured with camera intrinsics and distortion
     /// loaded from the YAML configuration.
     ///
-    /// The `viewer` reference must outlive the estimator.
-    pub fn new(config: Config, viewer: Option<&'a mut dyn Viewer>) -> Self {
+    pub fn new(config: Config, viewer: Option<Box<dyn Viewer>>) -> Self {
         Self::new_with_cameras(config, viewer, None, None)
     }
 
     /// Create a new estimator with optional camera models.
     /// If camera models are provided, they will be used; otherwise, they will be created from config.
     ///
-    /// The `viewer` reference must outlive the estimator.
     pub fn new_with_cameras(
         config: Config,
-        viewer: Option<&'a mut dyn Viewer>,
+        viewer: Option<Box<dyn Viewer>>,
         left_cam: Option<CameraModelType>,
         right_cam: Option<CameraModelType>,
     ) -> Self {

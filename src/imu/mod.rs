@@ -124,8 +124,8 @@
 //! - **Buffer**: Handles out-of-order measurements and interpolation
 //! - **Initialization**: Static period bias estimation
 
-pub mod bias_feedback_tests;
 pub mod batch_processing;
+pub mod bias_feedback_tests;
 pub mod buffer;
 pub mod eskf;
 pub mod initialization;
@@ -474,7 +474,7 @@ impl ImuAidedKeyframeSelector {
         let mut last_ts = imu_measurements[0].timestamp;
         let mut integrated_rot = na::UnitQuaternion::identity();
         let mut integrated_trans = na::Vector3::zeros();
-        let mut integrated_vel = na::Vector3::zeros();  // Track velocity for accurate displacement
+        let mut integrated_vel = na::Vector3::zeros(); // Track velocity for accurate displacement
 
         for imu in imu_measurements {
             let dt = fl!((imu.timestamp - last_ts) as f64 / 1e9);
@@ -1455,7 +1455,11 @@ impl ImuMotionPredictor {
         for imu in imu_measurements {
             let dt = (imu.timestamp - last_ts) as f64 / 1e9;
             if dt > 0.0 {
-                let accel = na::Vector3::new(imu.accel[0] as f64, imu.accel[1] as f64, imu.accel[2] as f64);
+                let accel = na::Vector3::new(
+                    imu.accel[0] as f64,
+                    imu.accel[1] as f64,
+                    imu.accel[2] as f64,
+                );
                 // Accumulate velocity: v = sum(a * dt)
                 velocity += accel * dt;
             }

@@ -4,10 +4,8 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use image::GrayImage;
 use rs_vio::datasets::config::Config;
 use rs_vio::datasets::{ImageData, TUMVIPlayer};
-use rs_vio::estimator::{AsyncOptimizer, Frame};
-use rs_vio::feature_tracker::{AsyncDetectorConfig, AsyncFeatureDetector};
-use std::sync::Arc;
-use tokio::runtime::Builder;
+use rs_vio::estimator::{Frame, SlidingWindow};
+use rs_vio::feature_tracker::{EnhancedDetectorConfig, EnhancedFeatureDetector};
 
 struct StereoFrame {
     left: GrayImage,
@@ -87,70 +85,45 @@ fn load_tumvi_frames(max_frames: usize) -> Option<(Vec<StereoFrame>, Config)> {
     Some((frames, vio_cfg))
 }
 
-fn bench_tumvi_async_pipeline(c: &mut Criterion) {
+fn bench_tumvi_sequential_baseline(c: &mut Criterion) {
     // Load dataset once
     let Some((frames, vio_cfg)) = load_tumvi_frames(500) else {
-        println!("Skipping tumvi_async_pipeline: set RS_VIO_TUMVI_PATH to a TUM-VI sequence root (contains mav0/)");
+        println!("Skipping tumvi_sequential_baseline: set RS_VIO_TUMVI_PATH to a TUM-VI sequence root (contains mav0/)");
         return;
     };
 
-    let grid_cell_size = (vio_cfg.camera.image_width as usize)
-        .saturating_div(vio_cfg.feature_detection.grid_cols.max(1) as usize)
-        .max(8);
-
-    let detector_config = AsyncDetectorConfig {
-        num_parallel_tasks: 4,
-        grid_cell_size,
+    let detector_config = EnhancedDetectorConfig {
         max_features: (vio_cfg.feature_detection.max_features_per_grid as usize)
             .saturating_mul(vio_cfg.feature_detection.grid_cols as usize)
             .max(200),
-        threshold: 20.0,
+        fast_threshold: 20,
+        min_distance: 8.0,
+        ..Default::default()
     };
 
-    // Use current-thread runtime because AsyncOptimizer Backend is !Send
-    let rt = Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .expect("tokio runtime");
-
-    c.bench_function("tumvi_async_pipeline_500_frames", |b| {
+    c.bench_function("tumvi_sequential_baseline_500_frames", |b| {
         b.iter(|| {
-            // Fresh detector and optimizer each iteration to avoid state carryover
-            let detector = AsyncFeatureDetector::new(detector_config.clone());
-            let optimizer = AsyncOptimizer::new();
+            // Fresh detector and sliding window each iteration to avoid state carryover
+            let detector = EnhancedFeatureDetector::new(detector_config.clone());
+            let mut sliding_window = SlidingWindow::with_default_size();
 
-            rt.block_on(async {
-                for (idx, f) in frames.iter().enumerate() {
-                    let mut frame = Frame::new(f.timestamp, idx as i32);
-                    frame.is_keyframe = idx % 5 == 0;
+            for (idx, f) in frames.iter().enumerate() {
+                let mut frame = Frame::new(f.timestamp, idx as i32);
+                frame.is_keyframe = idx % 5 == 0;
 
-                    // Process both stereo images
-                    let left_bytes = Arc::new(f.left.clone().into_vec());
-                    let right_bytes = Arc::new(f.right.clone().into_vec());
+                // Sequential feature detection on both stereo images (synchronous)
+                let _left_features = detector.detect(&f.left);
+                let _right_features = detector.detect(&f.right);
 
-                    let _left_features = detector
-                        .detect_async(
-                            left_bytes,
-                            vio_cfg.camera.image_width,
-                            vio_cfg.camera.image_height,
-                        )
-                        .await;
-                    let _right_features = detector
-                        .detect_async(
-                            right_bytes,
-                            vio_cfg.camera.image_width,
-                            vio_cfg.camera.image_height,
-                        )
-                        .await;
-
-                    if frame.is_keyframe {
-                        let _ = optimizer.optimize().await;
-                    }
+                // Sequential optimization (only on keyframes)
+                if frame.is_keyframe {
+                    sliding_window.add_frame(frame.clone());
+                    let _ = sliding_window.optimize();
                 }
-            });
+            }
         })
     });
 }
 
-criterion_group!(benches, bench_tumvi_async_pipeline);
+criterion_group!(benches, bench_tumvi_sequential_baseline);
 criterion_main!(benches);

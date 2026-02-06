@@ -43,10 +43,18 @@ macro_rules! safe_convert {
             log::warn!("Invalid float conversion: {:?}", f64_val);
             0.0_f32
         } else if f64_val > f32::MAX as f64 {
-            log::warn!("Overflow in f64->f32 conversion: {} > {}", f64_val, f32::MAX);
+            log::warn!(
+                "Overflow in f64->f32 conversion: {} > {}",
+                f64_val,
+                f32::MAX
+            );
             f32::MAX
         } else if f64_val < f32::MIN as f64 {
-            log::warn!("Underflow in f64->f32 conversion: {} < {}", f64_val, f32::MIN);
+            log::warn!(
+                "Underflow in f64->f32 conversion: {} < {}",
+                f64_val,
+                f32::MIN
+            );
             f32::MIN
         } else {
             f64_val as f32
@@ -174,8 +182,12 @@ macro_rules! batch_op {
 macro_rules! focal_length {
     ($fx:expr, $fy:expr) => {
         (
-            $crate::dimensioned!(struct FocalLengthX(f64);),
-            $crate::dimensioned!(struct FocalLengthY(f64);),
+            $crate::dimensioned!(
+                struct FocalLengthX(f64);
+            ),
+            $crate::dimensioned!(
+                struct FocalLengthY(f64);
+            ),
         )
     };
     ($f:expr) => {{
@@ -189,8 +201,12 @@ macro_rules! focal_length {
 macro_rules! principal_point {
     ($cx:expr, $cy:expr) => {{
         (
-            $crate::dimensioned!(struct PrincipalPointX(f64);),
-            $crate::dimensioned!(struct PrincipalPointY(f64);),
+            $crate::dimensioned!(
+                struct PrincipalPointX(f64);
+            ),
+            $crate::dimensioned!(
+                struct PrincipalPointY(f64);
+            ),
         )
     }};
 }
@@ -200,9 +216,7 @@ macro_rules! principal_point {
 macro_rules! distortion_coeffs {
     // Brown-Conrady model: k1, k2, p1, p2, k3
     (brown_conrady: $k1:expr, $k2:expr, $p1:expr, $p2:expr, $k3:expr) => {
-        [
-            $k1 as f64, $k2 as f64, $p1 as f64, $p2 as f64, $k3 as f64,
-        ]
+        [$k1 as f64, $k2 as f64, $p1 as f64, $p2 as f64, $k3 as f64]
     };
     // Fisheye model: k1, k2, k3, k4
     (fisheye: $k1:expr, $k2:expr, $k3:expr, $k4:expr) => {

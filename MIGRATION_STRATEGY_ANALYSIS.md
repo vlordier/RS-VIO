@@ -113,7 +113,7 @@ For each commit in develop-old, evaluate:
 ## Estimated Timeline
 
 - **Phase 1 (Configs)**: 2-3 days → 2-3 PRs
-- **Phase 2 (Evaluation)**: 5-7 days → 1-2 PRs  
+- **Phase 2 (Evaluation)**: 5-7 days → 1-2 PRs
 - **Phase 3 (Performance)**: 3-4 days → 2-3 PRs
 - **Phase 4 (Skip)**: 0 days → 0 PRs
 

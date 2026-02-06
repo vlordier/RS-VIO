@@ -26,7 +26,7 @@ def parse_intrinsics_from_config(text: str, key: str) -> List[float]:
         vals = [float(v.strip()) for v in match.group(1).split(",") if v.strip()]
         if len(vals) >= 4:
             return vals[:4]
-    
+
     # Try multi-line YAML list format
     # key:
     # - val1
@@ -48,7 +48,7 @@ def parse_intrinsics_from_config(text: str, key: str) -> List[float]:
                     pass
         if len(vals) >= 4:
             return vals[:4]
-    
+
     raise ValueError(f"Could not find {key} in config")
 
 

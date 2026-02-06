@@ -129,19 +129,19 @@ impl SIMDCovarianceOp {
         A: &SMatrix<f64, 9, 9>,
         Sigma: &SMatrix<f64, 9, 9>,
     ) -> SMatrix<f64, 9, 9> { }
-    
+
     /// B * Q * B^T (noise contribution)
     pub fn multiply_noise_contribution(
         B: &SMatrix<f64, 9, 6>,
         Q: &SMatrix<f64, 6, 6>,
     ) -> SMatrix<f64, 9, 9> { }
-    
+
     /// Fast matrix addition
     pub fn add_9x9(
         a: &SMatrix<f64, 9, 9>,
         b: &SMatrix<f64, 9, 9>,
     ) -> SMatrix<f64, 9, 9> { }
-    
+
     /// Trace for diagnostics
     pub fn trace_9x9(m: &SMatrix<f64, 9, 9>) -> f64 { }
 }
@@ -261,7 +261,7 @@ let mut processor = BatchImuProcessor::new(noise, 1000);
 // Main loop
 while let Some((gyro, accel, dt)) = imu_stream.next() {
     processor.push_measurement(gyro, accel, dt);
-    
+
     // Integrate when buffer fills or timeout
     if processor.count >= 100 || timeout_elapsed {
         match processor.integrate_batch() {
@@ -356,8 +356,8 @@ let result = processor.integrate_batch();
 
 1. **Initialization** (in IMU module):
 ```rust
-pub fn create_batch_processor(config: &ImuConfig) 
-    -> BatchImuProcessor 
+pub fn create_batch_processor(config: &ImuConfig)
+    -> BatchImuProcessor
 {
     BatchImuProcessor::new(config.noise, config.buffer_capacity)
 }
@@ -426,9 +426,9 @@ processor.set_thread_count(4);
 ```rust
 let metrics = processor.metrics();
 
-println!("Throughput: {:.0} meas/sec", 
+println!("Throughput: {:.0} meas/sec",
          metrics.measurements_per_sec);
-println!("Speedup: {:.2}x (SIMD)", 
+println!("Speedup: {:.2}x (SIMD)",
          metrics.speedup_ratio);
 
 // Alert on performance degradation
@@ -585,11 +585,11 @@ let preint = processor.integrate_batch()?;
 
 The batch processing and SIMD optimization layer provides:
 
-✅ **33% latency improvement** with minimal code changes  
-✅ **3-4x parallelization** efficiency across cores  
-✅ **Zero breaking changes** - fully backward compatible  
-✅ **Production-ready** - no unstable features, fully tested  
-✅ **Future-proof** - SIMD and GPU paths prepared  
+✅ **33% latency improvement** with minimal code changes
+✅ **3-4x parallelization** efficiency across cores
+✅ **Zero breaking changes** - fully backward compatible
+✅ **Production-ready** - no unstable features, fully tested
+✅ **Future-proof** - SIMD and GPU paths prepared
 
 The implementation follows Rust best practices:
 - No unsafe code

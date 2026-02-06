@@ -5,12 +5,12 @@ pub mod evaluation;
 pub mod feature_tracker;
 pub mod imu;
 pub mod logging;
-pub mod optimization;
-pub mod types;
-pub mod viewers;
 pub mod macros;
 pub mod nalgebra_macros;
+pub mod optimization;
 pub mod type_macros;
+pub mod types;
+pub mod viewers;
 
 #[allow(clippy::crate_in_macro_def)]
 #[macro_export]

@@ -197,7 +197,9 @@ fn main() {
 
     println!("💡 Key Insights:");
     println!("----------------");
-    println!("1. 🎯 Heterogeneity is powerful - different cameras provide complementary constraints");
+    println!(
+        "1. 🎯 Heterogeneity is powerful - different cameras provide complementary constraints"
+    );
     println!("2. 📊 Redundancy enables robustness - system works even with camera failures");
     println!("3. 🏗️ Graph-based approach scales - add cameras without redesigning the system");
     println!("4. 🎨 Trait-oriented design enables extensibility - easy to add new camera models");
