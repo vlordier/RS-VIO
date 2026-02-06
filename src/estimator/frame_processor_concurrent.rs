@@ -1,20 +1,32 @@
+//! Concurrent frame processor with task pipelining
+//!
+//! Manages multiple VIO pipeline stages as independent async tasks
+//! with message-passing channels for communication.
+
+use crate::datasets::ImuData;
+use crate::estimator::Frame;
+use anyhow::Result;
 use std::collections::BTreeMap;
-use std::time::Duration;
+use std::sync::Arc;
 use tokio::sync::mpsc;
 
-/// Configuration for concurrent frame processing
-#[derive(Debug, Clone)]
+/// Configuration for concurrent processor
+#[derive(Clone, Debug)]
 pub struct ConcurrentConfig {
-    /// Number of frames to keep in pipeline (default: 4)
+    /// Maximum frames in pipeline simultaneously
     pub pipeline_depth: usize,
-    /// Whether to maintain causal output ordering (default: true)
+    /// Enable frame reordering to maintain causal ordering
     pub maintain_order: bool,
-    /// Timeout for individual frame processing (ms, default: 33)
+    /// Timeout for processing individual frames (ms)
     pub frame_timeout_ms: u64,
-    /// Number of feature detection worker tasks (default: 2)
+    /// Number of worker threads for feature detection
     pub feature_workers: usize,
-    /// Number of optimization worker tasks (default: 1)
+    /// Number of worker threads for optimization
     pub optimization_workers: usize,
+    /// Optional simulated work delay (ms) for testing/benchmarks
+    pub simulated_work_ms: Option<u64>,
+    /// Optional jitter to force out-of-order completion (ms, applied to even ids)
+    pub simulated_jitter_ms: Option<u64>,
 }
 
 impl Default for ConcurrentConfig {
@@ -25,155 +37,285 @@ impl Default for ConcurrentConfig {
             frame_timeout_ms: 33,
             feature_workers: 2,
             optimization_workers: 1,
+            simulated_work_ms: None,
+            simulated_jitter_ms: None,
         }
     }
 }
 
-/// Result from processing a single frame
-#[derive(Debug, Clone)]
+/// Frame with metadata for concurrent processing
+#[derive(Clone)]
+pub struct ConcurrentFrame {
+    pub id: u64,
+    pub timestamp_ns: i64,
+    pub frame: Arc<Frame>,
+    pub imu_data: Option<Vec<ImuData>>,
+}
+
+/// Processing result with sequence information
 pub struct ProcessingResult {
-    /// Sequence number of the frame
-    pub sequence: u64,
-    /// Processing succeeded
+    pub frame_id: u64,
+    pub frame: Arc<Frame>,
+    pub processed_at_ns: i64,
     pub success: bool,
-    /// Error message if failed
     pub error: Option<String>,
-    /// Features found (if applicable)
-    pub features: usize,
-    /// Processing time in milliseconds
-    pub processing_time_ms: f64,
+    pub feature_count: usize,
 }
 
-/// Handle for managing frame processing task lifecycle
-pub struct ProcessingHandle {
-    /// Receiver for results
-    receiver: mpsc::Receiver<ProcessingResult>,
-    /// Configuration
-    config: ConcurrentConfig,
-}
-
-impl ProcessingHandle {
-    /// Get the next result with timeout
-    pub async fn wait_result(&mut self) -> Result<ProcessingResult, String> {
-        let timeout = Duration::from_millis(self.config.frame_timeout_ms);
-
-        tokio::time::timeout(timeout, self.receiver.recv())
-            .await
-            .map_err(|_| "Frame processing timeout".to_string())?
-            .ok_or_else(|| "Channel closed unexpectedly".to_string())
-    }
-
-    /// Try to get result without blocking
-    pub fn try_get_result(&mut self) -> Option<ProcessingResult> {
-        self.receiver.try_recv().ok()
-    }
-}
-
-/// Concurrent frame processor with worker-based architecture
-///
-/// Manages multiple worker tasks that process frames concurrently while
-/// maintaining causal ordering of results if configured.
-///
-/// # Architecture
-///
-/// ```text
-/// Input Channel → [Worker Pool] → Reorder Buffer → Output Channel
-/// ```
-///
-/// # Features
-///
-/// - **Configurable workers**: Adjust parallelism per stage
-/// - **Optional reordering**: Maintain causal order or allow out-of-order
-/// - **Backpressure**: Automatic flow control via channel limits
-/// - **Timeout handling**: Per-frame timeout configuration
-///
-/// # Example
-///
-/// ```rust,ignore
-/// let config = ConcurrentConfig {
-///     pipeline_depth: 8,
-///     feature_workers: 4,
-///     ..Default::default()
-/// };
-///
-/// let mut processor = ConcurrentFrameProcessor::new(config)?;
-/// // Submit frames asynchronously
-/// processor.submit(frame)?;
-/// // Retrieve results
-/// let result = processor.wait_result().await?;
-/// ```
+/// Concurrent VIO frame processor
 pub struct ConcurrentFrameProcessor {
-    /// Configuration parameters
     config: ConcurrentConfig,
-    /// Channel for submitting work
-    work_sender: mpsc::Sender<FrameWorkItem>,
-    /// Result receiver
-    result_receiver: mpsc::Receiver<ProcessingResult>,
-    /// Reordering buffer for out-of-order completion
+    frame_id: u64,
+    // Channel for submitting frames
+    frame_tx: mpsc::Sender<ConcurrentFrame>,
+    // Channel for results (in order if maintain_order=true)
+    result_rx: mpsc::Receiver<ProcessingResult>,
+    // Reordering buffer if maintain_order=true
     reorder_buffer: BTreeMap<u64, ProcessingResult>,
-    /// Next sequence ID to output
     next_output_id: u64,
 }
 
-/// Internal work item for processing (TODO: use in worker implementation)
-#[derive(Debug)]
-#[allow(dead_code)]
-struct FrameWorkItem {
-    sequence: u64,
-    data: Vec<u8>,
-}
-
 impl ConcurrentFrameProcessor {
-    /// Create a new concurrent frame processor with given configuration
-    pub fn new(config: ConcurrentConfig) -> Result<Self, String> {
-        let (tx, _rx) = mpsc::channel::<FrameWorkItem>(config.pipeline_depth);
-        let (_result_tx, result_rx) = mpsc::channel::<ProcessingResult>(config.pipeline_depth);
+    /// Create new concurrent processor
+    pub fn new(config: ConcurrentConfig) -> (Self, ProcessingHandle) {
+        let (frame_tx, frame_rx) = mpsc::channel(config.pipeline_depth);
+        let (result_tx, result_rx) = mpsc::channel(config.pipeline_depth);
 
-        Ok(Self {
-            config,
-            work_sender: tx,
-            result_receiver: result_rx,
+        let processor = Self {
+            config: config.clone(),
+            frame_id: 0,
+            frame_tx,
+            result_rx,
             reorder_buffer: BTreeMap::new(),
             next_output_id: 0,
-        })
+        };
+
+        let handle = ProcessingHandle {
+            config,
+            frame_rx: Arc::new(tokio::sync::Mutex::new(frame_rx)),
+            result_tx,
+            task_set: tokio::task::JoinSet::new(),
+        };
+
+        (processor, handle)
     }
 
-    /// Submit a frame for processing
-    pub fn submit(&self, sequence: u64, data: Vec<u8>) -> Result<(), String> {
-        let item = FrameWorkItem { sequence, data };
+    /// Submit frame for processing
+    pub async fn process_frame(
+        &mut self,
+        frame: Arc<Frame>,
+        imu_data: Option<Vec<ImuData>>,
+        timestamp_ns: i64,
+    ) -> Result<u64> {
+        let concurrent_frame = ConcurrentFrame {
+            id: self.frame_id,
+            timestamp_ns,
+            frame,
+            imu_data,
+        };
 
-        self.work_sender
-            .blocking_send(item)
-            .map_err(|_| "Failed to submit frame work item".to_string())
+        let frame_id = self.frame_id;
+        self.frame_id += 1;
+
+        self.frame_tx
+            .send(concurrent_frame)
+            .await
+            .map_err(|_| anyhow::anyhow!("Frame channel closed"))?;
+
+        Ok(frame_id)
     }
 
-    /// Try to get next result respecting order if configured
-    pub fn try_get_next(&mut self) -> Result<Option<ProcessingResult>, String> {
-        if !self.config.maintain_order {
-            return Ok(self.result_receiver.try_recv().ok());
+    /// Receive next result (in order if configured)
+    pub async fn recv_result(&mut self) -> Result<ProcessingResult> {
+        if self.config.maintain_order {
+            self.recv_ordered().await
+        } else {
+            self.recv_unordered().await
         }
+    }
 
-        // Check if we have the next expected result
-        if let Some(result) = self.reorder_buffer.remove(&self.next_output_id) {
-            self.next_output_id += 1;
-            return Ok(Some(result));
-        }
+    async fn recv_unordered(&mut self) -> Result<ProcessingResult> {
+        self.result_rx
+            .recv()
+            .await
+            .ok_or_else(|| anyhow::anyhow!("Result channel closed"))
+    }
 
-        // Try to get new results and add to buffer
-        while let Ok(result) = self.result_receiver.try_recv() {
-            if result.sequence == self.next_output_id {
+    async fn recv_ordered(&mut self) -> Result<ProcessingResult> {
+        loop {
+            // Check if next expected result is in buffer
+            if let Some(result) = self.reorder_buffer.remove(&self.next_output_id) {
                 self.next_output_id += 1;
-                return Ok(Some(result));
+                return Ok(result);
             }
-            self.reorder_buffer.insert(result.sequence, result);
-        }
 
-        Ok(None)
+            // Try to receive next result
+            match self.result_rx.recv().await {
+                Some(result) => {
+                    if result.frame_id == self.next_output_id {
+                        // Perfect: next in order
+                        self.next_output_id += 1;
+                        return Ok(result);
+                    } else {
+                        // Out of order: buffer it
+                        self.reorder_buffer.insert(result.frame_id, result);
+                    }
+                },
+                None => {
+                    return Err(anyhow::anyhow!("Result channel closed"));
+                },
+            }
+        }
     }
 
-    /// Get configuration
-    pub const fn config(&self) -> &ConcurrentConfig {
-        &self.config
+    /// Get number of frames currently in pipeline
+    pub fn queue_depth(&self) -> usize {
+        (self.frame_id - self.next_output_id) as usize
+    }
+}
+
+/// Handle for managing pipeline tasks
+pub struct ProcessingHandle {
+    config: ConcurrentConfig,
+    frame_rx: Arc<tokio::sync::Mutex<mpsc::Receiver<ConcurrentFrame>>>,
+    result_tx: mpsc::Sender<ProcessingResult>,
+    task_set: tokio::task::JoinSet<()>,
+}
+
+impl ProcessingHandle {
+    /// Start concurrent processing tasks
+    pub fn start(&mut self) {
+        let (detected_tx, detected_rx) = mpsc::channel(self.config.pipeline_depth);
+        let detected_rx = Arc::new(tokio::sync::Mutex::new(detected_rx));
+
+        // Spawn feature detection workers
+        for _ in 0..self.config.feature_workers {
+            let frame_rx = Arc::clone(&self.frame_rx);
+            let detected_tx = detected_tx.clone();
+            let worker_config = self.config.clone();
+
+            self.task_set.spawn(async move {
+                Self::feature_detection_worker(frame_rx, detected_tx, worker_config).await;
+            });
+        }
+
+        // Spawn optimization workers
+        for _ in 0..self.config.optimization_workers {
+            let detected_rx = Arc::clone(&detected_rx);
+            let result_tx = self.result_tx.clone();
+            let worker_config = self.config.clone();
+
+            self.task_set.spawn(async move {
+                Self::optimization_worker(detected_rx, result_tx, worker_config).await;
+            });
+        }
+    }
+
+    /// Feature detection worker task
+    async fn feature_detection_worker(
+        frame_rx: Arc<tokio::sync::Mutex<mpsc::Receiver<ConcurrentFrame>>>,
+        detected_tx: mpsc::Sender<(ConcurrentFrame, usize)>,
+        config: ConcurrentConfig,
+    ) {
+        loop {
+            let frame = {
+                let mut rx = frame_rx.lock().await;
+                rx.recv().await
+            };
+
+            match frame {
+                Some(frame) => {
+                    if let Some(delay_ms) = config.simulated_work_ms {
+                        let jitter = if let Some(jitter_ms) = config.simulated_jitter_ms {
+                            if frame.id % 2 == 0 {
+                                jitter_ms
+                            } else {
+                                0
+                            }
+                        } else {
+                            0
+                        };
+                        tokio::time::sleep(std::time::Duration::from_millis(delay_ms + jitter))
+                            .await;
+                    }
+
+                    let feature_count = frame.frame.left_features.len();
+
+                    // TODO: Implement actual feature detection
+                    if detected_tx.send((frame, feature_count)).await.is_err() {
+                        break;
+                    }
+                },
+                None => break,
+            }
+        }
+    }
+
+    /// Optimization worker task
+    /// If `enable_real_optimization` is true, would perform real BA
+    /// Currently uses simulated delays for testing/benchmarking
+    ///
+    /// NOTE: Real optimization integration requires Backend to be Send+Sync.
+    /// See AsyncOptimizer for async optimization in a single-threaded context.
+    async fn optimization_worker(
+        detected_rx: Arc<tokio::sync::Mutex<mpsc::Receiver<(ConcurrentFrame, usize)>>>,
+        result_tx: mpsc::Sender<ProcessingResult>,
+        config: ConcurrentConfig,
+    ) {
+        loop {
+            let detected = {
+                let mut rx = detected_rx.lock().await;
+                rx.recv().await
+            };
+
+            match detected {
+                Some((frame, feature_count)) => {
+                    let start = std::time::Instant::now();
+
+                    // Use simulated delay for testing/benchmarking
+                    // Real optimization would go here if Backend were Send+Sync
+                    if let Some(delay_ms) = config.simulated_work_ms {
+                        let jitter = if let Some(jitter_ms) = config.simulated_jitter_ms {
+                            if frame.id % 2 == 0 {
+                                jitter_ms
+                            } else {
+                                0
+                            }
+                        } else {
+                            0
+                        };
+                        tokio::time::sleep(std::time::Duration::from_millis(delay_ms + jitter))
+                            .await;
+                    }
+
+                    let processed_at_ns = frame.timestamp_ns + start.elapsed().as_nanos() as i64;
+
+                    let result = ProcessingResult {
+                        frame_id: frame.id,
+                        frame: frame.frame,
+                        processed_at_ns,
+                        success: true,
+                        error: None,
+                        feature_count,
+                    };
+
+                    if result_tx.send(result).await.is_err() {
+                        break;
+                    }
+                },
+                None => break,
+            }
+        }
+    }
+
+    /// Shutdown concurrent processor gracefully
+    pub async fn shutdown(mut self) {
+        // Close all channels
+        drop(self.frame_rx);
+        drop(self.result_tx);
+
+        // Wait for all tasks to complete
+        while self.task_set.join_next().await.is_some() {}
     }
 }
 
@@ -182,7 +324,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_config_default() {
+    fn test_processor_creation() {
+        let config = ConcurrentConfig::default();
+        let (processor, _handle) = ConcurrentFrameProcessor::new(config);
+        assert_eq!(processor.queue_depth(), 0);
+        assert_eq!(processor.next_output_id, 0);
+    }
+
+    #[test]
+    fn test_config_defaults() {
         let config = ConcurrentConfig::default();
         assert_eq!(config.pipeline_depth, 4);
         assert_eq!(config.feature_workers, 2);
@@ -191,61 +341,21 @@ mod tests {
     }
 
     #[test]
-    fn test_processor_creation() {
-        let config = ConcurrentConfig::default();
-        let processor = ConcurrentFrameProcessor::new(config);
-        assert!(processor.is_ok(), "Processor should initialize");
-    }
+    fn test_reorder_buffer_ordering() {
+        let mut buffer = BTreeMap::new();
 
-    #[test]
-    #[allow(clippy::unwrap_used)]
-    fn test_processor_with_custom_config() {
-        let config = ConcurrentConfig {
-            pipeline_depth: 8,
-            feature_workers: 4,
-            optimization_workers: 2,
-            ..Default::default()
-        };
+        // Simulate out-of-order insertion
+        buffer.insert(1, 11);
+        buffer.insert(0, 10);
+        buffer.insert(3, 13);
+        buffer.insert(2, 12);
 
-        let processor = ConcurrentFrameProcessor::new(config).unwrap();
-        assert_eq!(processor.config().pipeline_depth, 8);
-        assert_eq!(processor.config().feature_workers, 4);
-    }
-
-    #[test]
-    #[allow(clippy::float_cmp)]
-    fn test_processing_result_creation() {
-        let result = ProcessingResult {
-            sequence: 42,
-            success: true,
-            error: None,
-            features: 100,
-            processing_time_ms: 5.5,
-        };
-
-        assert_eq!(result.sequence, 42);
-        assert!(result.success);
-        assert_eq!(result.features, 100);
-    }
-
-    #[test]
-    #[allow(clippy::unwrap_used)]
-    fn test_reorder_buffer_structure() {
-        let config = ConcurrentConfig::default();
-        let processor = ConcurrentFrameProcessor::new(config).unwrap();
-
-        assert_eq!(processor.next_output_id, 0);
-        assert!(processor.reorder_buffer.is_empty());
-    }
-
-    #[test]
-    fn test_work_item_creation() {
-        let item = FrameWorkItem {
-            sequence: 1,
-            data: vec![1, 2, 3, 4],
-        };
-
-        assert_eq!(item.sequence, 1);
-        assert_eq!(item.data.len(), 4);
+        // Verify ordering on retrieval
+        let ids: Vec<_> = buffer.keys().copied().collect();
+        for (idx, id) in ids.into_iter().enumerate() {
+            let val = buffer.remove(&id).unwrap();
+            assert_eq!(id, idx as usize);
+            assert_eq!(val, 10 + idx as i32);
+        }
     }
 }

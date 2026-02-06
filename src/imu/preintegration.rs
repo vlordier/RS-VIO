@@ -157,7 +157,10 @@ impl PreintegratedImu {
         if dt <= 0.0 || dt > 1.0 {
             // Skip invalid measurements
             self.dropped_measurements = self.dropped_measurements.saturating_add(1);
-            log::warn!("[IMU Preintegration] Dropped measurement with invalid dt={:.6}", dt);
+            log::warn!(
+                "[IMU Preintegration] Dropped measurement with invalid dt={:.6}",
+                dt
+            );
             return;
         }
 
@@ -182,11 +185,11 @@ impl PreintegratedImu {
         // CRITICAL: Compute using OLD Jacobians to maintain correct chain rule
         // Cache old values before updating J_R_bg
         let Jr = right_jacobian_so3(omega * dt);
-        let R_k = self.delta_R.to_rotation_matrix().matrix().clone();  // Clone to avoid temporary borrow
+        let R_k = *self.delta_R.to_rotation_matrix().matrix();
         let acc_skew = skew_symmetric(acc);
-        let J_R_bg_k = self.J_R_bg;  // Cache BEFORE update
-        let J_v_bg_k = self.J_v_bg;  // Cache BEFORE update
-        let J_v_ba_k = self.J_v_ba;  // Cache BEFORE update
+        let J_R_bg_k = self.J_R_bg; // Cache BEFORE update
+        let J_v_bg_k = self.J_v_bg; // Cache BEFORE update
+        let J_v_ba_k = self.J_v_ba; // Cache BEFORE update
 
         // J_{R,bg}^{k+1} = ΔR_k * J_{R,bg}^k - Jr * dt (Eq. 27)
         self.J_R_bg = delta_R_k.to_rotation_matrix().matrix() * J_R_bg_k - Jr * dt;
@@ -240,12 +243,12 @@ impl PreintegratedImu {
         let acc_skew = skew_symmetric(acc);
 
         let mut A = na::SMatrix::<f64, 9, 9>::identity();
-        
+
         // Rotation block: Jr^{-T} for error-state formulation (left Jacobian inverse transpose)
         // Left Jacobian: Jl(ω) = Jr(-ω), and we use Jl^{-T} for error propagation
-        let Jr_inv_t = Jr.transpose()
-            .try_inverse()
-            .expect("Jr^T should always be invertible for SO(3); if this fails, check numerical stability");
+        let Jr_inv_t = Jr.transpose().try_inverse().expect(
+            "Jr^T should always be invertible for SO(3); if this fails, check numerical stability",
+        );
         A.fixed_view_mut::<3, 3>(0, 0).copy_from(&Jr_inv_t);
 
         // Velocity-rotation coupling
@@ -263,17 +266,16 @@ impl PreintegratedImu {
         // Noise gain matrix B (9x6)
         // Maps measurement noise to state error: ξ = B * [η_g; η_a]
         let mut B = na::SMatrix::<f64, 9, 6>::zeros();
-        B.fixed_view_mut::<3, 3>(0, 0).copy_from(&Jr);  // Gyro noise → rotation error
-        B.fixed_view_mut::<3, 3>(3, 3).copy_from(&R_k);  // Accel noise → velocity error
-        
+        B.fixed_view_mut::<3, 3>(0, 0).copy_from(&Jr); // Gyro noise → rotation error
+        B.fixed_view_mut::<3, 3>(3, 3).copy_from(&R_k); // Accel noise → velocity error
+
         // Gyro noise affects position through rotation error
         // dP/dη_g = -0.5 * R_k * [acc]_× * Jr * dt²
         B.fixed_view_mut::<3, 3>(6, 0)
             .copy_from(&(-0.5 * R_k * acc_skew * Jr * dt2));
-        
+
         // Accel noise → position error
-        B.fixed_view_mut::<3, 3>(6, 3)
-            .copy_from(&(0.5 * R_k * dt2));
+        B.fixed_view_mut::<3, 3>(6, 3).copy_from(&(0.5 * R_k * dt2));
 
         // Σ_{k+1} = A * Σ_k * A^T + B * Q * B^T
         self.covariance = A * self.covariance * A.transpose() + B * Q * B.transpose();
@@ -443,7 +445,11 @@ mod tests {
         let sym = (&cov + cov.transpose()) * 0.5;
         let eigen = na::SymmetricEigen::new(sym);
         let min_eig = eigen.eigenvalues.min();
-        assert!(min_eig > -1e-8, "Covariance should be PSD (min eigenvalue: {})", min_eig);
+        assert!(
+            min_eig > -1e-8,
+            "Covariance should be PSD (min eigenvalue: {})",
+            min_eig
+        );
     }
 
     #[test]
@@ -465,9 +471,18 @@ mod tests {
         let v_err = (coarse.delta_v - fine.delta_v).norm();
         let p_err = (coarse.delta_p - fine.delta_p).norm();
 
-        assert!(rot_err < 5e-4, "Rotation should be consistent across dt splits");
-        assert!(v_err < 1e-3, "Velocity should be consistent across dt splits");
-        assert!(p_err < 1e-3, "Position should be consistent across dt splits");
+        assert!(
+            rot_err < 5e-4,
+            "Rotation should be consistent across dt splits"
+        );
+        assert!(
+            v_err < 1e-3,
+            "Velocity should be consistent across dt splits"
+        );
+        assert!(
+            p_err < 1e-3,
+            "Position should be consistent across dt splits"
+        );
     }
 
     #[test]

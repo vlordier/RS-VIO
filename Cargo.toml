@@ -54,6 +54,7 @@ apex-solver = { git = "https://github.com/amin-abouee/apex-solver", branch = "ma
 camera-intrinsic-model = "0.7.2"
 clap = { version = "4.5", features = ["derive"] }
 core_affinity = "0.8"
+dhat = { version = "0.3", optional = true }
 env_logger = "0.11"
 faer = "0.23.2"
 futures = "0.3"
@@ -61,9 +62,6 @@ image = "0.25"
 imageproc = "0.25"
 lazy_static = "1.4"
 log = "0.4"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "time"] }
-tracing-appender = "0.2"
 nalgebra = "0.33.2"
 nalgebra034 = { package = "nalgebra", version = "0.34.1" } # TODO improve this, now this is dirty (needed for camera-intrinsic-model for now)
 ndarray = { version = "0.15.4", optional = true }
@@ -76,6 +74,9 @@ rerun = "0.25"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 tokio = { version = "1.35", features = ["rt-multi-thread", "sync", "time", "macros"] }
+tracing = "0.1"
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "time"] }
 typed-arena = "2.0"
 wgpu = { version = "0.20", optional = true }  # Pinned to 0.20; upgrading requires handling wgpu breaking changes
 
@@ -87,6 +88,7 @@ objc2 = { version = "0.5", optional = true }
 objc2-foundation = { version = "0.2", optional = true }
 
 [dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
 tempfile = "3"
 
 [lints.rust]
@@ -126,3 +128,35 @@ let_unit_value = "warn"  # Warn on bindings of unit values (e.g., `let x = ()`)
 # CORRECTNESS & NUMERIC SAFETY
 # =====================================================================
 float_cmp = "warn"  # Warn on floating point comparisons (use approx eq)
+
+# =====================================================================
+# COMPILATION PERFORMANCE OPTIMIZATIONS
+# =====================================================================
+[profile.dev]
+incremental = true       # Enable incremental compilation (default true, but explicit)
+codegen-units = 256      # Max parallelism during dev builds (faster compilation)
+opt-level = 0            # No optimization in dev (fastest compile)
+debug = true             # Keep debug info
+
+[profile.release]
+incremental = false      # Disable incremental for release (better optimization)
+codegen-units = 1        # Single codegen unit (better optimization, slower compile)
+lto = "thin"            # Thin LTO (good balance of speed/size)
+opt-level = 3           # Max optimization
+debug = false           # Strip debug symbols
+
+[profile.bench]
+inherits = "release"
+debug = true            # Keep debug symbols for profiling
+
+[[bench]]
+name = "concurrent_pipeline"
+harness = false
+
+[[bench]]
+name = "tum_vi_async_pipeline"
+harness = false
+
+[[bench]]
+name = "tum_vi_sequential_baseline"
+harness = false

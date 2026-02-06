@@ -60,11 +60,11 @@ macro_rules! downcast_or_log {
             obj if obj.is::<$target>() => {
                 // Safe because we checked is::<$target>() above
                 obj.downcast_ref::<$target>()
-            }
+            },
             _ => {
                 log::warn!("{}", $msg);
                 None
-            }
+            },
         }
     };
 }
@@ -99,7 +99,7 @@ macro_rules! intrinsics {
         let cx = $cx;
         #[allow(unused)]
         let cy = $cy;
-        
+
         if fx <= 0.0 || fy <= 0.0 {
             log::error!("Invalid focal lengths: fx={}, fy={}", fx, fy);
         }
@@ -127,10 +127,8 @@ macro_rules! transform_matrix {
         $m30:expr, $m31:expr, $m32:expr, $m33:expr
     ) => {
         vec![
-            $m00, $m01, $m02, $m03,
-            $m10, $m11, $m12, $m13,
-            $m20, $m21, $m22, $m23,
-            $m30, $m31, $m32, $m33,
+            $m00, $m01, $m02, $m03, $m10, $m11, $m12, $m13, $m20, $m21, $m22, $m23, $m30, $m31,
+            $m32, $m33,
         ]
     };
 }
@@ -190,9 +188,7 @@ macro_rules! result_chain {
 #[macro_export]
 macro_rules! setup_test {
     () => {
-        let _ = env_logger::builder()
-            .is_test(true)
-            .try_init();
+        let _ = env_logger::builder().is_test(true).try_init();
     };
     (logger) => {
         let _ = env_logger::builder()
@@ -318,10 +314,14 @@ macro_rules! try_with_context {
 #[macro_export]
 macro_rules! parse_or_err {
     ($value:expr, $field:expr) => {
-        $value.parse().map_err(|e| format!("Invalid {}: {} ({})", $field, $value, e))?
+        $value
+            .parse()
+            .map_err(|e| format!("Invalid {}: {} ({})", $field, $value, e))?
     };
     ($value:expr, $field:expr, $ty:ty) => {
-        $value.parse::<$ty>().map_err(|e| format!("Invalid {}: {} ({})", $field, $value, e))?
+        $value
+            .parse::<$ty>()
+            .map_err(|e| format!("Invalid {}: {} ({})", $field, $value, e))?
     };
 }
 
@@ -408,10 +408,14 @@ macro_rules! scoped_timer_result {
 #[macro_export]
 macro_rules! safe_lock {
     ($mutex:expr) => {
-        $mutex.lock().map_err(|e| anyhow::anyhow!("Mutex poisoned: {}", e))
+        $mutex
+            .lock()
+            .map_err(|e| anyhow::anyhow!("Mutex poisoned: {}", e))
     };
     ($mutex:expr, $msg:expr) => {
-        $mutex.lock().map_err(|e| anyhow::anyhow!("{}: {}", $msg, e))
+        $mutex
+            .lock()
+            .map_err(|e| anyhow::anyhow!("{}: {}", $msg, e))
     };
 }
 
@@ -456,7 +460,7 @@ macro_rules! unwrap_or_log {
             None => {
                 log::warn!("Option is None: {}", $msg);
                 return;
-            }
+            },
         }
     };
 }
@@ -476,7 +480,7 @@ macro_rules! unwrap_or_return {
             None => {
                 log::debug!("{}", $msg);
                 return $return_val;
-            }
+            },
         }
     };
 }
@@ -555,10 +559,7 @@ mod tests {
     #[test]
     fn test_transform_matrix_macro() {
         let matrix = transform_matrix!(
-            1.0, 0.0, 0.0, 0.0,
-            0.0, 1.0, 0.0, 0.0,
-            0.0, 0.0, 1.0, 0.0,
-            0.0, 0.0, 0.0, 1.0
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0
         );
         assert_eq!(matrix.len(), 16);
         assert_eq!(matrix[0], 1.0);
@@ -609,9 +610,9 @@ mod tests {
 
     #[test]
     fn test_scoped_timer_result() {
-        let (result, elapsed) = scoped_timer_result!("test_op", { 
+        let (result, elapsed) = scoped_timer_result!("test_op", {
             std::thread::sleep(std::time::Duration::from_micros(100));
-            42 
+            42
         });
         assert_eq!(result, 42);
         assert!(elapsed.as_micros() >= 50); // Allow some tolerance

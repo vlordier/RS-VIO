@@ -1,7 +1,7 @@
 # Feature: Self-Calibrating Stereo VIO with Multi-Camera Support
 
-**Branch:** `feature/stereo-calibration`  
-**Status:** Ready for merge  
+**Branch:** `feature/stereo-calibration`
+**Status:** Ready for merge
 **Date:** February 5, 2026
 
 ---
@@ -62,7 +62,7 @@ All tools are production-ready and fully functional:
   - Adaptive guidance application
   - Dynamic correction scaling based on convergence
   - Rich metadata output
-  
+
 - **Usage:**
   ```bash
   python tools/post_process_calibration.py \
@@ -338,14 +338,14 @@ These are example/reference implementations. Decision: Keep for reference, or re
 
 ## Key Achievements
 
-✅ **Calibration Error Reduction:** 61.7% (0.407% → 0.156%)  
-✅ **Three Complementary Strategies:** All working and validated  
-✅ **Multi-Camera Support:** N cameras with flexible configuration  
-✅ **Advanced Techniques:** Temporal super-resolution + adaptive guidance  
-✅ **Intelligent Processing:** Convergence-based stopping  
-✅ **Production Quality:** Type-safe Rust + robust Python  
-✅ **Comprehensive Testing:** Automated validation framework  
-✅ **Well Documented:** 10+ guides + API references  
+✅ **Calibration Error Reduction:** 61.7% (0.407% → 0.156%)
+✅ **Three Complementary Strategies:** All working and validated
+✅ **Multi-Camera Support:** N cameras with flexible configuration
+✅ **Advanced Techniques:** Temporal super-resolution + adaptive guidance
+✅ **Intelligent Processing:** Convergence-based stopping
+✅ **Production Quality:** Type-safe Rust + robust Python
+✅ **Comprehensive Testing:** Automated validation framework
+✅ **Well Documented:** 10+ guides + API references
 
 ---
 

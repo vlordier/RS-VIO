@@ -24,7 +24,7 @@ class BenchmarkResult:
     max_time_us: float
     stddev_us: float
     measurements_per_sec: float
-    
+
     def __str__(self) -> str:
         return (
             f"{self.name}:\n"
@@ -40,21 +40,21 @@ class BenchmarkResult:
 def run_benchmark(name: str, test_binary: str, iterations: int = 1000) -> BenchmarkResult:
     """Run a single benchmark test."""
     print(f"\n⏱️  Running: {name}")
-    
+
     cmd = [
         test_binary,
-        f"--bench",
+        "--bench",
         f"--iterations={iterations}"
     ]
-    
+
     try:
         start = time.time()
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         elapsed_ms = (time.time() - start) * 1000
-        
+
         # Parse output for timing information
         output = result.stdout + result.stderr
-        
+
         # Extract timing from output (format: "time: X.XXX ms")
         times = []
         for line in output.split('\n'):
@@ -65,18 +65,18 @@ def run_benchmark(name: str, test_binary: str, iterations: int = 1000) -> Benchm
                 except (ValueError, IndexError):
                     # Skip lines that don't match expected timing format
                     pass
-        
+
         if not times:
             # Estimate from total elapsed time
             times = [elapsed_ms * 1000 / iterations for _ in range(iterations)]
-        
+
         avg_us = statistics.mean(times)
         min_us = min(times)
         max_us = max(times)
         stddev_us = statistics.stdev(times) if len(times) > 1 else 0
-        
+
         measurements_per_sec = 1_000_000 / avg_us if avg_us > 0 else 0
-        
+
         return BenchmarkResult(
             name=name,
             iterations=iterations,
@@ -96,7 +96,7 @@ def run_rust_benchmarks():
     print("\n" + "="*70)
     print("🚀 IMU OPTIMIZATION BENCHMARKS")
     print("="*70)
-    
+
     # Build release binary first
     print("\n📦 Building release binary...")
     build_result = subprocess.run(
@@ -105,14 +105,14 @@ def run_rust_benchmarks():
         capture_output=True,
         text=True
     )
-    
+
     if build_result.returncode != 0:
         print("❌ Build failed:")
         print(build_result.stderr)
         return
-    
+
     print("✅ Build successful\n")
-    
+
     # Run tests that measure performance
     print("Running integration benchmarks...")
     result = subprocess.run(
@@ -122,14 +122,14 @@ def run_rust_benchmarks():
         text=True,
         timeout=120
     )
-    
+
     print(result.stdout)
     if result.stderr:
         print("stderr:", result.stderr)
 
 def create_optimization_report() -> str:
     """Generate detailed optimization report."""
-    
+
     report = """
 # Phase 3: Optimization - Batch Processing & SIMD Operations
 
@@ -298,7 +298,7 @@ test imu::batch_processing::tests::test_window_integration ... ok
 ### Profiling Integration
 ```rust
 let metrics = processor.metrics();
-println!("Throughput: {:.1f} measurements/sec", 
+println!("Throughput: {:.1f} measurements/sec",
          metrics.measurements_per_sec);
 println!("Speedup: {:.2f}x", metrics.speedup_ratio);
 ```
@@ -322,27 +322,27 @@ This optimization phase provides:
 The implementation is conservative (avoiding unstable features) while maintaining
 maximum performance and leaving ample headroom for future enhancements.
 """
-    
+
     return report
 
 def main():
     """Main benchmark entry point."""
-    
+
     print("\n" + "="*70)
     print("📊 IMU BATCH PROCESSING & SIMD OPTIMIZATION ANALYSIS")
     print("="*70)
-    
+
     # Run Rust benchmarks
     run_rust_benchmarks()
-    
+
     # Generate report
     report = create_optimization_report()
-    
+
     # Save report
     report_path = "/Users/vincent/Work/RS-VIO/OPTIMIZATION_BATCH_SIMD.md"
     with open(report_path, 'w') as f:
         f.write(report)
-    
+
     print("\n" + "="*70)
     print("✅ OPTIMIZATION ANALYSIS COMPLETE")
     print("="*70)
@@ -352,6 +352,6 @@ def main():
     print("  • Parallel scaling: ~85-90% efficiency")
     print("  • Memory overhead: <1% for metadata")
     print("  • API compatibility: 100% backward compatible")
-    
+
 if __name__ == "__main__":
     main()

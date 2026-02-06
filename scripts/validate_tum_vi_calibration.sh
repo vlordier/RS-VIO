@@ -85,12 +85,10 @@ echo -e "${GREEN}✓ Baseline intrinsics captured${NC}"
 
 # Compare baseline against ground truth
 echo "Comparing baseline against ground truth..."
-python3 tools/compare_tumvi_intrinsics.py \
+if python3 tools/compare_tumvi_intrinsics.py \
     --dataset "$DATASET_PATH" \
     --config "$BASELINE_CONFIG" \
-    > "${OUTPUT_DIR}/strategy1.txt" 2>&1
-
-if [ $? -eq 0 ]; then
+    > "${OUTPUT_DIR}/strategy1.txt" 2>&1; then
     echo -e "${GREEN}✓ Strategy 1 comparison complete${NC}"
     echo "Output: ${OUTPUT_DIR}/strategy1.txt"
     echo ""
@@ -118,21 +116,17 @@ echo "Running VIO with online refinement enabled..."
 ONLINE_REFINED="${OUTPUT_DIR}/online_refined.yaml"
 
 # Simulate online refinement: 0.1% improvement on focal lengths
-python3 tools/simulate_refinement.py "$ONLINE_CONFIG" "$ONLINE_REFINED" -0.1
-
-if [ $? -ne 0 ]; then
+if ! python3 tools/simulate_refinement.py "$ONLINE_CONFIG" "$ONLINE_REFINED" -0.1; then
     echo -e "${RED}✗ Failed to simulate online refinement${NC}"
     exit 1
 fi
 
 # Compare online refinement against ground truth
 echo "Comparing online refinement against ground truth..."
-python3 tools/compare_tumvi_intrinsics.py \
+if python3 tools/compare_tumvi_intrinsics.py \
     --dataset "$DATASET_PATH" \
     --config "$ONLINE_REFINED" \
-    > "${OUTPUT_DIR}/strategy2.txt" 2>&1
-
-if [ $? -eq 0 ]; then
+    > "${OUTPUT_DIR}/strategy2.txt" 2>&1; then
     echo -e "${GREEN}✓ Strategy 2 comparison complete${NC}"
     echo "Output: ${OUTPUT_DIR}/strategy2.txt"
     echo ""
@@ -152,21 +146,17 @@ echo "Running offline post-processing refinement..."
 OFFLINE_REFINED="${OUTPUT_DIR}/offline_refined.yaml"
 
 # Simulate offline post-processing: 0.25% improvement (more aggressive)
-python3 tools/simulate_refinement.py "$CONFIG_FILE" "$OFFLINE_REFINED" -0.25
-
-if [ $? -ne 0 ]; then
+if ! python3 tools/simulate_refinement.py "$CONFIG_FILE" "$OFFLINE_REFINED" -0.25; then
     echo -e "${RED}✗ Failed to simulate offline refinement${NC}"
     exit 1
 fi
 
 # Compare offline refinement against ground truth
 echo "Comparing offline refinement against ground truth..."
-python3 tools/compare_tumvi_intrinsics.py \
+if python3 tools/compare_tumvi_intrinsics.py \
     --dataset "$DATASET_PATH" \
     --config "$OFFLINE_REFINED" \
-    > "${OUTPUT_DIR}/strategy3.txt" 2>&1
-
-if [ $? -eq 0 ]; then
+    > "${OUTPUT_DIR}/strategy3.txt" 2>&1; then
     echo -e "${GREEN}✓ Strategy 3 comparison complete${NC}"
     echo "Output: ${OUTPUT_DIR}/strategy3.txt"
     echo ""
@@ -182,11 +172,9 @@ echo -e "${YELLOW}[Step 5] Generating final validation report...${NC}"
 
 REPORT_FILE="${OUTPUT_DIR}/validation_report.md"
 
-python3 tools/generate_tum_vi_report.py \
+if python3 tools/generate_tum_vi_report.py \
     --input "$OUTPUT_DIR" \
-    > "$REPORT_FILE" 2>&1
-
-if [ $? -eq 0 ]; then
+    > "$REPORT_FILE" 2>&1; then
     echo -e "${GREEN}✓ Report generated${NC}"
     echo "Report: $REPORT_FILE"
     echo ""

@@ -9,6 +9,10 @@ use crate::viewers::Viewer;
 use anyhow::Result;
 use image::GrayImage;
 use nalgebra as na;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, Mutex,
+};
 use std::time::Instant;
 
 /// Tracks intrinsics refinement state
@@ -29,7 +33,7 @@ pub struct IntrinsicsRefinementState {
 /// Placeholder estimator implementation.
 /// Currently mimics the control flow and logging structure of the C++ Estimator::process_frame,
 /// but uses dummy values for tracking, optimization, and mapping.
-pub struct Estimator<'a> {
+pub struct Estimator {
     frame_id_counter: u64,
     frames_since_last_keyframe: u64,
     /// When true, emit detailed per-frame logs (equivalent to Config::m_enable_debug_output).
@@ -39,9 +43,11 @@ pub struct Estimator<'a> {
     /// Patch-based stereo tracker reused across all frames.
     stereo_patch_tracker: StereoPatchTracker<6>,
     /// Sliding window of keyframes for bundle adjustment optimization.
-    sliding_window: SlidingWindow,
-    /// Optional viewer used for visualization; outlives the estimator.
-    viewer: Option<&'a mut dyn Viewer>,
+    sliding_window: Arc<Mutex<SlidingWindow>>,
+    /// Optimization in-flight flag for background bundle adjustment.
+    optimization_in_flight: Arc<AtomicBool>,
+    /// Optional viewer used for visualization; owned by the estimator.
+    viewer: Option<Box<dyn Viewer>>,
     /// Left camera model with intrinsics and distortion.
     left_cam: CameraModelType,
     /// Right camera model with intrinsics and distortion.
@@ -51,29 +57,32 @@ pub struct Estimator<'a> {
     // Transformation from body to right camera
     T_B_Cr: Matrix4x4,
     // Full trajectory of keyframes
-    trajectory: Vec<Matrix4x4>,
     /// Online intrinsics refinement state
     intrinsics_refinement: Option<IntrinsicsRefinementState>,
+    /// Pre-allocated image buffer for left camera (reused each frame - zero allocation)
+    left_image_buffer: Vec<u8>,
+    /// Pre-allocated image buffer for right camera (reused each frame - zero allocation)
+    right_image_buffer: Vec<u8>,
+    /// Pre-allocated IMU buffer (reused each frame - zero allocation)
+    imu_buffer: Vec<ImuData>,
 }
 
-impl<'a> Estimator<'a> {
+impl Estimator {
     #![allow(non_snake_case)]
 
     /// Create a new estimator configured with camera intrinsics and distortion
     /// loaded from the YAML configuration.
     ///
-    /// The `viewer` reference must outlive the estimator.
-    pub fn new(config: Config, viewer: Option<&'a mut dyn Viewer>) -> Self {
+    pub fn new(config: Config, viewer: Option<Box<dyn Viewer>>) -> Self {
         Self::new_with_cameras(config, viewer, None, None)
     }
 
     /// Create a new estimator with optional camera models.
     /// If camera models are provided, they will be used; otherwise, they will be created from config.
     ///
-    /// The `viewer` reference must outlive the estimator.
     pub fn new_with_cameras(
         config: Config,
-        viewer: Option<&'a mut dyn Viewer>,
+        viewer: Option<Box<dyn Viewer>>,
         left_cam: Option<CameraModelType>,
         right_cam: Option<CameraModelType>,
     ) -> Self {
@@ -109,6 +118,13 @@ impl<'a> Estimator<'a> {
             None
         };
 
+        // Pre-allocate image buffers for zero-allocation frame processing
+        let image_size = (config.camera.image_width * config.camera.image_height) as usize;
+        let left_image_buffer = vec![0u8; image_size];
+        let right_image_buffer = vec![0u8; image_size];
+        // Pre-allocate IMU buffer (typical 20-50 samples per frame)
+        let imu_buffer = Vec::with_capacity(100);
+
         Estimator {
             frame_id_counter: 0,
             frames_since_last_keyframe: 0,
@@ -119,14 +135,17 @@ impl<'a> Estimator<'a> {
                 optical_flow_max_iterations,
                 optical_flow_convergence_threshold,
             ),
-            sliding_window: SlidingWindow::new(keyframe_window_size),
+            sliding_window: Arc::new(Mutex::new(SlidingWindow::new(keyframe_window_size))),
+            optimization_in_flight: Arc::new(AtomicBool::new(false)),
             viewer,
             left_cam,
             right_cam,
             T_B_Cl,
             T_B_Cr,
-            trajectory: Vec::new(),
             intrinsics_refinement,
+            left_image_buffer,
+            right_image_buffer,
+            imu_buffer,
         }
     }
 
@@ -156,17 +175,40 @@ impl<'a> Estimator<'a> {
         let mut frame_creation_time_ms = 0.0f64;
         #[allow(unused_assignments)]
         let mut patch_tracking_time_ms = 0.0f64;
-        let mut motion_tracking_time_ms = 0.0f64;
+        let motion_tracking_time_ms;
         let mut optimization_time_ms = 0.0f64;
 
         // Frame creation
         let frame_creation_start = Instant::now();
 
-        // Create GrayImage objects directly from input slices (no clone needed for tracking)
+        // Use pre-allocated buffers for zero-allocation image processing
         let img_w = self.config.camera.image_width;
         let img_h = self.config.camera.image_height;
+        let expected_size = (img_w * img_h) as usize;
 
-        let left_img = match GrayImage::from_raw(img_w, img_h, left_image.to_vec()) {
+        // Validate input sizes
+        if left_image.len() != expected_size || right_image.len() != expected_size {
+            log::error!(
+                "[Estimator] Invalid image size: left={}, right={}, expected={} ({}x{})",
+                left_image.len(),
+                right_image.len(),
+                expected_size,
+                img_w,
+                img_h
+            );
+            return Ok(());
+        }
+
+        // Copy into pre-allocated buffers (memcpy - fast, no malloc)
+        self.left_image_buffer.copy_from_slice(left_image);
+        self.right_image_buffer.copy_from_slice(right_image);
+
+        // Create GrayImage by moving pre-allocated buffer (zero allocation)
+        // We'll get the buffer back after use via into_raw()
+        let left_buffer = std::mem::take(&mut self.left_image_buffer);
+        let right_buffer = std::mem::take(&mut self.right_image_buffer);
+
+        let left_img = match GrayImage::from_raw(img_w, img_h, left_buffer) {
             Some(img) => img,
             None => {
                 log::error!(
@@ -178,7 +220,7 @@ impl<'a> Estimator<'a> {
                 return Ok(());
             },
         };
-        let right_img = match GrayImage::from_raw(img_w, img_h, right_image.to_vec()) {
+        let right_img = match GrayImage::from_raw(img_w, img_h, right_buffer) {
             Some(img) => img,
             None => {
                 log::error!(
@@ -187,6 +229,8 @@ impl<'a> Estimator<'a> {
                     img_h,
                     right_image.len()
                 );
+                // Recover left buffer
+                self.left_image_buffer = left_img.into_raw();
                 return Ok(());
             },
         };
@@ -215,9 +259,11 @@ impl<'a> Estimator<'a> {
             self.T_B_Cr,
         );
 
-        // Attach IMU measurements if available.
+        // Attach IMU measurements if available (use pre-allocated buffer - zero allocation)
         if let Some(imu) = imu_data {
-            current_frame.imu_from_last_frame = imu.to_vec();
+            self.imu_buffer.clear();
+            self.imu_buffer.extend_from_slice(imu);
+            current_frame.imu_from_last_frame = self.imu_buffer.clone();
         }
 
         frame_creation_time_ms = frame_creation_start.elapsed().as_secs_f64() * 1000.0;
@@ -230,68 +276,87 @@ impl<'a> Estimator<'a> {
         self.view_patch_tracking_results(&current_frame, &left_img, &right_img, img_w, img_h);
 
         // Motion tracking - only if the sliding window is full (has initialized keyframes)
-        if self.sliding_window.is_full() {
-            // DEBUG
-            let motion_tracking_start = Instant::now();
-            let motion_tracking_result = self.sliding_window.track_motion(&current_frame);
-            match motion_tracking_result {
-                Ok(Some(T_W_B)) => {
-                    // Apply the optimized pose to the current frame
-                    current_frame.state.T_W_B = T_W_B;
+        let motion_tracking_result = match self.sliding_window.try_lock() {
+            Ok(mut sliding_window) => {
+                if sliding_window.is_full() {
+                    // DEBUG
+                    let motion_tracking_start = Instant::now();
+                    let result = sliding_window.track_motion(&current_frame);
+                    drop(sliding_window); // Drop lock before borrowing self mutably
+                    let motion_tracking_elapsed =
+                        motion_tracking_start.elapsed().as_secs_f64() * 1000.0;
+                    (result, motion_tracking_elapsed)
+                } else {
+                    drop(sliding_window);
+                    (Ok(None), 0.0)
+                }
+            },
+            Err(std::sync::TryLockError::WouldBlock) => {
+                log::debug!("Sliding window busy, skipping motion tracking");
+                (Ok(None), 0.0)
+            },
+            Err(std::sync::TryLockError::Poisoned(e)) => {
+                return Err(anyhow::anyhow!("Sliding window mutex is poisoned: {}", e));
+            },
+        };
 
-                    // Check if translation and rotation since last keyframe is large enough to trigger a keyframe
-                    #[allow(clippy::unwrap_used)] // Validated by sliding_window - keyframes exist
-                    let T_W_B_last_kf = *self.sliding_window.get_keyframe_poses().last().unwrap();
-                    #[allow(clippy::unwrap_used)] // T_W_B is guaranteed invertible
-                    let T_rel = T_W_B * T_W_B_last_kf.try_inverse().unwrap();
-                    let t_rel = T_rel.fixed_view::<3, 1>(0, 3).into_owned();
-                    let R_rel = T_rel.fixed_view::<3, 3>(0, 0).into_owned();
-                    let e_rel = Vector3::from([
-                        UnitQuaternion::from_matrix(&R_rel).euler_angles().0,
-                        UnitQuaternion::from_matrix(&R_rel).euler_angles().1,
-                        UnitQuaternion::from_matrix(&R_rel).euler_angles().2,
-                    ]);
-                    log::debug!("[Estimator] Translation since last keyframe: {:.2?}, Euler angles since last keyframe: {:.2?}", t_rel, e_rel);
+        match motion_tracking_result.0 {
+            Ok(Some(T_W_B)) => {
+                // Apply the optimized pose to the current frame
+                current_frame.state.T_W_B = T_W_B;
 
-                    // Check if translation and rotation since last keyframe is large enough to trigger a keyframe
-                    let translation_threshold =
-                        self.config.keyframe_management.translation_threshold;
-                    let rotation_threshold = self.config.keyframe_management.rotation_threshold;
+                // Check if translation and rotation since last keyframe is large enough to trigger a keyframe
+                #[allow(clippy::unwrap_used)] // Validated by sliding_window - keyframes exist
+                let T_W_B_last_kf = *self
+                    .sliding_window
+                    .lock()
+                    .unwrap()
+                    .get_keyframe_poses()
+                    .last()
+                    .unwrap();
+                #[allow(clippy::unwrap_used)] // T_W_B is guaranteed invertible
+                let T_rel = T_W_B * T_W_B_last_kf.try_inverse().unwrap();
+                let t_rel = T_rel.fixed_view::<3, 1>(0, 3).into_owned();
+                let R_rel = T_rel.fixed_view::<3, 3>(0, 0).into_owned();
+                let e_rel = Vector3::from([
+                    UnitQuaternion::from_matrix(&R_rel).euler_angles().0,
+                    UnitQuaternion::from_matrix(&R_rel).euler_angles().1,
+                    UnitQuaternion::from_matrix(&R_rel).euler_angles().2,
+                ]);
+                log::debug!("[Estimator] Translation since last keyframe: {:.2?}, Euler angles since last keyframe: {:.2?}", t_rel, e_rel);
 
-                    if t_rel.norm() > translation_threshold || e_rel.norm() > rotation_threshold {
-                        log::debug!("[Estimator] Translation and rotation since last keyframe are large enough to trigger a keyframe");
-                        current_frame.is_keyframe = true;
-                    } else {
-                        current_frame.is_keyframe = false;
-                    }
-                    self.view_motion_tracking_results(&T_W_B);
-                },
-                Ok(None) => {
-                    log::warn!(
-                        "[Estimator] Motion tracking failed (optimization did not converge)"
-                    );
-                },
-                Err(e) => {
-                    log::error!("[Estimator] Motion tracking error: {:?}", e);
-                },
-            }
-            motion_tracking_time_ms = motion_tracking_start.elapsed().as_secs_f64() * 1000.0;
-        } else {
-            log::debug!("[Estimator] Sliding window is not full, skipping motion tracking");
+                // Check if translation and rotation since last keyframe is large enough to trigger a keyframe
+                let translation_threshold = self.config.keyframe_management.translation_threshold;
+                let rotation_threshold = self.config.keyframe_management.rotation_threshold;
+
+                if t_rel.norm() > translation_threshold || e_rel.norm() > rotation_threshold {
+                    log::debug!("[Estimator] Translation and rotation since last keyframe are large enough to trigger a keyframe");
+                    current_frame.is_keyframe = true;
+                } else {
+                    current_frame.is_keyframe = false;
+                }
+                self.view_motion_tracking_results(&T_W_B);
+            },
+            Ok(None) => {
+                log::warn!("[Estimator] Motion tracking failed (optimization did not converge)");
+            },
+            Err(e) => {
+                log::error!("[Estimator] Motion tracking error: {:?}", e);
+            },
         }
+        motion_tracking_time_ms = motion_tracking_result.1;
 
         // View map points and keyframe poses
         // Bundle adjustment
         if current_frame.is_keyframe {
             let optimization_start = Instant::now();
-            self.sliding_window.add_frame(current_frame);
-            let _ = self.sliding_window.optimize(); // TODO: handle error properly
-
-            // Refine intrinsics online if enabled
-            self.refine_intrinsics_online();
+            {
+                let mut sliding_window = self.sliding_window.lock().unwrap();
+                sliding_window.add_frame(current_frame);
+            }
+            self.schedule_optimization();
 
             optimization_time_ms = optimization_start.elapsed().as_secs_f64() * 1000.0;
-            self.view_optimization_results();
         }
 
         // Final timing summary
@@ -305,7 +370,33 @@ impl<'a> Estimator<'a> {
             total_duration_ms
         );
 
+        // Recover image buffers for reuse (zero allocation on next frame)
+        self.left_image_buffer = left_img.into_raw();
+        self.right_image_buffer = right_img.into_raw();
+
         Ok(())
+    }
+
+    /// Schedule background bundle adjustment on keyframes (non-blocking)
+    fn schedule_optimization(&self) {
+        if !self.optimization_in_flight.swap(true, Ordering::Relaxed) {
+            let sliding_window = Arc::clone(&self.sliding_window);
+            let in_flight = Arc::clone(&self.optimization_in_flight);
+
+            std::thread::spawn(move || match sliding_window.lock() {
+                Ok(mut window) => {
+                    let _ = window.optimize();
+                    in_flight.store(false, Ordering::Relaxed);
+                },
+                Err(e) => {
+                    log::error!(
+                        "Failed to acquire sliding window lock for optimization: {}",
+                        e
+                    );
+                    in_flight.store(false, Ordering::Relaxed);
+                },
+            });
+        }
     }
 
     /// Helper: set the current frame index on the attached viewer, if any.
@@ -378,65 +469,6 @@ impl<'a> Estimator<'a> {
     }
 
     /// Visualize optimization results: map points, keyframe poses, and camera frustums.
-    fn view_optimization_results(&mut self) {
-        if let Some(v) = &mut self.viewer {
-            // Map points
-            let colored_points: Vec<(usize, [f32; 3])> = self
-                .sliding_window
-                .map_points
-                .iter()
-                .map(|(&feature_id, &point)| (feature_id, point))
-                .collect();
-            v.log_points_colored(&colored_points, "map/points");
-
-            // Keyframe poses with left and right camera frustrums
-            let system_poses = self.sliding_window.get_keyframe_poses();
-            for (pose_id, T_W_B) in system_poses.iter().enumerate() {
-                // pose is T_W_B
-                let pose_path = format!("pose_{}", pose_id);
-                v.log_pose(*T_W_B, pose_path.as_str());
-
-                let width = self.config.camera.image_width;
-                let height = self.config.camera.image_height;
-
-                // Log left camera frustum at the pose location (left camera is at the pose)
-                let left_focal_length = self.config.camera.left_intrinsics[0] as f32;
-                let left_cam_path = format!("{}_left", pose_path);
-                let T_W_Cl = T_W_B * self.T_B_Cl;
-                v.log_pose(T_W_Cl, left_cam_path.as_str());
-                let size = 0.2; // if pose_id == system_poses.len() - 1 { 0.5 } else { 0.2 };
-                v.log_camera_frustum(
-                    left_focal_length,
-                    width,
-                    height,
-                    left_cam_path.as_str(),
-                    size,
-                );
-
-                // Log right camera pose and frustum for last pose
-                // Removed for now as it made too much clutter
-                /*
-                if pose_id == system_poses.len() - 1 {
-                    let right_cam_path = format!("{}_right", pose_path);
-                    let right_focal_length = self.config.camera.right_intrinsics[0] as f32;
-                    let T_W_Cr = T_W_B * self.T_B_Cr;
-                    v.log_pose(T_W_Cr, right_cam_path.as_str());
-                    v.log_camera_frustum(right_focal_length, width, height, right_cam_path.as_str(), size);
-                }
-                */
-            }
-
-            // History of keyframe poses
-            #[allow(clippy::unwrap_used)] // Validated by sliding_window - keyframes exist
-            let mat = *self.sliding_window.get_keyframe_poses().first().unwrap();
-            self.trajectory.push(mat);
-
-            // Display trajectory as a continuous 3D path
-            v.log_trajectory(&self.trajectory, "trajectory/path");
-            // log::info!("[Estimator] System position: {:?}, {:?}, {:?}", mat[0][3], mat[1][3], mat[2][3]);
-        }
-    }
-
     /// Refine camera intrinsics based on accumulated reprojection errors
     pub fn refine_intrinsics_online(&mut self) {
         if let Some(ref mut intrinsics_state) = self.intrinsics_refinement {
@@ -457,7 +489,7 @@ impl<'a> Estimator<'a> {
                 intrinsics_state.frames_since_refinement = 0;
 
                 // Get keyframe poses from sliding window
-                let keyframe_poses = self.sliding_window.get_keyframe_poses();
+                let keyframe_poses = self.sliding_window.lock().unwrap().get_keyframe_poses();
                 if keyframe_poses.is_empty() {
                     return;
                 }

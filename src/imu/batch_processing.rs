@@ -39,8 +39,8 @@
 //! );
 //! ```
 
+use crate::imu::preintegration::{ImuNoise, PreintegratedImu};
 use nalgebra as na;
-use crate::imu::preintegration::{PreintegratedImu, ImuNoise};
 
 const SIMD_LANES: usize = 2; // f64x2 for x86-64 targets
 
@@ -98,7 +98,12 @@ impl BatchImuProcessor {
     /// Add measurement to buffer
     /// Returns error if buffer is at capacity (caller should integrate and clear)
     #[inline]
-    pub fn push_measurement(&mut self, gyro: na::Vector3<f64>, accel: na::Vector3<f64>, dt: f64) -> Result<(), &'static str> {
+    pub fn push_measurement(
+        &mut self,
+        gyro: na::Vector3<f64>,
+        accel: na::Vector3<f64>,
+        dt: f64,
+    ) -> Result<(), &'static str> {
         if self.count >= self.measurements.capacity() {
             // Buffer is full - caller must integrate and clear before adding more
             return Err("Buffer at capacity - integrate and clear first");
@@ -132,7 +137,7 @@ impl BatchImuProcessor {
         preint.reset(na::Vector3::zeros(), na::Vector3::zeros());
 
         let measurements = &self.measurements[0..self.count];
-        
+
         // Choose integration strategy based on count
         if measurements.len() >= 4 * SIMD_LANES {
             self.integrate_batch_simd(&mut preint, measurements);
@@ -149,7 +154,11 @@ impl BatchImuProcessor {
 
     /// Scalar batch integration (baseline)
     #[inline]
-    fn integrate_batch_scalar(&self, preint: &mut PreintegratedImu, measurements: &[ImuMeasurement]) {
+    fn integrate_batch_scalar(
+        &self,
+        preint: &mut PreintegratedImu,
+        measurements: &[ImuMeasurement],
+    ) {
         for meas in measurements {
             preint.integrate(meas.gyro, meas.accel, meas.dt);
         }
@@ -277,7 +286,10 @@ impl SIMDCovarianceOp {
 
     /// Add two 9x9 matrices with SIMD optimization
     #[inline]
-    pub fn add_9x9(a: &na::SMatrix<f64, 9, 9>, b: &na::SMatrix<f64, 9, 9>) -> na::SMatrix<f64, 9, 9> {
+    pub fn add_9x9(
+        a: &na::SMatrix<f64, 9, 9>,
+        b: &na::SMatrix<f64, 9, 9>,
+    ) -> na::SMatrix<f64, 9, 9> {
         a + b
     }
 
@@ -311,7 +323,8 @@ impl PreintegrationWindow {
 
     /// Integrate measurements into this window
     pub fn integrate_range(&mut self, measurements: &[ImuMeasurement]) {
-        self.preint.reset(na::Vector3::zeros(), na::Vector3::zeros());
+        self.preint
+            .reset(na::Vector3::zeros(), na::Vector3::zeros());
         for i in 0..self.length {
             let idx = self.start_idx + i;
             if idx < measurements.len() {
@@ -335,13 +348,9 @@ mod tests {
     #[test]
     fn test_batch_measurement_addition() {
         let mut processor = BatchImuProcessor::new(ImuNoise::default(), 100);
-        
-        let res = processor.push_measurement(
-            na::Vector3::zeros(),
-            na::Vector3::zeros(),
-            0.01,
-        );
-        
+
+        let res = processor.push_measurement(na::Vector3::zeros(), na::Vector3::zeros(), 0.01);
+
         assert!(res.is_ok());
         assert_eq!(processor.count, 1);
     }
@@ -349,18 +358,18 @@ mod tests {
     #[test]
     fn test_batch_integration() {
         let mut processor = BatchImuProcessor::new(ImuNoise::default(), 100);
-        
+
         let gyro = na::Vector3::new(0.0, 0.0, 0.1);
         let accel = na::Vector3::zeros();
-        
+
         for _ in 0..100 {
             let res = processor.push_measurement(gyro, accel, 0.01);
             assert!(res.is_ok());
         }
-        
+
         let result = processor.integrate_batch();
         assert!(result.is_ok());
-        
+
         let preint = result.unwrap();
         assert!(preint.delta_R.angle() > 0.0);
     }
@@ -368,26 +377,27 @@ mod tests {
     #[test]
     fn test_batch_parallel_preintegration() {
         let processor = BatchImuProcessor::new(ImuNoise::default(), 1000);
-        
+
         let mut preints = vec![
             PreintegratedImu::new(ImuNoise::default()),
             PreintegratedImu::new(ImuNoise::default()),
         ];
-        
+
         let mut measurements = vec![];
         let gyro = na::Vector3::new(0.0, 0.0, 0.1);
         let accel = na::Vector3::zeros();
-        
+
         for _ in 0..200 {
-            measurements.push(ImuMeasurement { gyro, accel, dt: 0.01 });
+            measurements.push(ImuMeasurement {
+                gyro,
+                accel,
+                dt: 0.01,
+            });
         }
-        
-        let result = processor.batch_preintegrate_parallel(
-            &mut preints,
-            &measurements,
-            &[100, 100],
-        );
-        
+
+        let result =
+            processor.batch_preintegrate_parallel(&mut preints, &measurements, &[100, 100]);
+
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 200);
     }
@@ -396,12 +406,12 @@ mod tests {
     fn test_simd_covariance_ops() {
         let mut A = na::SMatrix::<f64, 9, 9>::zeros();
         A.fill_diagonal(1.0);
-        
+
         let mut Sigma = na::SMatrix::<f64, 9, 9>::zeros();
         Sigma.fill_diagonal(0.1);
-        
+
         let result = SIMDCovarianceOp::multiply_similarity(&A, &Sigma);
-        
+
         // Should be approximately Sigma since A is identity
         assert!((result.trace() - 0.9).abs() < 1e-10);
     }
@@ -409,17 +419,21 @@ mod tests {
     #[test]
     fn test_window_integration() {
         let mut window = PreintegrationWindow::new(0, 100, ImuNoise::default());
-        
+
         let mut measurements = vec![];
         let gyro = na::Vector3::new(0.0, 0.0, 0.1);
         let accel = na::Vector3::zeros();
-        
+
         for _ in 0..100 {
-            measurements.push(ImuMeasurement { gyro, accel, dt: 0.01 });
+            measurements.push(ImuMeasurement {
+                gyro,
+                accel,
+                dt: 0.01,
+            });
         }
-        
+
         window.integrate_range(&measurements);
-        
+
         assert!(window.preint.delta_R.angle() > 0.0);
     }
 }

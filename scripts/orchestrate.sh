@@ -9,6 +9,7 @@ DATASETS_DIR="${DATASETS_DIR:-/tmp/rs-vio-samples}"
 
 # Load shared logging utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/logging.sh"
 
 usage() {

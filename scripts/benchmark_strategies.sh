@@ -30,6 +30,7 @@ RESULTS_FILE="$RESULTS_DIR/strategies_${TIMESTAMP}.csv"
 
 # Load shared logging utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/logging.sh"
 
 # Available strategies
@@ -126,7 +127,8 @@ run_benchmark() {
     local dataset=$2
     local dataset_path=$3
     local config_file=$4
-    local start_time=$(date +%s)
+    local start_time
+    start_time=$(date +%s)
 
     echo -n "  Testing $strategy on ${dataset^^}... "
 
@@ -149,14 +151,29 @@ run_benchmark() {
 
     # Run with timeout and capture output
     local output
-    output=$(timeout 120 $cmd 2>&1 || true)
+    local exit_code=0
+    output=$(timeout 120 "$cmd" 2>&1) || exit_code=$?
 
-    local end_time=$(date +%s)
+    local end_time
+    end_time=$(date +%s)
     local elapsed=$((end_time - start_time))
 
+    # Check for timeout or failure
+    if [ $exit_code -eq 124 ]; then
+        echo -e "${COLOR_RED}TIMEOUT${NC} (>120s)"
+        echo "$dataset,${dataset^^},$strategy,TIMEOUT,N/A,N/A" >> "$RESULTS_FILE"
+        return 1
+    elif [ $exit_code -ne 0 ]; then
+        echo -e "${COLOR_RED}FAILED${NC} (exit code: $exit_code)"
+        echo "$dataset,${dataset^^},$strategy,FAILED,N/A,N/A" >> "$RESULTS_FILE"
+        return 1
+    fi
+
     # Extract metrics from output
-    local frames=$(echo "$output" | grep -oP 'Processed \K[0-9]+' | head -1)
-    local avg_time=$(echo "$output" | grep -oP 'average \K[0-9.]+' | head -1)
+    local frames
+    local avg_time
+    frames=$(echo "$output" | grep -oP 'Processed \K[0-9]+' | head -1)
+    avg_time=$(echo "$output" | grep -oP 'average \K[0-9.]+' | head -1)
 
     frames=${frames:-"N/A"}
     avg_time=${avg_time:-"N/A"}
@@ -301,7 +318,7 @@ main() {
                         log_warn "EuRoC dataset not found, skipping"
                         continue
                     fi
-                    run_benchmark "$strategy" "euroc" "$dataset_path" "$config_file"
+                    run_benchmark "$strategy" "euroc" "$dataset_path" "$config_file" || true
                     ;;
                 tum)
                     config_file="$PROJECT_ROOT/config/tum_vi.yaml"
@@ -310,16 +327,16 @@ main() {
                         log_warn "TUM-VI dataset not found, skipping"
                         continue
                     fi
-                    run_benchmark "$strategy" "tum" "$dataset_path" "$config_file"
+                    run_benchmark "$strategy" "tum" "$dataset_path" "$config_file" || true
                     ;;
                 4seasons)
                     config_file="$PROJECT_ROOT/config/4seasons.yaml"
-                    dataset_path=$(ls -d "$DATASET_DIR"/4seasons/recording_* 2>/dev/null | head -1)
+                    dataset_path=$(find "$DATASET_DIR/4seasons" -maxdepth 1 -type d -name 'recording_*' 2>/dev/null | head -1)
                     if [ -z "$dataset_path" ]; then
                         log_warn "4Seasons dataset not found, skipping"
                         continue
                     fi
-                    run_benchmark "$strategy" "4seasons" "$dataset_path" "$config_file"
+                    run_benchmark "$strategy" "4seasons" "$dataset_path" "$config_file" || true
                     ;;
             esac
         done

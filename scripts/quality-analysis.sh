@@ -46,12 +46,15 @@ check_tool() {
 echo "Checking available tools..."
 
 # Basic Rust tools
+# shellcheck disable=SC2034
 check_tool cargo && HAS_CARGO=1
+# shellcheck disable=SC2034
 check_tool rustc && HAS_RUSTC=1
 
 # Quality tools
 check_tool valgrind && HAS_VALGRIND=1
 check_tool heaptrack && HAS_HEAPTRACK=1
+# shellcheck disable=SC2034
 check_tool perf && HAS_PERF=1
 
 # Cargo tools (check if installed)

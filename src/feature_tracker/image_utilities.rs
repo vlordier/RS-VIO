@@ -139,7 +139,10 @@ pub fn detect_key_points(
         }
     }
 
-    let mut tasks = Vec::new();
+    // Pre-allocate capacity for grid tasks (max: all cells)
+    let x_cells = ((x_stop - x_start) / grid_size) as usize;
+    let y_cells = ((y_stop - y_start) / grid_size) as usize;
+    let mut tasks = Vec::with_capacity(x_cells * y_cells);
     for x in (x_start..x_stop).step_by(grid_size as usize) {
         for y in (y_start..y_stop).step_by(grid_size as usize) {
             if grids[(
@@ -170,7 +173,8 @@ pub fn detect_key_points(
                     .unwrap_or(std::cmp::Ordering::Equal)
             });
 
-            let mut cell_corners = Vec::new();
+            // Pre-allocate capacity to avoid reallocations during push operations
+            let mut cell_corners = Vec::with_capacity(num_points_in_cell as usize);
             for mut point in fast_corners {
                 if cell_corners.len() as u32 >= num_points_in_cell {
                     break;

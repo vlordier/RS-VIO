@@ -2,10 +2,10 @@
 //!
 //! This shows the type of logging output you can expect when using
 //! the enhanced calibration system with logging enabled.
+use nalgebra as na;
+use rs_vio::calibration::stereo_calibrator::StereoPair;
 use rs_vio::calibration::CalibrationConfig;
 use rs_vio::calibration::StereoCalibrator;
-use rs_vio::calibration::stereo_calibrator::StereoPair;
-use nalgebra as na;
 fn main() {
     println!("🎯 Stereo Calibration Logging Demo");
     println!("==================================\n");
@@ -89,17 +89,27 @@ fn main() {
     for i in 1..=5 {
         // Create features with rolling shutter-like distortions
         // Higher rows have more distortion (typical rolling shutter pattern)
-        let left_features: Vec<_> = (0..15).map(|j| {
-            let row = j as f64 / 15.0; // 0 to 1
-            let distortion = row * 5.0 * (i as f64 * 0.1).sin(); // Rolling shutter effect
-            na::Vector2::new(320.0 + (j as f64 - 7.0) * 20.0 + distortion, 240.0 + (j as f64 - 7.0) * 15.0)
-        }).collect();
+        let left_features: Vec<_> = (0..15)
+            .map(|j| {
+                let row = j as f64 / 15.0; // 0 to 1
+                let distortion = row * 5.0 * (i as f64 * 0.1).sin(); // Rolling shutter effect
+                na::Vector2::new(
+                    320.0 + (j as f64 - 7.0) * 20.0 + distortion,
+                    240.0 + (j as f64 - 7.0) * 15.0,
+                )
+            })
+            .collect();
 
-        let right_features: Vec<_> = (0..15).map(|j| {
-            let row = j as f64 / 15.0;
-            let distortion = row * 3.0 * (i as f64 * 0.1).cos(); // Different distortion pattern
-            na::Vector2::new(320.0 + (j as f64 - 7.0) * 20.0 - 40.0 + distortion, 240.0 + (j as f64 - 7.0) * 15.0)
-        }).collect();
+        let right_features: Vec<_> = (0..15)
+            .map(|j| {
+                let row = j as f64 / 15.0;
+                let distortion = row * 3.0 * (i as f64 * 0.1).cos(); // Different distortion pattern
+                na::Vector2::new(
+                    320.0 + (j as f64 - 7.0) * 20.0 - 40.0 + distortion,
+                    240.0 + (j as f64 - 7.0) * 15.0,
+                )
+            })
+            .collect();
 
         let correspondences = (0..12).map(|j| (j, j)).collect();
 
@@ -119,11 +129,23 @@ fn main() {
         if i >= 3 {
             println!("\n🔍 Detection Analysis (after {} pairs):", i);
             if let Some(info) = calibrator.rolling_shutter_detection_info() {
-                println!("  Position distortion: {:.2}", info.position_distortion_score);
-                println!("  Temporal consistency: {:.2}", info.temporal_consistency_score);
-                println!("  Geometric distortion: {:.2}", info.geometric_distortion_score);
+                println!(
+                    "  Position distortion: {:.2}",
+                    info.position_distortion_score
+                );
+                println!(
+                    "  Temporal consistency: {:.2}",
+                    info.temporal_consistency_score
+                );
+                println!(
+                    "  Geometric distortion: {:.2}",
+                    info.geometric_distortion_score
+                );
                 println!("  Combined score: {:.2}", info.combined_score);
-                println!("  Rolling shutter detected: {}", info.rolling_shutter_detected);
+                println!(
+                    "  Rolling shutter detected: {}",
+                    info.rolling_shutter_detected
+                );
                 println!("  Confidence: {}%", info.confidence);
             }
         }

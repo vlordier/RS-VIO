@@ -4,14 +4,25 @@ use crate::datasets::io::{
 use crate::datasets::{
     config::Config, FrameContext, ImageData, ImuData, PlayerConfig, PlayerResult,
 };
-use crate::estimator::Estimator;
+use crate::estimator::AsyncEstimator;
 use crate::viewers::{create_viewer, Viewer};
 use anyhow::Result;
 use std::path::Path;
+use std::sync::mpsc::{self, Receiver};
 use std::thread;
 use std::time::{Duration, Instant};
+use tokio::runtime::Runtime;
 
 pub struct TUMVIPlayer;
+
+const PREFETCH_DEPTH: usize = 4;
+
+struct PrefetchedFrame {
+    left_image: Vec<u8>,
+    right_image: Vec<u8>,
+    timestamp: i64,
+    imu_between: Vec<ImuData>,
+}
 
 impl Default for TUMVIPlayer {
     fn default() -> Self {
@@ -59,8 +70,16 @@ impl TUMVIPlayer {
         let start_frame_idx = 0;
         let end_frame_idx = image_data.len();
 
+        let prefetch_rx = Self::start_prefetch_thread(
+            config.dataset_path.clone(),
+            image_data.clone(),
+            imu_data,
+            start_frame_idx,
+            end_frame_idx,
+        );
+
         // Initialize viewer
-        let mut viewer: Option<Box<dyn Viewer>> = match create_viewer() {
+        let viewer: Option<Box<dyn Viewer>> = match create_viewer() {
             Ok(v) => {
                 log::info!("[TUMVIPlayer] Viewer initialized successfully");
                 Some(v)
@@ -90,14 +109,19 @@ impl TUMVIPlayer {
             },
         };
 
+        let runtime = match Runtime::new() {
+            Ok(rt) => rt,
+            Err(e) => {
+                result.error_message = format!("Failed to start async runtime: {}", e);
+                return result;
+            },
+        };
+
         // Give ownership of the configuration to the estimator and pass a
         // reference to the viewer (which outlives the estimator).
-        let mut estimator = {
-            let viewer_ref: Option<&mut dyn Viewer> =
-                viewer.as_deref_mut().map(|v| v as &mut dyn Viewer);
-            Estimator::new_with_cameras(cfg, viewer_ref, Some(left_cam), Some(right_cam))
-        };
-        Self::initialize_estimator(&mut estimator, &image_data);
+        let estimator =
+            AsyncEstimator::new_with_cameras(cfg, viewer, Some(left_cam), Some(right_cam));
+        Self::initialize_estimator(&estimator, &image_data);
 
         // Process frames
         let mut context = FrameContext::new(config.step_mode);
@@ -122,13 +146,14 @@ impl TUMVIPlayer {
             if should_process_frame {
                 // Process single frame
                 let frame_start = Instant::now();
-                let _processing_time = match Self::process_single_frame(
-                    &mut estimator,
-                    &mut context,
-                    &image_data,
-                    &config.dataset_path,
-                    &imu_data,
-                ) {
+                let _processing_time = match prefetch_rx.recv() {
+                    Ok(Ok(prefetched)) => {
+                        Self::process_single_frame(&estimator, &runtime, &mut context, prefetched)
+                    },
+                    Ok(Err(e)) => Err(e),
+                    Err(e) => Err(anyhow::anyhow!("Prefetch channel closed: {}", e)),
+                };
+                let _processing_time = match _processing_time {
                     Ok(time) => time,
                     Err(e) => {
                         log::warn!("Error processing frame {}: {}", context.current_idx, e);
@@ -178,6 +203,8 @@ impl TUMVIPlayer {
             Self::save_statistics(&result, &config.dataset_path);
         }
 
+        runtime.block_on(estimator.shutdown());
+
         // Display final statistics summary
         if config.enable_console_statistics && result.success {
             log::info!("════════════════════════════════════════════════════════════════════");
@@ -205,14 +232,14 @@ impl TUMVIPlayer {
         result
     }
 
-    fn load_image_timestamps(dataset_path: &str) -> Result<Vec<ImageData>> {
+    pub fn load_image_timestamps(dataset_path: &str) -> Result<Vec<ImageData>> {
         let data_file = Path::new(dataset_path).join("mav0/cam0/data.csv");
         let image_data = load_csv_image_timestamps(&data_file)?;
         log::info!("[TUMVIPlayer] Loaded {} image timestamps", image_data.len());
         Ok(image_data)
     }
 
-    fn load_image(dataset_path: &str, filename: &str, cam_id: u32) -> Result<Vec<u8>> {
+    pub fn load_image(dataset_path: &str, filename: &str, cam_id: u32) -> Result<Vec<u8>> {
         let cam_folder = if cam_id == 0 { "cam0" } else { "cam1" };
         let full_path = Path::new(dataset_path)
             .join("mav0")
@@ -239,60 +266,108 @@ impl TUMVIPlayer {
         Ok(crate::datasets::create_camera_models_from_config(config))
     }
 
-    fn initialize_estimator<'a>(_estimator: &mut Estimator<'a>, _image_data: &[ImageData]) {
+    fn initialize_estimator(_estimator: &AsyncEstimator, _image_data: &[ImageData]) {
         // TODO: Set initial pose if needed
         // For now, just a placeholder
         log::debug!("[TUMVIPlayer] Estimator initialized");
     }
 
-    fn process_single_frame<'a>(
-        estimator: &mut Estimator<'a>,
+    fn start_prefetch_thread(
+        dataset_path: String,
+        image_data: Vec<ImageData>,
+        imu_data: Vec<ImuData>,
+        start_idx: usize,
+        end_idx: usize,
+    ) -> Receiver<Result<PrefetchedFrame>> {
+        let (tx, rx) = mpsc::sync_channel(PREFETCH_DEPTH);
+
+        thread::spawn(move || {
+            let mut previous_timestamp = 0_i64;
+
+            for idx in start_idx..end_idx {
+                let timestamp = image_data[idx].timestamp;
+
+                let left_image = match Self::load_image(&dataset_path, &image_data[idx].filename, 0)
+                {
+                    Ok(img) => img,
+                    Err(e) => {
+                        let _ = tx.send(Err(e));
+                        break;
+                    },
+                };
+
+                let right_image =
+                    match Self::load_image(&dataset_path, &image_data[idx].filename, 1) {
+                        Ok(img) => img,
+                        Err(e) => {
+                            let _ = tx.send(Err(e));
+                            break;
+                        },
+                    };
+
+                if left_image.is_empty() {
+                    let _ = tx.send(Err(anyhow::anyhow!(
+                        "Skipping frame {} due to empty image",
+                        idx
+                    )));
+                    break;
+                }
+
+                let imu_between = if !imu_data.is_empty() {
+                    Self::get_imu_data_between_frames(previous_timestamp, timestamp, &imu_data)
+                } else {
+                    Vec::new()
+                };
+
+                previous_timestamp = timestamp;
+
+                let prefetched = PrefetchedFrame {
+                    left_image,
+                    right_image,
+                    timestamp,
+                    imu_between,
+                };
+
+                if tx.send(Ok(prefetched)).is_err() {
+                    break;
+                }
+            }
+        });
+
+        rx
+    }
+
+    fn process_single_frame(
+        estimator: &AsyncEstimator,
+        runtime: &Runtime,
         context: &mut FrameContext,
-        image_data: &[ImageData],
-        dataset_path: &str,
-        imu_data: &[ImuData],
+        prefetched: PrefetchedFrame,
     ) -> Result<f64> {
         let frame_start = Instant::now();
 
-        // Inform the estimator about the current frame index for visualization.
-        estimator.set_viewer_frame(context.current_idx as i64);
-
-        // Load stereo images
-        let left_image =
-            Self::load_image(dataset_path, &image_data[context.current_idx].filename, 0)?;
-        let right_image =
-            Self::load_image(dataset_path, &image_data[context.current_idx].filename, 1)?;
-
-        if left_image.is_empty() {
-            anyhow::bail!("Skipping frame {} due to empty image", context.current_idx);
-        }
-
-        // Get IMU data between previous and current frame
-        let imu_between_frames = if !imu_data.is_empty() {
-            Self::get_imu_data_between_frames(
-                context.previous_frame_timestamp,
-                image_data[context.current_idx].timestamp,
-                imu_data,
-            )
-        } else {
-            Vec::new()
-        };
+        let PrefetchedFrame {
+            left_image,
+            right_image,
+            timestamp,
+            imu_between,
+        } = prefetched;
 
         // Process frame
-        let imu_slice = if imu_between_frames.is_empty() {
+        let imu_data = if imu_between.is_empty() {
             None
         } else {
-            Some(imu_between_frames.as_slice())
+            Some(imu_between)
         };
-        estimator.process_frame(
-            &left_image,
-            &right_image,
-            image_data[context.current_idx].timestamp,
-            imu_slice,
-        )?;
+        runtime.block_on(estimator.process_frame_async(
+            context.current_idx as i64,
+            left_image,
+            right_image,
+            timestamp,
+            imu_data,
+        ))?;
 
         // Update frame timestamp
-        context.previous_frame_timestamp = image_data[context.current_idx].timestamp;
+        context.previous_frame_timestamp = timestamp;
 
         let frame_duration = frame_start.elapsed();
         Ok(frame_duration.as_secs_f64() * 1000.0) // Return milliseconds
@@ -318,7 +393,11 @@ impl TUMVIPlayer {
         }
     }
 
-    fn save_trajectories(_estimator: &Estimator, _context: &FrameContext, _dataset_path: &str) {
+    fn save_trajectories(
+        _estimator: &AsyncEstimator,
+        _context: &FrameContext,
+        _dataset_path: &str,
+    ) {
         // TODO: Implement trajectory saving
         log::debug!("[TUMVIPlayer] Saving trajectories (placeholder)");
     }

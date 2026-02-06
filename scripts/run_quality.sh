@@ -112,7 +112,8 @@ get_profile() {
 
 # Run specific tool
 run_specific_tool() {
-    local profile=$(get_profile)
+    local profile
+    profile=$(get_profile)
     case "$TOOL_MODE" in
         fmt|format)
             run_cmd "Formatting (rustfmt)" cargo fmt --all
@@ -197,7 +198,8 @@ run_specific_tool() {
 # Main quality pipeline
 run_quality_pipeline() {
     local failed=0
-    local profile=$(get_profile)
+    local profile
+    profile=$(get_profile)
 
     print_header
 

@@ -17,8 +17,6 @@ import yaml
 from pathlib import Path
 from typing import List, Tuple
 import numpy as np
-import subprocess
-import tempfile
 import json
 from datetime import datetime
 
@@ -82,7 +80,7 @@ def read_original_config(config_path: str) -> dict:
         # Strip YAML directive
         content = f.read()
         if content.strip().startswith("%YAML"):
-            lines = [l for l in content.split("\n") if not l.strip().startswith("%")]
+            lines = [line for line in content.split("\n") if not line.strip().startswith("%")]
             content = "\n".join(lines)
         return yaml.safe_load(content)
 
@@ -102,13 +100,13 @@ def refine_intrinsics(
 ) -> None:
     """
     Refine intrinsics using collected frames until accuracy threshold is hit.
-    
-    Strategy: 
+
+    Strategy:
     1. Process frames iteratively with advanced techniques
     2. Apply temporal super-resolution for sub-pixel accuracy
     3. Use adaptive guidance to improve convergence
     4. Continue until target reprojection error is achieved or max frames reached
-    
+
     Args:
         original_config_path: Original YAML configuration
         frames: List of (timestamp, left_path, right_path) tuples
@@ -143,25 +141,25 @@ def refine_intrinsics(
     iteration = 0
     frames_processed = 0
     convergence_history = []  # Track error over iterations
-    
+
     # Determine adaptive processing strategy
     use_temporal_super_resolution = True
     use_adaptive_guidance = True
-    
+
     print("\n[INFO] Processing strategy:")
     print(f"  ✓ Temporal super-resolution: {use_temporal_super_resolution}")
     print(f"  ✓ Adaptive guidance: {use_adaptive_guidance}")
     print(f"  ✓ Convergence threshold: {target_error:.4f} pixels")
     print()
 
-    print(f"[INFO] Analyzing stereo pairs...")
+    print("[INFO] Analyzing stereo pairs...")
 
     # Process frames until convergence or max limit
     for i, (_, left_path, right_path) in enumerate(frames):
         if i >= max_frames:
             print(f"[INFO] Reached maximum frame limit: {max_frames}")
             break
-            
+
         frames_processed += 1
 
         if (i + 1) % 50 == 0 or frames_processed == 1:
@@ -190,16 +188,16 @@ def refine_intrinsics(
             current_reprojection_error = compute_reprojection_error(all_errors_x, all_errors_y)
             convergence_history.append(current_reprojection_error)
             iteration += 1
-            
+
             # Adaptive guidance: check if we're converging
             if use_adaptive_guidance and len(convergence_history) > 1:
                 prev_error = convergence_history[-2]
                 improvement = (prev_error - current_reprojection_error) / prev_error * 100
-                
+
                 if improvement < 0.5:  # Barely improving
                     print(f"  → Convergence plateau at {current_reprojection_error:.4f} px (improvement: {improvement:.2f}%)")
                     if current_reprojection_error <= target_error:
-                        print(f"[INFO] ✓ Target accuracy reached!")
+                        print("[INFO] ✓ Target accuracy reached!")
                         break
 
             # Check convergence criteria
@@ -221,11 +219,11 @@ def refine_intrinsics(
     # Estimate focal length correction with adaptive scaling
     # Aggressive correction when error is high, conservative when nearing target
     convergence_ratio = min(1.0, current_reprojection_error / target_error) if target_error > 0 else 1.0
-    
+
     # Dynamic scaling: more aggressive early, more conservative as we approach target
     base_scaling = 0.5
     dynamic_scaling = base_scaling * (0.5 + 0.5 * convergence_ratio)
-    
+
     fx_correction = float(mean_error_x * dynamic_scaling)  # Adaptive scale factor
     fy_correction = float(mean_error_y * dynamic_scaling)
 
@@ -234,14 +232,14 @@ def refine_intrinsics(
     refined_right_fx = float(right_intrin[0] + fx_correction * 0.98)
     refined_right_fy = float(right_intrin[1] + fy_correction * 0.98)
 
-    print(f"\n[INFO] Refinement statistics:")
+    print("\n[INFO] Refinement statistics:")
     print(f"  Total frames processed: {frames_processed}")
     print(f"  Iterations: {iteration}")
     print(f"  Mean reprojection error (x): {mean_error_x:.4f} pixels")
     print(f"  Mean reprojection error (y): {mean_error_y:.4f} pixels")
     print(f"  Final RMS error: {current_reprojection_error:.4f} pixels")
     print(f"  Target accuracy: {target_error:.4f} pixels")
-    
+
     if current_reprojection_error <= target_error:
         accuracy_status = f"✓ ACHIEVED ({(target_error/current_reprojection_error):.1f}x better than target)"
     elif current_reprojection_error < 0.3:
@@ -249,19 +247,19 @@ def refine_intrinsics(
     elif current_reprojection_error < 0.5:
         accuracy_status = f"✓ GOOD ({current_reprojection_error:.4f} px)"
     else:
-        accuracy_status = f"⚠ Continue processing for better accuracy"
-    
+        accuracy_status = "⚠ Continue processing for better accuracy"
+
     print(f"  Status: {accuracy_status}")
-    
+
     # Show convergence history
     if len(convergence_history) > 1:
-        print(f"\n[INFO] Convergence history:")
+        print("\n[INFO] Convergence history:")
         for idx, error in enumerate(convergence_history):
             pct_to_target = (error / target_error * 100) if target_error > 0 else 0
             bar_width = int(min(20, 20 * (1.0 - min(1.0, error/0.5))))
             progress_bar = "█" * bar_width + "░" * (20 - bar_width)
             print(f"  Iteration {idx+1}: {error:.4f} px [{progress_bar}] {pct_to_target:.0f}% of target")
-    
+
     print(f"\n[INFO] Estimated corrections (with adaptive scaling {dynamic_scaling:.2f}x):")
     print(
         f"  Left fx: {left_intrin[0]:.6f} → {refined_left_fx:.6f} (Δ {fx_correction:+.6f})"
@@ -297,7 +295,7 @@ def refine_intrinsics(
     refined_config["metadata"]["target_error_px"] = float(target_error)
     refined_config["metadata"]["accuracy_achieved"] = bool(current_reprojection_error <= target_error)
     refined_config["metadata"]["convergence_history"] = [float(e) for e in convergence_history]
-    
+
     # Techniques used
     refined_config["metadata"]["techniques_applied"] = {
         "temporal_super_resolution": bool(use_temporal_super_resolution),
@@ -366,7 +364,7 @@ def main():
         "--frames", type=int, default=500, help="Max frames to use for refinement"
     )
     parser.add_argument(
-        "--target-error", type=float, default=0.15, 
+        "--target-error", type=float, default=0.15,
         help="Target reprojection error in pixels (convergence threshold)"
     )
     parser.add_argument(
@@ -380,8 +378,8 @@ def main():
 
     # Refine intrinsics with convergence-based stopping
     refine_intrinsics(
-        args.config, 
-        frames, 
+        args.config,
+        frames,
         Path(args.output),
         target_error=args.target_error,
         max_frames=args.max_frames

@@ -70,7 +70,7 @@ impl AsyncFeatureDetector {
         height: u32,
     ) -> Vec<DetectedFeature> {
         // Spawn parallel detection tasks
-        let mut tasks = vec![];
+        let mut tasks = Vec::with_capacity(self.config.num_parallel_tasks);
 
         let rows_per_task = (height as usize).div_ceil(self.config.num_parallel_tasks);
 
@@ -172,7 +172,10 @@ fn detect_features_in_region(
     end_row: usize,
     threshold: f32,
 ) -> Vec<DetectedFeature> {
-    let mut features = Vec::new();
+    // Pre-allocate with estimated capacity (typical: 5-10 corners per 100 pixels)
+    let region_pixels = (end_row - start_row) * width;
+    let estimated_features = (region_pixels / 100).max(10);
+    let mut features = Vec::with_capacity(estimated_features);
 
     // Compute safe iteration bounds that avoid underflow for small images
     let y_start = start_row.saturating_add(3);

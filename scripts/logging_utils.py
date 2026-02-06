@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Shared logging utilities for RS-VIO scripts."""
 
-from typing import Optional
 
 
 class Colors:

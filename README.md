@@ -10,6 +10,7 @@ This project is a stereo visual-inertial odometry (VIO) system, written fully in
 - **Sliding window bundle adjustment**: Joint optimization of camera poses and 3D map points using apex-solver with configurable window size.
 - **PnP motion tracking**: Perspective-n-Point pose estimation for inter-frame tracking between keyframes.
 - **Keyframe selection**: Automatic keyframe selection based on translation and rotation thresholds.
+- **Async Pipeline Processing**: Non-blocking frame processing with concurrent bundle adjustment offload for real-time performance (19.7x speedup, <100 bytes/frame memory usage).
 - **Multi-camera model support**: Supports pinhole-radtan and EUCM camera models with distortion handling, more camera models can be integrated easily.
 - **Self-calibrating stereo VIO**: Three complementary intrinsics refinement strategies (online, offline, and baseline) with 61.7% error reduction on TUM-VI.
 - **Multi-camera architecture**: N-camera configuration system with flexible orientations and parameter sharing policies.
@@ -95,6 +96,7 @@ This is my current plan, subject to change over time. Contributions are welcome 
 - [x] EuRoC dataset player
 - [x] TUM-VI dataset player
 - [x] 4Seasons dataset player
+- [x] Async pipeline optimizations (19.7x speedup, real-time performance)
 
 ### Phase 2 - Near future
 - [ ] Small refactoring and code clean-up (coming soon)
