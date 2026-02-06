@@ -79,6 +79,11 @@ impl Default for PinholeCamera {
 
 impl CameraModel for PinholeCamera {
     fn project(&self, point_3d: &na::Vector3<f64>, intrinsics: &[f64]) -> na::Vector2<f64> {
+        // Guard against division by zero
+        if point_3d.z.abs() < 1e-12 {
+            return na::Vector2::new(f64::NAN, f64::NAN);
+        }
+
         // Extract parameters
         let fx = intrinsics[0];
         let fy = intrinsics[1];

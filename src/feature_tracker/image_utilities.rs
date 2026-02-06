@@ -68,9 +68,9 @@ pub fn image_grad(grayscale_image: &GrayImage, x: f32, y: f32) -> na::SVector<f3
 
 pub const fn point_in_bound(keypoint: &Corner, height: u32, width: u32, radius: u32) -> bool {
     keypoint.x >= radius
-        && keypoint.x <= width - radius
+        && keypoint.x + radius <= width
         && keypoint.y >= radius
-        && keypoint.y <= height - radius
+        && keypoint.y + radius <= height
 }
 
 pub fn inbound(image: &GrayImage, x: f32, y: f32, radius: u32) -> bool {

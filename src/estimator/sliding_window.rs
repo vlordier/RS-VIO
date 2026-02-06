@@ -474,12 +474,12 @@ impl SlidingWindow {
                 let error_str = format!("{:?}", e);
                 if error_str.contains("LinearSolveFailed") || error_str.contains("Singular matrix")
                 {
-                    log::warn!("[SlidingWindow] Schur complement failed with singular matrix, trying fallback solver (SparseCholesky)");
+                    log::warn!("[SlidingWindow] Schur complement failed with singular matrix, trying fallback solver (SparseQR)");
 
-                    // Create fallback solver with direct Cholesky
+                    // Create fallback solver with SparseQR (handles rank-deficient systems)
                     let mut fallback_solver = LevenbergMarquardt::with_config(
                         LevenbergMarquardtConfig::new()
-                            .with_linear_solver_type(LinearSolverType::SparseCholesky)
+                            .with_linear_solver_type(LinearSolverType::SparseQR)
                             .with_max_iterations(20)
                             .with_cost_tolerance(1e-6)
                             .with_parameter_tolerance(1e-9)
@@ -545,7 +545,6 @@ impl SlidingWindow {
                 | apex_solver::optimizer::OptimizationStatus::GradientToleranceReached
                 | apex_solver::optimizer::OptimizationStatus::TrustRegionRadiusTooSmall
                 | apex_solver::optimizer::OptimizationStatus::MinCostThresholdReached
-                | apex_solver::optimizer::OptimizationStatus::MaxIterationsReached
         )
     }
 

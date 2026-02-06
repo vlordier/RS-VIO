@@ -431,7 +431,7 @@ impl Factor for EpipolarFactor {
 
         // Compute distance from right point to epipolar line
         let p_right_homogeneous = na::Vector3::new(self.right_point.x, self.right_point.y, 1.0);
-        let numerator = epipolar_line.dot(&p_right_homogeneous).abs();
+        let numerator = epipolar_line.dot(&p_right_homogeneous);
         let denominator = (epipolar_line.x.powi(2) + epipolar_line.y.powi(2)).sqrt();
         let distance = if denominator > 1e-12 {
             numerator / denominator
@@ -739,7 +739,7 @@ impl Factor for TemporalConsistencyFactor {
         let linear_magnitude = linear_vel.norm();
 
         // Residuals penalize unrealistic motion
-        let mut residuals = na::DVector::zeros(6);
+        let mut residuals = na::DVector::zeros(8);
 
         // Angular velocity smoothness (penalize very fast rotations)
         let angular_smoothness_residual =
@@ -753,12 +753,12 @@ impl Factor for TemporalConsistencyFactor {
         // Individual velocity component smoothness
         for i in 0..3 {
             residuals[2 + i] = self.smoothness_weight * angular_vel[i].abs().min(1.0);
-            residuals[5 + i - 3] = self.smoothness_weight * linear_vel[i].abs().min(1.0);
+            residuals[5 + i] = self.smoothness_weight * linear_vel[i].abs().min(1.0);
         }
 
         // TODO: Add proper Jacobians for optimization
         let jacobian = if compute_jacobian {
-            Some(na::DMatrix::zeros(6, 6))
+            Some(na::DMatrix::zeros(8, 6))
         } else {
             None
         };
@@ -767,7 +767,7 @@ impl Factor for TemporalConsistencyFactor {
     }
 
     fn get_dimension(&self) -> usize {
-        6 // smoothness constraints
+        8 // smoothness constraints (2 magnitude + 3 angular + 3 linear)
     }
 }
 

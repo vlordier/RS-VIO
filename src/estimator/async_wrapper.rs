@@ -1537,8 +1537,8 @@ mod tests {
             async_config,
         ));
 
-        let left = create_checkerboard_image(1920, 1080, 10);
-        let right = create_checkerboard_image(1920, 1080, 10);
+        let left = create_checkerboard_image(640, 480, 10);
+        let right = create_checkerboard_image(640, 480, 10);
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
         // Send enough frames to create backlog (buffer pool optimizations made processing faster)
@@ -1657,8 +1657,8 @@ mod tests {
             let (left, right) = if i % 3 == 0 {
                 // Simpler pattern - faster processing
                 (
-                    create_checkerboard_image(320, 240, 30),
-                    create_checkerboard_image(320, 240, 30),
+                    create_checkerboard_image(640, 480, 30),
+                    create_checkerboard_image(640, 480, 30),
                 )
             } else {
                 // Complex pattern - slower processing

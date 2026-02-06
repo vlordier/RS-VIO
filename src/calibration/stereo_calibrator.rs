@@ -1654,7 +1654,7 @@ impl StereoCalibrator {
                 // Project back to cameras
                 let projected_left = self.project_point(&point_3d, left_intrinsics);
                 let projected_right =
-                    self.project_point(&(extrinsics * point_3d), right_intrinsics);
+                    self.project_point(&(extrinsics.inverse() * point_3d), right_intrinsics);
 
                 // Compute reprojection errors
                 let left_error = (observed_left - projected_left).norm();

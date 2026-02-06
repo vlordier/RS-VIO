@@ -152,7 +152,14 @@ impl Estimator {
                 img_w,
                 img_h
             );
-            return Ok(());
+            anyhow::bail!(
+                "Invalid image size: left={}, right={}, expected={} ({}x{})",
+                left_image.len(),
+                right_image.len(),
+                expected_size,
+                img_w,
+                img_h
+            );
         }
 
         // Copy into pre-allocated buffers (memcpy - fast, no malloc)
@@ -173,7 +180,12 @@ impl Estimator {
                     img_h,
                     left_image.len()
                 );
-                return Ok(());
+                anyhow::bail!(
+                    "Failed to construct GrayImage for left camera ({}x{}, len={})",
+                    img_w,
+                    img_h,
+                    left_image.len()
+                );
             },
         };
         let right_img = match GrayImage::from_raw(img_w, img_h, right_buffer) {
@@ -187,7 +199,12 @@ impl Estimator {
                 );
                 // Recover left buffer
                 self.left_image_buffer = left_img.into_raw();
-                return Ok(());
+                anyhow::bail!(
+                    "Failed to construct GrayImage for right camera ({}x{}, len={})",
+                    img_w,
+                    img_h,
+                    right_image.len()
+                );
             },
         };
 

@@ -858,6 +858,13 @@ impl StereoMatcher {
 
     /// Randomly sample k indices from n
     fn random_sample(&self, n: usize, k: usize) -> Vec<usize> {
+        if n == 0 {
+            return Vec::new();
+        }
+        if k >= n {
+            return (0..n).collect();
+        }
+
         use std::collections::HashSet;
 
         let seed = self.rng_counter.get();

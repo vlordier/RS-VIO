@@ -386,6 +386,9 @@ impl Factor for BundleAdjustmentFactor {
         // would stall the solver).
         if p_C.z <= 0.0 {
             let residuals = DVector::from_vec(vec![1e6, 1e6]);
+            if !compute_jacobian {
+                return (residuals, None);
+            }
             if self.fixed_pose.is_some() {
                 // Jacobian pushes the 3D point toward positive z in camera frame
                 let mut jac = DMatrix::zeros(2, 3);
@@ -402,13 +405,13 @@ impl Factor for BundleAdjustmentFactor {
                 // so the optimizer has gradient signal to recover from behind-camera
                 let mut jac = DMatrix::zeros(2, 9);
                 let push = R_C_B.transpose(); // camera z direction in world frame
-                                              // Point Jacobian (columns 6-8): push point toward positive camera z
-                jac[(0, 6)] = push[(2, 0)] * 1e3;
-                jac[(0, 7)] = push[(2, 1)] * 1e3;
-                jac[(0, 8)] = push[(2, 2)] * 1e3;
-                jac[(1, 6)] = push[(2, 0)] * 1e3;
-                jac[(1, 7)] = push[(2, 1)] * 1e3;
-                jac[(1, 8)] = push[(2, 2)] * 1e3;
+                                              // Point Jacobian (columns 0-2): push point toward positive camera z
+                jac[(0, 0)] = push[(2, 0)] * 1e3;
+                jac[(0, 1)] = push[(2, 1)] * 1e3;
+                jac[(0, 2)] = push[(2, 2)] * 1e3;
+                jac[(1, 0)] = push[(2, 0)] * 1e3;
+                jac[(1, 1)] = push[(2, 1)] * 1e3;
+                jac[(1, 2)] = push[(2, 2)] * 1e3;
                 return (residuals, Some(jac));
             }
         }
@@ -595,6 +598,26 @@ impl Factor for PnPFactor {
         // Transform: p_W -> p_B -> p_C
         let p_B = R_B_W * self.p_W + t_B_W;
         let p_C = R_C_B * p_B + t_C_B;
+
+        // Cheirality check: point behind camera gets large residual with
+        // gradient signal so the optimizer can recover
+        if p_C.z <= 0.0 {
+            let residuals = DVector::from_vec(vec![1e6, 1e6]);
+            if compute_jacobian {
+                // Provide gradient pushing the pose so p_C.z increases
+                let jac_proj = self.jacobian_r_wrt_p_C(Vector3::new(p_C.x, p_C.y, 1.0)); // use z=1 to avoid div-by-zero
+                let jac_proj_R_C_B = jac_proj * R_C_B;
+                let jac_trans = &jac_proj_R_C_B * R_B_W.matrix();
+                let mut jac = DMatrix::zeros(2, 6);
+                for r in 0..2 {
+                    for c in 0..3 {
+                        jac[(r, c)] = jac_trans[(r, c)] * 1e3;
+                    }
+                }
+                return (residuals, Some(jac));
+            }
+            return (residuals, None);
+        }
 
         // Project and compute residuals
         let proj = self.project_normalized(p_C);
