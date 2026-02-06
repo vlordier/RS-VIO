@@ -1,7 +1,7 @@
 # Async Pipeline Performance Comparison
 
-**Date**: February 5, 2026  
-**Branches**: `develop` vs `feature/async-pipeline`  
+**Date**: February 5, 2026
+**Branches**: `develop` vs `feature/async-pipeline`
 **Status**: Analysis & Benchmark Execution Plan
 
 ---
@@ -64,7 +64,7 @@ async fn pipeline() {
     tokio::spawn(feature_detection_worker);
     tokio::spawn(tracking_worker);
     tokio::spawn(optimization_worker);
-    
+
     // Frames processed concurrently
     // Frame N: optimization
     // Frame N-1: tracking
@@ -223,7 +223,7 @@ cargo bench --bench tum_vi_async_pipeline
 
 ### Phase 1: Fix Build Issues ✅
 
-**Problem**: Missing `criterion` dependency  
+**Problem**: Missing `criterion` dependency
 **Solution**: Added to Cargo.toml:
 ```toml
 [dev-dependencies]
@@ -320,8 +320,8 @@ Based on architectural analysis and code review:
 
 ### Status: ✅ **TUM-VI Async + Sequential Benchmarks Complete**
 
-**Dataset**: TUM-VI room1 (local, datasets/tum_vi/room1)  
-**Benchmark**: `tumvi_async_pipeline_500_frames`  
+**Dataset**: TUM-VI room1 (local, datasets/tum_vi/room1)
+**Benchmark**: `tumvi_async_pipeline_500_frames`
 **Runtime**: Async feature detection + async optimization (500 frames, **STEREO processing**)
 **Criterion settings**: sample-size 100, warm-up 1s, measurement 10s
 
@@ -535,6 +535,6 @@ From `benchmark_results/benchmark_comparison_feature_branch.json`:
 
 ---
 
-**Last Updated**: February 5, 2026  
-**Status**: Awaiting benchmark execution  
+**Last Updated**: February 5, 2026
+**Status**: Awaiting benchmark execution
 **Next Update**: After benchmark completion (~15 minutes)
