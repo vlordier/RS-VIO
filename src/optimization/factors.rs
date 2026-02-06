@@ -481,9 +481,16 @@ impl Factor for BundleAdjustmentFactor {
                 // We computed J * skew, so negate
                 jac_r_wrt_rot.neg_mut();
 
+                // ∂r/∂t_B_W = jac_proj * R_C_B (since p_B = R_B_W*p_W + t_B_W)
+                let mut jac_r_wrt_t = na::Matrix2x3::<f64>::zeros();
+                for i in 0..3 {
+                    jac_r_wrt_t[(0, i)] = fx * R_C_B[(0, i)] + fz_x * R_C_B[(2, i)];
+                    jac_r_wrt_t[(1, i)] = fy * R_C_B[(1, i)] + fz_y * R_C_B[(2, i)];
+                }
+
                 let mut jac = DMatrix::zeros(2, 9);
                 jac.view_mut((0, 0), (2, 3)).copy_from(&jac_r_wrt_p_W); // ∂r/∂p_W
-                jac.view_mut((0, 3), (2, 3)).copy_from(&jac_r_wrt_p_W); // ∂r/∂t (Following original logic)
+                jac.view_mut((0, 3), (2, 3)).copy_from(&jac_r_wrt_t); // ∂r/∂t_B_W
                 jac.view_mut((0, 6), (2, 3)).copy_from(&jac_r_wrt_rot); // ∂r/∂ω
                 Some(jac)
             }

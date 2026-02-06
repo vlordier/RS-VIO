@@ -6,8 +6,6 @@ use std::collections::HashMap;
 
 use super::{image_utilities, patch};
 
-use log::info;
-
 #[derive(Debug, Clone)]
 pub struct Feature {
     /// Unique identifier of this feature (within the current frame or globally).
@@ -26,79 +24,6 @@ impl Feature {
             feature_id,
             pixel_coord,
             undistorted_coord: [-1.0, -1.0],
-        }
-    }
-}
-
-#[derive(Default)]
-pub struct PatchTracker<const N: u32> {
-    last_keypoint_id: usize,
-    tracked_points_map: HashMap<usize, na::Affine2<f32>>,
-    previous_image_pyramid: Vec<GrayImage>,
-    current_image_pyramid: Vec<GrayImage>,
-    has_previous: bool,
-}
-impl<const LEVELS: u32> PatchTracker<LEVELS> {
-    pub fn process_frame(&mut self, greyscale_image: &GrayImage) {
-        // build current image pyramid (reuse buffers)
-        ensure_pyramid_buffers(
-            &mut self.current_image_pyramid,
-            greyscale_image.width(),
-            greyscale_image.height(),
-            LEVELS,
-        );
-        ensure_pyramid_buffers(
-            &mut self.previous_image_pyramid,
-            greyscale_image.width(),
-            greyscale_image.height(),
-            LEVELS,
-        );
-        build_pyramid_in_place(greyscale_image, &mut self.current_image_pyramid);
-
-        if self.has_previous {
-            info!("old points {}", self.tracked_points_map.len());
-            // track prev points
-            // Default values for PatchTracker (not used in estimator)
-            const DEFAULT_OPTICAL_FLOW_MAX_ITERATIONS: usize = 30;
-            const DEFAULT_OPTICAL_FLOW_CONVERGENCE_THRESHOLD: f32 = 0.005;
-            self.tracked_points_map = track_points::<LEVELS>(
-                &self.previous_image_pyramid,
-                &self.current_image_pyramid,
-                &self.tracked_points_map,
-                DEFAULT_OPTICAL_FLOW_MAX_ITERATIONS,
-                DEFAULT_OPTICAL_FLOW_CONVERGENCE_THRESHOLD,
-            );
-            info!("tracked old points {}", self.tracked_points_map.len());
-        }
-        // add new points
-        // Default grid_size for PatchTracker (not used in estimator)
-        const DEFAULT_GRID_SIZE: u32 = 30;
-        let new_points = add_points(&self.tracked_points_map, greyscale_image, DEFAULT_GRID_SIZE);
-        for point in &new_points {
-            let mut v = na::Affine2::<f32>::identity();
-
-            v.matrix_mut_unchecked().m13 = point.x as f32;
-            v.matrix_mut_unchecked().m23 = point.y as f32;
-            self.tracked_points_map.insert(self.last_keypoint_id, v);
-            self.last_keypoint_id += 1;
-        }
-
-        // update saved image pyramid (swap to reuse allocations)
-        std::mem::swap(
-            &mut self.previous_image_pyramid,
-            &mut self.current_image_pyramid,
-        );
-        self.has_previous = true;
-    }
-    pub fn get_track_points(&self) -> HashMap<usize, (f32, f32)> {
-        self.tracked_points_map
-            .iter()
-            .map(|(k, v)| (*k, (v.matrix().m13, v.matrix().m23)))
-            .collect()
-    }
-    pub fn remove_id(&mut self, ids: &[usize]) {
-        for id in ids {
-            self.tracked_points_map.remove(id);
         }
     }
 }

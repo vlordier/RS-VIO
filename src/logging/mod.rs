@@ -15,10 +15,7 @@ use anyhow::Result;
 use std::sync::{Arc, Mutex};
 
 /// Initialize real-time logging system
-pub fn init_realtime_logging(
-    _enable_metrics: bool,
-    log_file: Option<&str>,
-) -> Result<Arc<Mutex<StructuredLogger>>> {
+pub fn init_realtime_logging(log_file: Option<&str>) -> Result<Arc<Mutex<StructuredLogger>>> {
     let logger = StructuredLogger::new(log_file)?;
     Ok(Arc::new(Mutex::new(logger)))
 }
@@ -29,7 +26,7 @@ mod tests {
 
     #[test]
     fn test_realtime_logging_init() {
-        let result = init_realtime_logging(true, None);
+        let result = init_realtime_logging(None);
         assert!(result.is_ok());
     }
 }

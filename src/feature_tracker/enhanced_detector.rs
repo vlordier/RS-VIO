@@ -10,8 +10,6 @@
 use imageproc::corners::Corner;
 use nalgebra as na;
 use rayon::prelude::*;
-use std::f32;
-
 /// Enhanced feature with descriptor and subpixel precision
 #[derive(Debug, Clone)]
 pub struct EnhancedFeature {
@@ -66,43 +64,6 @@ impl Default for EnhancedDetectorConfig {
             brief_smoothing_sigma: 2.0,
         }
     }
-}
-
-/// Temporal feature tracker for maintaining consistency across frames
-#[derive(Debug, Clone)]
-pub struct TemporalFeatureTracker {
-    /// Tracked features from previous frames
-    pub tracks: Vec<FeatureTrack>,
-    /// Maximum number of frames to keep a track alive
-    pub max_track_age: usize,
-    /// Maximum displacement between frames (pixels)
-    pub max_displacement: f32,
-}
-
-#[derive(Debug, Clone)]
-pub struct FeatureTrack {
-    /// Unique track ID
-    pub id: usize,
-    /// Feature positions across frames
-    pub positions: Vec<na::Vector2<f32>>,
-    /// Feature descriptors across frames
-    pub descriptors: Vec<[u8; 16]>,
-    /// Track age (frames since last update)
-    pub age: usize,
-    /// Track quality/confidence
-    pub quality: f32,
-    /// Kalman filter state (position, velocity)
-    pub kalman_state: KalmanState,
-    /// Kalman filter covariance
-    pub kalman_covariance: na::Matrix4<f32>,
-}
-
-#[derive(Debug, Clone)]
-pub struct KalmanState {
-    /// Position (x, y)
-    pub position: na::Vector2<f32>,
-    /// Velocity (vx, vy)
-    pub velocity: na::Vector2<f32>,
 }
 
 /// Enhanced feature detector with ORB descriptors
@@ -529,44 +490,6 @@ pub fn hamming_distance(desc1: &[u8; 16], desc2: &[u8; 16]) -> u32 {
         .sum()
 }
 
-/// Match features between two sets using ORB descriptors
-pub fn match_features_orb(
-    features1: &[EnhancedFeature],
-    features2: &[EnhancedFeature],
-    max_distance: u32,
-) -> Vec<(usize, usize)> {
-    let mut matches = Vec::new();
-
-    for (i, f1) in features1.iter().enumerate() {
-        let mut best_match = None;
-        let mut best_distance = u32::MAX;
-        let mut second_best_distance = u32::MAX;
-
-        for (j, f2) in features2.iter().enumerate() {
-            let dist = hamming_distance(&f1.descriptor, &f2.descriptor);
-            if dist < best_distance {
-                second_best_distance = best_distance;
-                best_distance = dist;
-                best_match = Some(j);
-            } else if dist < second_best_distance {
-                second_best_distance = dist;
-            }
-        }
-
-        // Lowe's ratio test
-        if let Some(j) = best_match {
-            if best_distance < max_distance
-                && second_best_distance > 0
-                && (best_distance as f32) / (second_best_distance as f32) < 0.8
-            {
-                matches.push((i, j));
-            }
-        }
-    }
-
-    matches
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -576,179 +499,6 @@ mod tests {
         let config = EnhancedDetectorConfig::default();
         let detector = EnhancedFeatureDetector::new(config);
         assert_eq!(detector.config.max_features, 1000);
-    }
-
-    impl TemporalFeatureTracker {
-        /// Create new temporal tracker
-        pub fn new(max_track_age: usize, max_displacement: f32) -> Self {
-            Self {
-                tracks: Vec::new(),
-                max_track_age,
-                max_displacement,
-            }
-        }
-
-        /// Update tracks with new features from current frame
-        pub fn update_tracks(&mut self, new_features: &[EnhancedFeature]) -> Vec<(usize, usize)> {
-            let mut assignments = Vec::new();
-            let mut used_features = vec![false; new_features.len()];
-
-            // Try to match existing tracks to new features
-            for (track_idx, track) in self.tracks.iter_mut().enumerate() {
-                if let Some(last_pos) = track.positions.last() {
-                    let mut best_match = None;
-                    let mut best_distance = f32::INFINITY;
-
-                    for (feat_idx, feature) in new_features.iter().enumerate() {
-                        if used_features[feat_idx] {
-                            continue;
-                        }
-
-                        let dx = feature.point.x - last_pos.x;
-                        let dy = feature.point.y - last_pos.y;
-                        let distance = (dx * dx + dy * dy).sqrt();
-
-                        if distance < self.max_displacement && distance < best_distance {
-                            // Also check descriptor similarity if we have previous descriptor
-                            if let Some(last_desc) = track.descriptors.last() {
-                                let desc_distance =
-                                    hamming_distance(last_desc, &feature.descriptor);
-                                if desc_distance < 32 {
-                                    // Threshold for descriptor similarity
-                                    best_distance = distance;
-                                    best_match = Some(feat_idx);
-                                }
-                            } else {
-                                best_distance = distance;
-                                best_match = Some(feat_idx);
-                            }
-                        }
-                    }
-
-                    if let Some(feat_idx) = best_match {
-                        // Kalman filter update
-                        let dt = 1.0; // Assume 1 frame time unit
-                        Self::kalman_predict(track, dt);
-                        Self::kalman_update(track, new_features[feat_idx].point, 1.0); // Measurement noise
-
-                        // Update track data
-                        track.positions.push(track.kalman_state.position); // Use filtered position
-                        track.descriptors.push(new_features[feat_idx].descriptor);
-                        track.age = 0;
-                        track.quality = (track.quality + new_features[feat_idx].quality) * 0.5; // Running average
-
-                        assignments.push((track_idx, feat_idx));
-                        used_features[feat_idx] = true;
-                    } else {
-                        track.age += 1;
-                    }
-                }
-            }
-
-            // Create new tracks for unmatched features
-            for (feat_idx, feature) in new_features.iter().enumerate() {
-                if !used_features[feat_idx] {
-                    let track_id = self.tracks.len();
-                    self.tracks.push(FeatureTrack {
-                        id: track_id,
-                        positions: vec![feature.point],
-                        descriptors: vec![feature.descriptor],
-                        age: 0,
-                        quality: feature.quality,
-                        kalman_state: KalmanState {
-                            position: feature.point,
-                            velocity: na::Vector2::zeros(),
-                        },
-                        kalman_covariance: na::Matrix4::identity() * 10.0, // Initial uncertainty
-                    });
-                }
-            }
-
-            // Remove old tracks
-            self.tracks.retain(|track| track.age <= self.max_track_age);
-
-            assignments
-        }
-
-        /// Kalman filter prediction step
-        fn kalman_predict(track: &mut FeatureTrack, dt: f32) {
-            // State transition matrix F
-            let f = na::Matrix4::new(
-                1.0, 0.0, dt, 0.0, 0.0, 1.0, 0.0, dt, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-            );
-
-            // Process noise Q
-            let q = na::Matrix4::identity() * 0.1;
-
-            // Predict state
-            let state_vec = na::Vector4::new(
-                track.kalman_state.position.x,
-                track.kalman_state.position.y,
-                track.kalman_state.velocity.x,
-                track.kalman_state.velocity.y,
-            );
-
-            let predicted_state = f * state_vec;
-
-            track.kalman_state.position = na::Vector2::new(predicted_state[0], predicted_state[1]);
-            track.kalman_state.velocity = na::Vector2::new(predicted_state[2], predicted_state[3]);
-
-            // Predict covariance
-            track.kalman_covariance = f * track.kalman_covariance * f.transpose() + q;
-        }
-
-        /// Kalman filter update step
-        fn kalman_update(
-            track: &mut FeatureTrack,
-            measurement: na::Vector2<f32>,
-            measurement_noise: f32,
-        ) {
-            // Measurement matrix H (maps 4D state to 2D measurement)
-            let h = na::Matrix2x4::new(1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0);
-
-            // Measurement noise R
-            let r = na::Matrix2::identity() * measurement_noise;
-
-            // Innovation (measurement residual)
-            let predicted_pos = track.kalman_state.position;
-            let innovation = measurement - predicted_pos;
-
-            // Innovation covariance S = H*P*H^T + R
-            let h_t = h.transpose(); // 4x2
-            let hp = track.kalman_covariance * h_t; // 4x4 * 4x2 = 4x2
-            let s = h * hp + r; // 2x4 * 4x2 + 2x2 = 2x2
-
-            // Kalman gain K = P*H^T*S^-1
-            let s_inv = s.try_inverse().unwrap_or_else(|| {
-                // Fallback for singular matrix - use identity scaled by small factor
-                na::Matrix2::identity() * 0.01
-            });
-            let k = hp * s_inv; // 4x2 * 2x2 = 4x2
-
-            // Update state: x = x + K*innovation
-            let state_vec = na::Vector4::new(
-                track.kalman_state.position.x,
-                track.kalman_state.position.y,
-                track.kalman_state.velocity.x,
-                track.kalman_state.velocity.y,
-            );
-
-            let state_update = k * innovation;
-            let updated_state = state_vec + state_update;
-
-            track.kalman_state.position = na::Vector2::new(updated_state[0], updated_state[1]);
-            track.kalman_state.velocity = na::Vector2::new(updated_state[2], updated_state[3]);
-
-            // Update covariance: P = (I - K*H)*P
-            let i = na::Matrix4::identity();
-            let kh = k * h; // 4x2 * 2x4 = 4x4
-            track.kalman_covariance = (i - kh) * track.kalman_covariance;
-        }
-
-        /// Get active tracks (recently updated)
-        pub fn get_active_tracks(&self) -> Vec<&FeatureTrack> {
-            self.tracks.iter().filter(|track| track.age == 0).collect()
-        }
     }
 
     #[test]

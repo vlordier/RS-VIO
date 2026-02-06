@@ -54,6 +54,5 @@ unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 # Allow only these git sources
 allow-git = [
-    "https://github.com/charleshamesse/RS-VIO",
     "https://github.com/amin-abouee/apex-solver",
 ]

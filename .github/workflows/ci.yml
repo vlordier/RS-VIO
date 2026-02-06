@@ -1,13 +1,13 @@
 name: CI
 
 on:
+  push:
+    branches: [main, develop]
   pull_request:
-    types: [closed]
-    branches: [develop, main]
+    branches: [main, develop]
 
 jobs:
   test:
-    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     env:
       ZSTD_SYS_USE_PKG_CONFIG: "1"
@@ -64,7 +64,7 @@ jobs:
         run: cargo test --verbose 2>&1 | grep -v '<jemalloc>' || true
 
   pre-commit:
-    if: ${{ github.event.pull_request.merged == true && github.actor != 'nektos/act' }}
+    if: ${{ github.actor != 'nektos/act' }}
     runs-on: ubuntu-latest
     env:
       ZSTD_SYS_USE_PKG_CONFIG: "1"

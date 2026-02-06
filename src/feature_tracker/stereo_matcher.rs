@@ -123,8 +123,7 @@ impl StereoMatcher {
             // If not the finest level, use matches to guide next level
             if level > 0 {
                 // Propagate matches to guide finer level
-                all_matches =
-                    self.propagate_matches_to_next_level(&level_matches, &all_matches, scale);
+                all_matches = self.propagate_matches_to_next_level(&level_matches, scale);
             } else {
                 // Finest level - collect final matches
                 all_matches.extend(level_matches);
@@ -197,7 +196,6 @@ impl StereoMatcher {
     fn propagate_matches_to_next_level(
         &self,
         coarse_matches: &[StereoMatch],
-        _previous_matches: &[StereoMatch],
         scale: f32,
     ) -> Vec<StereoMatch> {
         // Use coarse matches to predict search regions for fine level
@@ -868,72 +866,6 @@ impl StereoMatcher {
     }
 }
 
-/// Memory-efficient stereo calibration data structure
-#[derive(Debug, Clone)]
-pub struct StereoCalibrationData {
-    /// Left image features
-    pub left_features: Vec<EnhancedFeature>,
-    /// Right image features
-    pub right_features: Vec<EnhancedFeature>,
-    /// Stereo matches
-    pub matches: Vec<StereoMatch>,
-    /// Camera intrinsics used for matching
-    pub intrinsics: na::Matrix3<f64>,
-    /// Timestamp of this stereo pair
-    pub timestamp: f64,
-}
-
-impl StereoCalibrationData {
-    /// Create new stereo calibration data
-    pub const fn new(
-        left_features: Vec<EnhancedFeature>,
-        right_features: Vec<EnhancedFeature>,
-        matches: Vec<StereoMatch>,
-        intrinsics: na::Matrix3<f64>,
-        timestamp: f64,
-    ) -> Self {
-        Self {
-            left_features,
-            right_features,
-            matches,
-            intrinsics,
-            timestamp,
-        }
-    }
-
-    /// Get number of valid matches
-    pub const fn num_matches(&self) -> usize {
-        self.matches.len()
-    }
-
-    /// Get average epipolar error
-    pub fn average_epipolar_error(&self) -> f32 {
-        if self.matches.is_empty() {
-            return 0.0;
-        }
-
-        self.matches.iter().map(|m| m.epipolar_error).sum::<f32>() / self.matches.len() as f32
-    }
-
-    /// Get match quality statistics
-    pub fn match_quality_stats(&self) -> (f32, f32, f32) {
-        if self.matches.is_empty() {
-            return (0.0, 0.0, 0.0);
-        }
-
-        let scores: Vec<f32> = self.matches.iter().map(|m| m.score as f32).collect();
-        let mean = scores.iter().sum::<f32>() / scores.len() as f32;
-        let variance = scores.iter().map(|s| (s - mean).powi(2)).sum::<f32>() / scores.len() as f32;
-        let std_dev = variance.sqrt();
-
-        (
-            mean,
-            std_dev,
-            scores.iter().fold(f32::INFINITY, |a, &b| a.min(b)),
-        )
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -956,17 +888,5 @@ mod tests {
 
         let error = matcher.compute_epipolar_error(&f, &left_point, &right_point);
         assert!(error >= 0.0);
-    }
-
-    #[test]
-    fn test_stereo_calibration_data() {
-        let features = vec![];
-        let matches = vec![];
-        let intrinsics = na::Matrix3::identity();
-
-        let data = StereoCalibrationData::new(features.clone(), features, matches, intrinsics, 0.0);
-
-        assert_eq!(data.num_matches(), 0);
-        assert!((data.average_epipolar_error() - 0.0_f32).abs() < f32::EPSILON);
     }
 }

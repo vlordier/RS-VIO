@@ -160,27 +160,8 @@ impl ImuFactor {
     }
 
     /// Convert unit quaternion to rotation vector (Log map)
-    ///
-    /// This is the inverse of exp_map (Rodrigues formula)
     fn quat_to_rotation_vector(q: &UnitQuaternion<f64>) -> Vector3<f64> {
-        // For unit quaternion q = [w, x, y, z]
-        // The rotation angle θ = 2 * acos(w)
-        // The rotation axis n = [x, y, z] / sin(θ/2)
-        // Rotation vector = θ * n
-
-        let w = q.w;
-        let vec = Vector3::new(q.i, q.j, q.k);
-
-        // Small angle approximation for numerical stability
-        if vec.norm() < 1e-8 {
-            // θ ≈ 0, so rotation vector ≈ 2 * [x, y, z]
-            return 2.0 * vec;
-        }
-
-        let theta = 2.0 * w.acos();
-        let axis = vec / vec.norm();
-
-        theta * axis
+        q.scaled_axis()
     }
 }
 

@@ -180,14 +180,7 @@ benchmark-all:
 # ---------------------------------------------------------------------------
 # Docker
 # ---------------------------------------------------------------------------
-docker: docker-build
-    echo "Docker image built: rs-vio:latest"
-
-docker-build:
-    echo "Building Docker image..."
-    docker build -t rs-vio:latest .
-
-docker-test: docker-build
+docker-test:
     echo "Testing Docker image..."
     docker run --rm rs-vio:latest --help
     echo "Docker smoke test passed."
@@ -202,25 +195,8 @@ docker-push:
 # ---------------------------------------------------------------------------
 # Visualization
 # ---------------------------------------------------------------------------
-viz: viz-demo viz-tum viz-plots viz-plots-tum
+viz: viz-plots viz-plots-tum
     echo "All visualizations generated."
-
-viz-demo:
-    echo "Generating synthetic demonstration data..."
-    cargo run --example plot_vio_comparisons
-    echo "Demo data generated in ./plot_output/"
-
-viz-tum:
-    echo "Processing TUM-VI dataset..."
-    if [ -d "{{dataset_dir}}/tum_vi/room1" ]; then \
-      cargo run --example plot_tum_vi_comparison -- {{dataset_dir}}/tum_vi/room1; \
-      echo "TUM-VI data generated in ./tum_vi_results/"; \
-    else \
-      echo "TUM-VI dataset not found at {{dataset_dir}}/tum_vi/room1"; \
-      echo "Download from https://vision.in.tum.de/data/datasets/visual-inertial-dataset"; \
-      echo "Or run: just download-datasets"; \
-      exit 1; \
-    fi
 
 viz-install-python:
     echo "Installing Python plotting dependencies..."
@@ -261,7 +237,7 @@ viz-plots-tum:
 clean:
     echo "Cleaning build artifacts..."
     cargo clean
-    rm -rf {{build_dir}} Cargo.lock
+    rm -rf {{build_dir}}
 
 clean-all: clean
     echo "Removing Docker containers and images..."

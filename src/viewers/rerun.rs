@@ -16,8 +16,6 @@ pub struct RerunViewer {
     initialized: bool,
     frame_id: i64,
     timestamp_ns: i64,
-    #[allow(dead_code)] // TODO: use for relative time calculation
-    first_timestamp_ns: Option<i64>,
 }
 
 impl Default for RerunViewer {
@@ -33,7 +31,6 @@ impl RerunViewer {
             initialized: false,
             frame_id: 0,
             timestamp_ns: 0,
-            first_timestamp_ns: None,
         }
     }
 
