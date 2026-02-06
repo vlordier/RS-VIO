@@ -46,8 +46,6 @@ pub struct Estimator {
     sliding_window: Arc<Mutex<SlidingWindow>>,
     /// Optimization in-flight flag for background bundle adjustment.
     optimization_in_flight: Arc<AtomicBool>,
-    /// Optimization completion flag for deferred visualization/refinement.
-    optimization_completed: Arc<AtomicBool>,
     /// Optional viewer used for visualization; owned by the estimator.
     viewer: Option<Box<dyn Viewer>>,
     /// Left camera model with intrinsics and distortion.
@@ -59,7 +57,6 @@ pub struct Estimator {
     // Transformation from body to right camera
     T_B_Cr: Matrix4x4,
     // Full trajectory of keyframes
-    trajectory: Vec<Matrix4x4>,
     /// Online intrinsics refinement state
     intrinsics_refinement: Option<IntrinsicsRefinementState>,
     /// Pre-allocated image buffer for left camera (reused each frame - zero allocation)
@@ -140,13 +137,11 @@ impl Estimator {
             ),
             sliding_window: Arc::new(Mutex::new(SlidingWindow::new(keyframe_window_size))),
             optimization_in_flight: Arc::new(AtomicBool::new(false)),
-            optimization_completed: Arc::new(AtomicBool::new(false)),
             viewer,
             left_cam,
             right_cam,
             T_B_Cl,
             T_B_Cr,
-            trajectory: Vec::new(),
             intrinsics_refinement,
             left_image_buffer,
             right_image_buffer,
@@ -180,7 +175,7 @@ impl Estimator {
         let mut frame_creation_time_ms = 0.0f64;
         #[allow(unused_assignments)]
         let mut patch_tracking_time_ms = 0.0f64;
-        let mut motion_tracking_time_ms = 0.0f64;
+        let motion_tracking_time_ms;
         let mut optimization_time_ms = 0.0f64;
 
         // Frame creation
@@ -281,23 +276,28 @@ impl Estimator {
         self.view_patch_tracking_results(&current_frame, &left_img, &right_img, img_w, img_h);
 
         // Motion tracking - only if the sliding window is full (has initialized keyframes)
-        let motion_tracking_result = if let Ok(mut sliding_window) = self.sliding_window.try_lock()
-        {
-            if sliding_window.is_full() {
-                // DEBUG
-                let motion_tracking_start = Instant::now();
-                let result = sliding_window.track_motion(&current_frame);
-                drop(sliding_window); // Drop lock before borrowing self mutably
-                let motion_tracking_elapsed =
-                    motion_tracking_start.elapsed().as_secs_f64() * 1000.0;
-                (result, motion_tracking_elapsed)
-            } else {
-                drop(sliding_window);
+        let motion_tracking_result = match self.sliding_window.try_lock() {
+            Ok(mut sliding_window) => {
+                if sliding_window.is_full() {
+                    // DEBUG
+                    let motion_tracking_start = Instant::now();
+                    let result = sliding_window.track_motion(&current_frame);
+                    drop(sliding_window); // Drop lock before borrowing self mutably
+                    let motion_tracking_elapsed =
+                        motion_tracking_start.elapsed().as_secs_f64() * 1000.0;
+                    (result, motion_tracking_elapsed)
+                } else {
+                    drop(sliding_window);
+                    (Ok(None), 0.0)
+                }
+            }
+            Err(std::sync::TryLockError::WouldBlock) => {
+                log::debug!("Sliding window busy, skipping motion tracking");
                 (Ok(None), 0.0)
             }
-        } else {
-            log::debug!("Sliding window busy, skipping motion tracking");
-            (Ok(None), 0.0)
+            Err(std::sync::TryLockError::Poisoned(e)) => {
+                return Err(anyhow::anyhow!("Sliding window mutex is poisoned: {}", e));
+            }
         };
 
         match motion_tracking_result.0 {
@@ -384,9 +384,15 @@ impl Estimator {
             let in_flight = Arc::clone(&self.optimization_in_flight);
 
             std::thread::spawn(move || {
-                if let Ok(mut window) = sliding_window.lock() {
-                    let _ = window.optimize();
-                    in_flight.store(false, Ordering::Relaxed);
+                match sliding_window.lock() {
+                    Ok(mut window) => {
+                        let _ = window.optimize();
+                        in_flight.store(false, Ordering::Relaxed);
+                    }
+                    Err(e) => {
+                        log::error!("Failed to acquire sliding window lock for optimization: {}", e);
+                        in_flight.store(false, Ordering::Relaxed);
+                    }
                 }
             });
         }
@@ -462,72 +468,6 @@ impl Estimator {
     }
 
     /// Visualize optimization results: map points, keyframe poses, and camera frustums.
-    fn view_optimization_results(&mut self) {
-        if let Some(v) = &mut self.viewer {
-            // Map points
-            let colored_points: Vec<(usize, [f32; 3])> = {
-                let sw = self.sliding_window.lock().unwrap();
-                sw.map_points
-                    .iter()
-                    .map(|(&feature_id, &point)| (feature_id, point))
-                    .collect()
-            };
-            v.log_points_colored(&colored_points, "map/points");
-
-            // Keyframe poses with left and right camera frustrums
-            let system_poses = self.sliding_window.lock().unwrap().get_keyframe_poses();
-            for (pose_id, T_W_B) in system_poses.iter().enumerate() {
-                // pose is T_W_B
-                let pose_path = format!("pose_{}", pose_id);
-                v.log_pose(*T_W_B, pose_path.as_str());
-
-                let width = self.config.camera.image_width;
-                let height = self.config.camera.image_height;
-
-                // Log left camera frustum at the pose location (left camera is at the pose)
-                let left_focal_length = self.config.camera.left_intrinsics[0] as f32;
-                let left_cam_path = format!("{}_left", pose_path);
-                let T_W_Cl = T_W_B * self.T_B_Cl;
-                v.log_pose(T_W_Cl, left_cam_path.as_str());
-                let size = 0.2; // if pose_id == system_poses.len() - 1 { 0.5 } else { 0.2 };
-                v.log_camera_frustum(
-                    left_focal_length,
-                    width,
-                    height,
-                    left_cam_path.as_str(),
-                    size,
-                );
-
-                // Log right camera pose and frustum for last pose
-                // Removed for now as it made too much clutter
-                /*
-                if pose_id == system_poses.len() - 1 {
-                    let right_cam_path = format!("{}_right", pose_path);
-                    let right_focal_length = self.config.camera.right_intrinsics[0] as f32;
-                    let T_W_Cr = T_W_B * self.T_B_Cr;
-                    v.log_pose(T_W_Cr, right_cam_path.as_str());
-                    v.log_camera_frustum(right_focal_length, width, height, right_cam_path.as_str(), size);
-                }
-                */
-            }
-
-            // History of keyframe poses
-            #[allow(clippy::unwrap_used)] // Validated by sliding_window - keyframes exist
-            let mat = *self
-                .sliding_window
-                .lock()
-                .unwrap()
-                .get_keyframe_poses()
-                .first()
-                .unwrap();
-            self.trajectory.push(mat);
-
-            // Display trajectory as a continuous 3D path
-            v.log_trajectory(&self.trajectory, "trajectory/path");
-            // log::info!("[Estimator] System position: {:?}, {:?}, {:?}", mat[0][3], mat[1][3], mat[2][3]);
-        }
-    }
-
     /// Refine camera intrinsics based on accumulated reprojection errors
     pub fn refine_intrinsics_online(&mut self) {
         if let Some(ref mut intrinsics_state) = self.intrinsics_refinement {

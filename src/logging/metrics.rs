@@ -92,68 +92,81 @@ impl PerformanceMetrics {
     /// Add sample and clean old entries
     fn _add_sample(&self, samples: &Arc<Mutex<VecDeque<MetricSample>>>, value: f64) {
         let now = Instant::now();
-        if let Ok(mut samples) = samples.lock() {
-            // Remove old samples outside window
-            while let Some(front) = samples.front() {
-                if now.duration_since(front.timestamp) > self.window_size {
+        match samples.lock() {
+            Ok(mut samples) => {
+                // Remove old samples outside window
+                while let Some(front) = samples.front() {
+                    if now.duration_since(front.timestamp) > self.window_size {
+                        samples.pop_front();
+                    } else {
+                        break;
+                    }
+                }
+
+                // Add new sample
+                samples.push_back(MetricSample {
+                    timestamp: now,
+                    value,
+                });
+
+                // Limit total samples
+                while samples.len() > self.max_samples {
                     samples.pop_front();
-                } else {
-                    break;
                 }
             }
-
-            // Add new sample
-            samples.push_back(MetricSample {
-                timestamp: now,
-                value,
-            });
-
-            // Limit total samples
-            while samples.len() > self.max_samples {
-                samples.pop_front();
+            Err(e) => {
+                log::error!("Failed to acquire metrics samples lock: {}", e);
             }
         }
     }
 
     /// Calculate average of samples in window
     fn _average(&self, samples: &Arc<Mutex<VecDeque<MetricSample>>>) -> Option<f64> {
-        if let Ok(samples) = samples.lock() {
-            if samples.is_empty() {
-                return None;
+        match samples.lock() {
+            Ok(samples) => {
+                if samples.is_empty() {
+                    return None;
+                }
+                let sum: f64 = samples.iter().map(|s| s.value).sum();
+                Some(sum / samples.len() as f64)
             }
-            let sum: f64 = samples.iter().map(|s| s.value).sum();
-            Some(sum / samples.len() as f64)
-        } else {
-            None
+            Err(e) => {
+                log::error!("Failed to acquire metrics samples lock for average: {}", e);
+                None
+            }
         }
     }
 
     /// Calculate min/max/std of samples in window
     fn _stats(&self, samples: &Arc<Mutex<VecDeque<MetricSample>>>) -> Option<MetricStats> {
-        if let Ok(samples) = samples.lock() {
-            if samples.is_empty() {
-                return None;
+        match samples.lock() {
+            Ok(samples) => {
+                if samples.is_empty() {
+                    return None;
+                }
+
+                let values: Vec<f64> = samples.iter().map(|s| s.value).collect();
+                let count = values.len() as f64;
+
+                let min = values.iter().cloned().fold(f64::INFINITY, f64::min);
+                let max = values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+                let mean = values.iter().sum::<f64>() / count;
+
+                let variance = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / count;
+                let std_dev = variance.sqrt();
+
+                Some(MetricStats {
+                    min,
+                    max,
+                    mean,
+                    std_dev,
+                    count: values.len(),
+                })
             }
-
-            let values: Vec<f64> = samples.iter().map(|s| s.value).collect();
-            let count = values.len() as f64;
-
-            let min = values.iter().cloned().fold(f64::INFINITY, f64::min);
-            let max = values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-            let mean = values.iter().sum::<f64>() / count;
-
-            let variance = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / count;
-            let std_dev = variance.sqrt();
-
-            Some(MetricStats {
-                min,
-                max,
-                mean,
-                std_dev,
-                count: values.len(),
-            })
-        } else {
-            None
+            Err(e) => {
+                log::error!("Failed to acquire metrics samples lock for stats: {}", e);
+                None
+            }
         }
     }
 }

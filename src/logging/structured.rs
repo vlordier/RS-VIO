@@ -141,9 +141,14 @@ impl StructuredLogger {
     /// Write log to file if configured
     fn _write_log(&self, message: &str) {
         if let Some(ref file) = self.log_file {
-            if let Ok(mut f) = file.lock() {
-                let _ = writeln!(f, "{}", message);
-                let _ = f.flush();
+            match file.lock() {
+                Ok(mut f) => {
+                    let _ = writeln!(f, "{}", message);
+                    let _ = f.flush();
+                }
+                Err(e) => {
+                    log::error!("Failed to acquire log file lock: {}", e);
+                }
             }
         }
     }

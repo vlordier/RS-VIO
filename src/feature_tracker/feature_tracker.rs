@@ -345,14 +345,6 @@ fn ensure_pyramid_buffers(
     }
 }
 
-fn downsample_2x2(src: &GrayImage, dst: &mut GrayImage) {
-    // Use imageops resize for consistent downsampling
-    let dst_w = (src.width() / 2).max(1);
-    let dst_h = (src.height() / 2).max(1);
-    let resized = imageops::resize(src, dst_w, dst_h, imageops::FilterType::Triangle);
-    *dst = resized;
-}
-
 fn build_pyramid_in_place(base: &GrayImage, pyramid: &mut [GrayImage]) {
     if pyramid.is_empty() {
         return;
@@ -379,18 +371,6 @@ fn build_pyramid_in_place(base: &GrayImage, pyramid: &mut [GrayImage]) {
         let downsampled = imageops::resize(&src, dst_w, dst_h, imageops::FilterType::Triangle);
         pyramid[level] = downsampled;
     }
-}
-
-fn build_image_pyramid(greyscale_image: &GrayImage, levels: u32) -> Vec<GrayImage> {
-    let mut pyramid = Vec::new();
-    ensure_pyramid_buffers(
-        &mut pyramid,
-        greyscale_image.width(),
-        greyscale_image.height(),
-        levels,
-    );
-    build_pyramid_in_place(greyscale_image, &mut pyramid);
-    pyramid
 }
 
 fn add_points(

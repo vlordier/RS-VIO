@@ -151,11 +151,23 @@ run_benchmark() {
 
     # Run with timeout and capture output
     local output
-    output=$(timeout 120 "$cmd" 2>&1 || true)
+    local exit_code=0
+    output=$(timeout 120 "$cmd" 2>&1) || exit_code=$?
 
     local end_time
     end_time=$(date +%s)
     local elapsed=$((end_time - start_time))
+
+    # Check for timeout or failure
+    if [ $exit_code -eq 124 ]; then
+        echo -e "${COLOR_RED}TIMEOUT${NC} (>120s)"
+        echo "$dataset,${dataset^^},$strategy,TIMEOUT,N/A,N/A" >> "$RESULTS_FILE"
+        return 1
+    elif [ $exit_code -ne 0 ]; then
+        echo -e "${COLOR_RED}FAILED${NC} (exit code: $exit_code)"
+        echo "$dataset,${dataset^^},$strategy,FAILED,N/A,N/A" >> "$RESULTS_FILE"
+        return 1
+    fi
 
     # Extract metrics from output
     local frames
@@ -306,7 +318,7 @@ main() {
                         log_warn "EuRoC dataset not found, skipping"
                         continue
                     fi
-                    run_benchmark "$strategy" "euroc" "$dataset_path" "$config_file"
+                    run_benchmark "$strategy" "euroc" "$dataset_path" "$config_file" || true
                     ;;
                 tum)
                     config_file="$PROJECT_ROOT/config/tum_vi.yaml"
@@ -315,7 +327,7 @@ main() {
                         log_warn "TUM-VI dataset not found, skipping"
                         continue
                     fi
-                    run_benchmark "$strategy" "tum" "$dataset_path" "$config_file"
+                    run_benchmark "$strategy" "tum" "$dataset_path" "$config_file" || true
                     ;;
                 4seasons)
                     config_file="$PROJECT_ROOT/config/4seasons.yaml"
@@ -324,7 +336,7 @@ main() {
                         log_warn "4Seasons dataset not found, skipping"
                         continue
                     fi
-                    run_benchmark "$strategy" "4seasons" "$dataset_path" "$config_file"
+                    run_benchmark "$strategy" "4seasons" "$dataset_path" "$config_file" || true
                     ;;
             esac
         done

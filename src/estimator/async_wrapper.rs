@@ -27,6 +27,7 @@ const BACKLOG_ERROR: &str = "Frame skipped - backlog limit exceeded";
 const ESTIMATOR_PANIC_ERROR: &str = "Estimator panicked while processing frame";
 
 /// Static error message for test panic
+#[cfg(test)]
 const TEST_PANIC_ERROR: &str = "AsyncEstimator test panic triggered";
 
 /// Configuration for async estimator real-time behavior
