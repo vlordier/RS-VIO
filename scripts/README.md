@@ -142,8 +142,8 @@ target/doc/
 # Run specific benchmark
 ./benchmark.sh --bench estimator
 
-# Use different profile (release [default], embedded-safe, ultra-critical)
-./benchmark.sh --profile ultra-critical
+# Use different profile (release [default], release-with-debug)
+./benchmark.sh --profile release-with-debug
 
 # Combine options
 ./benchmark.sh --bench feature_tracker --baseline tracking-v1 --save

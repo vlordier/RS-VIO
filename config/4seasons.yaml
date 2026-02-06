@@ -1,7 +1,7 @@
 %YAML:1.0
 ---
 
-# Camera Parameters (EuRoC dataset specific)
+# Camera Parameters (4Seasons dataset specific)
 # Image dimensions and processing parameters
 camera:
   image_width: 800            # Image width in pixels (EuRoC standard)
@@ -44,17 +44,6 @@ feature_detection:
   optical_flow_max_iterations: 10
   optical_flow_convergence_threshold: 0.01
 
-# Global Depth Parameters
-# Controls depth validation throughout the entire VIO system
-depth:
-  min_depth: 0.1              # Minimum depth for valid 3D points (meters) - used in all depth validation
-  max_depth: 100.0            # Maximum depth for valid 3D points (meters) - used in all depth validation
-
 optimization:
   pnp_max_iterations: 10
   bundle_adjustment_max_iterations: 20
-  # IMU prior integration (constrains latest keyframe pose to IMU prediction)
-  imu_prior_enable: true
-  imu_prior_weight_pos: 0.5      # Position constraint weight (start conservative)
-  imu_prior_weight_rot: 1.0      # Rotation constraint weight
-  imu_prior_huber_delta: 1.0     # Robust loss threshold (meters for position, radians for rotation)

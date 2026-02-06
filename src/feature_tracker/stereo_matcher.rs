@@ -5,6 +5,7 @@
 
 use crate::feature_tracker::enhanced_detector::{hamming_distance, EnhancedFeature};
 use nalgebra as na;
+use std::cell::Cell;
 
 /// Stereo correspondence between left and right features
 #[derive(Debug, Clone)]
@@ -60,12 +61,17 @@ impl Default for StereoMatcherConfig {
 /// Stereo feature matcher with descriptor-based matching
 pub struct StereoMatcher {
     config: StereoMatcherConfig,
+    /// RNG seed counter — incremented on each call for deterministic, unique seeds
+    rng_counter: Cell<u64>,
 }
 
 impl StereoMatcher {
     /// Create new stereo matcher
-    pub const fn new(config: StereoMatcherConfig) -> Self {
-        Self { config }
+    pub fn new(config: StereoMatcherConfig) -> Self {
+        Self {
+            config,
+            rng_counter: Cell::new(42),
+        }
     }
 
     /// Match features between left and right images
@@ -163,8 +169,13 @@ impl StereoMatcher {
             return Vec::new();
         }
 
-        // Scale intrinsics for this level
-        let scaled_intrinsics = camera_intrinsics * scale as f64;
+        // Scale intrinsics for this level (only fx, fy, cx, cy — K[2][2] must stay 1)
+        let mut scaled_intrinsics = *camera_intrinsics;
+        let s = scale as f64;
+        scaled_intrinsics[(0, 0)] *= s; // fx
+        scaled_intrinsics[(1, 1)] *= s; // fy
+        scaled_intrinsics[(0, 2)] *= s; // cx
+        scaled_intrinsics[(1, 2)] *= s; // cy
 
         // Epipolar geometry verification with relaxed constraints
         if self.config.enable_geometric_check {
@@ -849,12 +860,9 @@ impl StereoMatcher {
     fn random_sample(&self, n: usize, k: usize) -> Vec<usize> {
         use std::collections::HashSet;
 
-        let mut rng = oorandom::Rand32::new(
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_else(|_| std::time::Duration::from_secs(0))
-                .as_nanos() as u64,
-        );
+        let seed = self.rng_counter.get();
+        self.rng_counter.set(seed.wrapping_add(1));
+        let mut rng = oorandom::Rand32::new(seed);
 
         let mut samples = HashSet::new();
         while samples.len() < k {

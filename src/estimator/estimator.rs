@@ -15,14 +15,11 @@ use std::sync::{
 };
 use std::time::Instant;
 
-/// Placeholder estimator implementation.
-/// Currently mimics the control flow and logging structure of the C++ Estimator::process_frame,
-/// but uses dummy values for tracking, optimization, and mapping.
+/// Stereo visual odometry estimator.
+/// Processes stereo frames through feature tracking, motion estimation,
+/// keyframe management, and sliding-window bundle adjustment.
 pub struct Estimator {
     frame_id_counter: u64,
-    frames_since_last_keyframe: u64,
-    /// When true, emit detailed per-frame logs (equivalent to Config::m_enable_debug_output).
-    enable_debug_output: bool,
     /// Full configuration loaded from YAML (used to derive intrinsics, etc.).
     pub(crate) config: Config,
     /// Patch-based stereo tracker reused across all frames.
@@ -92,8 +89,6 @@ impl Estimator {
 
         Estimator {
             frame_id_counter: 0,
-            frames_since_last_keyframe: 0,
-            enable_debug_output: true,
             config,
             stereo_patch_tracker: StereoPatchTracker::<6>::new(
                 grid_size,
@@ -125,14 +120,11 @@ impl Estimator {
 
         // New frame: update counters
         self.frame_id_counter += 1;
-        self.frames_since_last_keyframe += 1;
 
-        if self.enable_debug_output {
-            log::debug!(
-                "============================== Frame {} ==============================",
-                self.frame_id_counter
-            );
-        }
+        log::debug!(
+            "============================== Frame {} ==============================",
+            self.frame_id_counter
+        );
 
         // Timing placeholders (warning: assigned before read in log::debug below)
         #[allow(unused_assignments)]
@@ -282,11 +274,10 @@ impl Estimator {
                 let T_rel = T_W_B * T_W_B_last_kf.try_inverse().unwrap();
                 let t_rel = T_rel.fixed_view::<3, 1>(0, 3).into_owned();
                 let R_rel = T_rel.fixed_view::<3, 3>(0, 0).into_owned();
-                let e_rel = Vector3::from([
-                    UnitQuaternion::from_matrix(&R_rel).euler_angles().0,
-                    UnitQuaternion::from_matrix(&R_rel).euler_angles().1,
-                    UnitQuaternion::from_matrix(&R_rel).euler_angles().2,
-                ]);
+                let e_rel = {
+                    let (r, p, y) = UnitQuaternion::from_matrix(&R_rel).euler_angles();
+                    Vector3::from([r, p, y])
+                };
                 log::debug!("[Estimator] Translation since last keyframe: {:.2?}, Euler angles since last keyframe: {:.2?}", t_rel, e_rel);
 
                 // Check if translation and rotation since last keyframe is large enough to trigger a keyframe

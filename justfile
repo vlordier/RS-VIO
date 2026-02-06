@@ -147,7 +147,7 @@ run-4seasons: release
         exit 1; \
       fi; \
       echo "Using recording: $(basename $$recording_dir)"; \
-      timeout 120 {{euroc_bin}} {{config_dir}}/4seasons.yaml "$$recording_dir" || true; \
+      timeout 120 {{four_seasons_bin}} {{config_dir}}/4seasons.yaml "$$recording_dir" || true; \
       echo "4Seasons benchmark complete."; \
     else \
       echo "4Seasons dataset not found. Run: just setup-datasets"; \

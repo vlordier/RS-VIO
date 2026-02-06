@@ -16,7 +16,7 @@ This feature adds three calibration improvement strategies to RS-VIO:
 
 Combined, these strategies reduce calibration error from **0.407% → 0.156%** (61.7% improvement) on TUM-VI dataset.
 
-Also introduces **multi-camera architecture** supporting N cameras with arbitrary orientations and flexible parameter sharing.
+Multi-camera architecture is planned (not yet implemented).
 
 ---
 
@@ -128,25 +128,12 @@ Offline Post-Processing  +0.156%         ✓ 61.7%
 - Calibration section with optimization parameters
 - Used for Strategy 2 validation
 
-### 2. **config/multi_camera_stereo.yaml** (Example: Stereo Pair)
-- Classic left-right stereo configuration
-- Demonstrates multi-camera YAML structure
-
-### 3. **config/multi_camera_forward_back.yaml** (Example: Drone)
-- Forward + backward facing cameras
-- Demonstrates arbitrary camera orientations
-
-### 4. **config/multi_camera_quad.yaml** (Example: 4-Camera Rig)
-- Forward stereo + downward stereo
-- Demonstrates camera groups and parameter sharing
-
 ---
 
 ## Documentation
 
 ### References
 - **docs/VALIDATION.md** - Validation guide with results and checklist
-- **docs/MULTI_CAMERA.md** - N-camera configuration API reference
 - **docs/CALIBRATION.md** - Calibration documentation
 
 ---
@@ -189,7 +176,6 @@ python tools/post_process_calibration.py \
 
 - ✅ **Testing**
   - All three strategies validated on TUM-VI
-  - Multi-camera system type-safe with validation
   - Convergence stopping verified
 
 - ✅ **Documentation**
@@ -200,13 +186,11 @@ python tools/post_process_calibration.py \
 - ✅ **Performance**
   - Online refinement: Minimal overhead (<1%)
   - Offline processing: Configurable time trade-off
-  - Multi-camera: Negligible impact
 
 - ✅ **Features**
   - Strategy 1: Works (baseline established)
   - Strategy 2: Works (24.7% improvement achieved)
   - Strategy 3: Works (61.7% total improvement achieved)
-  - Multi-camera: Fully functional with examples
 
 ---
 
@@ -215,7 +199,6 @@ python tools/post_process_calibration.py \
 ### What's Ready for Merge
 - ✅ Online intrinsics refinement (Rust implementation)
 - ✅ Offline post-processing (Python tool)
-- ✅ Multi-camera configuration system
 - ✅ Validation framework
 - ✅ Configuration examples
 - ✅ Comprehensive documentation
@@ -281,7 +264,6 @@ python tools/post_process_calibration.py \
 1. **Code Review**
    - Review Rust implementation for style/performance
    - Review Python tools for robustness
-   - Check multi-camera system design
 
 2. **Testing in CI/CD**
    - Build on multiple platforms

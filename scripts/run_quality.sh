@@ -1,8 +1,8 @@
 #!/bin/bash
-# RS-VIO Quality Pipeline Runner - Embedded Drone Edition
-# =======================================================
-# Harshest configuration for safety-critical drone real-time VIO
-# Usage: ./scripts/run_quality.sh [--quick] [--tool <tool>] [--embedded]
+# RS-VIO Quality Pipeline Runner
+# ===============================
+# Runs format, linting, test, and code quality checks.
+# Usage: ./scripts/run_quality.sh [--quick] [--tool <tool>]
 
 set -euo pipefail
 
@@ -78,20 +78,14 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --help|-h)
-            echo "Usage: $0 [--quick] [--tool <tool>] [--embedded]"
+            echo "Usage: $0 [--quick] [--tool <tool>]"
             echo ""
             echo "Options:"
             echo "  --quick    Run only core checks (format, clippy, test)"
             echo "  --tool     Run only a specific tool"
-            echo "  --embedded Use embedded-safe profile for maximum safety"
             echo ""
             echo "Available tools:"
             echo "  fmt, clippy, check, audit, deps, test, coverage, miri, unsafe, mutants, bloat, semver"
-            echo ""
-            echo "Embedded profiles:"
-            echo "  --embedded        Use embedded-safe profile"
-            echo "  cargo build --profile ultra-critical  # Maximum safety"
-            echo "  cargo build --profile bare-metal      # Bare-metal STM32"
             exit 0
             ;;
         *)
@@ -101,13 +95,9 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Get cargo profile for embedded mode
+# Get cargo profile
 get_profile() {
-    if $EMBEDDED_MODE; then
-        echo "embedded-safe"
-    else
-        echo "release"
-    fi
+    echo "release"
 }
 
 # Run specific tool
@@ -313,15 +303,6 @@ run_quality_pipeline() {
 
     if (( failed == 0 )); then
         log_success "All quality checks passed!"
-        echo ""
-        echo "For embedded drone safety, run:"
-        echo "  $0 --embedded                    # Full pipeline with embedded-safe"
-        echo "  $0 --quick --embedded            # Quick embedded check"
-        echo ""
-        echo "Build commands:"
-        echo "  cargo build --profile embedded-safe   # Embedded-safe build"
-        echo "  cargo build --profile ultra-critical  # Maximum safety build"
-        echo "  cargo build --profile bare-metal      # Bare-metal STM32 build"
     else
         log_error "$failed check(s) failed!"
         exit $failed

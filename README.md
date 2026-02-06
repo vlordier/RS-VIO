@@ -52,25 +52,6 @@ RS-VIO includes three complementary strategies for camera intrinsics refinement:
 
 See [docs/FEATURE_SUMMARY.md](docs/FEATURE_SUMMARY.md) for complete details, or [docs/VALIDATION.md](docs/VALIDATION.md) for validation guides.
 
-### Multi-Camera Support
-
-Configure multiple cameras in any orientation with flexible parameter sharing:
-
-```yaml
-cameras:
-  - name: "left"
-    image_width: 512
-    image_height: 512
-    intrinsics: [fx, fy, cx, cy]
-
-  - name: "right"
-    image_width: 512
-    image_height: 512
-    intrinsics: [fx, fy, cx, cy]
-```
-
-See [docs/MULTI_CAMERA.md](docs/MULTI_CAMERA.md) for API reference and examples.
-
 ## Variable naming conventions
 
 We use the following naming conventions for coordinate frame transformations:

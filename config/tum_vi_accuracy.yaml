@@ -1,13 +1,5 @@
 # Accuracy-focused TUM-VI config: prioritize accuracy over speed
 
-debug:
-  use_imu: true
-  use_feature_tracking: true
-  use_triangulation: true
-  use_fallback_depth: true            # enable to seed map when triangulation fails
-  min_stereo_matches: 2
-  log_stereo_undistorted: false
-
 camera:
   image_width: 512
   image_height: 512
@@ -34,28 +26,6 @@ feature_detection:
   optical_flow_max_iterations: 15
   optical_flow_convergence_threshold: 0.01
 
-depth:
-  min_depth: 0.05
-  max_depth: 80.0
-
 optimization:
   pnp_max_iterations: 10
   bundle_adjustment_max_iterations: 20
-  imu_prior_enable: true
-  imu_prior_weight_pos: 0.8
-  imu_prior_weight_rot: 1.5
-  imu_prior_huber_delta: 1.0
-
-marginalization:
-  enabled: true
-  max_keyframes: 20
-  num_marginalize_per_step: 1
-  min_landmark_observations: 3
-  landmark_age_limit: 60
-  use_fej: true
-  damping: 1e-7
-  prior_weight: 1.0
-  prior_info_scale: 1.0
-  hessian_approximator: "GaussNewton"   # more accurate, slower
-  gradient_computer: "Standard"
-  prior_constructor: "Standard"

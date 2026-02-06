@@ -46,7 +46,7 @@ Options:
     --bench NAME            Run specific benchmark (estimator, optimization, etc.)
     --output-dir DIR        Output directory for results
     --plot-dir DIR          Output directory for plots
-    --profile PROFILE       Build profile (release, ultra-critical, embedded-safe)
+    --profile PROFILE       Build profile (release, release-with-debug)
     --help                  Show this help message
 
 Examples:
@@ -56,8 +56,8 @@ Examples:
     # Run benchmarks and compare against baseline
     ./scripts/benchmark.sh --baseline v0.2.0
 
-    # Run only estimator benchmarks with ultra-critical profile
-    ./scripts/benchmark.sh --bench estimator --profile ultra-critical
+    # Run only estimator benchmarks
+    ./scripts/benchmark.sh --bench estimator
 
     # Run all benchmarks and generate plots
     ./scripts/benchmark.sh --all
@@ -110,7 +110,7 @@ mkdir -p "$OUTPUT_DIR" "$PLOT_DIR"
 
 # Validate profile
 case "$PROFILE" in
-    release|embedded-safe|ultra-critical|release-with-debug)
+    release|release-with-debug)
         ;;
     *)
         print_error "Invalid profile: $PROFILE"

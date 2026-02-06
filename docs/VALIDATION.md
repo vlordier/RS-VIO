@@ -11,8 +11,9 @@ Complete implementation for validating all three calibration strategies on the T
 All components successfully implemented and integrated:
 
 ### Rust Code (src/estimator/estimator.rs)
-- ✅ `export_refined_intrinsics_yaml()` - Exports refined intrinsics as YAML string
-- ✅ `save_refined_intrinsics(path)` - Saves refined intrinsics to file with error handling
+- `IntrinsicsRefinementState` — tracks original vs refined intrinsics
+- **Note:** `export_refined_intrinsics_yaml()` and `save_refined_intrinsics()` were removed.
+  Online refinement is a future work item.
 
 ### Bash Scripts (scripts/)
 - ✅ `validate_tum_vi_calibration.sh` - Master validation orchestrator (252 lines)
@@ -29,9 +30,6 @@ All components successfully implemented and integrated:
 
 ### Configuration Files
 - ✅ `config/tum_vi_self_calibrating_from_baseline.yaml` - Online refinement config
-- ✅ `config/multi_camera_stereo.yaml` - Multi-camera examples
-- ✅ `config/multi_camera_forward_back.yaml`
-- ✅ `config/multi_camera_quad.yaml`
 
 ---
 
@@ -230,9 +228,8 @@ Install PyYAML: `pip install pyyaml`
 | Reporter | tools/generate_tum_vi_report.py | 246 | ✅ |
 | Comparator | tools/compare_tumvi_intrinsics.py | +30 | ✅ |
 | Post-processor | tools/post_process_calibration.py | +20 | ✅ |
-| Configs | config/multi_camera_*.yaml | 300 | ✅ |
 
-**Total Implementation**: ~1,200 lines of code + documentation
+**Total Implementation**: ~900 lines of code + documentation
 
 ---
 
@@ -240,7 +237,6 @@ Install PyYAML: `pip install pyyaml`
 
 See also:
 - [CALIBRATION.md](CALIBRATION.md) - All calibration strategies (online, offline, and batch approaches)
-- [MULTI_CAMERA.md](MULTI_CAMERA.md) - Multi-camera configuration examples
 - [QUICKSTART.md](QUICKSTART.md) - Getting started guide
 - [DATASETS.md](DATASETS.md) - Dataset information and setup
 

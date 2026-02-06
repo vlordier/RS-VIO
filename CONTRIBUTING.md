@@ -23,7 +23,7 @@ This project follows a code of conduct to ensure a welcoming environment for all
 
 2. **Clone and Setup**
    ```bash
-   git clone https://github.com/your-org/rs-vio.git
+   git clone https://github.com/charleshamesse/RS-VIO.git
    cd rs-vio
    cargo build
    cargo test

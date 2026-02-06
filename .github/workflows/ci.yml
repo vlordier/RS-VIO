@@ -26,8 +26,9 @@ jobs:
           echo "MALLOC_CONF=abort_conf:false,stats_print:false,background_thread:false" >> $GITHUB_ENV
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: "1.92.0"
           components: rustfmt, clippy
 
       - name: Cache cargo registry
@@ -74,8 +75,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: "1.92.0"
           components: rustfmt, clippy
 
       - name: Install system dependencies
