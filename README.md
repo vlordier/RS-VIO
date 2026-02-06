@@ -50,7 +50,7 @@ RS-VIO includes three complementary strategies for camera intrinsics refinement:
 - **Offline Post-Processing** (Strategy 3): Batch refinement after VIO with convergence-based stopping (~61.7% total reduction)
 - **Baseline Analysis** (Strategy 1): Establish reference calibration quality
 
-See [FEATURE_SUMMARY.md](FEATURE_SUMMARY.md) for complete details, or [VALIDATION.md](VALIDATION.md) for validation guides.
+See [docs/FEATURE_SUMMARY.md](docs/FEATURE_SUMMARY.md) for complete details, or [docs/VALIDATION.md](docs/VALIDATION.md) for validation guides.
 
 ### Multi-Camera Support
 
@@ -69,7 +69,7 @@ cameras:
     intrinsics: [fx, fy, cx, cy]
 ```
 
-See [MULTI_CAMERA_GUIDE.md](MULTI_CAMERA_GUIDE.md) for API reference and examples.
+See [docs/MULTI_CAMERA.md](docs/MULTI_CAMERA.md) for API reference and examples.
 
 ## Variable naming conventions
 
@@ -120,7 +120,6 @@ This project builds on excellent open-source work:
 
 ### Dependencies:
 - [apex-solver](https://github.com/amin-abouee/apex-solver)
-- [faer](https://github.com/sarah-quinones/faer-rs)
 - [camera-intrinsic-model-rs](https://github.com/powei-lin/camera-intrinsic-model-rs)
 - [patch-tracker-rs](https://github.com/powei-lin/patch-tracker-rs)
 

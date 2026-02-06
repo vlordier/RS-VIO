@@ -97,7 +97,7 @@ RS-VIO enforces strict safety standards suitable for embedded systems. All code 
 - All new code must have tests
 - Tests must pass: `cargo test --release`
 - All targets must pass clippy: `cargo clippy --all-targets -- -D warnings`
-- For safety-critical code, verify with ultra-critical profile: `cargo build --profile ultra-critical`
+- For safety-critical code, verify with: `cargo clippy --all-targets -- -D warnings`
 
 ### Example: Error Handling
 
@@ -169,7 +169,6 @@ scripts/               # Utility scripts
 - Coordinate frames use `T_A_B` convention (transform from B to A)
 
 #### Error Handling
-- Use custom error types with `thiserror`
 - Prefer `Result<T, Error>` over panics
 - Provide meaningful error messages
 - Log errors appropriately
@@ -206,7 +205,7 @@ scripts/               # Utility scripts
 
 - **Issues**: Use GitHub issues for bugs and feature requests
 - **Discussions**: Use GitHub discussions for questions and ideas
-- **Documentation**: Check [docs.rs/rs-vio](https://docs.rs/rs-vio) for API docs
+- **Documentation**: Run `cargo doc --open` to generate and view API docs
 
 ## Recognition
 

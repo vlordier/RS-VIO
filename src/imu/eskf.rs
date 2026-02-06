@@ -209,19 +209,20 @@ impl Eskf {
         // Process noise covariance Q (9x9)
         let mut Q = na::SMatrix::<f64, 9, 9>::zeros();
 
-        // Velocity process noise from accelerometer (discretized)
-        // R * R^T = I for rotation matrices, so this simplifies to scalar * I
-        let accel_noise_var = self.noise.accel_noise_density.powi(2) * dt;
+        // Continuous-time process noise spectral density Q_c.
+        // The outer discretization `P += P_dot * dt` provides the single dt factor,
+        // so Q_c must NOT contain dt (otherwise noise is double-scaled).
+        let accel_noise_var = self.noise.accel_noise_density.powi(2);
         Q.fixed_view_mut::<3, 3>(0, 0)
             .fill_diagonal(accel_noise_var);
 
         // Gyro bias random walk
         Q.fixed_view_mut::<3, 3>(3, 3)
-            .fill_diagonal(self.noise.gyro_bias_random_walk.powi(2) * dt);
+            .fill_diagonal(self.noise.gyro_bias_random_walk.powi(2));
 
         // Accel bias random walk
         Q.fixed_view_mut::<3, 3>(6, 6)
-            .fill_diagonal(self.noise.accel_bias_random_walk.powi(2) * dt);
+            .fill_diagonal(self.noise.accel_bias_random_walk.powi(2));
 
         // Discretized covariance update (first-order)
         // P_{k+1} = P_k + (F * P_k + P_k * F^T + Q) * dt

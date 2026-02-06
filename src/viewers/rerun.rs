@@ -353,7 +353,6 @@ impl Viewer for RerunViewer {
             rec.set_time_sequence("frame", self.frame_id);
             rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
 
-            let _points_3d: Vec<[f32; 3]> = points.to_vec();
             // Exclude points that are further than 300m
             let points_3d: Vec<[f32; 3]> = points
                 .iter()

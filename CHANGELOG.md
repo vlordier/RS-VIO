@@ -28,14 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Comprehensive unit and integration tests
 - Performance benchmarks using Criterion
-- Profiling examples with pprof support
-- Docker containerization for deployment
-- Structured logging with tracing
-- Custom error types with thiserror
 - Security audits with cargo-audit
-- Code coverage reporting with cargo-tarpaulin
 - GitHub Actions CI/CD pipeline
-- API documentation publishing
 
 ### Changed
 - Improved code formatting and linting

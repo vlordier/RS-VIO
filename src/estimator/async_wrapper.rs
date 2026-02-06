@@ -22,7 +22,6 @@ use tokio::time::timeout;
 /// Static error message for backlog limit (no allocation in hot path)
 const BACKLOG_ERROR: &str = "Frame skipped - backlog limit exceeded";
 
-/// Configuration for async estimator real-time behavior
 /// Static error message for estimator panic recovery
 const ESTIMATOR_PANIC_ERROR: &str = "Estimator panicked while processing frame";
 

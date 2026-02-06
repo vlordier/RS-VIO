@@ -1,5 +1,5 @@
 use apex_solver::factors::Factor;
-use na::{DMatrix, DVector, Matrix3, Matrix4, Quaternion, UnitQuaternion, Vector2, Vector3};
+use na::{DMatrix, DVector, Matrix4, Quaternion, UnitQuaternion, Vector2, Vector3};
 use nalgebra as na;
 use std::sync::Arc;
 
@@ -121,11 +121,6 @@ impl Factor for PinholeProjectionFactor {
     fn get_dimension(&self) -> usize {
         2 // 2D residual (u, v)
     }
-}
-
-#[inline]
-pub fn skew_symmetric(v: &Vector3<f64>) -> Matrix3<f64> {
-    Matrix3::new(0.0, -v.z, v.y, v.z, 0.0, -v.x, -v.y, v.x, 0.0)
 }
 
 /// BA factor for optimizing only the translation of a camera pose - development purposes
@@ -403,7 +398,17 @@ impl Factor for BundleAdjustmentFactor {
                 jac[(1, 2)] = push[(2, 2)] * 1e3;
                 return (residuals, Some(jac));
             } else {
-                let jac = DMatrix::zeros(2, 9);
+                // Provide non-zero Jacobian for pose (6) + point (3) = 9 variables
+                // so the optimizer has gradient signal to recover from behind-camera
+                let mut jac = DMatrix::zeros(2, 9);
+                let push = R_C_B.transpose(); // camera z direction in world frame
+                                              // Point Jacobian (columns 6-8): push point toward positive camera z
+                jac[(0, 6)] = push[(2, 0)] * 1e3;
+                jac[(0, 7)] = push[(2, 1)] * 1e3;
+                jac[(0, 8)] = push[(2, 2)] * 1e3;
+                jac[(1, 6)] = push[(2, 0)] * 1e3;
+                jac[(1, 7)] = push[(2, 1)] * 1e3;
+                jac[(1, 8)] = push[(2, 2)] * 1e3;
                 return (residuals, Some(jac));
             }
         }

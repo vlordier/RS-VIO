@@ -67,9 +67,10 @@ impl ImuFactor {
         // If covariance is singular, use identity (unit information)
         let information = cov.try_inverse().unwrap_or_else(na::SMatrix::identity);
 
-        // Compute Cholesky decomposition of information matrix
+        // Compute Cholesky decomposition: Information = L * L^T
+        // We need S such that S^T * S = Information, so S = L^T
         let sqrt_information = if let Some(chol) = information.cholesky() {
-            chol.l()
+            chol.l().transpose()
         } else {
             // Fallback: use identity if information is not positive definite
             na::SMatrix::identity()

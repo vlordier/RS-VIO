@@ -152,22 +152,10 @@ Offline Post-Processing  +0.156%         ✓ 61.7%
 
 ## Documentation
 
-### Primary References (Start Here)
-1. **VALIDATION.md** - Complete validation guide with results and checklist
-3. **ENHANCED_OFFLINE_PROCESSING.md** - Technical details of advanced features
-
-### Detailed Guides
-- **CALIBRATION_STRATEGIES.md** - Complete strategy descriptions
-- **MULTI_CAMERA.md** - N-camera configuration API reference
-- **ENHANCED_OFFLINE_PROCESSING.md** - Offline refinement with convergence tracking
-
-### Quick References
-- **ENHANCED_OFFLINE_PROCESSING.md** - Technical implementation guide
-- **TUM_VI_VALIDATION_FRAMEWORK.md** - Complete validation guide
-
-### Validation Details
-- **TUM_VI_VALIDATION_FRAMEWORK.md** - Full validation guide
-- **VALIDATION_FRAMEWORK_CHECKLIST.md** - Implementation verification
+### References
+- **docs/VALIDATION.md** - Validation guide with results and checklist
+- **docs/MULTI_CAMERA.md** - N-camera configuration API reference
+- **docs/CALIBRATION.md** - Calibration documentation
 
 ---
 
@@ -175,7 +163,6 @@ Offline Post-Processing  +0.156%         ✓ 61.7%
 
 ### Build Release Binary
 ```bash
-cd /Users/vincent/Work/RS-VIO
 cargo build --release
 ```
 

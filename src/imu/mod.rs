@@ -546,7 +546,7 @@ impl ImuAidedKeyframeSelector {
             let imu_motion_trigger = imu_translation_norm > self.translation_threshold * fl!(0.5)
                 || imu_rotation_angle.abs() > self.rotation_threshold * fl!(0.5);
 
-            // If IMU and visual disagree significantly,可能有跟踪问题
+            // If IMU and visual disagree significantly, there may be tracking issues
             let imu_visual_disagree = imu_rotation_deviation > self.rotation_threshold * fl!(2.0);
 
             if visual_trigger || imu_motion_trigger || imu_visual_disagree {
@@ -701,15 +701,18 @@ impl ImuMotionPrior {
         );
         let R_W_Bj = R_W_Bi * self.delta_rotation.to_rotation_matrix();
 
-        // Velocity prediction
-        let v_W_Bj = self.initial_velocity + self.delta_velocity + self.gravity * self.delta_time;
+        // Velocity prediction: delta_v is in body frame, rotate to world
+        let R_W_Bi_mat = R_W_Bi.matrix();
+        let v_W_Bj = self.initial_velocity
+            + R_W_Bi_mat * self.delta_velocity
+            + self.gravity * self.delta_time;
 
-        // Position prediction
+        // Position prediction: delta_p is in body frame, rotate to world
         let p_W_Bi = self.initial_pose.fixed_view::<3, 1>(0, 3).into_owned();
         let p_W_Bj = p_W_Bi
             + self.initial_velocity * self.delta_time
             + 0.5 * self.gravity * self.delta_time * self.delta_time
-            + self.delta_position;
+            + R_W_Bi_mat * self.delta_position;
 
         // Compose pose matrix
         let mut T_W_Bj = na::Matrix4::identity();

@@ -466,77 +466,47 @@ impl SlidingWindow {
             return Ok(false);
         }
 
-        // Try optimization with Schur complement first (fallback to SparseCholesky as needed)
-        let has_landmarks = landmark_variables > 0;
-        let opt_result = if !has_landmarks {
-            log::warn!(
-                "[SlidingWindow] No landmark variables found; using fallback solver (SparseCholesky)"
-            );
-            let mut fallback_solver = LevenbergMarquardt::with_config(
-                LevenbergMarquardtConfig::new()
-                    .with_linear_solver_type(LinearSolverType::SparseCholesky)
-                    .with_max_iterations(20)
-                    .with_cost_tolerance(1e-6)
-                    .with_parameter_tolerance(1e-9)
-                    .with_jacobi_scaling(false),
-            );
-            match fallback_solver.optimize(&problem, &initial_values) {
-                Ok(result) => {
-                    log::debug!("[SlidingWindow] Fallback solver succeeded");
-                    result
-                },
-                Err(e2) => {
-                    log::error!("[SlidingWindow] Fallback solver failed: {:?} - reverting to previous state", e2);
+        // Try optimization with Schur complement (fallback to SparseCholesky on singular matrix)
+        let opt_result = match solver.optimize(&problem, &initial_values) {
+            Ok(result) => result,
+            Err(e) => {
+                // Check if it's a linear solve failure (singular matrix)
+                let error_str = format!("{:?}", e);
+                if error_str.contains("LinearSolveFailed") || error_str.contains("Singular matrix")
+                {
+                    log::warn!("[SlidingWindow] Schur complement failed with singular matrix, trying fallback solver (SparseCholesky)");
+
+                    // Create fallback solver with direct Cholesky
+                    let mut fallback_solver = LevenbergMarquardt::with_config(
+                        LevenbergMarquardtConfig::new()
+                            .with_linear_solver_type(LinearSolverType::SparseCholesky)
+                            .with_max_iterations(20)
+                            .with_cost_tolerance(1e-6)
+                            .with_parameter_tolerance(1e-9)
+                            .with_jacobi_scaling(false),
+                    );
+
+                    match fallback_solver.optimize(&problem, &initial_values) {
+                        Ok(result) => {
+                            log::debug!("[SlidingWindow] Fallback solver succeeded");
+                            result
+                        },
+                        Err(e2) => {
+                            log::error!("[SlidingWindow] Both Schur complement and fallback solver failed: {:?} - reverting to previous state", e2);
+                            self.revert_to_saved_state(&saved_keyframe_poses, &saved_map_points);
+                            return Ok(false);
+                        },
+                    }
+                } else {
+                    // Other optimization errors - revert to saved state
+                    log::error!(
+                        "[SlidingWindow] Optimization error: {:?} - reverting to previous state",
+                        e
+                    );
                     self.revert_to_saved_state(&saved_keyframe_poses, &saved_map_points);
                     return Ok(false);
-                },
-            }
-        } else {
-            match solver.optimize(&problem, &initial_values) {
-                Ok(result) => result,
-                Err(e) => {
-                    // Check if it's a linear solve failure (singular matrix)
-                    let error_str = format!("{:?}", e);
-                    if error_str.contains("LinearSolveFailed")
-                        || error_str.contains("Singular matrix")
-                    {
-                        log::warn!("[SlidingWindow] Schur complement failed with singular matrix, trying fallback solver (SparseCholesky)");
-
-                        // Create fallback solver with direct Cholesky
-                        let mut fallback_solver = LevenbergMarquardt::with_config(
-                            LevenbergMarquardtConfig::new()
-                                .with_linear_solver_type(LinearSolverType::SparseCholesky)
-                                .with_max_iterations(20)
-                                .with_cost_tolerance(1e-6)
-                                .with_parameter_tolerance(1e-9)
-                                .with_jacobi_scaling(false),
-                        );
-
-                        match fallback_solver.optimize(&problem, &initial_values) {
-                            Ok(result) => {
-                                log::debug!("[SlidingWindow] Fallback solver succeeded");
-                                result
-                            },
-                            Err(e2) => {
-                                log::error!("[SlidingWindow] Both Schur complement and fallback solver failed: {:?} - reverting to previous state", e2);
-                                self.revert_to_saved_state(
-                                    &saved_keyframe_poses,
-                                    &saved_map_points,
-                                );
-                                return Ok(false);
-                            },
-                        }
-                    } else {
-                        // Other optimization errors - revert to saved state
-                        log::error!(
-                            "[SlidingWindow] Optimization error: {:?} - reverting to previous state",
-                            e
-                        );
-                        self.revert_to_saved_state(&saved_keyframe_poses, &saved_map_points);
-                        return Ok(false);
-                    }
-                },
-            }
+                }
+            },
         };
 
         // Check if optimization was successful based on status
