@@ -282,7 +282,7 @@ checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
 [[package]]
 name = "apex-solver"
 version = "0.1.6"
-source = "git+https://github.com/amin-abouee/apex-solver?branch=main#e091706e27fdf72bebd61807feee07bc33d6bcd2"
+source = "git+https://github.com/amin-abouee/apex-solver?rev=e091706#e091706e27fdf72bebd61807feee07bc33d6bcd2"
 dependencies = [
  "chrono",
  "clap",
@@ -9827,7 +9827,6 @@ dependencies = [
  "futures",
  "image",
  "imageproc",
- "lazy_static",
  "log",
  "metal 0.27.0",
  "nalgebra 0.33.2",
@@ -9845,9 +9844,6 @@ dependencies = [
  "serde_yaml",
  "tempfile",
  "tokio",
- "tracing",
- "tracing-appender",
- "tracing-subscriber",
  "typed-arena",
  "wgpu 0.20.1",
 ]
@@ -11213,18 +11209,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tracing-appender"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "786d480bce6247ab75f005b14ae1624ad978d3029d9113f0a22fa1ac773faeaf"
-dependencies = [
- "crossbeam-channel",
- "thiserror 2.0.17",
- "time",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "tracing-attributes"
 version = "0.1.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11269,7 +11253,6 @@ dependencies = [
  "sharded-slab",
  "smallvec",
  "thread_local",
- "time",
  "tracing",
  "tracing-core",
  "tracing-log",

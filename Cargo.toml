@@ -9,34 +9,16 @@ default = ["matching-basic-ransac"]
 benchmarks = []
 # Feature flag for 32-bit float operations (f32) instead of f64
 use_f32 = []
-# Feature flag for Rerun.io 3D visualization (built-in, always available)
-rerun-viewer = []
+# Feature flag for Rerun.io 3D visualization
+rerun-viewer = ["rerun"]
 # Feature flag for LightGlue ONNX-based verification
 lightglue = ["ort", "ndarray"]
 # Feature flag for neural network position refinement (ONNX Runtime)
 onnx-refinement = ["ort", "ndarray"]
 # Feature flag for memory profiling with dhat
 dhat-heap = []
-# Feature flag for GPU acceleration framework (placeholder for future CUDA/OpenCL support)
+# Feature flag for GPU acceleration framework
 gpu = ["wgpu", "pollster", "wgpu/spirv"]
-# Feature flag to enable debug/trace logging in hot paths (default off)
-debug-logging = []
-
-# === Swarm & Distributed Features ===
-# Enable full telemetry and health monitoring for fleet operations
-full-telemetry = []
-# Enable distributed system types (drone swarms, consensus, etc.)
-distributed = []
-# Enable both telemetry and distributed features
-swarm = ["full-telemetry", "distributed"]
-# Enable health checks and readiness probes
-health-checks = []
-
-# === Platform-Specific Optimizations ===
-# Enable embedded system optimizations (thread pinning, etc.)
-embedded = []
-# Enable Jetson-specific configurations and optimizations
-jetson-optimized = ["embedded"]
 
 # Stereo matching strategies - only one should be enabled per build
 # Basic RANSAC: 1000 iterations, standard 8-point algorithm (baseline, default)
@@ -50,7 +32,7 @@ matching-hybrid-of = []
 
 [dependencies]
 anyhow = "1.0"
-apex-solver = { git = "https://github.com/amin-abouee/apex-solver", branch = "main" } # TODO change when official release includes the Schur complement methods
+apex-solver = { git = "https://github.com/amin-abouee/apex-solver", rev = "e091706" } # TODO change when official release includes the Schur complement methods
 camera-intrinsic-model = "0.7.2"
 clap = { version = "4.5", features = ["derive"] }
 core_affinity = "0.8"
@@ -60,7 +42,6 @@ faer = "0.23.2"
 futures = "0.3"
 image = "0.25"
 imageproc = "0.25"
-lazy_static = "1.4"
 log = "0.4"
 nalgebra = "0.33.2"
 nalgebra034 = { package = "nalgebra", version = "0.34.1" } # TODO improve this, now this is dirty (needed for camera-intrinsic-model for now)
@@ -70,13 +51,10 @@ ort = { version = "2.0.0-rc.11", optional = true }  # Using ORT 2.0 RC for requi
 pollster = { version = "0.3", optional = true }
 rand = "0.8"
 rayon = "1.10"
-rerun = "0.25"
+rerun = { version = "0.25", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 tokio = { version = "1.35", features = ["rt-multi-thread", "sync", "time", "macros"] }
-tracing = "0.1"
-tracing-appender = "0.2"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "time"] }
 typed-arena = "2.0"
 wgpu = { version = "0.20", optional = true }  # Pinned to 0.20; upgrading requires handling wgpu breaking changes
 
@@ -92,7 +70,7 @@ criterion = { version = "0.5", features = ["html_reports"] }
 tempfile = "3"
 
 [lints.rust]
-unsafe_code = "warn"  # Allowed only for SIMD intrinsics (must be documented)
+unsafe_code = "forbid"
 # warnings = "deny"  # Temporarily allowing warnings due to existing codebase issues
 non_snake_case = "allow"  # Allow for transformation matrices (T_A_B convention)
 
@@ -148,10 +126,6 @@ debug = false           # Strip debug symbols
 [profile.bench]
 inherits = "release"
 debug = true            # Keep debug symbols for profiling
-
-[[bench]]
-name = "concurrent_pipeline"
-harness = false
 
 [[bench]]
 name = "tum_vi_async_pipeline"

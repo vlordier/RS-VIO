@@ -1,6 +1,7 @@
 //! Real-time logging example demonstrating structured logging and performance metrics
 
-use rs_vio::{PerformanceMetrics, StructuredLogger};
+use rs_vio::logging::StructuredLogger;
+use rs_vio::PerformanceMetrics;
 use std::thread;
 use std::time::Duration;
 

@@ -81,8 +81,10 @@ impl TUMVIPlayer {
         // Initialize viewer
         let viewer: Option<Box<dyn Viewer>> = match create_viewer() {
             Ok(v) => {
-                log::info!("[TUMVIPlayer] Viewer initialized successfully");
-                Some(v)
+                if v.is_some() {
+                    log::info!("[TUMVIPlayer] Viewer initialized successfully");
+                }
+                v
             },
             Err(e) => {
                 log::warn!("Failed to initialize viewer: {}", e);

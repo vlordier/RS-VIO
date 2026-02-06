@@ -519,29 +519,14 @@ impl EnhancedFeatureDetector {
 
 /// Hamming distance for ORB descriptor matching
 /// Compute Hamming distance between two 128-bit ORB descriptors
-/// Uses SIMD acceleration when available for better performance
+/// Uses the compiler's auto-vectorized popcount which is optimized
+/// for each target architecture.
 pub fn hamming_distance(desc1: &[u8; 16], desc2: &[u8; 16]) -> u32 {
-    #[cfg(target_arch = "x86_64")]
-    {
-        // Use SIMD for x86_64
-        use std::arch::x86_64::*;
-        unsafe {
-            let d1 = _mm_loadu_si128(desc1.as_ptr() as *const __m128i);
-            let d2 = _mm_loadu_si128(desc2.as_ptr() as *const __m128i);
-            let xor = _mm_xor_si128(d1, d2);
-            _mm_popcnt_u64(_mm_cvtsi128_si64(xor) as u64) as u32
-                + _mm_popcnt_u64(_mm_extract_epi64(xor, 1) as u64) as u32
-        }
-    }
-    #[cfg(not(target_arch = "x86_64"))]
-    {
-        // Fallback to scalar implementation
-        desc1
-            .iter()
-            .zip(desc2.iter())
-            .map(|(&a, &b)| (a ^ b).count_ones())
-            .sum()
-    }
+    desc1
+        .iter()
+        .zip(desc2.iter())
+        .map(|(&a, &b)| (a ^ b).count_ones())
+        .sum()
 }
 
 /// Match features between two sets using ORB descriptors

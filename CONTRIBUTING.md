@@ -17,7 +17,7 @@ This project follows a code of conduct to ensure a welcoming environment for all
 ### Development Setup
 
 1. **Prerequisites**
-   - Rust 1.75 or later
+   - Rust 1.92 or later (see `rust-toolchain.toml`)
    - Git
    - (Optional) Docker for containerized development
 
@@ -82,10 +82,9 @@ RS-VIO enforces strict safety standards suitable for embedded systems. All code 
 
 ### Compile-Time Safety (Enforced at Build)
 - ❌ **NO unsafe code** - `unsafe_code = forbid` (zero exceptions)
-- ❌ **NO panics** - `panic = deny` in production code (tests allowed)
-- ❌ **NO expect()** - Use `Result<T>` instead (`expect_used = deny`)
+- ❌ **NO expect()/unwrap()** - Use `Result<T>` instead (`expect_used = warn`, working toward `deny`)
 - ❌ **NO unimplemented!()** - All code must be complete (`unimplemented = deny`)
-- ❌ **NO TODO comments** - Resolve before merge (`todo = deny`)
+- ❌ **NO todo!()** - Resolve before merge (`todo = deny`)
 - ❌ **NO double allocations** - No `Box<Vec<T>>` (`box_collection = deny`)
 - ❌ **NO reference-counted buffers** - No `Rc<Vec<T>>` in realtime (`rc_buffer = deny`)
 

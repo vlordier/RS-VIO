@@ -46,7 +46,7 @@ fn main() {
         step_mode: false,
     };
 
-    // Create and run EuRoC player
+    // Create and run TUM-VI player
     let player = TUMVIPlayer::new();
     let result = player.run(player_config);
 
@@ -60,14 +60,14 @@ fn main() {
 }
 
 #[derive(Parser, Debug)]
-#[command(name = "euroc_vio")]
-#[command(about = "EuRoC VIO/VO Dataset Player")]
+#[command(name = "run_tum")]
+#[command(about = "TUM-VI VIO/VO Dataset Player")]
 struct Args {
     /// Path to configuration file (YAML)
-    #[arg(help = "Path to configuration file (e.g., config/euroc_vio.yaml)")]
+    #[arg(help = "Path to configuration file (e.g., config/tum_vi.yaml)")]
     config_file: String,
 
-    /// Path to EuRoC dataset directory
-    #[arg(help = "Path to EuRoC dataset directory (e.g., /path/to/MH_01_easy)")]
+    /// Path to TUM-VI dataset directory
+    #[arg(help = "Path to TUM-VI dataset directory (e.g., /path/to/dataset-corridor1_512_16)")]
     dataset_path: String,
 }

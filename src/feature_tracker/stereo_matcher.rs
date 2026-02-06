@@ -69,6 +69,7 @@ impl TemporalDepthFusion {
         &mut self,
         matches: &[StereoMatch],
         left_features: &[EnhancedFeature],
+        right_features: &[EnhancedFeature],
         baseline: f32,
         focal_length: f32,
         timestamp: f64,
@@ -79,7 +80,7 @@ impl TemporalDepthFusion {
             let left_point = left_features[match_.left_idx].point;
 
             // Compute disparity and depth
-            let right_point = left_features[match_.right_idx].point; // Note: this should be right_features, but for simplicity
+            let right_point = right_features[match_.right_idx].point;
             let disparity = (left_point.x - right_point.x).abs();
 
             if disparity > 1.0 {

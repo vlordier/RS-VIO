@@ -142,7 +142,64 @@ impl Config {
             content
         };
         let config: Config = serde_yaml::from_str(&content)?;
+        config.validate()?;
         Ok(config)
+    }
+
+    /// Validate configuration values to catch bad YAML before panicking downstream.
+    fn validate(&self) -> anyhow::Result<()> {
+        let cam = &self.camera;
+
+        if cam.image_width == 0 || cam.image_height == 0 {
+            anyhow::bail!(
+                "Invalid image dimensions: {}x{}",
+                cam.image_width,
+                cam.image_height
+            );
+        }
+
+        if cam.left_intrinsics.len() != 4 {
+            anyhow::bail!(
+                "left_intrinsics must have exactly 4 elements [fx, fy, cx, cy], got {}",
+                cam.left_intrinsics.len()
+            );
+        }
+        if cam.right_intrinsics.len() != 4 {
+            anyhow::bail!(
+                "right_intrinsics must have exactly 4 elements [fx, fy, cx, cy], got {}",
+                cam.right_intrinsics.len()
+            );
+        }
+
+        if cam.T_B_Cl.len() != 16 {
+            anyhow::bail!(
+                "T_B_Cl must have exactly 16 elements (4x4 row-major), got {}",
+                cam.T_B_Cl.len()
+            );
+        }
+        if cam.T_B_Cr.len() != 16 {
+            anyhow::bail!(
+                "T_B_Cr must have exactly 16 elements (4x4 row-major), got {}",
+                cam.T_B_Cr.len()
+            );
+        }
+
+        // Sanity check intrinsics are positive
+        for (name, intrinsics) in [
+            ("left", &cam.left_intrinsics),
+            ("right", &cam.right_intrinsics),
+        ] {
+            if intrinsics[0] <= 0.0 || intrinsics[1] <= 0.0 {
+                anyhow::bail!(
+                    "{} focal length must be positive: fx={}, fy={}",
+                    name,
+                    intrinsics[0],
+                    intrinsics[1]
+                );
+            }
+        }
+
+        Ok(())
     }
 }
 

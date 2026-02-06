@@ -46,7 +46,7 @@ fn main() {
         step_mode: false,
     };
 
-    // Create and run EuRoC player
+    // Create and run 4Seasons player
     let player = FourSeasonsPlayer::new();
     let result = player.run(player_config);
 
@@ -67,7 +67,7 @@ struct Args {
     #[arg(help = "Path to configuration file (e.g., config/4seasons.yaml)")]
     config_file: String,
 
-    /// Path to EuRoC dataset directory
-    #[arg(help = "Path to EuRoC dataset directory (e.g., /path/to/old_town_1_train)")]
+    /// Path to 4Seasons dataset directory
+    #[arg(help = "Path to 4Seasons dataset directory (e.g., /path/to/old_town_1_train)")]
     dataset_path: String,
 }

@@ -1,7 +1,7 @@
 # Feature: Self-Calibrating Stereo VIO with Multi-Camera Support
 
 **Branch:** `feature/stereo-calibration`
-**Status:** Ready for merge
+**Status:** Work in progress — core BA and tracking work, calibration refinement is stubbed
 **Date:** February 5, 2026
 
 ---
@@ -25,11 +25,11 @@ Also introduces **multi-camera architecture** supporting N cameras with arbitrar
 ### Rust Implementation
 
 #### 1. **src/estimator/estimator.rs** (Online Refinement)
-- Added `IntrinsicsRefinementState` struct for tracking refinement state
-- Added `refine_intrinsics_online()` method for real-time optimization
-- Added export methods: `export_refined_intrinsics_yaml()`, `save_refined_intrinsics()`
-- Per-camera independent optimization with regularization
-- ~190 lines added
+- `IntrinsicsRefinementState` struct for tracking refinement state
+- **Note:** `refine_intrinsics_online()` was removed — it applied hardcoded constant
+  adjustments not derived from observations. Real online calibration refinement
+  is a future work item requiring mini-BA on tracked features.
+- ~50 lines remaining (state struct + initialization)
 
 #### 2. **src/datasets/config.rs** (Calibration Configuration)
 - Added `CalibrationRefinementConfig` struct with 7 calibration parameters
@@ -349,4 +349,4 @@ These are example/reference implementations. Decision: Keep for reference, or re
 
 ---
 
-**Status:** ✅ **Feature complete and ready for merge**
+**Status:** ⚠️ **Work in progress — see cleanup notes above**

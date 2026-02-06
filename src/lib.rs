@@ -5,10 +5,7 @@ pub mod evaluation;
 pub mod feature_tracker;
 pub mod imu;
 pub mod logging;
-pub mod macros;
-pub mod nalgebra_macros;
 pub mod optimization;
-pub mod type_macros;
 pub mod types;
 pub mod viewers;
 
@@ -30,7 +27,4 @@ pub use evaluation::{
     calculate_ate, calculate_rpe, EstimatedTrajectory, GroundTruthPose, GroundTruthTrajectory,
     TrajectoryEvaluation,
 };
-pub use logging::{
-    init_tracing_logging, LoggingGuard, PerformanceMetrics, StructuredLogger, TelemetryCounters,
-    TelemetryReport,
-};
+pub use logging::PerformanceMetrics;

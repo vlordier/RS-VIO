@@ -386,14 +386,21 @@ impl Factor for BundleAdjustmentFactor {
         let p_C = R_C_B * p_B + t_C_B;
 
         //println!("p_C: {:?}", p_C.to_owned().to_string());
-        // Check cheirality of the 3D point
-        // TODO fix this because it does not help
+        // Check cheirality: point behind camera gets a large residual with
+        // a finite Jacobian so the optimizer can recover (zero Jacobian
+        // would stall the solver).
         if p_C.z <= 0.0 {
-            // log::warn!("3D point is behind the camera, skipping optimization");
             let residuals = DVector::from_vec(vec![1e6, 1e6]);
             if self.fixed_pose.is_some() {
-                // Only optimize 3D point
-                let jac = DMatrix::zeros(2, 3);
+                // Jacobian pushes the 3D point toward positive z in camera frame
+                let mut jac = DMatrix::zeros(2, 3);
+                let push = R_C_B.transpose(); // direction from camera z back to world
+                jac[(0, 0)] = push[(2, 0)] * 1e3;
+                jac[(0, 1)] = push[(2, 1)] * 1e3;
+                jac[(0, 2)] = push[(2, 2)] * 1e3;
+                jac[(1, 0)] = push[(2, 0)] * 1e3;
+                jac[(1, 1)] = push[(2, 1)] * 1e3;
+                jac[(1, 2)] = push[(2, 2)] * 1e3;
                 return (residuals, Some(jac));
             } else {
                 let jac = DMatrix::zeros(2, 9);

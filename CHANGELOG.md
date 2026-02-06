@@ -8,25 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.0] - 2026-01-11
 
 ### Added
-- **Ultra-tight safety configuration** for embedded and safety-critical systems
-- **SAFETY.md**: Comprehensive 323-line safety documentation
+- **Safety lint configuration** for embedded and safety-critical systems
+- **SAFETY.md**: Comprehensive safety documentation
 - **Build profiles**: Three-tier strategy (release, embedded-safe, ultra-critical)
-- **Deny-level lints**: expect_used, todo, unimplemented, box_collection, rc_buffer
+- **Deny-level lints**: todo, unimplemented, box_collection, rc_buffer
 - **Sanitizer support**: Memory, thread, and address sanitizers for pre-deployment testing
-- **Pre-deployment checklist**: 11-step validation process for critical deployments
-- Support for medical devices, aerospace systems, and autonomous vehicles
 
 ### Changed
-- Promoted unsafe patterns to deny-level in Cargo.toml clippy lints
+- Promoted unsafe_code to forbid in Cargo.toml
 - Enhanced integer overflow protection in all build profiles
-- Strengthened panic handling with abort strategy
 - Updated description to emphasize safety-critical capabilities
 
 ### Security
 - **unsafe_code = forbid**: 100% safe Rust guarantee
-- **panic = deny**: No panics in production code
-- **expect_used = deny**: Must use Result<T> instead
-- All 27 tests passing with strict safety validation
+- **expect_used/unwrap_used = warn**: Gradually tightening toward deny
 
 ## [Unreleased]
 
@@ -51,7 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Compilation errors in estimator and datasets modules
 - Various clippy warnings and code quality issues
 
-## [0.1.0] - 2024-01-XX
+## [0.1.0] - 2024-01-15
 
 ### Added
 - Initial implementation of Visual-Inertial Odometry system

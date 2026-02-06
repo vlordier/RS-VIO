@@ -34,7 +34,7 @@
 //! ```
 
 use crate::datasets::ImuData;
-use crate::imu::preintegration::{exp_map_so3, ImuNoise};
+use crate::imu::preintegration::{exp_map_so3, skew_symmetric, ImuNoise};
 use nalgebra as na;
 
 /// State of the ESKF
@@ -186,31 +186,34 @@ impl Eskf {
         // b_{k+1} = b_k + noise
 
         // Covariance prediction (uncertainty growth)
-        self.predict_covariance(dt);
+        self.predict_covariance(dt, accel_corrected);
 
         // Update timestamp for next iteration
         self.state.timestamp = Some(imu.timestamp);
     }
 
     /// Predict covariance using continuous-time linearization
-    fn predict_covariance(&mut self, dt: f64) {
+    fn predict_covariance(&mut self, dt: f64, accel_corrected: na::Vector3<f64>) {
         let R_rot = self.orientation.to_rotation_matrix();
         let R = R_rot.matrix();
 
-        // State transition matrix F (9x9)
-        // F = [0, 0, -R]
-        //     [0, 0,  0]
-        //     [0, 0,  0]
+        // State transition matrix F (9x9) for state [v, b_g, b_a]
+        // dv/db_a = -R (accel bias error rotated to world frame)
+        // dv/db_g = -R * [a_corrected]_x (gyro bias error causes rotation error
+        //           which misrotates the accelerometer measurement)
         let mut F = na::SMatrix::<f64, 9, 9>::zeros();
-        F.fixed_view_mut::<3, 3>(0, 6).copy_from(&(-R));
+        F.fixed_view_mut::<3, 3>(0, 6).copy_from(&(-R)); // dv/db_a
+        let accel_skew = skew_symmetric(accel_corrected);
+        F.fixed_view_mut::<3, 3>(0, 3).copy_from(&(-R * accel_skew)); // dv/db_g
 
         // Process noise covariance Q (9x9)
         let mut Q = na::SMatrix::<f64, 9, 9>::zeros();
 
         // Velocity process noise from accelerometer (discretized)
+        // R * R^T = I for rotation matrices, so this simplifies to scalar * I
         let accel_noise_var = self.noise.accel_noise_density.powi(2) * dt;
-        let vel_noise_var = (R * R.transpose()) * accel_noise_var;
-        Q.fixed_view_mut::<3, 3>(0, 0).copy_from(&vel_noise_var);
+        Q.fixed_view_mut::<3, 3>(0, 0)
+            .fill_diagonal(accel_noise_var);
 
         // Gyro bias random walk
         Q.fixed_view_mut::<3, 3>(3, 3)
