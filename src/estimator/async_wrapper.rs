@@ -23,6 +23,13 @@ use tokio::time::timeout;
 const BACKLOG_ERROR: &str = "Frame skipped - backlog limit exceeded";
 
 /// Configuration for async estimator real-time behavior
+/// Static error message for estimator panic recovery
+const ESTIMATOR_PANIC_ERROR: &str = "Estimator panicked while processing frame";
+
+/// Static error message for test panic
+const TEST_PANIC_ERROR: &str = "AsyncEstimator test panic triggered";
+
+/// Configuration for async estimator real-time behavior
 #[derive(Clone, Debug)]
 pub struct AsyncConfig {
     /// Channel capacity for command queue
@@ -309,8 +316,7 @@ impl AsyncEstimator {
                                         Err(err) => err.into_inner().record_panic_recovery(now_ns),
                                     }
                                     let _ = respond_to.send(Err(anyhow::anyhow!(
-                                        "Estimator panicked while processing frame {}",
-                                        frame_id
+                                        ESTIMATOR_PANIC_ERROR
                                     )));
                                     return;
                                 },
@@ -336,7 +342,7 @@ impl AsyncEstimator {
                                         Err(err) => err.into_inner().record_panic_recovery(0),
                                     }
                                     let _ = respond_to.send(Err(anyhow::anyhow!(
-                                        "AsyncEstimator test panic triggered"
+                                        TEST_PANIC_ERROR
                                     )));
                                     return;
                                 },

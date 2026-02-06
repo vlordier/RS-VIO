@@ -10,6 +10,9 @@ use rs_vio::estimator::AsyncEstimator;
 use std::sync::Arc;
 
 #[cfg(feature = "dhat-heap")]
+use dhat::Profiler;
+
+#[cfg(feature = "dhat-heap")]
 #[global_allocator]
 static ALLOC: dhat::Alloc = dhat::Alloc;
 
@@ -21,7 +24,7 @@ fn create_test_image(width: u32, height: u32) -> Vec<u8> {
 #[tokio::test]
 async fn test_zero_allocation_frame_processing() {
     #[cfg(feature = "dhat-heap")]
-    let _profiler = dhat::Profiler::new_heap();
+    let _profiler = Profiler::new_heap();
 
     let config = Config::load("config/tum_vi.yaml").expect("Config should load");
     let estimator = AsyncEstimator::new_with_cameras(config, None, None, None);
@@ -46,12 +49,13 @@ async fn test_zero_allocation_frame_processing() {
 
     #[cfg(feature = "dhat-heap")]
     {
-        let stats_after = dhat::HeapStats::get();
+        use dhat::HeapStats;
+        let stats_after = HeapStats::get();
         let alloc_diff = stats_after.total_blocks - stats_before.total_blocks;
         let bytes_diff = stats_after.total_bytes - stats_before.total_bytes;
 
         println!("Allocation delta: {} blocks, {} bytes", alloc_diff, bytes_diff);
-        
+
         // Allow small allocations for logging/metrics  (< 1KB acceptable)
         // The critical fix is eliminating 4MB+ image allocations
         assert!(
@@ -71,7 +75,7 @@ async fn test_zero_allocation_frame_processing() {
 #[tokio::test]
 async fn test_sustained_zero_allocation_processing() {
     #[cfg(feature = "dhat-heap")]
-    let _profiler = dhat::Profiler::new_heap();
+    let _profiler = Profiler::new_heap();
 
     let config = Config::load("config/tum_vi.yaml").expect("Config should load");
     let estimator = AsyncEstimator::new_with_cameras(config, None, None, None);
@@ -112,7 +116,8 @@ async fn test_sustained_zero_allocation_processing() {
 
     #[cfg(feature = "dhat-heap")]
     {
-        let stats_after = dhat::HeapStats::get();
+        use dhat::HeapStats;
+        let stats_after = HeapStats::get();
         let bytes_diff = stats_after.total_bytes - stats_before.total_bytes;
 
         println!(
