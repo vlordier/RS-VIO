@@ -1,7 +1,7 @@
 use clap::Parser;
 use env_logger::{Builder, Env};
 use log::{error, info, LevelFilter};
-use rs_vio::{FourSeasonsPlayer, PlayerConfig};
+use rs_vio::{DatasetPlayer, FourSeasonsPlayer, PlayerConfig};
 use std::process;
 
 fn main() {

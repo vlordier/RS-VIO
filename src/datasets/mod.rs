@@ -2,11 +2,13 @@ pub mod config;
 pub mod euroc_player;
 pub mod fourseasons_player;
 pub mod io;
+pub mod player;
 pub mod tum_vi_player;
 
 // Re-export player types for convenience
 pub use euroc_player::EurocPlayer;
 pub use fourseasons_player::FourSeasonsPlayer;
+pub use player::DatasetPlayer;
 pub use tum_vi_player::TUMVIPlayer;
 
 use crate::datasets::config::Config;

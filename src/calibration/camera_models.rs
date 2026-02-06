@@ -286,28 +286,50 @@ impl CameraModel for FisheyeCamera {
         let cx = intrinsics[2];
         let cy = intrinsics[3];
 
-        // Compute angle from optical axis
-        let theta = (point_3d.x / point_3d.z).atan2(point_3d.y / point_3d.z);
+        let x = point_3d.x;
+        let y = point_3d.y;
+        let z = point_3d.z;
 
-        // Compute radius (distance from optical axis)
-        let rho = (point_3d.x * point_3d.x + point_3d.y * point_3d.y).sqrt() / point_3d.z.abs();
+        // Incidence angle: angle between the ray and the optical axis
+        let r_xy = (x * x + y * y).sqrt();
+        let theta = r_xy.atan2(z);
 
-        // Apply fisheye projection model
+        // Azimuth angle in the image plane
+        let phi = y.atan2(x);
+
+        // Apply fisheye projection model to get projected radius
         let r = match self.model {
-            FisheyeModel::Equidistant => rho,                       // r = theta
-            FisheyeModel::Equisolid => 2.0 * (rho / 2.0).sin(),     // r = 2*sin(theta/2)
-            FisheyeModel::Stereographic => 2.0 * (rho / 2.0).tan(), // r = 2*tan(theta/2)
+            FisheyeModel::Equidistant => theta,                       // r = θ
+            FisheyeModel::Equisolid => 2.0 * (theta / 2.0).sin(),     // r = 2·sin(θ/2)
+            FisheyeModel::Stereographic => 2.0 * (theta / 2.0).tan(), // r = 2·tan(θ/2)
         };
 
         // Convert to image coordinates
-        na::Vector2::new(fx * r * theta.cos() + cx, fy * r * theta.sin() + cy)
+        na::Vector2::new(fx * r * phi.cos() + cx, fy * r * phi.sin() + cy)
     }
 
-    fn unproject(&self, _point_2d: &na::Vector2<f64>, _intrinsics: &[f64]) -> na::Vector3<f64> {
-        // TODO: Implement fisheye unprojection
-        // This is complex and requires solving transcendental equations
-        // For now, return a placeholder
-        na::Vector3::new(0.0, 0.0, 1.0)
+    fn unproject(&self, point_2d: &na::Vector2<f64>, intrinsics: &[f64]) -> na::Vector3<f64> {
+        let fx = intrinsics[0];
+        let fy = intrinsics[1];
+        let cx = intrinsics[2];
+        let cy = intrinsics[3];
+
+        // Normalized image coordinates
+        let mx = (point_2d.x - cx) / fx;
+        let my = (point_2d.y - cy) / fy;
+        let r = (mx * mx + my * my).sqrt();
+        let phi = my.atan2(mx);
+
+        // Invert the projection model to recover incidence angle θ
+        let theta = match self.model {
+            FisheyeModel::Equidistant => r,                    // r = θ  ⇒  θ = r
+            FisheyeModel::Equisolid => 2.0 * (r / 2.0).asin(), // r = 2·sin(θ/2) ⇒ θ = 2·asin(r/2)
+            FisheyeModel::Stereographic => 2.0 * (r / 2.0).atan(), // r = 2·tan(θ/2) ⇒ θ = 2·atan(r/2)
+        };
+
+        // Reconstruct the 3D bearing vector
+        let sin_theta = theta.sin();
+        na::Vector3::new(sin_theta * phi.cos(), sin_theta * phi.sin(), theta.cos())
     }
 
     fn num_intrinsics(&self) -> usize {

@@ -3,7 +3,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use image::GrayImage;
 use rs_vio::datasets::config::Config;
-use rs_vio::datasets::{ImageData, TUMVIPlayer};
+use rs_vio::datasets::{DatasetPlayer, ImageData, TUMVIPlayer};
 use rs_vio::estimator::{Frame, SlidingWindow};
 use rs_vio::feature_tracker::{EnhancedDetectorConfig, EnhancedFeatureDetector};
 

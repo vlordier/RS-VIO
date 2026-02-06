@@ -1,7 +1,7 @@
 use clap::Parser;
 use env_logger::{Builder, Env};
 use log::{error, info, LevelFilter};
-use rs_vio::{EurocPlayer, PlayerConfig};
+use rs_vio::{DatasetPlayer, EurocPlayer, PlayerConfig};
 use std::process;
 
 fn main() {

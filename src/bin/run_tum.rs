@@ -1,7 +1,7 @@
 use clap::Parser;
 use env_logger::{Builder, Env};
 use log::{error, info, LevelFilter};
-use rs_vio::{PlayerConfig, TUMVIPlayer};
+use rs_vio::{DatasetPlayer, PlayerConfig, TUMVIPlayer};
 use std::process;
 
 fn main() {

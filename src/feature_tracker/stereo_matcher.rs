@@ -207,19 +207,12 @@ impl StereoMatcher {
     fn propagate_matches_to_next_level(
         &self,
         coarse_matches: &[StereoMatch],
-        scale: f32,
+        _scale: f32,
     ) -> Vec<StereoMatch> {
-        // Use coarse matches to predict search regions for fine level
-        // For now, just return coarse matches scaled up
-        coarse_matches
-            .iter()
-            .map(|m| {
-                let mut scaled = m.clone();
-                scaled.left_idx = (m.left_idx as f32 / scale) as usize;
-                scaled.right_idx = (m.right_idx as f32 / scale) as usize;
-                scaled
-            })
-            .collect()
+        // Indices are into the same feature arrays at every pyramid level
+        // (only the .point coordinates are scaled by scale_features),
+        // so no index remapping is needed.
+        coarse_matches.to_vec()
     }
 
     /// Descriptor matching with custom parameters
@@ -719,6 +712,9 @@ impl StereoMatcher {
 
         let f_refined = u * na::Matrix3::from_diagonal(&sigma) * v_t;
 
+        // Convert Essential → Fundamental so error is in pixel space.
+        let f_refined = k_inv.transpose() * f_refined * k_inv;
+
         (f_refined, weights.to_vec())
     }
 
@@ -799,7 +795,11 @@ impl StereoMatcher {
 
         // Reconstruct F
         let sigma_diag = na::Matrix3::from_diagonal(&sigma);
-        Some(u * sigma_diag * v_t)
+        // The 8-point algorithm with K-normalized points yields the Essential
+        // matrix E.  Convert to Fundamental matrix F = K^{-T} E K^{-1} so that
+        // downstream epipolar-error computation works in pixel coordinates.
+        let e = u * sigma_diag * v_t;
+        Some(k_inv.transpose() * e * k_inv)
     }
 
     /// Compute epipolar error for a point pair
