@@ -21,36 +21,13 @@ pub fn create_viewer() -> Result<Option<Box<dyn Viewer>>> {
     }
 }
 
-use std::collections::HashMap;
-use std::sync::{LazyLock, Mutex};
-
-/// Global color map for feature IDs
-/// Uses a deterministic hash-based color assignment to ensure consistent colors
-static FEATURE_COLOR_MAP: LazyLock<Mutex<HashMap<usize, [u8; 3]>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
-
-/// Get or assign a color for a given feature ID
-/// Colors are deterministically assigned based on the feature ID using a hash function
+/// Get a deterministic color for a given feature ID.
+/// Uses hash-based color assignment — no caching needed since the function is pure.
 pub fn get_feature_color(feature_id: usize) -> [u8; 3] {
-    let mut map = match FEATURE_COLOR_MAP.lock() {
-        Ok(guard) => guard,
-        Err(poisoned) => poisoned.into_inner(),
-    };
-
-    // Check if color already assigned
-    if let Some(&color) = map.get(&feature_id) {
-        return color;
-    }
-
-    // Generate a deterministic color based on feature ID using a hash
     let hash = feature_id as u64;
-    let r = ((hash * 2654435761) % 256) as u8;
-    let g = ((hash * 2246822507) % 256) as u8;
-    let b = ((hash * 3266489917) % 256) as u8;
-
+    let r = ((hash.wrapping_mul(2654435761)) % 256) as u8;
+    let g = ((hash.wrapping_mul(2246822507)) % 256) as u8;
+    let b = ((hash.wrapping_mul(3266489917)) % 256) as u8;
     // Ensure minimum brightness for visibility
-    let color = [r.max(50), g.max(50), b.max(50)];
-
-    map.insert(feature_id, color);
-    color
+    [r.max(50), g.max(50), b.max(50)]
 }

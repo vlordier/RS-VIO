@@ -228,7 +228,7 @@ impl Estimator {
         // Create frame (images are not stored, only features will be added)
         let mut current_frame = Frame::from_stereo_images(
             timestamp_ns,
-            self.frame_id_counter as i32,
+            i32::try_from(self.frame_id_counter).unwrap_or(i32::MAX),
             self.left_cam.clone(),
             self.right_cam.clone(),
             self.T_B_Cl,
@@ -239,7 +239,7 @@ impl Estimator {
         if let Some(imu) = imu_data {
             self.imu_buffer.clear();
             self.imu_buffer.extend_from_slice(imu);
-            current_frame.imu_from_last_frame = self.imu_buffer.clone();
+            current_frame.imu_from_last_frame = std::mem::take(&mut self.imu_buffer);
         }
 
         frame_creation_time_ms = frame_creation_start.elapsed().as_secs_f64() * 1000.0;
@@ -285,13 +285,10 @@ impl Estimator {
 
                 // Check if translation and rotation since last keyframe is large enough to trigger a keyframe
                 #[allow(clippy::unwrap_used)] // Validated by sliding_window - keyframes exist
-                let T_W_B_last_kf = *self
-                    .sliding_window
-                    .lock()
-                    .unwrap()
-                    .get_keyframe_poses()
-                    .last()
-                    .unwrap();
+                let T_W_B_last_kf = {
+                    let sw = self.sliding_window.lock().unwrap();
+                    sw.last_keyframe_pose().unwrap()
+                };
                 #[allow(clippy::unwrap_used)] // T_W_B is guaranteed invertible
                 let T_rel = T_W_B * T_W_B_last_kf.try_inverse().unwrap();
                 let t_rel = T_rel.fixed_view::<3, 1>(0, 3).into_owned();

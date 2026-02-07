@@ -106,6 +106,10 @@ impl Pattern52 {
             }
         }
 
+        if num_valid_points == 0 {
+            self.mean = 0.0;
+            return;
+        }
         self.mean = sum / num_valid_points as f32;
 
         let mean_inv = num_valid_points as f32 / sum;

@@ -102,7 +102,7 @@ impl AsyncFeatureDetector {
                 Ok(features) => all_features.extend(features),
                 Err(err) => {
                     // Log task panic, continue with other results
-                    eprintln!(
+                    log::warn!(
                         "AsyncFeatureDetector::detect_async: spawn_blocking task failed: {:?}",
                         err
                     );

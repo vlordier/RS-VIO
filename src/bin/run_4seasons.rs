@@ -49,7 +49,7 @@ fn main() {
         process::exit(0);
     } else {
         error!("[Main] processing failed: {}", result.error_message);
-        process::exit(-1);
+        process::exit(1);
     }
 }
 

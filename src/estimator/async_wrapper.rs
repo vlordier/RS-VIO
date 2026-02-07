@@ -581,7 +581,7 @@ impl AsyncEstimator {
                 },
                 _ => {
                     // Shutdown command failed or timed out
-                    eprintln!("Warning: AsyncEstimator shutdown timed out");
+                    log::warn!("AsyncEstimator shutdown timed out");
                 },
             }
 

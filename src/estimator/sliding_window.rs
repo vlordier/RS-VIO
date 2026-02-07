@@ -123,14 +123,14 @@ impl SlidingWindow {
         self.keyframes.len() >= self.max_frames
     }
 
-    /// Get a reference to a specific keyframe by index.
-    pub fn get_frame(&self, index: usize) -> Option<&Frame> {
-        self.keyframes.get(index)
-    }
-
     pub fn get_keyframe_poses(&self) -> Vec<Matrix4x4> {
         // Return poses of body in world frame
         self.keyframes.iter().map(|f| f.state.T_W_B).collect()
+    }
+
+    /// Get the pose of the last keyframe without allocating.
+    pub fn last_keyframe_pose(&self) -> Option<Matrix4x4> {
+        self.keyframes.back().map(|f| f.state.T_W_B)
     }
 
     /// Clear all keyframes from the sliding window.

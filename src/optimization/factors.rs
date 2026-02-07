@@ -92,7 +92,6 @@ impl Factor for PinholeProjectionFactor {
         // Transform 3D point from world to camera frame
         let R_C_W = self.T_C_W.fixed_view::<3, 3>(0, 0);
         let t_C_W = self.T_C_W.fixed_view::<3, 1>(0, 3);
-        //println!("t_C_W: {:?}", t_C_W.to_owned().to_string());
         let point_camera = R_C_W * point_world + t_C_W;
 
         // Project to normalized coordinates (simple pinhole: x/z, y/z)
@@ -223,7 +222,6 @@ impl Factor for BundleAdjustmentFactorTranslationOnly {
             >,
         > = self.T_C_B.fixed_view::<3, 3>(0, 0);
         let t_C_B = self.T_C_B.fixed_view::<3, 1>(0, 3);
-        //println!("t_C_W: {:?}", t_C_W.to_owned().to_string());
         let p_C = R_C_B * (p_W + t_B_W) + t_C_B;
 
         // Project to normalized coordinates (simple pinhole: x/z, y/z)
@@ -356,12 +354,11 @@ impl Factor for BundleAdjustmentFactor {
         let p_B = R_B_W * p_W + t_B_W;
         let p_C = R_C_B * p_B + t_C_B;
 
-        //println!("p_C: {:?}", p_C.to_owned().to_string());
         // Check cheirality: point behind camera gets a large residual with
         // a finite Jacobian so the optimizer can recover (zero Jacobian
         // would stall the solver).
         if p_C.z <= 0.0 {
-            let residuals = DVector::from_vec(vec![1e6, 1e6]);
+            let residuals = DVector::from_column_slice(&[1e6, 1e6]);
             if !compute_jacobian {
                 return (residuals, None);
             }
@@ -377,7 +374,7 @@ impl Factor for BundleAdjustmentFactor {
                 jac[(1, 2)] = push[(2, 2)] * 1e3;
                 return (residuals, Some(jac));
             } else {
-                // Provide non-zero Jacobian for pose (6) + point (3) = 9 variables
+                // Provide non-zero Jacobian for point (3) + pose (6) = 9 variables
                 // so the optimizer has gradient signal to recover from behind-camera
                 let mut jac = DMatrix::zeros(2, 9);
                 let push = R_C_B.transpose(); // camera z direction in world frame
@@ -388,13 +385,24 @@ impl Factor for BundleAdjustmentFactor {
                 jac[(1, 0)] = push[(2, 0)] * 1e3;
                 jac[(1, 1)] = push[(2, 1)] * 1e3;
                 jac[(1, 2)] = push[(2, 2)] * 1e3;
+                // Pose translation Jacobian (columns 3-5): push pose to move point in front
+                // Under right-perturbation: ∂p_C/∂δρ = R_C_B * R_B_W
+                // We want ∂residual/∂t to push p_C.z positive, same direction as point push
+                jac[(0, 3)] = push[(2, 0)] * 1e3;
+                jac[(0, 4)] = push[(2, 1)] * 1e3;
+                jac[(0, 5)] = push[(2, 2)] * 1e3;
+                jac[(1, 3)] = push[(2, 0)] * 1e3;
+                jac[(1, 4)] = push[(2, 1)] * 1e3;
+                jac[(1, 5)] = push[(2, 2)] * 1e3;
+                // Rotation Jacobian (columns 6-8): leave as zero (rotation recovery is
+                // under-determined when point is behind camera)
                 return (residuals, Some(jac));
             }
         }
 
         // Project and compute residuals
         let proj = self.project_normalized(p_C);
-        let residuals = DVector::from_vec(vec![
+        let residuals = DVector::from_column_slice(&[
             proj[0] - self.observation[0],
             proj[1] - self.observation[1],
         ]);
@@ -578,7 +586,7 @@ impl Factor for PnPFactor {
         // Cheirality check: point behind camera gets large residual with
         // gradient signal so the optimizer can recover
         if p_C.z <= 0.0 {
-            let residuals = DVector::from_vec(vec![1e6, 1e6]);
+            let residuals = DVector::from_column_slice(&[1e6, 1e6]);
             if compute_jacobian {
                 // Provide gradient pushing the pose so p_C.z increases
                 let jac_proj = self.jacobian_r_wrt_p_C(Vector3::new(p_C.x, p_C.y, 1.0)); // use z=1 to avoid div-by-zero
@@ -597,7 +605,7 @@ impl Factor for PnPFactor {
 
         // Project and compute residuals
         let proj = self.project_normalized(p_C);
-        let residuals = DVector::from_vec(vec![
+        let residuals = DVector::from_column_slice(&[
             proj[0] - self.observation[0],
             proj[1] - self.observation[1],
         ]);
