@@ -40,6 +40,8 @@ use anyhow::Result;
 use nalgebra as na;
 use serde::{Deserialize, Serialize};
 
+use super::motion_model::MotionModel;
+
 /// Configuration for constant velocity motion model
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConstantVelocityConfig {
@@ -283,6 +285,32 @@ impl ConstantVelocityModel {
     /// Get configuration
     pub const fn config(&self) -> &ConstantVelocityConfig {
         &self.config
+    }
+}
+
+impl MotionModel for ConstantVelocityModel {
+    fn initialize(&mut self, pose: na::Isometry3<f64>, timestamp: i64) -> Result<()> {
+        self.initialize(pose, timestamp)
+    }
+
+    fn update(&mut self, pose: na::Isometry3<f64>, timestamp: i64) -> Result<f64> {
+        self.update(pose, timestamp)
+    }
+
+    fn predict_pose(&self, time_delta: f64) -> Result<na::Isometry3<f64>> {
+        self.predict_pose(time_delta)
+    }
+
+    fn is_initialized(&self) -> bool {
+        self.is_initialized()
+    }
+
+    fn confidence(&self) -> f64 {
+        self.confidence()
+    }
+
+    fn reset(&mut self) {
+        self.reset();
     }
 }
 
