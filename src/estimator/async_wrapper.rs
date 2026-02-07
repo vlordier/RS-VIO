@@ -339,7 +339,7 @@ impl AsyncEstimator {
                     }
                 }
             })
-            .expect("failed to spawn VIO estimator thread");
+            .unwrap_or_else(|e| panic!("failed to spawn VIO estimator thread: {e}"));
 
         Self {
             command_tx,
@@ -508,7 +508,7 @@ impl AsyncEstimator {
     }
 
     /// Get current async configuration
-    pub fn config(&self) -> &AsyncConfig {
+    pub const fn config(&self) -> &AsyncConfig {
         &self.config
     }
 

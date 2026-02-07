@@ -187,7 +187,7 @@ pub struct DeadlineTracker {
 
 impl DeadlineTracker {
     /// Create new deadline tracker
-    pub fn new(deadline_ns: i64, frame_id: i64) -> Self {
+    pub const fn new(deadline_ns: i64, frame_id: i64) -> Self {
         Self {
             deadline_ns,
             frame_id,
@@ -196,12 +196,12 @@ impl DeadlineTracker {
     }
 
     /// Check if deadline is currently missed
-    pub fn is_missed(&self, current_time_ns: i64) -> bool {
+    pub const fn is_missed(&self, current_time_ns: i64) -> bool {
         current_time_ns > self.deadline_ns
     }
 
     /// Mark deadline as met
-    pub fn mark_met(&mut self) {
+    pub const fn mark_met(&mut self) {
         self.met = true;
     }
 }
@@ -258,7 +258,7 @@ impl StreamingPatternAnalyzer {
         }
     }
 
-    fn sample_at(&self, index: usize) -> i64 {
+    const fn sample_at(&self, index: usize) -> i64 {
         let len = self.recent_arrivals_ns.len();
         let oldest = (self.recent_index + len - self.recent_count) % len;
         let pos = (oldest + index) % len;
@@ -302,14 +302,14 @@ impl Default for FailureRecoveryTracker {
 
 impl FailureRecoveryTracker {
     /// Record a panic recovery event
-    pub fn record_panic_recovery(&mut self, timestamp_ns: i64) {
+    pub const fn record_panic_recovery(&mut self, timestamp_ns: i64) {
         self.panic_recoveries += 1;
         self.last_panic_ns = Some(timestamp_ns);
         self.worker_healthy = false;
     }
 
     /// Mark worker as healthy
-    pub fn mark_worker_healthy(&mut self) {
+    pub const fn mark_worker_healthy(&mut self) {
         self.worker_healthy = true;
     }
 

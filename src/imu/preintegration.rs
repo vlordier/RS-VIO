@@ -297,7 +297,7 @@ impl PreintegratedImu {
 
         // First-order bias correction
         let delta_R_correction = exp_map_so3(self.J_R_bg * d_bg);
-        self.delta_R = self.delta_R * delta_R_correction;
+        self.delta_R *= delta_R_correction;
 
         self.delta_v = self.delta_v + self.J_v_bg * d_bg + self.J_v_ba * d_ba;
         self.delta_p = self.delta_p + self.J_p_bg * d_bg + self.J_p_ba * d_ba;

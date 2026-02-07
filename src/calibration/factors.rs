@@ -624,11 +624,9 @@ impl Factor for TemporalSuperResolutionFactor {
 
         // Compute residuals for each temporal observation
         let mut residuals = na::DVector::zeros(self.temporal_observations.len() * 4);
-        let jacobian = if compute_jacobian {
-            None // Return None to trigger solver's numerical differentiation fallback
-        } else {
-            None
-        };
+        // Jacobians not yet implemented — always rely on solver's numerical differentiation
+        let _ = compute_jacobian;
+        let jacobian: Option<na::DMatrix<f64>> = None;
 
         for (i, observation) in self.temporal_observations.iter().enumerate() {
             // Interpolate motion at this timestamp
@@ -755,12 +753,9 @@ impl Factor for TemporalConsistencyFactor {
             residuals[5 + i] = self.smoothness_weight * linear_vel[i].abs().min(1.0);
         }
 
-        // TODO: Add proper Jacobians for optimization
-        let jacobian = if compute_jacobian {
-            None // Return None to trigger solver's numerical differentiation fallback
-        } else {
-            None
-        };
+        // Jacobians not yet implemented — always rely on solver's numerical differentiation
+        let _ = compute_jacobian;
+        let jacobian: Option<na::DMatrix<f64>> = None;
 
         (residuals, jacobian)
     }
@@ -942,12 +937,9 @@ impl Factor for CameraGraphFactor {
             translation_error.z,
         ]);
 
-        // TODO: Compute Jacobians for pose graph optimization
-        let jacobian = if compute_jacobian {
-            None // Return None to trigger solver's numerical differentiation fallback
-        } else {
-            None
-        };
+        // Jacobians not yet implemented — always rely on solver's numerical differentiation
+        let _ = compute_jacobian;
+        let jacobian: Option<na::DMatrix<f64>> = None;
 
         (residuals, jacobian)
     }

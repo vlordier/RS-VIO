@@ -645,7 +645,6 @@ impl SlidingWindow {
                         Some(inv) => kf.state.T_W_B = inv,
                         None => {
                             log::warn!("[SlidingWindow] Near-singular matrix for KF_{frame_id}, skipping update");
-                            return;
                         }
                     }
                 }

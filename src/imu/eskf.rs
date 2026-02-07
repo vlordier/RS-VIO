@@ -141,7 +141,7 @@ impl Eskf {
     }
 
     /// Update orientation from external source (e.g., visual odometry)
-    pub fn update_orientation(&mut self, R: na::UnitQuaternion<f64>) {
+    pub const fn update_orientation(&mut self, R: na::UnitQuaternion<f64>) {
         self.orientation = R;
     }
 
@@ -172,7 +172,7 @@ impl Eskf {
         // This is essential even with visual odometry for high-rate IMU fusion
         let gyro_corrected = gyro - self.state.gyro_bias;
         let delta_R = exp_map_so3(gyro_corrected * dt);
-        self.orientation = self.orientation * delta_R;
+        self.orientation *= delta_R;
 
         // Accelerometer prediction: Update velocity with bias correction
         let accel_corrected = accel - self.state.accel_bias;
@@ -328,12 +328,12 @@ impl Eskf {
     }
 
     /// Get current velocity estimate
-    pub fn get_velocity(&self) -> na::Vector3<f64> {
+    pub const fn get_velocity(&self) -> na::Vector3<f64> {
         self.state.velocity
     }
 
     /// Get current bias estimates
-    pub fn get_biases(&self) -> (na::Vector3<f64>, na::Vector3<f64>) {
+    pub const fn get_biases(&self) -> (na::Vector3<f64>, na::Vector3<f64>) {
         (self.state.gyro_bias, self.state.accel_bias)
     }
 

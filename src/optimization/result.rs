@@ -26,7 +26,7 @@ pub struct OptimizationResult {
 
 impl OptimizationResult {
     /// Create new optimization result
-    pub fn new(
+    pub const fn new(
         gyro_bias: nalgebra::Vector3<f64>,
         accel_bias: nalgebra::Vector3<f64>,
         bias_uncertainty: f64,
@@ -42,7 +42,7 @@ impl OptimizationResult {
     }
 
     /// Create with full metadata
-    pub fn with_metadata(
+    pub const fn with_metadata(
         gyro_bias: nalgebra::Vector3<f64>,
         accel_bias: nalgebra::Vector3<f64>,
         bias_uncertainty: f64,

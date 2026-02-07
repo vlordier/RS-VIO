@@ -20,12 +20,18 @@ pub struct AsyncOptimizer {
     sliding_window: Arc<Mutex<SlidingWindow>>,
 }
 
-impl AsyncOptimizer {
-    /// Create a new async optimizer
-    pub fn new() -> Self {
+impl Default for AsyncOptimizer {
+    fn default() -> Self {
         Self {
             sliding_window: Arc::new(Mutex::new(SlidingWindow::new(10))),
         }
+    }
+}
+
+impl AsyncOptimizer {
+    /// Create a new async optimizer
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Clone the optimizer for sharing across async tasks
