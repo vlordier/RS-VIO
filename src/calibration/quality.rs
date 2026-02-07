@@ -220,7 +220,7 @@ impl CalibrationLogger {
             .collect();
 
         let improvement_rate = if mean_errors.len() >= 2 {
-            (mean_errors[0] - mean_errors[mean_errors.len() - 1]) / mean_errors.len() as f64
+            (mean_errors[mean_errors.len() - 1] - mean_errors[0]) / (mean_errors.len() - 1) as f64
         } else {
             0.0
         };
