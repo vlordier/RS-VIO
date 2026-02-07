@@ -95,7 +95,7 @@ async fn test_sustained_zero_allocation_processing() {
                 i,
                 left.clone(),
                 right.clone(),
-                i64::from(i) * 1_000_000,
+                i * 1_000_000,
                 None,
             )
             .await;
@@ -111,7 +111,7 @@ async fn test_sustained_zero_allocation_processing() {
                 i,
                 left.clone(),
                 right.clone(),
-                i64::from(i) * 1_000_000,
+                i * 1_000_000,
                 None,
             )
             .await;
@@ -161,7 +161,7 @@ async fn test_concurrent_processing_no_allocation_growth() {
         let l = left.clone();
         let r = right.clone();
         handles.push(tokio::spawn(async move {
-            est.process_frame_async(i, l, r, i64::from(i) * 1_000_000, None)
+            est.process_frame_async(i, l, r, i * 1_000_000, None)
                 .await
         }));
     }

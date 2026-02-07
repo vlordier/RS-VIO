@@ -816,4 +816,71 @@ mod tests {
         let error = matcher.compute_epipolar_error(&f, &left_point, &right_point);
         assert!(error >= 0.0);
     }
+
+    #[test]
+    fn test_default_config_values() {
+        let config = StereoMatcherConfig::default();
+        assert_eq!(config.max_descriptor_distance, 64);
+        assert!((config.max_epipolar_error - 2.0).abs() < f32::EPSILON);
+        assert!((config.ratio_threshold - 0.8).abs() < f32::EPSILON);
+        assert!(config.enable_geometric_check);
+        assert_eq!(config.ransac_iterations, 1000);
+        assert!((config.ransac_threshold - 1.0).abs() < f32::EPSILON);
+        assert!(!config.enable_hierarchical_matching);
+        assert_eq!(config.pyramid_levels, 3);
+    }
+
+    #[test]
+    fn test_match_confidence_perfect_score() {
+        let matcher = StereoMatcher::new(StereoMatcherConfig::default());
+        // Perfect match: zero distance, zero epipolar error
+        let confidence = matcher.compute_match_confidence(0, 0.0, 64, 2.0);
+        assert!((confidence - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_match_confidence_worst_score() {
+        let matcher = StereoMatcher::new(StereoMatcherConfig::default());
+        // Worst match: max distance, max epipolar error
+        let confidence = matcher.compute_match_confidence(64, 2.0, 64, 2.0);
+        assert!((confidence - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_match_features_empty_inputs() {
+        let matcher = StereoMatcher::new(StereoMatcherConfig::default());
+        let intrinsics = na::Matrix3::new(500.0, 0.0, 320.0, 0.0, 500.0, 240.0, 0.0, 0.0, 1.0);
+        let matches = matcher.match_features(&[], &[], &intrinsics);
+        assert!(matches.is_empty());
+    }
+
+    #[test]
+    fn test_match_features_no_right_features() {
+        let matcher = StereoMatcher::new(StereoMatcherConfig::default());
+        let intrinsics = na::Matrix3::new(500.0, 0.0, 320.0, 0.0, 500.0, 240.0, 0.0, 0.0, 1.0);
+        let left = vec![EnhancedFeature {
+            point: na::Vector2::new(100.0, 100.0),
+            orientation: 0.0,
+            descriptor: [0u8; 16],
+            score: 50.0,
+            scale: 1.0,
+            quality: 0.8,
+        }];
+        let matches = matcher.match_features(&left, &[], &intrinsics);
+        assert!(matches.is_empty());
+    }
+
+    #[test]
+    fn test_hierarchical_matching_config() {
+        let config = StereoMatcherConfig {
+            enable_hierarchical_matching: true,
+            pyramid_levels: 2,
+            ..StereoMatcherConfig::default()
+        };
+        let matcher = StereoMatcher::new(config);
+        let intrinsics = na::Matrix3::new(500.0, 0.0, 320.0, 0.0, 500.0, 240.0, 0.0, 0.0, 1.0);
+        // With empty features, hierarchical matching should also return empty
+        let matches = matcher.match_features(&[], &[], &intrinsics);
+        assert!(matches.is_empty());
+    }
 }

@@ -50,7 +50,7 @@ fn create_checkerboard_image(width: usize, height: usize, square_size: usize) ->
         for x in 0..width {
             let square_x = x / square_size;
             let square_y = y / square_size;
-            if (square_x + square_y) % 2 == 0 {
+            if (square_x + square_y).is_multiple_of(2) {
                 image[y * width + x] = 200; // Light square
             } else {
                 image[y * width + x] = 50; // Dark square
@@ -390,7 +390,7 @@ async fn test_async_estimator_frame_skipping() {
 
     // Test that frame skipping is enabled in config
     assert_eq!(estimator.config().channel_capacity, 1);
-    assert_eq!(estimator.config().enable_frame_skipping, true);
+    assert!(estimator.config().enable_frame_skipping);
 
     // Process a single frame successfully
     let result = estimator
@@ -425,7 +425,7 @@ async fn test_async_estimator_config_access() {
     // Test config access
     assert_eq!(estimator.config().frame_timeout_ms, 500);
     assert_eq!(estimator.config().channel_capacity, 16);
-    assert_eq!(estimator.config().enable_frame_skipping, false);
+    assert!(!estimator.config().enable_frame_skipping);
 
     // Test can_accept_frame
     assert!(
@@ -690,7 +690,7 @@ async fn test_backlog_cap_drops_frames() {
                 i,
                 left,
                 right,
-                i64::from(i) * 1_000_000,
+                i * 1_000_000,
                 None,
                 is_keyframe,
             )
@@ -1099,7 +1099,7 @@ async fn test_frame_skipping_disabled_vs_enabled() {
         async_config_no_skip,
     );
 
-    assert_eq!(est_no_skip.config().enable_frame_skipping, false);
+    assert!(!est_no_skip.config().enable_frame_skipping);
 
     // With skipping enabled
     let async_config_skip = AsyncConfig {
@@ -1115,7 +1115,7 @@ async fn test_frame_skipping_disabled_vs_enabled() {
         async_config_skip,
     );
 
-    assert_eq!(est_skip.config().enable_frame_skipping, true);
+    assert!(est_skip.config().enable_frame_skipping);
 
     // Both should process at least one frame successfully
     let left = create_checkerboard_image(640, 480, 20);

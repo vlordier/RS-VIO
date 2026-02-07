@@ -794,3 +794,121 @@ impl SlidingWindow {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_keyframe(id: i32) -> Frame {
+        let mut frame = Frame::new(id as i64 * 1_000_000_000, id);
+        frame.is_keyframe = true;
+        frame
+    }
+
+    #[test]
+    fn test_sliding_window_new() {
+        let sw = SlidingWindow::new(4);
+        assert_eq!(sw.len(), 0);
+        assert!(sw.is_empty());
+        assert!(!sw.is_full());
+        assert_eq!(sw.max_frames, 4);
+        assert!(sw.map_points.is_empty());
+    }
+
+    #[test]
+    fn test_sliding_window_with_default_size() {
+        let sw = SlidingWindow::with_default_size();
+        assert_eq!(sw.max_frames, 8);
+        assert!(sw.is_empty());
+    }
+
+    #[test]
+    fn test_add_keyframe_accepted() {
+        let mut sw = SlidingWindow::new(4);
+        let frame = make_keyframe(1);
+        assert!(sw.add_frame(frame));
+        assert_eq!(sw.len(), 1);
+        assert!(!sw.is_empty());
+        assert!(!sw.is_full());
+    }
+
+    #[test]
+    fn test_reject_non_keyframe() {
+        let mut sw = SlidingWindow::new(4);
+        let frame = Frame::new(1_000_000_000, 1); // is_keyframe = false
+        assert!(!sw.add_frame(frame));
+        assert_eq!(sw.len(), 0);
+    }
+
+    #[test]
+    fn test_window_fills_and_evicts_oldest() {
+        let mut sw = SlidingWindow::new(3);
+        for i in 1..=3 {
+            assert!(sw.add_frame(make_keyframe(i)));
+        }
+        assert!(sw.is_full());
+        assert_eq!(sw.len(), 3);
+
+        // Adding a 4th frame should evict the oldest (frame_id=1)
+        assert!(sw.add_frame(make_keyframe(4)));
+        assert_eq!(sw.len(), 3);
+        assert_eq!(sw.keyframes.front().unwrap().frame_id, 2);
+        assert_eq!(sw.keyframes.back().unwrap().frame_id, 4);
+    }
+
+    #[test]
+    fn test_clear() {
+        let mut sw = SlidingWindow::new(4);
+        sw.add_frame(make_keyframe(1));
+        sw.add_frame(make_keyframe(2));
+        assert_eq!(sw.len(), 2);
+        sw.clear();
+        assert!(sw.is_empty());
+        assert_eq!(sw.len(), 0);
+    }
+
+    #[test]
+    fn test_get_keyframe_poses_returns_identity() {
+        let mut sw = SlidingWindow::new(4);
+        sw.add_frame(make_keyframe(1));
+        sw.add_frame(make_keyframe(2));
+        let poses = sw.get_keyframe_poses();
+        assert_eq!(poses.len(), 2);
+        for pose in &poses {
+            // Default Frame::new produces identity T_W_B
+            assert!((pose[(0, 0)] - 1.0).abs() < 1e-6);
+            assert!((pose[(1, 1)] - 1.0).abs() < 1e-6);
+            assert!((pose[(2, 2)] - 1.0).abs() < 1e-6);
+            assert!((pose[(3, 3)] - 1.0).abs() < 1e-6);
+        }
+    }
+
+    #[test]
+    fn test_last_keyframe_pose() {
+        let mut sw = SlidingWindow::new(4);
+        assert!(sw.last_keyframe_pose().is_none());
+        sw.add_frame(make_keyframe(1));
+        let pose = sw.last_keyframe_pose();
+        assert!(pose.is_some());
+        // Should be identity
+        let p = pose.unwrap();
+        assert!((p[(0, 0)] - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_optimize_rejects_empty_window() {
+        let mut sw = SlidingWindow::new(4);
+        let result = sw.optimize();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_optimize_rejects_underfilled_window() {
+        let mut sw = SlidingWindow::new(4);
+        sw.add_frame(make_keyframe(1));
+        sw.add_frame(make_keyframe(2));
+        // Only 2 of 4 required frames
+        let result = sw.optimize();
+        assert!(result.is_err());
+    }
+}

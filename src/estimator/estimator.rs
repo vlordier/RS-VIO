@@ -512,3 +512,109 @@ impl Estimator {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::datasets::config::{
+        CameraConfig, Config, FeatureDetectionConfig, KeyframeManagementConfig,
+        OptimizationConfig,
+    };
+
+    fn create_test_config() -> Config {
+        Config {
+            camera: CameraConfig {
+                image_width: 640,
+                image_height: 480,
+                left_intrinsics: vec![500.0, 500.0, 320.0, 240.0],
+                left_distortion: vec![0.0, 0.0, 0.0, 0.0, 0.0],
+                right_intrinsics: vec![500.0, 500.0, 320.0, 240.0],
+                right_distortion: vec![0.0, 0.0, 0.0, 0.0, 0.0],
+                left_model: None,
+                right_model: None,
+                T_B_Cl: vec![
+                    1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
+                    0.0, 1.0,
+                ],
+                T_B_Cr: vec![
+                    1.0, 0.0, 0.0, -0.12, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
+                    0.0, 1.0,
+                ],
+            },
+            keyframe_management: KeyframeManagementConfig {
+                keyframe_window_size: 8,
+                translation_threshold: 0.2,
+                rotation_threshold: 0.1,
+            },
+            feature_detection: FeatureDetectionConfig {
+                grid_cols: 16,
+                max_features_per_grid: 80,
+                optical_flow_max_iterations: 30,
+                optical_flow_convergence_threshold: 0.01,
+            },
+            optimization: OptimizationConfig {
+                bundle_adjustment_max_iterations: 5,
+                pnp_max_iterations: 5,
+            },
+            calibration: None,
+        }
+    }
+
+    #[test]
+    fn test_estimator_new_default() {
+        let config = create_test_config();
+        let estimator = Estimator::new(config, None);
+        assert_eq!(estimator.frame_id_counter, 0);
+        assert_eq!(estimator.config.camera.image_width, 640);
+        assert_eq!(estimator.config.camera.image_height, 480);
+        assert!(estimator.viewer.is_none());
+        assert_eq!(estimator.consecutive_tracking_failures, 0);
+    }
+
+    #[test]
+    fn test_estimator_new_with_explicit_cameras() {
+        let config = create_test_config();
+        let (left_cam, right_cam) = crate::datasets::create_camera_models_from_config(&config);
+        let estimator =
+            Estimator::new_with_cameras(config, None, Some(left_cam), Some(right_cam));
+        assert_eq!(estimator.frame_id_counter, 0);
+        assert!(estimator.viewer.is_none());
+        // Sliding window should be empty initially
+        let sw = estimator.sliding_window.lock().unwrap();
+        assert!(sw.is_empty());
+    }
+
+    #[test]
+    fn test_process_frame_rejects_wrong_image_size() {
+        let config = create_test_config();
+        let mut estimator = Estimator::new(config, None);
+        let small_img = vec![128u8; 100]; // Much smaller than 640x480
+        let result = estimator.process_frame(&small_img, &small_img, 1_000_000_000, None);
+        assert!(result.is_err());
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(err_msg.contains("Invalid image size"));
+    }
+
+    #[test]
+    fn test_process_frame_bootstrap_adds_keyframe() {
+        let config = create_test_config();
+        let w = config.camera.image_width as usize;
+        let h = config.camera.image_height as usize;
+        let mut estimator = Estimator::new(config, None);
+        let image = vec![128u8; w * h];
+        let result = estimator.process_frame(&image, &image, 1_000_000_000, None);
+        assert!(result.is_ok());
+        assert_eq!(estimator.frame_id_counter, 1);
+        // Bootstrap should add the frame as a keyframe to the sliding window
+        let sw = estimator.sliding_window.lock().unwrap();
+        assert_eq!(sw.len(), 1);
+    }
+
+    #[test]
+    fn test_set_viewer_frame_without_viewer() {
+        let config = create_test_config();
+        let mut estimator = Estimator::new(config, None);
+        // Should not panic when no viewer is attached
+        estimator.set_viewer_frame(42);
+    }
+}
