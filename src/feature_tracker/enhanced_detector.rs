@@ -88,19 +88,20 @@ impl EnhancedFeatureDetector {
         let adaptive_config = self.adapt_parameters(image);
 
         // Parallel multi-scale detection
-        let features: Vec<EnhancedFeature> = (0..adaptive_config.pyramid_levels)
-            .into_par_iter()
-            .flat_map(|level| {
-                let scale = adaptive_config.scale_factor.powi(level as i32);
-                let scaled_image = if level == 0 {
-                    image.clone()
-                } else {
-                    self.scale_image(image, 1.0 / scale)
-                };
+        // Level 0 uses the original image directly (avoids a full-image clone)
+        let mut features: Vec<EnhancedFeature> = self.detect_at_scale(image, 1.0);
 
-                self.detect_at_scale(&scaled_image, scale)
-            })
-            .collect();
+        if adaptive_config.pyramid_levels > 1 {
+            let pyramid_features: Vec<EnhancedFeature> = (1..adaptive_config.pyramid_levels)
+                .into_par_iter()
+                .flat_map(|level| {
+                    let scale = adaptive_config.scale_factor.powi(level as i32);
+                    let scaled_image = self.scale_image(image, 1.0 / scale);
+                    self.detect_at_scale(&scaled_image, scale)
+                })
+                .collect();
+            features.extend(pyramid_features);
+        }
 
         // Sort by score and limit to max features
         let mut sorted_features = features;
@@ -300,14 +301,13 @@ impl EnhancedFeatureDetector {
                 let py = (cy + dy).clamp(0, image.height() as i32 - 1) as u32;
 
                 let intensity = image.get_pixel(px, py)[0] as f32;
-                let weight = intensity - 128.0; // Center around mean
 
-                m01 += dy as f32 * weight;
-                m10 += dx as f32 * weight;
+                m01 += dy as f32 * intensity;
+                m10 += dx as f32 * intensity;
             }
         }
 
-        m10.atan2(m01)
+        m01.atan2(m10)
     }
 
     /// Compute BRIEF descriptor (128-bit for memory efficiency)
@@ -451,30 +451,30 @@ impl EnhancedFeatureDetector {
     }
 
     /// Apply non-maximum suppression
+    /// Uses swap_remove for O(1) removal instead of O(n) shift per element
     fn apply_nms(&self, features: &mut Vec<EnhancedFeature>) {
+        // Sort by score descending so higher-score features suppress lower-score ones
         features.sort_by(|a, b| {
-            (a.point.y as i32)
-                .cmp(&(b.point.y as i32))
-                .then((a.point.x as i32).cmp(&(b.point.x as i32)))
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
-        let mut i = 0;
-        while i < features.len() {
-            let mut j = i + 1;
-            while j < features.len() {
-                let dist = (features[i].point - features[j].point).norm();
-                if dist < self.config.min_distance {
-                    // Remove the one with lower score
-                    if features[i].score < features[j].score {
-                        features.swap(i, j);
-                    }
-                    features.remove(j);
-                } else {
-                    j += 1;
-                }
+        let min_dist_sq = self.config.min_distance * self.config.min_distance;
+        let mut kept = Vec::with_capacity(features.len());
+
+        for f in features.iter() {
+            let dominated = kept.iter().any(|k: &EnhancedFeature| {
+                let dx = f.point.x - k.point.x;
+                let dy = f.point.y - k.point.y;
+                dx * dx + dy * dy < min_dist_sq
+            });
+            if !dominated {
+                kept.push(f.clone());
             }
-            i += 1;
         }
+
+        *features = kept;
     }
 }
 

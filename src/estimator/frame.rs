@@ -50,14 +50,14 @@ impl Frame {
             // Reasonable but arbitrary defaults; real values should come from config.
             // Use nalgebra 0.34.1 (which camera-intrinsic-model uses)
             left_cam: CameraModelType::OpenCV5(OpenCVModel5::new(
-                &nalgebra034::DVector::from_vec(vec![
+                &nalgebra034::DVector::from_column_slice(&[
                     500.0, 500.0, 320.0, 240.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                 ]),
                 0,
                 0,
             )),
             right_cam: CameraModelType::OpenCV5(OpenCVModel5::new(
-                &nalgebra034::DVector::from_vec(vec![
+                &nalgebra034::DVector::from_column_slice(&[
                     500.0, 500.0, 320.0, 240.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                 ]),
                 0,

@@ -24,6 +24,8 @@
 //! - Forster et al., "On-Manifold Preintegration for Real-Time Visual-Inertial Odometry", RSS 2017
 //! - Solà et al., "Quaternion kinematics for the error-state Kalman filter", 2017
 
+use std::collections::VecDeque;
+
 use crate::datasets::ImuData;
 use anyhow::{bail, Result};
 use nalgebra as na;
@@ -322,7 +324,7 @@ pub struct AdaptiveNoiseEstimator {
     /// Window size for noise estimation
     window_size: usize,
     /// Recent measurements
-    recent_measurements: Vec<ImuData>,
+    recent_measurements: VecDeque<ImuData>,
 }
 
 impl AdaptiveNoiseEstimator {
@@ -332,17 +334,17 @@ impl AdaptiveNoiseEstimator {
             base_accel_noise,
             base_gyro_noise,
             window_size: 50,
-            recent_measurements: Vec::new(),
+            recent_measurements: VecDeque::new(),
         }
     }
 
     /// Add measurement and update noise estimates
     pub fn add_measurement(&mut self, imu: &ImuData) {
-        self.recent_measurements.push(imu.clone());
+        self.recent_measurements.push_back(imu.clone());
 
         // Keep only recent measurements
         if self.recent_measurements.len() > self.window_size {
-            self.recent_measurements.remove(0);
+            self.recent_measurements.pop_front();
         }
     }
 

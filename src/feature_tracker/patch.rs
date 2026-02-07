@@ -89,14 +89,12 @@ impl Pattern52 {
 
         let mut jw_se2 = na::SMatrix::<f32, 2, 3>::identity();
 
-        for (i, pattern_pos) in Self::PATTERN_RAW.into_iter().enumerate() {
-            let p = self.pos
-                + na::SVector::<f32, 2>::new(
-                    pattern_pos[0] / self.pattern_scale_down,
-                    pattern_pos[1] / self.pattern_scale_down,
-                );
-            jw_se2[(0, 2)] = -pattern_pos[1] / self.pattern_scale_down;
-            jw_se2[(1, 2)] = pattern_pos[0] / self.pattern_scale_down;
+        for i in 0..PATTERN52_SIZE {
+            let px = PATTERN52_MATRIX[(0, i)];
+            let py = PATTERN52_MATRIX[(1, i)];
+            let p = self.pos + na::SVector::<f32, 2>::new(px, py);
+            jw_se2[(0, 2)] = -py;
+            jw_se2[(1, 2)] = px;
 
             if image_utilities::inbound(greyscale_image, p.x, p.y, 2) {
                 let val_grad = image_utilities::image_grad(greyscale_image, p.x, p.y);

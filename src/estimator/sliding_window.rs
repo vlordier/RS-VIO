@@ -259,7 +259,7 @@ impl SlidingWindow {
                 let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
                 let R_B_W = Matrix3x3::from(T_B_W.fixed_view::<3, 3>(0, 0));
                 let q_B_W = UnitQuaternion::from_matrix(&R_B_W);
-                let se3_data = DVector::from_vec(vec![
+                let se3_data = DVector::from_column_slice(&[
                     t_B_W.x, t_B_W.y, t_B_W.z, q_B_W.w, q_B_W.i, q_B_W.j, q_B_W.k,
                 ]);
                 local_initials.push((
@@ -313,7 +313,7 @@ impl SlidingWindow {
                                         T_B_C.fixed_view::<3, 1>(0, 3).into_owned(),
                                     );
                                     let p_W = R_W_B * (R_B_C * p_C + t_B_C) + t_W_B;
-                                    let data = DVector::from_vec(vec![p_W.x, p_W.y, p_W.z]);
+                                    let data = DVector::from_column_slice(&[p_W.x, p_W.y, p_W.z]);
                                     local_initials
                                         .push(((**lm_var_arc).clone(), (ManifoldType::RN, data)));
                                 }
@@ -361,23 +361,17 @@ impl SlidingWindow {
             .collect();
 
         // PART 3: Aggregate into Problem and Initial Values
-        let (all_initials_maps, all_residuals_vecs): (Vec<_>, Vec<_>) =
-            results.into_par_iter().unzip();
+        let (all_initials_maps, all_residuals_vecs): (Vec<_>, Vec<_>) = results.into_iter().unzip();
 
-        let mut initial_values = all_initials_maps
-            .into_par_iter()
-            .fold(HashMap::new, |mut acc, block_initials| {
-                for (k, v) in block_initials {
-                    acc.entry(k).or_insert(v);
-                }
-                acc
-            })
-            .reduce(HashMap::new, |mut left, right| {
-                for (k, v) in right {
-                    left.entry(k).or_insert(v);
-                }
-                left
-            });
+        let mut initial_values =
+            all_initials_maps
+                .into_iter()
+                .fold(HashMap::new(), |mut acc, block_initials| {
+                    for (k, v) in block_initials {
+                        acc.entry(k).or_insert(v);
+                    }
+                    acc
+                });
 
         // Add already known landmarks (avoid re-computing them in every frame)
         // Use the cache to filter only ACTIVE landmarks
@@ -389,7 +383,11 @@ impl SlidingWindow {
                     .or_insert_with(|| {
                         (
                             ManifoldType::RN,
-                            DVector::from_vec(vec![pos[0] as f64, pos[1] as f64, pos[2] as f64]),
+                            DVector::from_column_slice(&[
+                                pos[0] as f64,
+                                pos[1] as f64,
+                                pos[2] as f64,
+                            ]),
                         )
                     });
             }
@@ -683,7 +681,7 @@ impl SlidingWindow {
         let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
         let R_B_W = Matrix3x3::from(T_B_W.fixed_view::<3, 3>(0, 0));
         let q_B_W = UnitQuaternion::from_matrix(&R_B_W);
-        let se3_data = DVector::from_vec(vec![
+        let se3_data = DVector::from_column_slice(&[
             t_B_W.x, t_B_W.y, t_B_W.z, q_B_W.w, q_B_W.i, q_B_W.j, q_B_W.k,
         ]);
         initial_values.insert(kf_var.clone(), (ManifoldType::SE3, se3_data.cast::<f64>()));

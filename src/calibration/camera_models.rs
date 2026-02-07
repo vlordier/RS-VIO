@@ -79,8 +79,8 @@ impl Default for PinholeCamera {
 
 impl CameraModel for PinholeCamera {
     fn project(&self, point_3d: &na::Vector3<f64>, intrinsics: &[f64]) -> na::Vector2<f64> {
-        // Guard against division by zero
-        if point_3d.z.abs() < 1e-12 {
+        // Guard against division by zero and behind-camera points
+        if point_3d.z < 1e-12 {
             return na::Vector2::new(f64::NAN, f64::NAN);
         }
 
@@ -112,11 +112,21 @@ impl CameraModel for PinholeCamera {
         let cy = intrinsics[3];
 
         // Remove principal point and focal length
-        let x = (point_2d.x - cx) / fx;
-        let y = (point_2d.y - cy) / fy;
+        let mut x = (point_2d.x - cx) / fx;
+        let mut y = (point_2d.y - cy) / fy;
 
-        // TODO: Implement undistortion for unprojection
-        // For now, assume no distortion in unprojection
+        // Iterative undistortion: find the undistorted point that, when distorted,
+        // maps back to (x_d, y_d). Typically converges in 5-10 iterations.
+        if self.has_distortion && intrinsics.len() > 4 {
+            let x_d = x;
+            let y_d = y;
+            for _ in 0..10 {
+                let (dx, dy) = self.apply_distortion(x, y, &intrinsics[4..]);
+                x = x_d - (dx - x);
+                y = y_d - (dy - y);
+            }
+        }
+
         na::Vector3::new(x, y, 1.0).normalize()
     }
 

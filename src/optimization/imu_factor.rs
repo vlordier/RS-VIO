@@ -63,16 +63,14 @@ impl ImuFactor {
         // sqrt_information such that sqrt_information^T * sqrt_information = Information
         let cov = preintegration.covariance;
 
-        // Try to compute Cholesky of inverse
-        // If covariance is singular, use identity (unit information)
-        let information = cov.try_inverse().unwrap_or_else(na::SMatrix::identity);
-
-        // Compute Cholesky decomposition: Information = L * L^T
-        // We need S such that S^T * S = Information, so S = L^T
-        let sqrt_information = if let Some(chol) = information.cholesky() {
-            chol.l().transpose()
+        // Compute square root of information matrix via Cholesky of covariance.
+        // cov = L * L^T, so cov^{-1} = L^{-T} * L^{-1}.
+        // Setting M = L^{-1} gives M^T * M = cov^{-1} = Information.
+        // This avoids the numerically unstable explicit dense inverse.
+        let sqrt_information = if let Some(chol) = cov.cholesky() {
+            chol.l().try_inverse().unwrap_or_else(na::SMatrix::identity)
         } else {
-            // Fallback: use identity if information is not positive definite
+            // Fallback: use identity if covariance is not positive definite
             na::SMatrix::identity()
         };
 

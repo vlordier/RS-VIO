@@ -119,14 +119,10 @@ impl AsyncFeatureDetector {
             self.config.max_features,
         );
 
-        // Re-sort by score to keep the best features globally after grid distribution
-        all_features.sort_by(|a, b| {
-            b.score
-                .partial_cmp(&a.score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-
-        // Limit to max features
+        // Truncate to max features (grid distribution already enforces per-cell limits,
+        // but total may still exceed max_features for grids with many occupied cells).
+        // Do NOT re-sort globally by score here — that would undo the spatial spread
+        // guarantee from grid distribution.
         all_features.truncate(self.config.max_features);
         all_features
     }
@@ -150,13 +146,6 @@ impl AsyncFeatureDetector {
             self.config.grid_cell_size,
             self.config.max_features,
         );
-
-        // Re-sort by score to keep the best features globally
-        sorted_features.sort_by(|a, b| {
-            b.score
-                .partial_cmp(&a.score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
 
         sorted_features.truncate(self.config.max_features);
         sorted_features

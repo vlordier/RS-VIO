@@ -107,6 +107,7 @@ codegen-units = 1        # Single codegen unit (better optimization, slower comp
 lto = "thin"            # Thin LTO (good balance of speed/size)
 opt-level = 3           # Max optimization
 debug = false           # Strip debug symbols
+strip = "symbols"       # Strip symbols from release binary (smaller binary)
 
 [profile.bench]
 inherits = "release"

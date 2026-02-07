@@ -175,6 +175,29 @@ impl Config {
             }
         }
 
+        // Validate camera model names and distortion param counts
+        for (name, model_opt, distortion) in [
+            ("left", &cam.left_model, &cam.left_distortion),
+            ("right", &cam.right_model, &cam.right_distortion),
+        ] {
+            let model_str = model_opt.as_deref().unwrap_or("pinhole-radtan");
+            if model_str.eq_ignore_ascii_case("eucm") {
+                if distortion.len() < 2 {
+                    anyhow::bail!(
+                        "{} camera uses EUCM but distortion has {} params (need >= 2 for alpha, beta)",
+                        name,
+                        distortion.len()
+                    );
+                }
+            } else if !model_str.eq_ignore_ascii_case("pinhole-radtan") {
+                log::warn!(
+                    "Unknown {} camera model '{}', falling back to pinhole-radtan",
+                    name,
+                    model_str
+                );
+            }
+        }
+
         Ok(())
     }
 }

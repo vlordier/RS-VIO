@@ -105,12 +105,12 @@ pub fn create_camera_models_from_config(config: &Config) -> (CameraModelType, Ca
     let left_cam = if left_model_str.eq_ignore_ascii_case("eucm") {
         // EUCM model: [fx, fy, cx, cy, alpha, beta]
         let eucm_params_vec: Vec<f64> = vec![
-            cam.left_intrinsics.first().copied().unwrap_or(500.0), // fx
-            cam.left_intrinsics.get(1).copied().unwrap_or(500.0),  // fy
-            cam.left_intrinsics.get(2).copied().unwrap_or(320.0),  // cx
-            cam.left_intrinsics.get(3).copied().unwrap_or(240.0),  // cy
-            cam.left_distortion.first().copied().unwrap_or(0.5),   // alpha
-            cam.left_distortion.get(1).copied().unwrap_or(1.0),    // beta
+            cam.left_intrinsics[0], // fx (validated)
+            cam.left_intrinsics[1], // fy
+            cam.left_intrinsics[2], // cx
+            cam.left_intrinsics[3], // cy
+            cam.left_distortion[0], // alpha (validated: EUCM requires >= 2 distortion)
+            cam.left_distortion[1], // beta
         ];
         let eucm_params = nalgebra034::DVector::from_vec(eucm_params_vec);
         CameraModelType::EUCM(EUCM::new(&eucm_params, cam.image_width, cam.image_height))
@@ -140,12 +140,12 @@ pub fn create_camera_models_from_config(config: &Config) -> (CameraModelType, Ca
     let right_cam = if right_model_str.eq_ignore_ascii_case("eucm") {
         // EUCM model: [fx, fy, cx, cy, alpha, beta]
         let eucm_params_vec: Vec<f64> = vec![
-            cam.right_intrinsics.first().copied().unwrap_or(500.0), // fx
-            cam.right_intrinsics.get(1).copied().unwrap_or(500.0),  // fy
-            cam.right_intrinsics.get(2).copied().unwrap_or(320.0),  // cx
-            cam.right_intrinsics.get(3).copied().unwrap_or(240.0),  // cy
-            cam.right_distortion.first().copied().unwrap_or(0.5),   // alpha
-            cam.right_distortion.get(1).copied().unwrap_or(1.0),    // beta
+            cam.right_intrinsics[0], // fx (validated)
+            cam.right_intrinsics[1], // fy
+            cam.right_intrinsics[2], // cx
+            cam.right_intrinsics[3], // cy
+            cam.right_distortion[0], // alpha (validated: EUCM requires >= 2 distortion)
+            cam.right_distortion[1], // beta
         ];
         let eucm_params = nalgebra034::DVector::from_vec(eucm_params_vec);
         CameraModelType::EUCM(EUCM::new(&eucm_params, cam.image_width, cam.image_height))
