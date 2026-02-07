@@ -1,3 +1,8 @@
+//! Visual feature detection, tracking, and stereo matching.
+//!
+//! Provides patch-based KLT tracking, async detection pipelines,
+//! and stereo correspondence for VIO front-end processing.
+
 pub mod async_detector;
 #[allow(clippy::module_inception)] // Re-exported as crate::feature_tracker::*
 pub mod enhanced_detector;

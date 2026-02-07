@@ -1,3 +1,8 @@
+//! Patch-based stereo feature tracker.
+//!
+//! Detects FAST corners and tracks them across stereo pairs using
+//! KLT-style template matching with sub-pixel refinement.
+
 use image::{imageops, GrayImage};
 use imageproc::corners::Corner;
 use nalgebra as na;

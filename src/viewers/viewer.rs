@@ -1,3 +1,8 @@
+//! Abstract viewer trait for VIO visualization.
+//!
+//! Defines the interface for logging poses, images, and point clouds
+//! that concrete back-ends (e.g. Rerun) implement.
+
 use anyhow::Result;
 
 use crate::types::Matrix4x4;

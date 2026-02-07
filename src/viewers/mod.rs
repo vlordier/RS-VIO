@@ -1,3 +1,8 @@
+//! Visualization back-ends for VIO output.
+//!
+//! Defines the [`Viewer`] trait and optional Rerun-based implementation
+//! for logging poses, point clouds, and images.
+
 #[cfg(feature = "rerun-viewer")]
 pub mod rerun;
 pub mod viewer;

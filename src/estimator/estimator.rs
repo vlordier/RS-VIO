@@ -1,3 +1,8 @@
+//! Core VIO estimator with sliding-window optimization.
+//!
+//! Orchestrates feature tracking, IMU integration, keyframe selection,
+//! and nonlinear optimization to produce real-time pose estimates.
+
 use crate::datasets::config::Config;
 use crate::datasets::CameraModelType;
 use crate::datasets::ImuData;

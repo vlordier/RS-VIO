@@ -1,3 +1,8 @@
+//! Dataset loaders and configuration.
+//!
+//! Provides players for TUM-VI, EuRoC, and 4Seasons datasets,
+//! along with YAML-based pipeline configuration.
+
 pub mod config;
 pub mod euroc_player;
 pub mod fourseasons_player;

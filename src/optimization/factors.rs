@@ -1,3 +1,8 @@
+//! Visual reprojection factors for bundle adjustment.
+//!
+//! Implements pinhole and stereo projection factors that compute
+//! residuals and Jacobians for nonlinear least-squares optimization.
+
 use apex_solver::factors::Factor;
 use na::{DMatrix, DVector, Matrix4, Quaternion, UnitQuaternion, Vector2, Vector3};
 use nalgebra as na;

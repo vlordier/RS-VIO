@@ -1,3 +1,8 @@
+//! Optimization observer for recording per-iteration metrics.
+//!
+//! Collects cost, gradient norm, and step size at each solver iteration
+//! to support convergence diagnostics and logging.
+
 use apex_solver::core::problem::VariableEnum;
 use apex_solver::observers::OptObserver;
 use std::cell::RefCell;

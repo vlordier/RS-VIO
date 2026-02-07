@@ -1,4 +1,9 @@
-use crate::types::Matrix4x4;
+//! Per-frame VIO state: pose, velocity, and IMU biases.
+//!
+//! Stored on each [`super::Frame`] and updated by the estimator
+//! after optimization or IMU propagation.
+
+use crate::types::{Float, Matrix4x4};
 
 #[derive(Debug, Clone)]
 pub struct State {
@@ -9,13 +14,13 @@ pub struct State {
     pub T_B_Cr: Matrix4x4,
 
     /// Body-frame linear velocity in world coordinates.
-    pub velocity: [f32; 3],
+    pub velocity: [Float; 3],
 
     /// Accelerometer bias.
-    pub accel_bias: [f32; 3],
+    pub accel_bias: [Float; 3],
 
     /// Gyroscope bias.
-    pub gyro_bias: [f32; 3],
+    pub gyro_bias: [Float; 3],
 }
 
 impl State {

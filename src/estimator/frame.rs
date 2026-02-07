@@ -1,3 +1,8 @@
+//! Stereo frame representation carrying per-frame state and features.
+//!
+//! Each [`Frame`] bundles camera models, tracked features, IMU samples,
+//! and the current VIO state for one stereo observation.
+
 use crate::datasets::CameraModelType;
 use crate::datasets::ImuData;
 use crate::estimator::state::State;

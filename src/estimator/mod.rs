@@ -1,3 +1,8 @@
+//! State estimation and VIO pipeline.
+//!
+//! Contains the sliding-window estimator, per-frame state, motion models,
+//! and async wrappers for real-time operation.
+
 pub mod async_enhancements;
 pub mod async_optimization;
 pub mod async_wrapper;

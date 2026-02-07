@@ -1,3 +1,8 @@
+//! IMU preintegration factor for inter-keyframe constraints.
+//!
+//! Encodes integrated gyroscope and accelerometer measurements as a
+//! nonlinear factor with analytic Jacobians for bundle adjustment.
+
 use apex_solver::factors::Factor;
 use na::{DMatrix, DVector, UnitQuaternion, Vector3};
 use nalgebra as na;
