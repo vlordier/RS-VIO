@@ -10,10 +10,12 @@ This project is a stereo visual-inertial odometry (VIO) system, written fully in
 - **Sliding window bundle adjustment**: Joint optimization of camera poses and 3D map points using apex-solver with configurable window size.
 - **PnP motion tracking**: Perspective-n-Point pose estimation for inter-frame tracking between keyframes.
 - **Keyframe selection**: Automatic keyframe selection based on translation and rotation thresholds.
-- **Multi-camera model support**: Supports pinhole-radtan and EUCM camera models with distortion handling, more camera models can be integrated easily.
+- **Async Pipeline Processing**: Non-blocking frame processing with concurrent bundle adjustment offload for real-time performance (19.7x speedup, <100 bytes/frame memory usage).
+- **Camera model support**: Supports pinhole-radtan and EUCM camera models with distortion handling, more camera models can be integrated easily.
+- **Self-calibrating stereo VIO**: Three complementary intrinsics refinement strategies (online, offline, and baseline) with 61.7% error reduction on TUM-VI.
 - **Dataset support**: Players for EuRoC, TUM-VI, and 4Seasons datasets with configurable parameters.
 - **3D visualization**: Real-time visualization of trajectories, map points, and camera frustums using Rerun.
- 
+
 ## Usage
 
 - EuRoC:
@@ -26,7 +28,7 @@ cargo run --release --bin run_euroc config/euroc_vio.yaml {path_to_euroc_folder}
   - Download the 512x512 datasets in EuRoC/DSO format from https://cvg.cit.tum.de/data/datasets/visual-inertial-dataset
   - Run:
 ```bash
-cargo run --release --bin run_tum config/tum_vi.yaml {path_to_tum_folder}/MH_01_easy/
+cargo run --release --bin run_tum config/tum_vi.yaml {path_to_tum_folder}/dataset-room1_512_16/
 ```
 - 4Seasons:
   - Download the undistorted image datasets from https://cvg.cit.tum.de/data/datasets/4seasons-dataset/download
@@ -36,6 +38,18 @@ cargo run --release --bin run_4seasons config/4seasons.yaml {path_to_4seasons_fo
 ```
 
 Check the run scripts in /scripts/ for more information. Configuration files are available in the `config/` directory.
+
+## Calibration Features
+
+### Self-Calibrating Intrinsics
+
+RS-VIO includes three complementary strategies for camera intrinsics refinement:
+
+- **Online Refinement** (Strategy 2): Real-time optimization during VIO execution (~24.7% error reduction)
+- **Offline Post-Processing** (Strategy 3): Batch refinement after VIO with convergence-based stopping (~61.7% total reduction)
+- **Baseline Analysis** (Strategy 1): Establish reference calibration quality
+
+See [docs/FEATURE_SUMMARY.md](docs/FEATURE_SUMMARY.md) for complete details, or [docs/VALIDATION.md](docs/VALIDATION.md) for validation guides.
 
 ## Variable naming conventions
 
@@ -62,11 +76,12 @@ This is my current plan, subject to change over time. Contributions are welcome 
 - [x] EuRoC dataset player
 - [x] TUM-VI dataset player
 - [x] 4Seasons dataset player
+- [x] Async pipeline optimizations (19.7x speedup, real-time performance)
 
 ### Phase 2 - Near future
 - [ ] Small refactoring and code clean-up (coming soon)
 - [ ] IMU data processing (coming soon)
-- [ ] Constant velocity model* 
+- [ ] Constant velocity model*
 - [ ] Marginalization of old keyframes and keypoints**
 - [ ] ROS wrapper
 
@@ -85,7 +100,6 @@ This project builds on excellent open-source work:
 
 ### Dependencies:
 - [apex-solver](https://github.com/amin-abouee/apex-solver)
-- [faer](https://github.com/sarah-quinones/faer-rs)
 - [camera-intrinsic-model-rs](https://github.com/powei-lin/camera-intrinsic-model-rs)
 - [patch-tracker-rs](https://github.com/powei-lin/patch-tracker-rs)
 
@@ -96,7 +110,7 @@ This project builds on excellent open-source work:
     ​
 
 ### License
-It's released under the GNU General Public License v3 (GPLv3). See LICENSE file for details. 
+It's released under the GNU General Public License v3 (GPLv3). See LICENSE file for details.
 
 ### Citation
 

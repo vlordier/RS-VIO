@@ -1,0 +1,28 @@
+2026-02-05T14:02:15.593960Z  INFO main ThreadId(01) tracing_demo:21: ═══════════════════════════════════════════════════════
+2026-02-05T14:02:15.593993Z  INFO main ThreadId(01) tracing_demo:22:   RS-VIO Real-Time Logging with Tracing
+2026-02-05T14:02:15.593997Z  INFO main ThreadId(01) tracing_demo:23: ═══════════════════════════════════════════════════════
+2026-02-05T14:02:15.594004Z  INFO main ThreadId(01) tracing_demo:29: Initializing VIO estimator module="estimator" operation="vio_init"
+2026-02-05T14:02:15.594038Z  INFO ThreadId(03) tracing_demo:40: VIO loop: starting hot loop (no logs inside)
+2026-02-05T14:02:15.783767Z  INFO ThreadId(03) tracing_demo:72: VIO loop: completed 300 frames
+2026-02-05T14:02:16.702646Z  INFO ThreadId(04) tracing_demo:93: telemetry frames=300 dropped=0 features_detected=38400 features_tracked=24000 imu_measurements=240 loop_closures=2
+2026-02-05T14:02:17.707780Z  INFO ThreadId(04) tracing_demo:93: telemetry frames=0 dropped=0 features_detected=0 features_tracked=0 imu_measurements=0 loop_closures=0
+2026-02-05T14:02:18.710936Z  INFO ThreadId(04) tracing_demo:93: telemetry frames=0 dropped=0 features_detected=0 features_tracked=0 imu_measurements=0 loop_closures=0
+2026-02-05T14:02:19.714499Z  INFO ThreadId(04) tracing_demo:93: telemetry frames=0 dropped=0 features_detected=0 features_tracked=0 imu_measurements=0 loop_closures=0
+2026-02-05T14:02:20.717921Z  INFO ThreadId(04) tracing_demo:93: telemetry frames=0 dropped=0 features_detected=0 features_tracked=0 imu_measurements=0 loop_closures=0
+2026-02-05T14:02:21.719283Z  INFO ThreadId(04) tracing_demo:93: telemetry frames=0 dropped=0 features_detected=0 features_tracked=0 imu_measurements=0 loop_closures=0
+2026-02-05T14:02:21.719526Z  INFO main ThreadId(01) tracing_demo:125: session_complete total_frames=0 success_rate=NaN
+2026-02-05T14:02:49.442387Z  INFO main ThreadId(01) tracing_demo:20: ═══════════════════════════════════════════════════════
+2026-02-05T14:02:49.442427Z  INFO main ThreadId(01) tracing_demo:21:   RS-VIO Real-Time Logging with Tracing
+2026-02-05T14:02:49.442431Z  INFO main ThreadId(01) tracing_demo:22: ═══════════════════════════════════════════════════════
+2026-02-05T14:02:49.442440Z  INFO main ThreadId(01) tracing_demo:28: Initializing VIO estimator module="estimator" operation="vio_init"
+2026-02-05T14:02:49.442471Z  INFO ThreadId(03) tracing_demo:39: VIO loop: starting hot loop (no logs inside)
+2026-02-05T14:02:50.552511Z  INFO ThreadId(04) tracing_demo:91: telemetry frames=31 dropped=0 features_detected=4096 features_tracked=2640 imu_measurements=28 loop_closures=0
+2026-02-05T14:02:51.557610Z  INFO ThreadId(04) tracing_demo:91: telemetry frames=29 dropped=0 features_detected=3584 features_tracked=2160 imu_measurements=20 loop_closures=0
+2026-02-05T14:02:52.559189Z  INFO ThreadId(04) tracing_demo:91: telemetry frames=28 dropped=0 features_detected=3584 features_tracked=2400 imu_measurements=24 loop_closures=0
+2026-02-05T14:02:53.564252Z  INFO ThreadId(04) tracing_demo:91: telemetry frames=27 dropped=0 features_detected=3584 features_tracked=2160 imu_measurements=20 loop_closures=1
+2026-02-05T14:02:54.565760Z  INFO ThreadId(04) tracing_demo:91: telemetry frames=28 dropped=0 features_detected=3584 features_tracked=2160 imu_measurements=24 loop_closures=0
+2026-02-05T14:02:54.832857Z  INFO ThreadId(03) tracing_demo:71: VIO loop: completed 150 frames
+2026-02-05T14:02:55.570829Z  INFO ThreadId(04) tracing_demo:91: telemetry frames=7 dropped=0 features_detected=768 features_tracked=480 imu_measurements=4 loop_closures=0
+2026-02-05T14:02:56.571062Z  INFO ThreadId(04) tracing_demo:91: telemetry frames=0 dropped=0 features_detected=0 features_tracked=0 imu_measurements=0 loop_closures=0
+2026-02-05T14:02:57.571695Z  INFO ThreadId(04) tracing_demo:91: telemetry frames=0 dropped=0 features_detected=0 features_tracked=0 imu_measurements=0 loop_closures=0
+2026-02-05T14:02:57.571833Z  INFO main ThreadId(01) tracing_demo:126: session_complete total_frames=0 success_rate=0.0

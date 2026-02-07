@@ -2,21 +2,117 @@
 name = "rs-vio"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.92"
+
+[features]
+default = ["matching-basic-ransac"]
+benchmarks = []
+# Feature flag for 32-bit float operations (f32) instead of f64
+use_f32 = []
+# Feature flag for Rerun.io 3D visualization
+rerun-viewer = ["rerun"]
+# Feature flag for LightGlue ONNX-based verification
+lightglue = ["ort", "ndarray"]
+# Feature flag for neural network position refinement (ONNX Runtime)
+onnx-refinement = ["ort", "ndarray"]
+
+# Stereo matching strategies - only one should be enabled per build
+# Basic RANSAC: 1000 iterations, standard 8-point algorithm (baseline, default)
+matching-basic-ransac = []
+# IMU-guided: Predictive matching with restricted search window (~8x faster stereo)
+matching-imu-guided = []
+# Temporal consistency: Frame-to-frame depth coherence (~100x faster than RANSAC)
+matching-temporal = []
+# Hybrid optical flow: Coarse OF + selective stereo (~30% faster)
+matching-hybrid-of = []
 
 [dependencies]
-clap = { version = "4.5", features = ["derive"] }
-log = "0.4"
-env_logger = "0.11"
-rand = "0.8"
-serde = { version = "1.0", features = ["derive"] }
-serde_yaml = "0.9"
 anyhow = "1.0"
-rerun = "0.25"
+apex-solver = { git = "https://github.com/amin-abouee/apex-solver", rev = "e091706" } # TODO change when official release includes the Schur complement methods
+camera-intrinsic-model = "0.7.2"
+clap = { version = "4.5", features = ["derive"] }
+env_logger = "0.11"
 image = "0.25"
 imageproc = "0.25"
+log = "0.4"
 nalgebra = "0.33.2"
 nalgebra034 = { package = "nalgebra", version = "0.34.1" } # TODO improve this, now this is dirty (needed for camera-intrinsic-model for now)
-rayon = "1.11.0"
-camera-intrinsic-model = "0.7.2"
-apex-solver = { git = "https://github.com/amin-abouee/apex-solver", branch = "main" } # TODO change when official release includes the Schur complement methods
-faer = "0.23.2"
+ndarray = { version = "0.15.4", optional = true }
+oorandom = "11.1"
+ort = { version = "2.0.0-rc.11", optional = true }  # Using ORT 2.0 RC for required 2.0 APIs; monitor for stable 2.0.x release
+rayon = "1.10"
+rerun = { version = "0.25", optional = true }
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+tokio = { version = "1.35", features = ["rt-multi-thread", "sync", "time", "macros"] }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+rand = "0.8"
+tempfile = "3"
+
+[lints.rust]
+unsafe_code = "forbid"
+# warnings = "deny"  # Temporarily allowing warnings due to existing codebase issues
+non_snake_case = "allow"  # Allow for transformation matrices (T_A_B convention)
+
+[lints.clippy]
+# =====================================================================
+# CRITICAL SAFETY LINTS - NO EXCEPTIONS
+# =====================================================================
+unnecessary_unwrap = "deny"
+expect_used = "warn"  # Temporarily warn - many expects in existing code (matrix inversions)
+unwrap_used = "warn"  # Temporarily warn - gradually fixing violations in existing code
+todo = "deny"  # TODO comments must be resolved before release
+unimplemented = "deny"  # No stub implementations
+# panic = "deny"  # Invalid lint name - use panic_in_result_fn or similar if needed
+exit = "deny"  # Never call process::exit in library code
+dbg_macro = "deny"  # No debug prints in production
+
+# =====================================================================
+# EMBEDDED SYSTEMS SAFETY - Real-time predictability
+# =====================================================================
+missing_const_for_fn = "warn"  # Prefer const for const-eligible functions (many in existing code)
+inefficient_to_string = "deny"  # Prevent unnecessary allocations
+clone_on_copy = "deny"  # No unnecessary clones on Copy types
+implicit_clone = "deny"  # Explicit clone() required
+
+# Allocation safety - must be predictable in realtime
+large_stack_arrays = "deny"  # Avoid stack arrays above ~512KB (lint threshold)
+large_types_passed_by_value = "deny"  # Stack pressure must be minimal
+box_collection = "deny"  # NO Box<Vec<T>> - preallocate or use Vec directly (covers deprecated vec_box)
+rc_buffer = "deny"  # NO reference counted buffers in realtime code
+let_unit_value = "warn"  # Warn on bindings of unit values (e.g., `let x = ()`)
+
+# =====================================================================
+# CORRECTNESS & NUMERIC SAFETY
+# =====================================================================
+float_cmp = "warn"  # Warn on floating point comparisons (use approx eq)
+
+# =====================================================================
+# COMPILATION PERFORMANCE OPTIMIZATIONS
+# =====================================================================
+[profile.dev]
+incremental = true       # Enable incremental compilation (default true, but explicit)
+opt-level = 0            # No optimization in dev (fastest compile)
+debug = true             # Keep debug info
+
+[profile.release]
+incremental = false      # Disable incremental for release (better optimization)
+codegen-units = 1        # Single codegen unit (better optimization, slower compile)
+lto = "thin"            # Thin LTO (good balance of speed/size)
+opt-level = 3           # Max optimization
+debug = false           # Strip debug symbols
+strip = "symbols"       # Strip symbols from release binary (smaller binary)
+
+[profile.bench]
+inherits = "release"
+debug = true            # Keep debug symbols for profiling
+
+[[bench]]
+name = "tum_vi_async_pipeline"
+harness = false
+
+[[bench]]
+name = "tum_vi_sequential_baseline"
+harness = false

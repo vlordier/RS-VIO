@@ -1,13 +1,10 @@
+use crate::datasets::CameraModelType;
 use crate::datasets::ImuData;
 use crate::estimator::state::State;
 use crate::feature_tracker::Feature;
 use crate::types::Matrix4x4;
-use nalgebra as na;
-use nalgebra034;
-use std::collections::HashMap;
 use camera_intrinsic_model::models::opencv5::OpenCVModel5;
-use camera_intrinsic_model::generic_model::CameraModel;
-use crate::datasets::CameraModelType;
+use nalgebra034;
 
 /// Type of frame (only Stereo used for now; RGBD omitted).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -33,9 +30,6 @@ pub struct Frame {
     /// IMU samples since last frame.
     pub imu_from_last_frame: Vec<ImuData>,
 
-    /// IMU samples since last keyframe.
-    pub imu_since_last_keyframe: Vec<ImuData>,
-
     /// Whether this frame is a keyframe.
     pub is_keyframe: bool,
 
@@ -56,18 +50,21 @@ impl Frame {
             // Reasonable but arbitrary defaults; real values should come from config.
             // Use nalgebra 0.34.1 (which camera-intrinsic-model uses)
             left_cam: CameraModelType::OpenCV5(OpenCVModel5::new(
-                &nalgebra034::DVector::from_vec(vec![500.0, 500.0, 320.0, 240.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+                &nalgebra034::DVector::from_column_slice(&[
+                    500.0, 500.0, 320.0, 240.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                ]),
                 0,
                 0,
             )),
             right_cam: CameraModelType::OpenCV5(OpenCVModel5::new(
-                &nalgebra034::DVector::from_vec(vec![500.0, 500.0, 320.0, 240.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+                &nalgebra034::DVector::from_column_slice(&[
+                    500.0, 500.0, 320.0, 240.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                ]),
                 0,
                 0,
             )),
             state: State::identity(),
             imu_from_last_frame: Vec::new(),
-            imu_since_last_keyframe: Vec::new(),
             is_keyframe: false,
             left_features: Vec::new(),
             right_features: Vec::new(),
@@ -91,7 +88,6 @@ impl Frame {
             right_cam,
             state: State::new(T_B_Cl, T_B_Cr),
             imu_from_last_frame: Vec::new(),
-            imu_since_last_keyframe: Vec::new(),
             is_keyframe: true,
             left_features: Vec::new(),
             right_features: Vec::new(),
@@ -99,39 +95,39 @@ impl Frame {
     }
 
     /// Immutable access to left-image features.
-    pub fn left_features(&self) -> &Vec<Feature> {
+    pub fn left_features(&self) -> &[Feature] {
         &self.left_features
     }
 
     /// Append a new feature to the left image.
     pub fn add_left_feature(&mut self, mut feature: Feature) {
-        // Use nalgebra034::Vector2 since OpenCVModel5 uses nalgebra 0.34.1
-
-        // Center radius around the center of the image (256, 256)
-        /* 
-        let x = feature.pixel_coord[0] as f64 - 256.0;
-        let y = feature.pixel_coord[1] as f64 - 256.0;
-        let radius = (x * x + y * y).sqrt();
-        if radius > 400.0 {
-            return;
-        } */
-        let undist_coord = self.left_cam.as_camera_model().unproject_one(&nalgebra034::Vector2::new(feature.pixel_coord[0] as f64, feature.pixel_coord[1] as f64));
+        let undist_coord =
+            self.left_cam
+                .as_camera_model()
+                .unproject_one(&nalgebra034::Vector2::new(
+                    feature.pixel_coord[0] as f64,
+                    feature.pixel_coord[1] as f64,
+                ));
         feature.undistorted_coord = [undist_coord[0] as f32, undist_coord[1] as f32];
         self.left_features.push(feature);
     }
 
     /// Immutable access to right-image features.
-    pub fn right_features(&self) -> &Vec<Feature> {
+    pub fn right_features(&self) -> &[Feature] {
         &self.right_features
     }
 
     /// Append a new feature to the right image.
     pub fn add_right_feature(&mut self, mut feature: Feature) {
         // Use nalgebra034::Vector2 since OpenCVModel5 uses nalgebra 0.34.1
-        let undist_coord = self.right_cam.as_camera_model().unproject_one(&nalgebra034::Vector2::new(feature.pixel_coord[0] as f64, feature.pixel_coord[1] as f64));
+        let undist_coord =
+            self.right_cam
+                .as_camera_model()
+                .unproject_one(&nalgebra034::Vector2::new(
+                    feature.pixel_coord[0] as f64,
+                    feature.pixel_coord[1] as f64,
+                ));
         feature.undistorted_coord = [undist_coord[0] as f32, undist_coord[1] as f32];
         self.right_features.push(feature);
     }
 }
-
-

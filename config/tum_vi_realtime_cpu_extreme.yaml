@@ -1,0 +1,37 @@
+# Extreme Realtime CPU profile: maximize throughput on CPU-only hardware
+# Changes vs tum_vi_realtime_cpu.yaml:
+# - Smaller window (8)
+# - Fewer features (smaller grid, fewer per cell)
+# - Fewer iterations (PnP/BA = 1)
+# - Tighter optical flow budget
+# - Slightly higher damping for stability
+
+camera:
+  # Keep at dataset resolution; loader enforces exact size.
+  image_width: 512
+  image_height: 512
+  left_intrinsics: [190.97847715128717, 190.9733070521226, 254.93170605935475, 256.8974428996504]
+  left_distortion: [0.0034823894022493434, 0.0007150348452162257, -0.0020532361418706202, 0.00020293673591811182, 0.0]
+  left_model: "opencv5"
+
+  right_intrinsics: [190.44236969414825, 190.4344384721956, 252.59949716835982, 254.91723064636983]
+  right_distortion: [0.0034003170790442797, 0.001766278153469831, -0.00266312569781606, 0.0003299517423931039, 0.0]
+  right_model: "opencv5"
+
+  T_B_Cl: [-0.99952504, 0.00750192, -0.02989013, 0.04557484, 0.02961534, -0.03439736, -0.99896935, -0.07116180, -0.00852233, -0.99938008, 0.03415885, -0.04468125, 0.0, 0.0, 0.0, 1.0]
+  T_B_Cr: [-0.99951105, 0.00810408, -0.03019914, -0.05545634, 0.03029912, 0.01251164, -0.99946257, -0.06925002, -0.00772188, -0.99988889, -0.01275107, -0.04745286, 0.0, 0.0, 0.0, 1.0]
+
+keyframe_management:
+  keyframe_window_size: 8
+  translation_threshold: 0.08
+  rotation_threshold: 0.08
+
+feature_detection:
+  grid_size: 12              # fewer cells than realtime_cpu
+  max_features_per_grid: 3   # fewer features per cell (~36 total)
+  optical_flow_max_iterations: 5
+  optical_flow_convergence_threshold: 0.03
+
+optimization:
+  pnp_max_iterations: 1
+  bundle_adjustment_max_iterations: 1

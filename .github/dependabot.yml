@@ -1,0 +1,48 @@
+version: 2
+
+updates:
+  # Rust/Cargo dependencies
+  - package-ecosystem: cargo
+    directory: '/'
+    schedule:
+      interval: monthly
+      day: monday
+      time: '09:00'
+    open-pull-requests-limit: 5
+    pull-request-branch-name:
+      separator: /
+    reviewers:
+      - vlordier
+    assignees:
+      - vlordier
+    labels:
+      - dependencies
+      - rust
+    commit-message:
+      prefix: 'chore(deps):'
+      include: 'scope'
+    rebase-strategy: auto
+    allow:
+      - dependency-type: all
+
+  # GitHub Actions
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: monthly
+      day: monday
+      time: '09:00'
+    open-pull-requests-limit: 5
+    pull-request-branch-name:
+      separator: /
+    reviewers:
+      - vlordier
+    assignees:
+      - vlordier
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: 'chore(actions):'
+      include: 'scope'
+    rebase-strategy: auto

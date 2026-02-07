@@ -1,0 +1,198 @@
+# Dataset Setup Guide
+
+This guide explains how to download and set up the datasets supported by RS-VIO.
+
+## Quick Start
+
+```bash
+# Auto-downloads TUM-VI (if mirror is available)
+just download-datasets
+
+# Manually place EuRoC and 4Seasons data, then run
+just run-euroc
+just run-tum
+just run-4seasons
+```
+
+## EuRoC MAV Dataset
+
+**Status**: Requires registration & manual download
+**Size**: ~2-3 GB per sequence
+**Sequences**: MH_01_easy, MH_02_easy, MH_03_medium, V1_01_easy, V2_01_easy, etc.
+
+### Download Instructions
+
+1. Visit https://projects.asl.ethz.ch/datasets/euroc-mav/
+2. Register for free account
+3. Download `MH_01_easy.zip` (or any other sequence)
+4. Extract to `/tmp/rs-vio-samples/euroc/`:
+   ```bash
+   mkdir -p /tmp/rs-vio-samples/euroc
+   unzip MH_01_easy.zip -d /tmp/rs-vio-samples/euroc/
+   ```
+
+### Run
+
+```bash
+cargo run --release --bin run_euroc config/euroc_vio.yaml /tmp/rs-vio-samples/euroc/MH_01_easy
+```
+
+Expected output:
+- Loading 3682 stereo image pairs
+- Real-time feature tracking and pose estimation
+- Statistics saved to `statistics.txt`
+
+## TUM-VI Dataset
+
+**Status**: Auto-downloads (if mirror available), otherwise manual setup
+**Size**: ~1.6 GB per sequence (EuRoC format, 512x512)
+**Sequences**: room1, room2, room3, room4, room5, room6, magistrale1-6, slides1-3
+
+### Auto-Download
+
+```bash
+just download-datasets
+```
+
+This will download and extract TUM-VI sequences in EuRoC format to `/tmp/rs-vio-samples/tum_vi/`.
+
+### Manual Download
+
+If auto-download fails:
+
+1. Visit https://cvg.cit.tum.de/data/datasets/visual-inertial-dataset
+2. Download the 512x512 EuRoC format sequences (e.g., `dataset-room1_512_16.tar`)
+3. Extract to `/tmp/rs-vio-samples/tum_vi/`:
+   ```bash
+   mkdir -p /tmp/rs-vio-samples/tum_vi/room1
+   tar -xf dataset-room1_512_16.tar -C /tmp/rs-vio-samples/tum_vi/room1
+   ```
+
+### Run
+
+```bash
+cargo run --release --bin run_tum config/tum_vi.yaml /tmp/rs-vio-samples/tum_vi/room1
+```
+
+## 4Seasons Dataset
+
+**Status**: Requires free registration & manual download
+**Size**: ~5 GB per recording
+**Recordings**: 4 seasonal recordings with 600+ minutes of video
+
+### Download Instructions
+
+1. Visit https://www.4seasons-dataset.com/
+2. Register for free account
+3. Download one or more recording ZIPs (e.g., `recording_2021-01-07_13-03-56.zip`)
+4. Extract to `/tmp/rs-vio-samples/4seasons/`:
+   ```bash
+   mkdir -p /tmp/rs-vio-samples/4seasons
+   unzip recording_2021-01-07_13-03-56.zip -d /tmp/rs-vio-samples/4seasons/
+   ```
+
+### Run
+
+```bash
+cargo run --release --bin run_4seasons config/4seasons.yaml /tmp/rs-vio-samples/4seasons/recording_2021-01-07_13-03-56
+```
+
+## Docker with Datasets (Planned)
+
+> **Note:** No Dockerfile exists yet. The commands below show the intended workflow
+> once a Dockerfile is added.
+
+```bash
+# Build image
+docker build -t rs-vio .
+
+# Run with EuRoC
+docker run --rm \
+  -v /tmp/rs-vio-samples:/data:ro \
+  rs-vio:latest \
+  /usr/local/bin/run_euroc config/euroc_vio.yaml /data/euroc/MH_01_easy
+
+# Run with TUM-VI
+docker run --rm \
+  -v /tmp/rs-vio-samples:/data:ro \
+  --entrypoint /usr/local/bin/run_tum \
+  rs-vio:latest \
+  config/tum_vi.yaml /data/tum_vi
+
+# Run with 4Seasons
+docker run --rm \
+  -v /tmp/rs-vio-samples:/data:ro \
+  --entrypoint /usr/local/bin/run_4seasons \
+  rs-vio:latest \
+  config/4seasons.yaml /data/4seasons/recording_2021-01-07_13-03-56
+```
+
+## Dataset Compatibility
+
+| Dataset | Format | Cameras | IMU | Distortion Model | Status |
+|---------|--------|---------|-----|------------------|--------|
+| EuRoC | mav0/ CSV | Stereo | Yes | Radtan | ✓ Supported |
+| TUM-VI | EuRoC format / CSV | Stereo | Yes | EUCM / OpenCV5 | ✓ Supported |
+| 4Seasons | undistorted_images/ | Stereo | Yes | None (pre-rectified) | ✓ Supported |
+
+## Troubleshooting
+
+### "Dataset not found" error
+
+```bash
+# Verify dataset structure
+ls -la /tmp/rs-vio-samples/euroc/MH_01_easy/mav0/
+# Should show: cam0/, cam1/, imu0/ directories
+
+ls -la /tmp/rs-vio-samples/4seasons/recording_2021-01-07_13-03-56/
+# Should show: undistorted_images/, times.txt files
+```
+
+### Slow download speed
+
+- Try different mirror (if available)
+- Download in off-peak hours
+- Check network connectivity
+
+### Disk space issues
+
+- EuRoC: ~2-3 GB per sequence
+- TUM-VI: ~2 GB per sequence
+- 4Seasons: ~5 GB per recording
+- Total for all test: ~15 GB
+
+Free up space before downloading large sequences.
+
+## Citation
+
+If using these datasets, please cite:
+
+**EuRoC MAV Dataset**:
+```
+@article{burri2016euroc,
+  title={The {EuRoC} micro aerial vehicle datasets},
+  author={Burri, Michael and others},
+  journal={IJRR},
+  year={2016}
+}
+```
+
+**TUM-VI Dataset**:
+```
+@inproceedings{schubert2018tumvi,
+  title={The {TUM VI} Benchmark for Evaluating Visual-Inertial Odometry},
+  author={Schubert, David and Goll, Thore and Demmel, Nikolaus and Usenko, Vladyslav and St{\"u}ckler, J{\"o}rg and Cremers, Daniel},
+  booktitle={IROS},
+  year={2018}
+}
+```
+
+**4Seasons Dataset**:
+```
+@article{buchner20224seasons,
+  title={The {4Seasons} dataset},
+  author={B\"uchner, V. and others},
+  journal={IJRR},
+  year={2022}
+}
+```

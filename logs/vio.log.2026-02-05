@@ -1,0 +1,3 @@
+2026-02-05T14:07:52.076439Z  INFO main ThreadId(01) tracing_logging_demo:10: VIO started
+2026-02-05T14:07:52.681467Z  INFO main ThreadId(01) tracing_logging_demo:28: telemetry frames=100 features_detected=1280
+2026-02-05T14:07:52.681502Z  INFO main ThreadId(01) tracing_logging_demo:34: VIO finished

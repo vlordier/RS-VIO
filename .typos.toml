@@ -1,0 +1,19 @@
+[default.extend-words]
+# Mathematical and algorithm-specific variable names
+iy = "iy"        # Image y coordinate
+Pn = "Pn"        # PnP algorithm/Point n
+BA = "BA"        # Bundle Adjustment
+ba = "ba"        # Bundle adjustment (lowercase)
+Fo = "Fo"        # Factor/Force variable
+preint = "preint"      # PreintegratedImu variable name
+preints = "preints"    # Preintegrations (plural abbreviation)
+Preints = "Preints"    # Preintegrations (capitalized)
+
+# Technical terms
+patten = "patten"      # Pattern matching context
+remaped = "remaped"    # Remapped (intentional variant)
+frustrums = "frustrums"  # Frustums plural variant
+daa = "daa"            # Data acquisition abbreviation
+consts = "consts"      # Rust std::f64::consts module
+TRO = "TRO"            # IEEE Transactions on Robotics journal
+abd = "abd"            # Git commit hash fragments

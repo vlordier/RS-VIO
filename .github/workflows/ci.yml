@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      ZSTD_SYS_USE_PKG_CONFIG: "1"
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Speed up builds & suppress jemalloc (act)
+        if: ${{ env.ACT }}
+        run: |
+          echo "CARGO_INCREMENTAL=1" >> $GITHUB_ENV
+          echo "CARGO_BUILD_JOBS=6" >> $GITHUB_ENV
+          echo "CARGO_TEST_THREADS=6" >> $GITHUB_ENV
+          echo "RUSTFLAGS=-C debuginfo=0" >> $GITHUB_ENV
+          echo "MALLOC_CONF=abort_conf:false,stats_print:false,background_thread:false" >> $GITHUB_ENV
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.92.0"
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.toml') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.toml') }}
+
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.toml') }}
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libzstd-dev clang
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --all-targets
+
+      - name: Build
+        run: cargo build --verbose
+
+      - name: Run tests (parallel)
+        run: cargo test --verbose
+
+  pre-commit:
+    if: ${{ github.actor != 'nektos/act' }}
+    runs-on: ubuntu-latest
+    env:
+      ZSTD_SYS_USE_PKG_CONFIG: "1"
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.92.0"
+          components: rustfmt, clippy
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libzstd-dev clang
+
+      - name: Install cargo-sort
+        run: cargo install cargo-sort --locked
+
+      - name: Set up Python
+        if: ${{ !env.ACT }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python (act)
+        if: ${{ env.ACT }}
+        run: sudo apt-get update && sudo apt-get install -y python3 python3-pip
+
+      - name: Install pre-commit
+        run: python3 -m pip install pre-commit
+
+      - name: Cache pre-commit
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Run pre-commit
+        run: pre-commit run --all-files

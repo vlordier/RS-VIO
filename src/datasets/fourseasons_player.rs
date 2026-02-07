@@ -1,178 +1,28 @@
+use crate::datasets::io::load_grayscale_image;
+use crate::datasets::player::DatasetPlayer;
+use crate::datasets::{ImageData, ImuData};
 use anyhow::{Context, Result};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
-use std::thread;
-use std::time::{Duration, Instant};
-use image::{ImageReader};
-use crate::viewers::{Viewer, create_viewer};
-use crate::estimator::Estimator;
-use crate::datasets::{config::Config, ImageData, ImuData, FrameContext, PlayerConfig, PlayerResult};
-
 
 pub struct FourSeasonsPlayer;
 
+impl Default for FourSeasonsPlayer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FourSeasonsPlayer {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         FourSeasonsPlayer
     }
+}
 
-    pub fn run(&self, config: PlayerConfig) -> PlayerResult {
-        let mut result = PlayerResult::default();
-
-        // Load image timestamps
-        let image_data = match Self::load_image_timestamps(&config.dataset_path) {
-            Ok(data) => {
-                if data.is_empty() {
-                    result.error_message = "No images found in dataset".to_string();
-                    return result;
-                }
-                data
-            }
-            Err(e) => {
-                result.error_message = format!("Failed to load image timestamps: {}", e);
-                return result;
-            }
-        };
-
-        let start_frame_idx = 0;
-        let end_frame_idx = image_data.len();
-
-        // Initialize viewer
-        let mut viewer: Option<Box<dyn Viewer>> = match create_viewer() {
-            Ok(v) => {
-                log::info!("[EurocPlayer] Viewer initialized successfully");
-                Some(v)
-            }
-            Err(e) => {
-                log::warn!("Failed to initialize viewer: {}", e);
-                None
-            }
-        };
-
-        // Load full YAML config
-        let cfg = match Config::load(&config.config_path) {
-            Ok(c) => c,
-            Err(e) => {
-                result.error_message = format!("Failed to load config '{}': {}", config.config_path, e);
-                return result;
-            }
-        };
-
-        // Create camera models from config
-        let (left_cam, right_cam) = match Self::create_camera_models_from_config(&cfg) {
-            Ok(cams) => cams,
-            Err(e) => {
-                result.error_message = format!("Failed to create camera models: {}", e);
-                return result;
-            }
-        };
-
-        // Give ownership of the configuration to the estimator and pass a
-        // reference to the viewer (which outlives the estimator).
-        let mut estimator = {
-            let viewer_ref: Option<&mut dyn Viewer> =
-                viewer.as_deref_mut().map(|v| v as &mut dyn Viewer);
-            Estimator::new_with_cameras(cfg, viewer_ref, Some(left_cam), Some(right_cam))
-        };
-        Self::initialize_estimator(&mut estimator, &image_data);
-
-        // Process frames
-        let mut context = FrameContext::new(config.step_mode);
-
-        context.current_idx = start_frame_idx;
-        while context.current_idx < end_frame_idx {
-            let should_process_frame = if context.auto_play {
-                // Auto mode: process frame
-                true
-            } else {
-                // Step mode: only process if advance_frame is set
-                if context.advance_frame {
-                    context.advance_frame = false;
-                    true
-                } else {
-                    // In step mode with no advance request, just wait
-                    thread::sleep(Duration::from_millis(1));
-                    continue;
-                }
-            };
-
-            if should_process_frame {
-                // Process single frame
-                let frame_start = Instant::now();
-                let _processing_time = match Self::process_single_frame(
-                    &mut estimator,
-                    &mut context,
-                    &image_data,
-                    &config.dataset_path,
-                ) {
-                    Ok(time) => time,
-                    Err(e) => {
-                        log::warn!("Error processing frame {}: {}", context.current_idx, e);
-                        0.0
-                    }
-                };
-
-                let frame_duration = frame_start.elapsed();
-                let total_time_ms = frame_duration.as_secs_f64() * 1000.0;
-                result.frame_processing_times.push(total_time_ms);
-
-                context.current_idx += 1;
-                context.processed_frames += 1;
-
-                // Calculate sleep time based on actual frame intervals (only in auto mode)
-                if context.auto_play && context.current_idx < end_frame_idx {
-                    let current_timestamp = image_data[context.current_idx - 1].timestamp;
-                    let next_timestamp = image_data[context.current_idx].timestamp;
-                    let frame_interval_ms = (next_timestamp - current_timestamp) as f64 / 1e6; // nanoseconds to milliseconds
-
-                    let sleep_time_ms = (frame_interval_ms - total_time_ms).max(0.0);
-                    if sleep_time_ms > 0.0 {
-                        thread::sleep(Duration::from_millis(sleep_time_ms as u64));
-                    }
-                }
-            }
-        }
-
-        // Save results
-        if config.enable_statistics {
-            Self::save_trajectories(&estimator, &context, &config.dataset_path);
-            Self::save_statistics(&result, &config.dataset_path);
-        }
-
-        // Calculate final statistics
-        result.success = true;
-        result.processed_frames = context.processed_frames;
-
-        if !result.frame_processing_times.is_empty() {
-            result.average_processing_time_ms = result.frame_processing_times.iter().sum::<f64>()
-                / result.frame_processing_times.len() as f64;
-
-            log::info!(
-                "[4SeasonsPlayer] Average processing time: {:.2} ms ({:.1} fps)",
-                result.average_processing_time_ms,
-                1000.0 / result.average_processing_time_ms
-            );
-        }
-
-        // Display final statistics summary
-        if config.enable_console_statistics && result.success {
-            log::info!("════════════════════════════════════════════════════════════════════");
-            log::info!("                          STATISTICS                                ");
-            log::info!("════════════════════════════════════════════════════════════════════");
-            log::info!("");
-            log::info!("                          TIMING ANALYSIS                           ");
-            log::info!("════════════════════════════════════════════════════════════════════");
-            log::info!(" Total Frames Processed: {}", result.processed_frames);
-            log::info!(" Average Processing Time: {:.2}ms", result.average_processing_time_ms);
-            let fps = 1000.0 / result.average_processing_time_ms;
-            log::info!(" Average Frame Rate: {:.1}fps", fps);
-            log::info!("════════════════════════════════════════════════════════════════════");
-        }
-        
-        log::info!("[4SeasonsPlayer] Processing completed! Viewer remains open for inspection.");
-        
-        result
+impl DatasetPlayer for FourSeasonsPlayer {
+    fn name() -> &'static str {
+        "4SeasonsPlayer"
     }
 
     fn load_image_timestamps(dataset_path: &str) -> Result<Vec<ImageData>> {
@@ -185,7 +35,7 @@ impl FourSeasonsPlayer {
 
         for (line_num, line) in reader.lines().enumerate() {
             let line = line?;
-            
+
             // Skip header and empty lines
             if line_num == 0 || line.trim().is_empty() || line.trim_start().starts_with('#') {
                 continue;
@@ -205,7 +55,10 @@ impl FourSeasonsPlayer {
             }
         }
 
-        log::info!("[4SeasonsPlayer] Loaded {} image timestamps", image_data.len());
+        log::info!(
+            "[4SeasonsPlayer] Loaded {} image timestamps",
+            image_data.len()
+        );
         Ok(image_data)
     }
 
@@ -215,132 +68,150 @@ impl FourSeasonsPlayer {
             .join("undistorted_images")
             .join(cam_folder)
             .join(filename);
+        load_grayscale_image(&full_path)
+    }
 
-        if !full_path.exists() {
-            anyhow::bail!("Cannot load image: {}", full_path.display());
+    fn load_imu_data(dataset_path: &str) -> Result<Vec<ImuData>> {
+        // 4Seasons dataset may have IMU data in imu.txt or imu.csv
+        // Special handling: supports both comma and space-separated formats
+        let mut imu_file = Path::new(dataset_path).join("imu.txt");
+
+        if !imu_file.exists() {
+            let imu_csv = Path::new(dataset_path).join("imu.csv");
+            if imu_csv.exists() {
+                log::debug!(
+                    "[4SeasonsPlayer] IMU file imu.txt not found, falling back to {:?}",
+                    imu_csv
+                );
+                imu_file = imu_csv;
+            } else {
+                log::debug!(
+                    "[4SeasonsPlayer] IMU file not found (tried {:?} and {:?}), skipping",
+                    imu_file,
+                    imu_csv
+                );
+                return Ok(Vec::new());
+            }
         }
 
-        // Load image using image crate
-        let img = ImageReader::open(&full_path)
-            .with_context(|| format!("Failed to open image: {}", full_path.display()))?
-            .decode()
-            .with_context(|| format!("Failed to decode image: {}", full_path.display()))?;
+        let file = File::open(&imu_file)
+            .with_context(|| format!("Cannot open IMU file: {}", imu_file.display()))?;
 
-        // Convert to grayscale if needed (EuRoC images are typically grayscale)
-        let gray_img = img.to_luma8();
+        let reader = BufReader::new(file);
+        let mut imu_data = Vec::new();
 
-        // Return raw pixel data as Vec<u8>
-        let pixel_data = gray_img.as_raw().to_vec();
-        
-        Ok(pixel_data)
-    }
+        for (line_num, line) in reader.lines().enumerate() {
+            let line = line?;
 
-    fn load_imu_data(
-        _dataset_path: &str,
-        _image_data: &[ImageData],
-        _start_frame_idx: usize,
-        _end_frame_idx: usize,
-    ) -> Result<()> {
-        // TODO: Implement IMU data loading
-        log::info!("[4SeasonsPlayer] IMU data loading (placeholder)");
-        Ok(())
-    }
+            // Skip header and empty lines
+            if line_num == 0 || line.trim().is_empty() || line.trim_start().starts_with('#') {
+                continue;
+            }
 
-    /// Create camera models from config using the datasets module helper function
-    fn create_camera_models_from_config(
-        config: &Config,
-    ) -> Result<(crate::datasets::CameraModelType, crate::datasets::CameraModelType)> {
-        Ok(crate::datasets::create_camera_models_from_config(config))
-    }
+            // Try to parse both space-separated and comma-separated formats
+            let parts: Vec<&str> = if line.contains(',') {
+                line.split(',').map(|s| s.trim()).collect()
+            } else {
+                line.split_whitespace().collect()
+            };
 
-    fn initialize_estimator<'a>(_estimator: &mut Estimator<'a>, _image_data: &[ImageData]) {
-        // TODO: Set initial pose if needed
-        // For now, just a placeholder
-        log::debug!("[4SeasonsPlayer] Estimator initialized");
-    }
+            // Format: timestamp[ns] w.x w.y w.z a.x a.y a.z
+            if parts.len() >= 7 {
+                if let Ok(timestamp) = parts[0].trim().parse::<i64>() {
+                    if let (Ok(wx), Ok(wy), Ok(wz), Ok(ax), Ok(ay), Ok(az)) = (
+                        parts[1].trim().parse::<f64>(),
+                        parts[2].trim().parse::<f64>(),
+                        parts[3].trim().parse::<f64>(),
+                        parts[4].trim().parse::<f64>(),
+                        parts[5].trim().parse::<f64>(),
+                        parts[6].trim().parse::<f64>(),
+                    ) {
+                        // Validate ranges
+                        let gyro_magnitude = (wx * wx + wy * wy + wz * wz).sqrt();
+                        let accel_magnitude = (ax * ax + ay * ay + az * az).sqrt();
 
-    fn process_single_frame<'a>(
-        estimator: &mut Estimator<'a>,
-        context: &mut FrameContext,
-        image_data: &[ImageData],
-        dataset_path: &str,
-    ) -> Result<f64> {
-        let frame_start = Instant::now();
-
-        // Inform the estimator about the current frame index for visualization.
-        estimator.set_viewer_frame(context.current_idx as i64);
-
-        // Load stereo images
-        let left_image = Self::load_image(dataset_path, &image_data[context.current_idx].filename, 0)?;
-        let right_image = Self::load_image(dataset_path, &image_data[context.current_idx].filename, 1)?;
-
-        if left_image.is_empty() {
-            anyhow::bail!("Skipping frame {} due to empty image", context.current_idx);
+                        if gyro_magnitude <= 1000.0 && accel_magnitude <= 200.0 {
+                            imu_data.push(ImuData {
+                                timestamp,
+                                gyro: [wx, wy, wz],
+                                accel: [ax, ay, az],
+                            });
+                        } else {
+                            log::debug!(
+                                "[4SeasonsPlayer] Skipped malformed IMU line {}: out-of-range values (gyro={:.1}, accel={:.1})",
+                                line_num, gyro_magnitude, accel_magnitude
+                            );
+                        }
+                    } else {
+                        log::debug!("[4SeasonsPlayer] Skipped malformed IMU line {}: invalid numeric values", line_num);
+                    }
+                } else {
+                    log::debug!(
+                        "[4SeasonsPlayer] Skipped malformed IMU line {}: invalid timestamp",
+                        line_num
+                    );
+                }
+            } else {
+                log::debug!("[4SeasonsPlayer] Skipped malformed IMU line {}: insufficient fields (expected 7+, got {})", line_num, parts.len());
+            }
         }
-        
-        // Get IMU data if VIO mode
-        let imu_data = if false && context.processed_frames > 0 { // TODO when implementing IMU data loading
-            Some(Self::get_imu_data_between_frames(
-                context.previous_frame_timestamp,
-                image_data[context.current_idx].timestamp,
-            ))
-        } else {
-            None
-        };
 
-        // Process frame
-        let imu_slice = imu_data.as_ref().map(|v| v.as_slice());
-        estimator.process_frame(
-            &left_image,
-            &right_image,
-            image_data[context.current_idx].timestamp,
-            imu_slice,
-        )?;
+        log::info!(
+            "[4SeasonsPlayer] Loaded {} IMU samples from {}",
+            imu_data.len(),
+            imu_file.display()
+        );
+        Ok(imu_data)
+    }
+}
 
-        // Update frame timestamp
-        context.previous_frame_timestamp = image_data[context.current_idx].timestamp;
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use crate::datasets::test_utils::{sample_imu_data, timestamps, write_file};
+    use tempfile::tempdir;
 
-        let frame_duration = frame_start.elapsed();
-        Ok(frame_duration.as_secs_f64() * 1000.0) // Return milliseconds
+    #[test]
+    fn load_imu_data_missing_file_returns_empty() {
+        let dir = tempdir().expect("tempdir");
+        let dataset_path = dir.path().to_str().expect("path utf-8");
+
+        let imu_data = FourSeasonsPlayer::load_imu_data(dataset_path).expect("load imu data");
+        assert!(imu_data.is_empty());
     }
 
-    fn get_imu_data_between_frames(
-        _previous_timestamp: i64,
-        _current_timestamp: i64,
-    ) -> Vec<ImuData> {
-        // TODO: Implement IMU data retrieval between timestamps
-        Vec::new()
+    #[test]
+    fn load_imu_data_skips_malformed_lines() {
+        let dir = tempdir().expect("tempdir");
+        let imu_path = dir.path().join("imu.txt");
+
+        write_file(
+            &imu_path,
+            "timestamp w.x w.y w.z a.x a.y a.z\n\
+not_a_timestamp 0 0 0 0 0 0\n\
+1 0 0 0 0 0\n\
+2,0,0,0,0,0,bad\n\
+3,0.1,0.2,0.3,1.0,1.1,1.2\n\
+4 0.1 0.2 0.3 1.0 1.1 1.2\n",
+        );
+
+        let dataset_path = dir.path().to_str().expect("path utf-8");
+        let imu_data = FourSeasonsPlayer::load_imu_data(dataset_path).expect("load imu data");
+        assert_eq!(timestamps(&imu_data), vec![3, 4]);
     }
 
-    fn save_trajectories(
-        _estimator: &Estimator,
-        _context: &FrameContext,
-        _dataset_path: &str,
-    ) {
-        // TODO: Implement trajectory saving
-        log::debug!("[4SeasonsPlayer] Saving trajectories (placeholder)");
-    }
+    #[test]
+    fn get_imu_data_between_frames_boundaries() {
+        let imu_data = sample_imu_data();
 
-    fn save_statistics(result: &PlayerResult, dataset_path: &str) {
-        let stats_file = Path::new(dataset_path).join(format!("statistics.txt"));
+        let between = FourSeasonsPlayer::get_imu_data_between_frames(2, 4, &imu_data);
+        assert_eq!(timestamps(&between), vec![3, 4]);
 
-        if let Ok(mut file) = std::fs::File::create(&stats_file) {
-            use std::io::Write;
-            writeln!(file, "════════════════════════════════════════════════════════════════════").ok();
-            writeln!(file, "                          STATISTICS                                ").ok();
-            writeln!(file, "════════════════════════════════════════════════════════════════════").ok();
-            writeln!(file, "").ok();
+        let between = FourSeasonsPlayer::get_imu_data_between_frames(0, 1, &imu_data);
+        assert_eq!(timestamps(&between), vec![1]);
 
-            // Timing statistics
-            writeln!(file, "                          TIMING ANALYSIS                           ").ok();
-            writeln!(file, "════════════════════════════════════════════════════════════════════").ok();
-            writeln!(file, " Total Frames Processed: {}", result.processed_frames).ok();
-            writeln!(file, " Average Processing Time: {:.2}ms", result.average_processing_time_ms).ok();
-            let fps = 1000.0 / result.average_processing_time_ms;
-            writeln!(file, " Average Frame Rate: {:.1}fps", fps).ok();
-            writeln!(file, "════════════════════════════════════════════════════════════════════").ok();
-
-            log::info!("[4SeasonsPlayer] Saved statistics to: {}", stats_file.display());
-        }
+        let between = FourSeasonsPlayer::get_imu_data_between_frames(3, 3, &imu_data);
+        assert!(between.is_empty());
     }
 }

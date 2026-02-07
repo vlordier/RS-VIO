@@ -3,11 +3,8 @@ use imageproc::corners::Corner;
 use nalgebra as na;
 use rayon::prelude::*;
 use std::collections::HashMap;
-use std::ops::AddAssign;
 
 use super::{image_utilities, patch};
-
-use log::info;
 
 #[derive(Debug, Clone)]
 pub struct Feature {
@@ -22,7 +19,7 @@ pub struct Feature {
 }
 
 impl Feature {
-    pub fn new(feature_id: usize, pixel_coord: [f32; 2]) -> Self {
+    pub const fn new(feature_id: usize, pixel_coord: [f32; 2]) -> Self {
         Self {
             feature_id,
             pixel_coord,
@@ -31,115 +28,133 @@ impl Feature {
     }
 }
 
-
-
-#[derive(Default)]
-pub struct PatchTracker<const N: u32> {
-    last_keypoint_id: usize,
-    tracked_points_map: HashMap<usize, na::Affine2<f32>>,
-    previous_image_pyramid: Vec<GrayImage>,
-}
-impl<const LEVELS: u32> PatchTracker<LEVELS> {
-    pub fn process_frame(&mut self, greyscale_image: &GrayImage) {
-        // build current image pyramid
-        let current_image_pyramid: Vec<GrayImage> = build_image_pyramid(greyscale_image, LEVELS);
-
-        if !self.previous_image_pyramid.is_empty() {
-            info!("old points {}", self.tracked_points_map.len());
-            // track prev points
-            // Default values for PatchTracker (not used in estimator)
-            const DEFAULT_OPTICAL_FLOW_MAX_ITERATIONS: usize = 30;
-            const DEFAULT_OPTICAL_FLOW_CONVERGENCE_THRESHOLD: f32 = 0.005;
-            self.tracked_points_map = track_points::<LEVELS>(
-                &self.previous_image_pyramid,
-                &current_image_pyramid,
-                &self.tracked_points_map,
-                DEFAULT_OPTICAL_FLOW_MAX_ITERATIONS,
-                DEFAULT_OPTICAL_FLOW_CONVERGENCE_THRESHOLD,
-            );
-            info!("tracked old points {}", self.tracked_points_map.len());
-        }
-        // add new points
-        // Default grid_size for PatchTracker (not used in estimator)
-        const DEFAULT_GRID_SIZE: u32 = 30;
-        let new_points = add_points(&self.tracked_points_map, greyscale_image, DEFAULT_GRID_SIZE);
-        for point in &new_points {
-            let mut v = na::Affine2::<f32>::identity();
-
-            v.matrix_mut_unchecked().m13 = point.x as f32;
-            v.matrix_mut_unchecked().m23 = point.y as f32;
-            self.tracked_points_map.insert(self.last_keypoint_id, v);
-            self.last_keypoint_id += 1;
-        }
-
-        // update saved image pyramid
-        self.previous_image_pyramid = current_image_pyramid;
-    }
-    pub fn get_track_points(&self) -> HashMap<usize, (f32, f32)> {
-        self.tracked_points_map
-            .iter()
-            .map(|(k, v)| (*k, (v.matrix().m13, v.matrix().m23)))
-            .collect()
-    }
-    pub fn remove_id(&mut self, ids: &[usize]) {
-        for id in ids {
-            self.tracked_points_map.remove(id);
-        }
-    }
-}
-
 pub struct StereoPatchTracker<const N: u32> {
     last_keypoint_id: usize,
     tracked_points_map_cam0: HashMap<usize, na::Affine2<f32>>,
     previous_image_pyramid0: Vec<GrayImage>,
+    current_image_pyramid0: Vec<GrayImage>,
     tracked_points_map_cam1: HashMap<usize, na::Affine2<f32>>,
     previous_image_pyramid1: Vec<GrayImage>,
+    current_image_pyramid1: Vec<GrayImage>,
+    has_previous: bool,
     grid_size: u32,
     optical_flow_max_iterations: usize,
     optical_flow_convergence_threshold: f32,
 }
 
 impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
-    pub fn new(grid_size: u32, optical_flow_max_iterations: u32, optical_flow_convergence_threshold: f64) -> Self {
+    pub fn new(
+        grid_size: u32,
+        optical_flow_max_iterations: u32,
+        optical_flow_convergence_threshold: f64,
+    ) -> Self {
         Self {
             last_keypoint_id: 0,
             tracked_points_map_cam0: HashMap::new(),
             previous_image_pyramid0: Vec::new(),
+            current_image_pyramid0: Vec::new(),
             tracked_points_map_cam1: HashMap::new(),
             previous_image_pyramid1: Vec::new(),
+            current_image_pyramid1: Vec::new(),
+            has_previous: false,
             grid_size,
             optical_flow_max_iterations: optical_flow_max_iterations as usize,
             optical_flow_convergence_threshold: optical_flow_convergence_threshold as f32,
         }
     }
 
-    pub fn process_frame(&mut self, greyscale_image0: &GrayImage, greyscale_image1: &GrayImage, frame: &mut crate::estimator::Frame) {
-        // build current image pyramid
-        let current_image_pyramid0: Vec<GrayImage> = build_image_pyramid(greyscale_image0, LEVELS);
-        let current_image_pyramid1: Vec<GrayImage> = build_image_pyramid(greyscale_image1, LEVELS);
+    pub fn process_frame(
+        &mut self,
+        greyscale_image0: &GrayImage,
+        greyscale_image1: &GrayImage,
+        frame: &mut crate::estimator::Frame,
+    ) {
+        // build current image pyramid (reuse buffers)
+        ensure_pyramid_buffers(
+            &mut self.current_image_pyramid0,
+            greyscale_image0.width(),
+            greyscale_image0.height(),
+            LEVELS,
+        );
+        ensure_pyramid_buffers(
+            &mut self.previous_image_pyramid0,
+            greyscale_image0.width(),
+            greyscale_image0.height(),
+            LEVELS,
+        );
+        ensure_pyramid_buffers(
+            &mut self.current_image_pyramid1,
+            greyscale_image1.width(),
+            greyscale_image1.height(),
+            LEVELS,
+        );
+        ensure_pyramid_buffers(
+            &mut self.previous_image_pyramid1,
+            greyscale_image1.width(),
+            greyscale_image1.height(),
+            LEVELS,
+        );
+
+        // Parallelize pyramid construction
+        let (current_pyr0, current_pyr1) = (
+            &mut self.current_image_pyramid0,
+            &mut self.current_image_pyramid1,
+        );
+        rayon::join(
+            || build_pyramid_in_place(greyscale_image0, current_pyr0),
+            || build_pyramid_in_place(greyscale_image1, current_pyr1),
+        );
 
         // not initialized
-        if !self.previous_image_pyramid0.is_empty() {
-            log::debug!("[FeatureTracker] Number of old points in cam0: {}", self.tracked_points_map_cam0.len());
+        if self.has_previous {
+            log::debug!(
+                "[FeatureTracker] Number of old points in cam0: {}",
+                self.tracked_points_map_cam0.len()
+            );
             // track prev points
-            self.tracked_points_map_cam0 = track_points::<LEVELS>(
-                &self.previous_image_pyramid0,
-                &current_image_pyramid0,
-                &self.tracked_points_map_cam0,
-                self.optical_flow_max_iterations,
-                self.optical_flow_convergence_threshold,
+            // Parallelize temporal tracking (Left and Right cameras independently)
+            let prev_pyr0 = &self.previous_image_pyramid0;
+            let prev_pyr1 = &self.previous_image_pyramid1;
+            let map0 = &self.tracked_points_map_cam0;
+            let map1 = &self.tracked_points_map_cam1;
+            let max_iters = self.optical_flow_max_iterations;
+            let threshold = self.optical_flow_convergence_threshold;
+
+            let (new_map0, new_map1) = rayon::join(
+                || {
+                    track_points::<LEVELS>(
+                        prev_pyr0,
+                        &self.current_image_pyramid0,
+                        map0,
+                        max_iters,
+                        threshold,
+                    )
+                },
+                || {
+                    track_points::<LEVELS>(
+                        prev_pyr1,
+                        &self.current_image_pyramid1,
+                        map1,
+                        max_iters,
+                        threshold,
+                    )
+                },
             );
-            self.tracked_points_map_cam1 = track_points::<LEVELS>(
-                &self.previous_image_pyramid1,
-                &current_image_pyramid1,
-                &self.tracked_points_map_cam1,
-                self.optical_flow_max_iterations,
-                self.optical_flow_convergence_threshold,
+
+            self.tracked_points_map_cam0 = new_map0;
+            self.tracked_points_map_cam1 = new_map1;
+
+            log::debug!(
+                "[FeatureTracker] Number of tracked old points in cam0: {}",
+                self.tracked_points_map_cam0.len()
             );
-            log::debug!("[FeatureTracker] Number of tracked old points in cam0: {}", self.tracked_points_map_cam0.len());
         }
         // add new points
-        let new_points0 = add_points(&self.tracked_points_map_cam0, greyscale_image0, self.grid_size);
+        let new_points0 = add_points(
+            &self.tracked_points_map_cam0,
+            greyscale_image0,
+            self.grid_size,
+        );
         let tmp_tracked_points0: HashMap<usize, _> = new_points0
             .iter()
             .enumerate()
@@ -152,8 +167,8 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             .collect();
 
         let tmp_tracked_points1 = track_points::<LEVELS>(
-            &current_image_pyramid0,
-            &current_image_pyramid1,
+            &self.current_image_pyramid0,
+            &self.current_image_pyramid1,
             &tmp_tracked_points0,
             self.optical_flow_max_iterations,
             self.optical_flow_convergence_threshold,
@@ -169,19 +184,25 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             }
         }
 
-        // update saved image pyramid
-        self.previous_image_pyramid0 = current_image_pyramid0;
-        self.previous_image_pyramid1 = current_image_pyramid1;
+        // update saved image pyramid (swap to reuse allocations)
+        std::mem::swap(
+            &mut self.previous_image_pyramid0,
+            &mut self.current_image_pyramid0,
+        );
+        std::mem::swap(
+            &mut self.previous_image_pyramid1,
+            &mut self.current_image_pyramid1,
+        );
+        self.has_previous = true;
 
-        // Populate the frame's feature lists from the stereo tracks
-        let [tracked_left, tracked_right] = self.get_track_points();
-        for (id, (x, y)) in tracked_left {
-            let f = Feature::new(id, [x, y]);
+        // Populate the frame's feature lists directly from tracked_points_maps
+        // (avoids allocating 2 temporary HashMaps per frame)
+        for (&id, v) in &self.tracked_points_map_cam0 {
+            let f = Feature::new(id, [v.matrix().m13, v.matrix().m23]);
             frame.add_left_feature(f);
         }
-
-        for (id, (x, y)) in tracked_right {
-            let f = Feature::new(id, [x, y]);
+        for (&id, v) in &self.tracked_points_map_cam1 {
+            let f = Feature::new(id, [v.matrix().m13, v.matrix().m23]);
             frame.add_right_feature(f);
         }
     }
@@ -198,25 +219,116 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             .collect();
         [tracked_pts0, tracked_pts1]
     }
-    pub fn remove_id(&mut self, ids: &[usize]) {
-        for id in ids {
-            self.tracked_points_map_cam0.remove(id);
-            self.tracked_points_map_cam1.remove(id);
+}
+
+fn ensure_pyramid_buffers(
+    pyramid: &mut Vec<GrayImage>,
+    base_width: u32,
+    base_height: u32,
+    levels: u32,
+) {
+    let target_len = levels as usize;
+    if pyramid.len() != target_len {
+        pyramid.clear();
+        pyramid.reserve(target_len);
+        for level in 0..levels {
+            let scale_down = 1 << level;
+            let width = (base_width / scale_down).max(1);
+            let height = (base_height / scale_down).max(1);
+            pyramid.push(GrayImage::new(width, height));
+        }
+        return;
+    }
+
+    let mut resize_needed = false;
+    for (level, img) in pyramid.iter().enumerate() {
+        let scale_down = 1 << level;
+        let width = (base_width / scale_down).max(1);
+        let height = (base_height / scale_down).max(1);
+        if img.width() != width || img.height() != height {
+            resize_needed = true;
+            break;
+        }
+    }
+
+    if resize_needed {
+        pyramid.clear();
+        pyramid.reserve(target_len);
+        for level in 0..levels {
+            let scale_down = 1 << level;
+            let width = (base_width / scale_down).max(1);
+            let height = (base_height / scale_down).max(1);
+            pyramid.push(GrayImage::new(width, height));
         }
     }
 }
 
-fn build_image_pyramid(greyscale_image: &GrayImage, levels: u32) -> Vec<GrayImage> {
-    const FILTER_TYPE: imageops::FilterType = imageops::FilterType::Triangle;
-    let (w0, h0) = greyscale_image.dimensions();
-    (0..levels)
-        .into_par_iter()
-        .map(|i| {
-            let scale_down: u32 = 1 << i;
-            let (new_w, new_h) = (w0 / scale_down, h0 / scale_down);
-            imageops::resize(greyscale_image, new_w, new_h, FILTER_TYPE)
-        })
-        .collect()
+fn build_pyramid_in_place(base: &GrayImage, pyramid: &mut [GrayImage]) {
+    if pyramid.is_empty() {
+        return;
+    }
+
+    // Copy or resize base image to pyramid level 0
+    if pyramid[0].width() == base.width() && pyramid[0].height() == base.height() {
+        // Reuse existing buffer: memcpy instead of clone avoids allocation
+        pyramid[0].copy_from_slice(base);
+    } else {
+        let resized = imageops::resize(
+            base,
+            pyramid[0].width(),
+            pyramid[0].height(),
+            imageops::FilterType::Triangle,
+        );
+        pyramid[0] = resized;
+    }
+
+    // Build remaining pyramid levels by downsampling with 2×2 box filter (in-place, zero alloc)
+    for level in 1..pyramid.len() {
+        let (left, right) = pyramid.split_at_mut(level);
+        let src = &left[level - 1];
+        let sw = src.width();
+        let sh = src.height();
+        let dw = (sw / 2).max(1);
+        let dh = (sh / 2).max(1);
+        let dst = &mut right[0];
+        debug_assert!(dst.width() == dw && dst.height() == dh);
+        let src_raw = src.as_raw();
+        let dst_raw = dst.as_mut();
+        let sw_usize = sw as usize;
+        // Fast interior: all four 2×2 neighbors guaranteed in-bounds
+        let safe_dh = if sh >= 2 { dh.saturating_sub(1) } else { 0 };
+        let safe_dw = if sw >= 2 { dw.saturating_sub(1) } else { 0 };
+        for dy in 0..safe_dh {
+            let sy = (dy * 2) as usize;
+            let row0 = sy * sw_usize;
+            let row1 = row0 + sw_usize;
+            let dst_row = (dy * dw) as usize;
+            for dx in 0..safe_dw {
+                let sx = (dx * 2) as usize;
+                let v = (src_raw[row0 + sx] as u16
+                    + src_raw[row0 + sx + 1] as u16
+                    + src_raw[row1 + sx] as u16
+                    + src_raw[row1 + sx + 1] as u16)
+                    / 4;
+                dst_raw[dst_row + dx as usize] = v as u8;
+            }
+        }
+        // Border pixels: last row and/or last column need bounds-checked access
+        for dy in 0..dh {
+            let start_dx = if dy < safe_dh { safe_dw } else { 0 };
+            for dx in start_dx..dw {
+                let sx = (dx * 2) as usize;
+                let sy = (dy * 2) as usize;
+                let i = sy * sw_usize + sx;
+                let v = (src_raw[i] as u16
+                    + src_raw.get(i + 1).copied().unwrap_or(src_raw[i]) as u16
+                    + src_raw.get(i + sw_usize).copied().unwrap_or(src_raw[i]) as u16
+                    + src_raw.get(i + sw_usize + 1).copied().unwrap_or(src_raw[i]) as u16)
+                    / 4;
+                dst_raw[(dy * dw + dx) as usize] = v as u8;
+            }
+        }
+    }
 }
 
 fn add_points(
@@ -225,29 +337,21 @@ fn add_points(
     grid_size: u32,
 ) -> Vec<Corner> {
     let num_points_in_cell = 1;
-    let current_corners: Vec<Corner> = tracked_points_map
-        .values()
-        .map(|v| {
-            Corner::new(
-                v.matrix().m13.round() as u32,
-                v.matrix().m23.round() as u32,
-                0.0,
-            )
-        })
-        .collect();
-    // let curr_img_luma8 = DynamicImage::ImageLuma16(grayscale_image.clone()).into_luma8();
+    // Pre-allocate capacity to avoid reallocation during collection
+    let mut current_corners: Vec<Corner> = Vec::with_capacity(tracked_points_map.len());
+    current_corners.extend(tracked_points_map.values().map(|v| {
+        Corner::new(
+            v.matrix().m13.round() as u32,
+            v.matrix().m23.round() as u32,
+            0.0,
+        )
+    }));
     image_utilities::detect_key_points(
         grayscale_image,
         grid_size,
         &current_corners,
         num_points_in_cell,
     )
-    // let mut prev_points =
-    // Eigen::aligned_vector<Eigen::Vector2d> pts0;
-
-    // for (const auto &kv : observations.at(0)) {
-    //   pts0.emplace_back(kv.second.translation().template cast<double>());
-    // }
 }
 fn track_points<const LEVELS: u32>(
     image_pyramid0: &[GrayImage],
@@ -256,7 +360,8 @@ fn track_points<const LEVELS: u32>(
     optical_flow_max_iterations: usize,
     optical_flow_convergence_threshold: f32,
 ) -> HashMap<usize, na::Affine2<f32>> {
-    let transform_maps1: HashMap<usize, na::Affine2<f32>> = transform_maps0
+    // Collect with parallel iterator, then insert into pre-allocated HashMap
+    let results: Vec<(usize, na::Affine2<f32>)> = transform_maps0
         .par_iter()
         .filter_map(|(k, v)| {
             if let Some(new_v) = track_one_point::<LEVELS>(
@@ -287,8 +392,14 @@ fn track_points<const LEVELS: u32>(
         })
         .collect();
 
+    // Pre-allocate HashMap with capacity hint before inserting
+    let mut transform_maps1: HashMap<usize, na::Affine2<f32>> =
+        HashMap::with_capacity(results.len());
+    transform_maps1.extend(results);
+
     transform_maps1
 }
+#[inline]
 fn track_one_point<const LEVELS: u32>(
     image_pyramid0: &[GrayImage],
     image_pyramid1: &[GrayImage],
@@ -341,6 +452,7 @@ fn track_one_point<const LEVELS: u32>(
     Some(transform1)
 }
 
+#[inline]
 pub fn track_point_at_level(
     grayscale_image: &GrayImage,
     dp: &patch::Pattern52,
@@ -349,39 +461,31 @@ pub fn track_point_at_level(
     optical_flow_convergence_threshold: f32,
 ) -> bool {
     // Use pre-computed pattern matrix instead of recomputing
-    let patten = &dp.pattern_matrix;
-    
     for _iteration in 0..optical_flow_max_iterations {
-        // Transform pattern: R * pattern + t
-        let mut transformed_pat = transform.matrix().fixed_view::<2, 2>(0, 0) * patten;
-        let translation = transform.matrix().fixed_view::<2, 1>(0, 2);
-        for i in 0..52 {
-            transformed_pat.column_mut(i).add_assign(translation);
-        }
-        
-        if let Some(res) = dp.residual(grayscale_image, &transformed_pat) {
+        if let Some(res) = dp.residual(grayscale_image, transform) {
             let inc = -dp.h_se2_inv_j_se2_t * res;
 
             // avoid NaN in increment (leads to SE2::exp crashing)
             if !inc.iter().all(|x| x.is_finite()) {
                 return false;
             }
-            if inc.norm() > 1e6 {
+            let inc_norm = inc.norm();
+            if inc_norm > 1e6 {
                 return false;
             }
-            
+
             // Early termination if converged
-            if inc.norm() < optical_flow_convergence_threshold {
+            if inc_norm < optical_flow_convergence_threshold {
                 break;
             }
-            
+
             let new_trans = transform.matrix() * image_utilities::se2_exp_matrix(&inc);
             *transform = na::Affine2::<f32>::from_matrix_unchecked(new_trans);
             let filter_margin = 2;
             if !image_utilities::inbound(
                 grayscale_image,
-                transform.matrix_mut_unchecked().m13,
-                transform.matrix_mut_unchecked().m23,
+                transform.matrix().m13,
+                transform.matrix().m23,
                 filter_margin,
             ) {
                 return false;
