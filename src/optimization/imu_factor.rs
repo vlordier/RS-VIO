@@ -157,7 +157,7 @@ impl ImuFactor {
         residual.rows_mut(6, 3).copy_from(&r_p);
 
         let weighted = self.sqrt_information * residual;
-        DVector::from_vec(weighted.as_slice().to_vec())
+        DVector::from_column_slice(weighted.as_slice())
     }
 
     /// Convert unit quaternion to rotation vector (Log map)
@@ -204,7 +204,7 @@ impl Factor for ImuFactor {
         assert_eq!(params[7].len(), 3, "b_a must be 3D");
 
         // Extract parameters
-        let R_i = UnitQuaternion::from_quaternion(na::Quaternion::new(
+        let R_i = UnitQuaternion::new_normalize(na::Quaternion::new(
             params[0][0],
             params[0][1],
             params[0][2],
@@ -213,7 +213,7 @@ impl Factor for ImuFactor {
         let v_i = Vector3::new(params[1][0], params[1][1], params[1][2]);
         let p_i = Vector3::new(params[2][0], params[2][1], params[2][2]);
 
-        let R_j = UnitQuaternion::from_quaternion(na::Quaternion::new(
+        let R_j = UnitQuaternion::new_normalize(na::Quaternion::new(
             params[3][0],
             params[3][1],
             params[3][2],
@@ -340,7 +340,7 @@ impl ImuFactorSe3 {
 
     fn pose_from_se3(param: &DVector<f64>) -> (UnitQuaternion<f64>, Vector3<f64>) {
         let t_B_W = Vector3::new(param[0], param[1], param[2]);
-        let q_B_W = UnitQuaternion::from_quaternion(na::Quaternion::new(
+        let q_B_W = UnitQuaternion::new_normalize(na::Quaternion::new(
             param[3], param[4], param[5], param[6],
         ));
         let q_W_B = q_B_W.inverse();

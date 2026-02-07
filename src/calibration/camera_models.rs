@@ -327,8 +327,8 @@ impl CameraModel for FisheyeCamera {
 
         // Invert the projection model to recover incidence angle θ
         let theta = match self.model {
-            FisheyeModel::Equidistant => r,                    // r = θ  ⇒  θ = r
-            FisheyeModel::Equisolid => 2.0 * (r / 2.0).asin(), // r = 2·sin(θ/2) ⇒ θ = 2·asin(r/2)
+            FisheyeModel::Equidistant => r, // r = θ  ⇒  θ = r
+            FisheyeModel::Equisolid => 2.0 * (r / 2.0).clamp(-1.0, 1.0).asin(), // r = 2·sin(θ/2) ⇒ θ = 2·asin(r/2)
             FisheyeModel::Stereographic => 2.0 * (r / 2.0).atan(), // r = 2·tan(θ/2) ⇒ θ = 2·atan(r/2)
         };
 
@@ -400,54 +400,43 @@ pub enum CameraModelEnum {
     Fisheye(FisheyeCamera),
 }
 
+/// Dispatch a method call through `CameraModelEnum` to the inner model.
+macro_rules! dispatch_camera {
+    ($self:expr, $method:ident ( $($arg:expr),* $(,)? )) => {
+        match $self {
+            CameraModelEnum::Pinhole(m) => m.$method($($arg),*),
+            CameraModelEnum::Fisheye(m) => m.$method($($arg),*),
+        }
+    };
+}
+
 impl CameraModel for CameraModelEnum {
     fn project(&self, point_3d: &na::Vector3<f64>, intrinsics: &[f64]) -> na::Vector2<f64> {
-        match self {
-            CameraModelEnum::Pinhole(model) => model.project(point_3d, intrinsics),
-            CameraModelEnum::Fisheye(model) => model.project(point_3d, intrinsics),
-        }
+        dispatch_camera!(self, project(point_3d, intrinsics))
     }
 
     fn unproject(&self, point_2d: &na::Vector2<f64>, intrinsics: &[f64]) -> na::Vector3<f64> {
-        match self {
-            CameraModelEnum::Pinhole(model) => model.unproject(point_2d, intrinsics),
-            CameraModelEnum::Fisheye(model) => model.unproject(point_2d, intrinsics),
-        }
+        dispatch_camera!(self, unproject(point_2d, intrinsics))
     }
 
     fn num_intrinsics(&self) -> usize {
-        match self {
-            CameraModelEnum::Pinhole(model) => model.num_intrinsics(),
-            CameraModelEnum::Fisheye(model) => model.num_intrinsics(),
-        }
+        dispatch_camera!(self, num_intrinsics())
     }
 
     fn default_intrinsics(&self, image_width: u32, image_height: u32) -> Vec<f64> {
-        match self {
-            CameraModelEnum::Pinhole(model) => model.default_intrinsics(image_width, image_height),
-            CameraModelEnum::Fisheye(model) => model.default_intrinsics(image_width, image_height),
-        }
+        dispatch_camera!(self, default_intrinsics(image_width, image_height))
     }
 
     fn parameter_names(&self) -> Vec<String> {
-        match self {
-            CameraModelEnum::Pinhole(model) => model.parameter_names(),
-            CameraModelEnum::Fisheye(model) => model.parameter_names(),
-        }
+        dispatch_camera!(self, parameter_names())
     }
 
     fn validate_intrinsics(&self, intrinsics: &[f64]) -> Result<(), String> {
-        match self {
-            CameraModelEnum::Pinhole(model) => model.validate_intrinsics(intrinsics),
-            CameraModelEnum::Fisheye(model) => model.validate_intrinsics(intrinsics),
-        }
+        dispatch_camera!(self, validate_intrinsics(intrinsics))
     }
 
     fn name(&self) -> &str {
-        match self {
-            CameraModelEnum::Pinhole(model) => model.name(),
-            CameraModelEnum::Fisheye(model) => model.name(),
-        }
+        dispatch_camera!(self, name())
     }
 
     fn clone_box(&self) -> Box<dyn CameraModel> {

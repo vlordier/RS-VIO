@@ -436,12 +436,13 @@ pub fn track_point_at_level(
             if !inc.iter().all(|x| x.is_finite()) {
                 return false;
             }
-            if inc.norm() > 1e6 {
+            let inc_norm = inc.norm();
+            if inc_norm > 1e6 {
                 return false;
             }
 
             // Early termination if converged
-            if inc.norm() < optical_flow_convergence_threshold {
+            if inc_norm < optical_flow_convergence_threshold {
                 break;
             }
 
@@ -450,8 +451,8 @@ pub fn track_point_at_level(
             let filter_margin = 2;
             if !image_utilities::inbound(
                 grayscale_image,
-                transform.matrix_mut_unchecked().m13,
-                transform.matrix_mut_unchecked().m23,
+                transform.matrix().m13,
+                transform.matrix().m23,
                 filter_margin,
             ) {
                 return false;

@@ -226,75 +226,41 @@ impl AsyncEstimator {
                             match result {
                                 Ok(frame_result) => {
                                     if frame_result.is_ok() {
-                                        match metrics_thread.lock() {
-                                            Ok(mut metrics) => {
-                                                metrics.frames_processed += 1;
-                                                metrics.total_processing_time_ns += latency_ns;
-                                                if metrics.frames_processed == 1 {
-                                                    metrics.min_latency_ns = latency_ns;
-                                                    metrics.max_latency_ns = latency_ns;
-                                                } else {
-                                                    if latency_ns < metrics.min_latency_ns {
-                                                        metrics.min_latency_ns = latency_ns;
-                                                    }
-                                                    if latency_ns > metrics.max_latency_ns {
-                                                        metrics.max_latency_ns = latency_ns;
-                                                    }
-                                                }
-                                                metrics.avg_latency_ns = metrics
-                                                    .total_processing_time_ns
-                                                    / metrics.frames_processed;
-                                                if processing_time
-                                                    > Duration::from_millis(
-                                                        async_config_clone.frame_timeout_ms,
-                                                    )
-                                                {
-                                                    metrics.deadline_misses += 1;
-                                                }
-                                                if async_config_clone.frame_budget_ms > 0
-                                                    && processing_time
-                                                        > Duration::from_millis(
-                                                            async_config_clone.frame_budget_ms,
-                                                        )
-                                                {
-                                                    metrics.budget_violations += 1;
-                                                }
-                                            },
-                                            Err(err) => {
-                                                let mut metrics = err.into_inner();
-                                                metrics.frames_processed += 1;
-                                                metrics.total_processing_time_ns += latency_ns;
-                                                if metrics.frames_processed == 1 {
-                                                    metrics.min_latency_ns = latency_ns;
-                                                    metrics.max_latency_ns = latency_ns;
-                                                } else {
-                                                    if latency_ns < metrics.min_latency_ns {
-                                                        metrics.min_latency_ns = latency_ns;
-                                                    }
-                                                    if latency_ns > metrics.max_latency_ns {
-                                                        metrics.max_latency_ns = latency_ns;
-                                                    }
-                                                }
-                                                metrics.avg_latency_ns = metrics
-                                                    .total_processing_time_ns
-                                                    / metrics.frames_processed;
-                                                if processing_time
-                                                    > Duration::from_millis(
-                                                        async_config_clone.frame_timeout_ms,
-                                                    )
-                                                {
-                                                    metrics.deadline_misses += 1;
-                                                }
-                                                if async_config_clone.frame_budget_ms > 0
-                                                    && processing_time
-                                                        > Duration::from_millis(
-                                                            async_config_clone.frame_budget_ms,
-                                                        )
-                                                {
-                                                    metrics.budget_violations += 1;
-                                                }
-                                            },
+                                        let mut m = match metrics_thread.lock() {
+                                            Ok(guard) => guard,
+                                            Err(err) => err.into_inner(),
+                                        };
+                                        m.frames_processed += 1;
+                                        m.total_processing_time_ns += latency_ns;
+                                        if m.frames_processed == 1 {
+                                            m.min_latency_ns = latency_ns;
+                                            m.max_latency_ns = latency_ns;
+                                        } else {
+                                            if latency_ns < m.min_latency_ns {
+                                                m.min_latency_ns = latency_ns;
+                                            }
+                                            if latency_ns > m.max_latency_ns {
+                                                m.max_latency_ns = latency_ns;
+                                            }
                                         }
+                                        m.avg_latency_ns =
+                                            m.total_processing_time_ns / m.frames_processed;
+                                        if processing_time
+                                            > Duration::from_millis(
+                                                async_config_clone.frame_timeout_ms,
+                                            )
+                                        {
+                                            m.deadline_misses += 1;
+                                        }
+                                        if async_config_clone.frame_budget_ms > 0
+                                            && processing_time
+                                                > Duration::from_millis(
+                                                    async_config_clone.frame_budget_ms,
+                                                )
+                                        {
+                                            m.budget_violations += 1;
+                                        }
+                                        drop(m);
 
                                         match latency_thread.lock() {
                                             Ok(mut histogram) => histogram.record(latency_ns),

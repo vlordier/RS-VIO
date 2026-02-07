@@ -3,6 +3,7 @@ use super::Viewer;
 use crate::types::{Array3, Float, Matrix3x3, Matrix4x4, ToArray};
 use anyhow::Result;
 use image::{DynamicImage, ImageBuffer, Luma};
+use nalgebra as na;
 use rerun::components::Color;
 use rerun::time::Timestamp;
 use rerun::LineStrips3D;
@@ -163,14 +164,11 @@ impl Viewer for RerunViewer {
             let translation = Array3::from(T_W_B.fixed_view::<3, 1>(0, 3));
             let rotation = Matrix3x3::from(T_W_B.fixed_view::<3, 3>(0, 0));
 
-            // Convert rotation matrix to quaternion
-            let quat = matrix_to_quaternion(Matrix3x3::from(rotation).to_array());
-            let quaternion = rerun::Quaternion::from_xyzw([
-                quat[0] as f32,
-                quat[1] as f32,
-                quat[2] as f32,
-                quat[3] as f32,
-            ]);
+            // Convert rotation matrix to quaternion using nalgebra
+            let rot3 = na::Rotation3::from_matrix_unchecked(rotation);
+            let q = na::UnitQuaternion::from_rotation_matrix(&rot3);
+            let quaternion =
+                rerun::Quaternion::from_xyzw([q.i as f32, q.j as f32, q.k as f32, q.w as f32]);
 
             if let Err(e) = rec.log(
                 entity_path,
@@ -480,40 +478,6 @@ impl Viewer for RerunViewer {
             }
         }
     }
-}
-
-// Helper function to convert 3x3 rotation matrix to quaternion [x, y, z, w]
-fn matrix_to_quaternion(rot: [[Float; 3]; 3]) -> [Float; 4] {
-    let trace = rot[0][0] + rot[1][1] + rot[2][2];
-    let mut quat = [0.0 as Float; 4];
-
-    if trace > 0.0 {
-        let s = (trace + 1.0).sqrt() * 2.0;
-        quat[3] = 0.25 * s;
-        quat[0] = (rot[2][1] - rot[1][2]) / s;
-        quat[1] = (rot[0][2] - rot[2][0]) / s;
-        quat[2] = (rot[1][0] - rot[0][1]) / s;
-    } else if rot[0][0] > rot[1][1] && rot[0][0] > rot[2][2] {
-        let s = (1.0 + rot[0][0] - rot[1][1] - rot[2][2]).sqrt() * 2.0;
-        quat[3] = (rot[2][1] - rot[1][2]) / s;
-        quat[0] = 0.25 * s;
-        quat[1] = (rot[0][1] + rot[1][0]) / s;
-        quat[2] = (rot[0][2] + rot[2][0]) / s;
-    } else if rot[1][1] > rot[2][2] {
-        let s = (1.0 + rot[1][1] - rot[0][0] - rot[2][2]).sqrt() * 2.0;
-        quat[3] = (rot[0][2] - rot[2][0]) / s;
-        quat[0] = (rot[0][1] + rot[1][0]) / s;
-        quat[1] = 0.25 * s;
-        quat[2] = (rot[1][2] + rot[2][1]) / s;
-    } else {
-        let s = (1.0 + rot[2][2] - rot[0][0] - rot[1][1]).sqrt() * 2.0;
-        quat[3] = (rot[1][0] - rot[0][1]) / s;
-        quat[0] = (rot[0][2] + rot[2][0]) / s;
-        quat[1] = (rot[1][2] + rot[2][1]) / s;
-        quat[2] = 0.25 * s;
-    }
-
-    quat
 }
 
 // Helper function to create a RerunViewer

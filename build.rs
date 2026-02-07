@@ -28,6 +28,8 @@ fn main() {
     }
 
     if enabled.is_empty() {
-        eprintln!("warning: No matching strategy enabled, using default (matching-basic-ransac)");
+        println!(
+            "cargo::warning=No matching strategy enabled, using default (matching-basic-ransac)"
+        );
     }
 }

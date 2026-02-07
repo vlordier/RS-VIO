@@ -239,7 +239,8 @@ impl Estimator {
         if let Some(imu) = imu_data {
             self.imu_buffer.clear();
             self.imu_buffer.extend_from_slice(imu);
-            current_frame.imu_from_last_frame = std::mem::take(&mut self.imu_buffer);
+            current_frame.imu_from_last_frame =
+                std::mem::replace(&mut self.imu_buffer, Vec::with_capacity(100));
         }
 
         frame_creation_time_ms = frame_creation_start.elapsed().as_secs_f64() * 1000.0;
@@ -253,13 +254,17 @@ impl Estimator {
 
         // Motion tracking - only if the sliding window is full (has initialized keyframes)
         let mut is_bootstrap = false;
+        // last_kf_pose extracted while holding the try_lock guard to avoid a
+        // second blocking lock() after the guard is dropped.
+        let mut last_kf_pose: Option<Matrix4x4> = None;
         let motion_tracking_result = match self.sliding_window.try_lock() {
             Ok(mut sliding_window) => {
                 if sliding_window.is_full() {
-                    // DEBUG
                     let motion_tracking_start = Instant::now();
                     let result = sliding_window.track_motion(&current_frame);
-                    drop(sliding_window); // Drop lock before borrowing self mutably
+                    // Grab last keyframe pose while we still hold the lock
+                    last_kf_pose = sliding_window.last_keyframe_pose();
+                    drop(sliding_window);
                     let motion_tracking_elapsed =
                         motion_tracking_start.elapsed().as_secs_f64() * 1000.0;
                     (result, motion_tracking_elapsed)
@@ -283,11 +288,27 @@ impl Estimator {
                 // Apply the optimized pose to the current frame
                 current_frame.state.T_W_B = T_W_B;
 
-                // Check if translation and rotation since last keyframe is large enough to trigger a keyframe
-                #[allow(clippy::unwrap_used)] // Validated by sliding_window - keyframes exist
-                let T_W_B_last_kf = {
-                    let sw = self.sliding_window.lock().unwrap();
-                    sw.last_keyframe_pose().unwrap()
+                // Use pre-fetched last keyframe pose (grabbed while holding try_lock)
+                let Some(T_W_B_last_kf) = last_kf_pose else {
+                    log::warn!("[Estimator] No last keyframe pose available for keyframe decision");
+                    current_frame.is_keyframe = true;
+                    motion_tracking_time_ms = motion_tracking_result.1;
+                    // Skip to keyframe insertion
+                    let optimization_start = Instant::now();
+                    {
+                        let mut sliding_window = self.sliding_window.lock().unwrap();
+                        sliding_window.add_frame(current_frame);
+                    }
+                    self.schedule_optimization();
+                    optimization_time_ms = optimization_start.elapsed().as_secs_f64() * 1000.0;
+                    let total_duration_ms = total_start_time.elapsed().as_secs_f64() * 1000.0;
+                    log::debug!(
+                        "[Timing] frame_creation={:.3} ms, patch_tracking={:.3} ms, motion_tracking={:.3} ms, optimization={:.3} ms, total={:.3} ms",
+                        frame_creation_time_ms, patch_tracking_time_ms, motion_tracking_time_ms, optimization_time_ms, total_duration_ms
+                    );
+                    self.left_image_buffer = left_img.into_raw();
+                    self.right_image_buffer = right_img.into_raw();
+                    return Ok(());
                 };
                 #[allow(clippy::unwrap_used)] // T_W_B is guaranteed invertible
                 let T_rel = T_W_B * T_W_B_last_kf.try_inverse().unwrap();
@@ -430,24 +451,16 @@ impl Estimator {
 
     fn view_motion_tracking_results(&mut self, T_W_B: &Matrix4x4) {
         if let Some(v) = &mut self.viewer {
-            let pose_path = "pose_current".to_string();
-            v.log_pose(*T_W_B, pose_path.as_str());
+            v.log_pose(*T_W_B, "pose_current");
 
             let width = self.config.camera.image_width;
             let height = self.config.camera.image_height;
 
             // Log left camera frustum at the pose location (left camera is at the pose)
             let left_focal_length = self.config.camera.left_intrinsics[0] as f32;
-            let left_cam_path = format!("{}_left", pose_path);
             let T_W_Cl = T_W_B * self.T_B_Cl;
-            v.log_pose(T_W_Cl, left_cam_path.as_str());
-            v.log_camera_frustum(
-                left_focal_length,
-                width,
-                height,
-                left_cam_path.as_str(),
-                0.4,
-            );
+            v.log_pose(T_W_Cl, "pose_current_left");
+            v.log_camera_frustum(left_focal_length, width, height, "pose_current_left", 0.4);
         }
     }
 }

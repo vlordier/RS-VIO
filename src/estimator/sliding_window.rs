@@ -656,6 +656,11 @@ impl SlidingWindow {
     /// Track the motion of the system by solving a PnP-like problem
     /// The map points and existing keyframes are kept constant, only the new frame is optimized
     pub fn track_motion(&mut self, frame: &Frame) -> Result<Option<Matrix4x4>, std::io::Error> {
+        // Guard: need at least one keyframe
+        if self.keyframes.is_empty() {
+            return Ok(None);
+        }
+
         // Create a new problem and solver
         let mut problem = Problem::new();
         let mut solver = LevenbergMarquardt::with_config(

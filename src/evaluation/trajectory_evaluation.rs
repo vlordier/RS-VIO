@@ -19,17 +19,14 @@ pub struct GroundTruthPose {
     /// Position in world frame (meters)
     pub position: Vector3,
     /// Orientation as unit quaternion (x, y, z, w)
-    pub quaternion: na::UnitQuaternion<f32>,
+    pub quaternion: na::UnitQuaternion<f64>,
 }
 
 impl GroundTruthPose {
     /// Convert to SE(3) matrix (world to body)
     pub fn to_matrix(&self) -> Matrix4x4 {
-        na::Isometry3::from_parts(
-            na::Translation3::from(self.position),
-            self.quaternion.cast::<f64>(),
-        )
-        .to_homogeneous()
+        na::Isometry3::from_parts(na::Translation3::from(self.position), self.quaternion)
+            .to_homogeneous()
     }
 }
 
@@ -81,33 +78,33 @@ impl GroundTruthTrajectory {
             let timestamp_ns = (timestamp_s * 1e9) as i64;
 
             // Parse position
-            let tx: f32 = parts[1]
+            let tx: f64 = parts[1]
                 .parse()
                 .map_err(|_| format!("Invalid tx: {}", parts[1]))?;
-            let ty: f32 = parts[2]
+            let ty: f64 = parts[2]
                 .parse()
                 .map_err(|_| format!("Invalid ty: {}", parts[2]))?;
-            let tz: f32 = parts[3]
+            let tz: f64 = parts[3]
                 .parse()
                 .map_err(|_| format!("Invalid tz: {}", parts[3]))?;
 
             // Parse quaternion
-            let qx: f32 = parts[4]
+            let qx: f64 = parts[4]
                 .parse()
                 .map_err(|_| format!("Invalid qx: {}", parts[4]))?;
-            let qy: f32 = parts[5]
+            let qy: f64 = parts[5]
                 .parse()
                 .map_err(|_| format!("Invalid qy: {}", parts[5]))?;
-            let qz: f32 = parts[6]
+            let qz: f64 = parts[6]
                 .parse()
                 .map_err(|_| format!("Invalid qz: {}", parts[6]))?;
-            let qw: f32 = parts[7]
+            let qw: f64 = parts[7]
                 .parse()
                 .map_err(|_| format!("Invalid qw: {}", parts[7]))?;
 
             let pose = GroundTruthPose {
                 timestamp_ns,
-                position: Vector3::new(tx as f64, ty as f64, tz as f64),
+                position: Vector3::new(tx, ty, tz),
                 quaternion: na::UnitQuaternion::new_normalize(na::Quaternion::new(qw, qx, qy, qz)),
             };
 
@@ -286,23 +283,23 @@ pub struct TrajectoryEvaluation {
 impl TrajectoryEvaluation {
     /// Print formatted evaluation results
     pub fn print_summary(&self) {
-        println!("\n📊 Trajectory Evaluation: {}", self.algorithm);
-        println!("  ├─ ATE (Absolute Trajectory Error)");
-        println!("  │  ├─ RMSE:  {:.6} m", self.ate_rmse);
-        println!("  │  ├─ Mean:  {:.6} m", self.ate_mean);
-        println!("  │  ├─ Median: {:.6} m", self.ate_median);
-        println!("  │  ├─ Min:   {:.6} m", self.ate_min);
-        println!("  │  ├─ Max:   {:.6} m", self.ate_max);
-        println!("  │  └─ Std:   {:.6} m", self.ate_std);
-        println!("  ├─ RPE (Relative Pose Error)");
-        println!("  │  ├─ Translation: {:.6} m", self.rpe_translation_rmse);
-        println!(
-            "  │  └─ Rotation:    {:.4}°",
+        log::info!("Trajectory Evaluation: {}", self.algorithm);
+        log::info!("  ATE (Absolute Trajectory Error)");
+        log::info!("    RMSE:   {:.6} m", self.ate_rmse);
+        log::info!("    Mean:   {:.6} m", self.ate_mean);
+        log::info!("    Median: {:.6} m", self.ate_median);
+        log::info!("    Min:    {:.6} m", self.ate_min);
+        log::info!("    Max:    {:.6} m", self.ate_max);
+        log::info!("    Std:    {:.6} m", self.ate_std);
+        log::info!("  RPE (Relative Pose Error)");
+        log::info!("    Translation: {:.6} m", self.rpe_translation_rmse);
+        log::info!(
+            "    Rotation:    {:.4} deg",
             self.rpe_rotation_rmse.to_degrees()
         );
-        println!("  └─ Statistics");
-        println!("     ├─ Poses:      {}", self.num_poses);
-        println!("     └─ Failed:     {}", self.num_failed_matches);
+        log::info!("  Statistics");
+        log::info!("    Poses:  {}", self.num_poses);
+        log::info!("    Failed: {}", self.num_failed_matches);
     }
 }
 
@@ -797,7 +794,7 @@ mod benchmarks {
             let gt_pose = GroundTruthPose {
                 timestamp_ns: ts,
                 position: Vector3::new(t, 0.0, 0.0),
-                quaternion: na::UnitQuaternion::from_euler_angles(0.0, 0.0, (0.01 * t) as f32),
+                quaternion: na::UnitQuaternion::from_euler_angles(0.0, 0.0, 0.01 * t),
             };
             gt.poses.insert(ts, gt_pose);
 
