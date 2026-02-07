@@ -44,6 +44,12 @@ pub struct Estimator {
     right_image_buffer: Vec<u8>,
     /// Pre-allocated IMU buffer (reused each frame - zero allocation)
     imu_buffer: Vec<ImuData>,
+    /// Last two successfully tracked poses for constant-velocity prediction.
+    /// (previous, current) — used to extrapolate initial guess for track_motion.
+    last_two_poses: (Option<Matrix4x4>, Option<Matrix4x4>),
+    /// Counter for consecutive motion tracking failures.
+    /// When this exceeds a threshold, we force a keyframe to prevent map staleness.
+    consecutive_tracking_failures: u32,
 }
 
 impl Estimator {
@@ -105,6 +111,8 @@ impl Estimator {
             left_image_buffer,
             right_image_buffer,
             imu_buffer,
+            last_two_poses: (None, None),
+            consecutive_tracking_failures: 0,
         }
     }
 
@@ -243,11 +251,25 @@ impl Estimator {
         // last_kf_pose extracted while holding the try_lock guard to avoid a
         // second blocking lock() after the guard is dropped.
         let mut last_kf_pose: Option<Matrix4x4> = None;
+
+        // Constant-velocity prediction: extrapolate from last two successful poses
+        let predicted_pose = match self.last_two_poses {
+            (Some(prev), Some(curr)) => {
+                // delta = curr * prev^{-1}, predicted = delta * curr
+                prev.try_inverse().map(|prev_inv| {
+                    let delta = curr * prev_inv;
+                    delta * curr
+                })
+            },
+            (_, Some(curr)) => Some(curr), // Only one pose: use it directly
+            _ => None,
+        };
+
         let motion_tracking_result = match self.sliding_window.try_lock() {
             Ok(mut sliding_window) => {
                 if sliding_window.is_full() {
                     let motion_tracking_start = Instant::now();
-                    let result = sliding_window.track_motion(&current_frame);
+                    let result = sliding_window.track_motion(&current_frame, predicted_pose);
                     // Grab last keyframe pose while we still hold the lock
                     last_kf_pose = sliding_window.last_keyframe_pose();
                     drop(sliding_window);
@@ -271,6 +293,10 @@ impl Estimator {
 
         match motion_tracking_result.0 {
             Ok(Some(T_W_B)) => {
+                // Tracking succeeded: update pose history and reset failure counter
+                self.last_two_poses = (self.last_two_poses.1, Some(T_W_B));
+                self.consecutive_tracking_failures = 0;
+
                 // Apply the optimized pose to the current frame
                 current_frame.state.T_W_B = T_W_B;
 
@@ -331,14 +357,34 @@ impl Estimator {
                     log::info!("[Estimator] Bootstrap: adding keyframe (window not yet full)");
                     // is_keyframe stays true (default from from_stereo_images)
                 } else {
-                    log::warn!(
-                        "[Estimator] Motion tracking failed (optimization did not converge)"
-                    );
-                    current_frame.is_keyframe = false;
+                    self.consecutive_tracking_failures += 1;
+                    // Force keyframe after 5 consecutive failures to refresh the map
+                    // and prevent death spiral from stale map_points
+                    const MAX_CONSECUTIVE_FAILURES: u32 = 5;
+                    if self.consecutive_tracking_failures >= MAX_CONSECUTIVE_FAILURES {
+                        log::warn!(
+                            "[Estimator] Motion tracking failed {} consecutive times, forcing keyframe to refresh map",
+                            self.consecutive_tracking_failures
+                        );
+                        // Use the predicted pose (or last known pose) for the forced keyframe
+                        if let Some(pose) = predicted_pose.or(self.last_two_poses.1) {
+                            current_frame.state.T_W_B = pose;
+                        }
+                        current_frame.is_keyframe = true;
+                        self.consecutive_tracking_failures = 0;
+                    } else {
+                        log::warn!(
+                            "[Estimator] Motion tracking failed (optimization did not converge) [{}/{}]",
+                            self.consecutive_tracking_failures,
+                            MAX_CONSECUTIVE_FAILURES
+                        );
+                        current_frame.is_keyframe = false;
+                    }
                 }
             },
             Err(e) => {
                 log::error!("[Estimator] Motion tracking error: {:?}", e);
+                self.consecutive_tracking_failures += 1;
                 current_frame.is_keyframe = false;
             },
         }

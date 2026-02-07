@@ -653,9 +653,18 @@ impl SlidingWindow {
         });
     }
 
-    /// Track the motion of the system by solving a PnP-like problem
-    /// The map points and existing keyframes are kept constant, only the new frame is optimized
-    pub fn track_motion(&mut self, frame: &Frame) -> Result<Option<Matrix4x4>, std::io::Error> {
+    /// Track the motion of the system by solving a PnP-like problem.
+    /// The map points and existing keyframes are kept constant, only the new frame is optimized.
+    ///
+    /// # Arguments
+    /// * `frame` - The current frame with detected features
+    /// * `predicted_pose` - Optional predicted T_W_B from constant-velocity model.
+    ///   Falls back to last keyframe pose if `None`.
+    pub fn track_motion(
+        &mut self,
+        frame: &Frame,
+        predicted_pose: Option<Matrix4x4>,
+    ) -> Result<Option<Matrix4x4>, std::io::Error> {
         // Guard: need at least one keyframe
         if self.keyframes.is_empty() {
             return Ok(None);
@@ -666,23 +675,19 @@ impl SlidingWindow {
         let mut solver = LevenbergMarquardt::with_config(
             LevenbergMarquardtConfig::new()
                 .with_linear_solver_type(LinearSolverType::SparseCholesky)
-                .with_max_iterations(10)
+                .with_max_iterations(20)
                 .with_cost_tolerance(1e-6)
                 .with_parameter_tolerance(1e-9)
                 .with_jacobi_scaling(false),
         );
         let mut initial_values = HashMap::new();
-        // solver.add_observer(TerminalObserver::new());
 
         // Add variable for the new frame
-        // Only the new frame is optimized and it's initialized from the last keyframe
+        // Use predicted pose if available, otherwise fall back to last keyframe
         let kf_var = "F".to_string();
-        let T_B_W = self
-            .keyframes
-            .back()
-            .unwrap()
-            .state
-            .T_W_B
+        let T_W_B_init =
+            predicted_pose.unwrap_or_else(|| self.keyframes.back().unwrap().state.T_W_B);
+        let T_B_W = T_W_B_init
             .try_inverse()
             .expect("T_W_B should be invertible");
         let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
@@ -737,6 +742,15 @@ impl SlidingWindow {
                     );
                 }
             }
+        }
+
+        // Minimum correspondences check: PnP needs at least 6 2D-3D correspondences
+        let num_residuals = problem.num_residual_blocks();
+        if num_residuals < 6 {
+            log::warn!(
+                "[SlidingWindow] Motion tracking: too few 2D-3D correspondences ({num_residuals}), need >= 6"
+            );
+            return Ok(None);
         }
 
         // Initialize variables in the problem
