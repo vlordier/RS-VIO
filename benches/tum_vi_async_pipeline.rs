@@ -144,6 +144,7 @@ fn bench_tumvi_async_pipeline(c: &mut Criterion) {
                         .await;
 
                     if frame.is_keyframe {
+                        optimizer.add_frame(frame).await;
                         let _ = optimizer.optimize().await;
                     }
                 }
