@@ -9,7 +9,6 @@ fn main() {
     Builder::from_env(Env::default().default_filter_or("debug"))
         // Silence rerun noise unless it's a warning or worse
         .filter_module("rerun", LevelFilter::Warn)
-        .format_timestamp_millis()
         .format(|buf, record| {
             use std::io::Write;
             let level = match record.level() {

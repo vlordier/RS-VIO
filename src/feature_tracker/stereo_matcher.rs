@@ -366,8 +366,12 @@ impl StereoMatcher {
         }
 
         // Adaptive threshold based on median error
-        errors.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-        let median_error = errors[errors.len() / 2];
+        // Clone before sorting: sorted order must not decouple errors[i] from candidate_matches[i]
+        let median_error = {
+            let mut sorted = errors.clone();
+            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            sorted[sorted.len() / 2]
+        };
         let adaptive_threshold = (median_error * 2.0).max(self.config.max_epipolar_error);
 
         for (i, match_) in candidate_matches.iter().enumerate() {

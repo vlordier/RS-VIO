@@ -300,30 +300,6 @@ impl BundleAdjustmentFactor {
         let y = point_3d_cam[1] / point_3d_cam[2];
         Vector2::new(x, y)
     }
-
-    /// Compute Jacobian of normalized projection w.r.t. 3D point in camera frame.
-    /// For pinhole: [x/z, y/z], so ∂[x/z, y/z]/∂[x, y, z]
-    #[allow(dead_code)]
-    fn jacobian_r_wrt_p_C(&self, point_3d_cam: Vector3<f64>) -> na::Matrix2x3<f64> {
-        let x = point_3d_cam[0];
-        let y = point_3d_cam[1];
-        let z = point_3d_cam[2];
-
-        // ∂(x/z)/∂x = 1/z, ∂(x/z)/∂y = 0, ∂(x/z)/∂z = -x/z²
-        // ∂(y/z)/∂x = 0, ∂(y/z)/∂y = 1/z, ∂(y/z)/∂z = -y/z²
-        let inv_z = 1.0 / z;
-        let inv_z_sq = inv_z * inv_z;
-
-        let mut jac = na::Matrix2x3::zeros();
-        jac[(0, 0)] = inv_z; // ∂(x/z)/∂x
-        jac[(0, 1)] = 0.0; // ∂(x/z)/∂y
-        jac[(0, 2)] = -x * inv_z_sq; // ∂(x/z)/∂z
-        jac[(1, 0)] = 0.0; // ∂(y/z)/∂x
-        jac[(1, 1)] = inv_z; // ∂(y/z)/∂y
-        jac[(1, 2)] = -y * inv_z_sq; // ∂(y/z)/∂z
-
-        jac
-    }
 }
 
 impl Factor for BundleAdjustmentFactor {
@@ -484,11 +460,12 @@ impl Factor for BundleAdjustmentFactor {
                 // We computed J * skew, so negate
                 jac_r_wrt_rot.neg_mut();
 
-                // ∂r/∂t_B_W = jac_proj * R_C_B (since p_B = R_B_W*p_W + t_B_W)
+                // ∂r/∂δρ = jac_proj * R_C_B * R_B_W = jac_proj * R_total
+                // Under SE3 right-perturbation: t' = t + R_B_W * δρ, so ∂t/∂δρ = R_B_W
                 let mut jac_r_wrt_t = na::Matrix2x3::<f64>::zeros();
                 for i in 0..3 {
-                    jac_r_wrt_t[(0, i)] = fx * R_C_B[(0, i)] + fz_x * R_C_B[(2, i)];
-                    jac_r_wrt_t[(1, i)] = fy * R_C_B[(1, i)] + fz_y * R_C_B[(2, i)];
+                    jac_r_wrt_t[(0, i)] = fx * R_total[(0, i)] + fz_x * R_total[(2, i)];
+                    jac_r_wrt_t[(1, i)] = fy * R_total[(1, i)] + fz_y * R_total[(2, i)];
                 }
 
                 let mut jac = DMatrix::zeros(2, 9);
@@ -587,8 +564,7 @@ impl Factor for PnPFactor {
 
         // Construct rotation/translation manually
         let t_B_W = Vector3::new(tx, ty, tz);
-        // We assume valid unit quaternion from solver
-        let q_B_W = UnitQuaternion::new_unchecked(Quaternion::new(qw, qx, qy, qz));
+        let q_B_W = UnitQuaternion::new_normalize(Quaternion::new(qw, qx, qy, qz));
         let R_B_W = q_B_W.to_rotation_matrix();
 
         // Pre-compute camera transform components (reused in jacobian)

@@ -284,11 +284,12 @@ fn build_pyramid_in_place(base: &GrayImage, pyramid: &mut [GrayImage]) {
 
     // Build remaining pyramid levels by downsampling
     for level in 1..pyramid.len() {
-        let src = pyramid[level - 1].clone();
-        let dst_w = (pyramid[level - 1].width() / 2).max(1);
-        let dst_h = (pyramid[level - 1].height() / 2).max(1);
-        let downsampled = imageops::resize(&src, dst_w, dst_h, imageops::FilterType::Triangle);
-        pyramid[level] = downsampled;
+        let (left, right) = pyramid.split_at_mut(level);
+        let src = &left[level - 1];
+        let dst_w = (src.width() / 2).max(1);
+        let dst_h = (src.height() / 2).max(1);
+        let downsampled = imageops::resize(src, dst_w, dst_h, imageops::FilterType::Triangle);
+        right[0] = downsampled;
     }
 }
 

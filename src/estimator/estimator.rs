@@ -174,6 +174,9 @@ impl Estimator {
         let left_img = match GrayImage::from_raw(img_w, img_h, left_buffer) {
             Some(img) => img,
             None => {
+                // Recover right buffer (not yet consumed); left buffer lost in from_raw
+                self.right_image_buffer = right_buffer;
+                self.left_image_buffer = vec![0u8; left_image.len()];
                 log::error!(
                     "[Estimator] Failed to construct GrayImage for left camera ({}x{}, len={})",
                     img_w,
@@ -249,6 +252,7 @@ impl Estimator {
         self.view_patch_tracking_results(&current_frame, &left_img, &right_img, img_w, img_h);
 
         // Motion tracking - only if the sliding window is full (has initialized keyframes)
+        let mut is_bootstrap = false;
         let motion_tracking_result = match self.sliding_window.try_lock() {
             Ok(mut sliding_window) => {
                 if sliding_window.is_full() {
@@ -260,6 +264,7 @@ impl Estimator {
                         motion_tracking_start.elapsed().as_secs_f64() * 1000.0;
                     (result, motion_tracking_elapsed)
                 } else {
+                    is_bootstrap = true;
                     drop(sliding_window);
                     (Ok(None), 0.0)
                 }
@@ -310,10 +315,19 @@ impl Estimator {
                 self.view_motion_tracking_results(&T_W_B);
             },
             Ok(None) => {
-                log::warn!("[Estimator] Motion tracking failed (optimization did not converge)");
+                if is_bootstrap {
+                    log::info!("[Estimator] Bootstrap: adding keyframe (window not yet full)");
+                    // is_keyframe stays true (default from from_stereo_images)
+                } else {
+                    log::warn!(
+                        "[Estimator] Motion tracking failed (optimization did not converge)"
+                    );
+                    current_frame.is_keyframe = false;
+                }
             },
             Err(e) => {
                 log::error!("[Estimator] Motion tracking error: {:?}", e);
+                current_frame.is_keyframe = false;
             },
         }
         motion_tracking_time_ms = motion_tracking_result.1;

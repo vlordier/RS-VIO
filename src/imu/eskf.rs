@@ -161,7 +161,7 @@ impl Eskf {
     /// - Gyro provides inter-frame orientation estimate when visual updates are sparse
     pub fn predict(&mut self, imu: &ImuData, dt: f64) {
         if dt <= 0.0 || dt > 1.0 {
-            eprintln!("Warning: Invalid dt = {:.6}s for IMU prediction", dt);
+            log::warn!("Invalid dt = {:.6}s for IMU prediction", dt);
             return;
         }
 
