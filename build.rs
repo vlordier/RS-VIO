@@ -24,15 +24,14 @@ fn main() {
     // Separate default strategy from explicit non-default strategies
     let non_default_strategies: Vec<_> = enabled
         .iter()
-        .filter(|&&s| s != &"matching-basic-ransac")
+        .filter(|&&s| *s != "matching-basic-ransac")
         .collect();
 
     // Check mutual exclusivity only among non-default strategies
     if non_default_strategies.len() > 1 {
         panic!(
             "Only one matching strategy can be enabled at a time, but found: {:?}. \
-             Use --features <strategy> --no-default-features to select one, \
-             or use --no-default-features --features <strategy> to avoid conflicts.",
+             Use --no-default-features --features <strategy> to select one.",
             non_default_strategies
         );
     }
