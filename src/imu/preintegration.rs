@@ -208,7 +208,7 @@ impl PreintegratedImu {
         self.J_p_ba = self.J_p_ba + J_v_ba_k * dt - 0.5 * R_k * dt2;
 
         // Propagate covariance (reuse precomputed Jr, R_k, acc_skew, R_k_acc_skew)
-        self.propagate_covariance_with_cached(&Jr, &R_k, &acc_skew, &R_k_acc_skew, omega, dt);
+        self.propagate_covariance_with_cached(&Jr, &R_k, &R_k_acc_skew, dt);
 
         // Update preintegrated values
         self.delta_R = new_delta_R;
@@ -231,9 +231,7 @@ impl PreintegratedImu {
         &mut self,
         Jr: &na::Matrix3<f64>,
         R_k: &na::Matrix3<f64>,
-        _acc_skew: &na::Matrix3<f64>,
         R_k_acc_skew: &na::Matrix3<f64>,
-        _omega: na::Vector3<f64>,
         dt: f64,
     ) {
         // ✓ FIXED: Multiply by dt (was dividing - made filter behavior backwards)

@@ -15,8 +15,6 @@ rerun-viewer = ["rerun"]
 lightglue = ["ort", "ndarray"]
 # Feature flag for neural network position refinement (ONNX Runtime)
 onnx-refinement = ["ort", "ndarray"]
-# Feature flag for memory profiling with dhat
-dhat-heap = []
 
 # Stereo matching strategies - only one should be enabled per build
 # Basic RANSAC: 1000 iterations, standard 8-point algorithm (baseline, default)
@@ -33,7 +31,6 @@ anyhow = "1.0"
 apex-solver = { git = "https://github.com/amin-abouee/apex-solver", rev = "e091706" } # TODO change when official release includes the Schur complement methods
 camera-intrinsic-model = "0.7.2"
 clap = { version = "4.5", features = ["derive"] }
-dhat = { version = "0.3", optional = true }
 env_logger = "0.11"
 image = "0.25"
 imageproc = "0.25"
@@ -97,7 +94,6 @@ float_cmp = "warn"  # Warn on floating point comparisons (use approx eq)
 # =====================================================================
 [profile.dev]
 incremental = true       # Enable incremental compilation (default true, but explicit)
-codegen-units = 256      # Max parallelism during dev builds (faster compilation)
 opt-level = 0            # No optimization in dev (fastest compile)
 debug = true             # Keep debug info
 

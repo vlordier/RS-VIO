@@ -478,7 +478,8 @@ impl StereoMatcher {
         for _ in 0..self.config.ransac_iterations {
             // Randomly sample 8 matches
             let sample_indices = self.random_sample(matches.len(), 8);
-            let sample_matches: Vec<_> = sample_indices.iter().map(|&idx| &matches[idx]).collect();
+            let sample_matches: [&StereoMatch; 8] =
+                std::array::from_fn(|i| &matches[sample_indices[i]]);
 
             if let Some(f) = self.estimate_fundamental_matrix_8point(
                 &sample_matches,

@@ -4,7 +4,7 @@ use crate::datasets::ImuData;
 use crate::estimator::sliding_window::SlidingWindow;
 use crate::estimator::Frame;
 use crate::feature_tracker::StereoPatchTracker;
-use crate::types::{Matrix4x4, UnitQuaternion, Vector3};
+use crate::types::{Matrix4x4, UnitQuaternion};
 use crate::viewers::Viewer;
 use anyhow::Result;
 use image::GrayImage;
@@ -317,17 +317,14 @@ impl Estimator {
                 let T_rel = T_W_B * T_W_B_last_kf.try_inverse().unwrap();
                 let t_rel = T_rel.fixed_view::<3, 1>(0, 3).into_owned();
                 let R_rel = T_rel.fixed_view::<3, 3>(0, 0).into_owned();
-                let e_rel = {
-                    let (r, p, y) = UnitQuaternion::from_matrix(&R_rel).euler_angles();
-                    Vector3::from([r, p, y])
-                };
-                log::debug!("[Estimator] Translation since last keyframe: {:.2?}, Euler angles since last keyframe: {:.2?}", t_rel, e_rel);
+                let angle_rel = UnitQuaternion::from_matrix(&R_rel).angle();
+                log::debug!("[Estimator] Translation since last keyframe: {:.2?}, Rotation angle since last keyframe: {:.4} rad", t_rel, angle_rel);
 
                 // Check if translation and rotation since last keyframe is large enough to trigger a keyframe
                 let translation_threshold = self.config.keyframe_management.translation_threshold;
                 let rotation_threshold = self.config.keyframe_management.rotation_threshold;
 
-                if t_rel.norm() > translation_threshold || e_rel.norm() > rotation_threshold {
+                if t_rel.norm() > translation_threshold || angle_rel > rotation_threshold {
                     log::debug!("[Estimator] Translation and rotation since last keyframe are large enough to trigger a keyframe");
                     current_frame.is_keyframe = true;
                 } else {

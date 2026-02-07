@@ -366,7 +366,7 @@ impl AdaptiveNoiseEstimator {
             let dev = na::Vector3::from(imu.accel) - accel_mean;
             variance += dev.norm_squared();
         }
-        variance /= self.recent_measurements.len() as f64;
+        variance /= (self.recent_measurements.len() - 1).max(1) as f64;
 
         // Adaptive scaling: increase noise if variance is high
         let std = variance.sqrt();
@@ -391,7 +391,7 @@ impl AdaptiveNoiseEstimator {
             let dev = na::Vector3::from(imu.gyro) - gyro_mean;
             variance += dev.norm_squared();
         }
-        variance /= self.recent_measurements.len() as f64;
+        variance /= (self.recent_measurements.len() - 1).max(1) as f64;
 
         // Adaptive scaling
         let std = variance.sqrt();

@@ -1236,8 +1236,14 @@ impl StereoCalibrator {
             .sum::<f64>()
             / position_errors.len() as f64;
 
-        let correlation = if var_v > 1e-10 {
-            covariance / var_v.sqrt()
+        let var_d = position_errors
+            .iter()
+            .map(|(_, d)| (d - mean_d).powi(2))
+            .sum::<f64>()
+            / position_errors.len() as f64;
+
+        let correlation = if var_v > 1e-10 && var_d > 1e-10 {
+            covariance / (var_v.sqrt() * var_d.sqrt())
         } else {
             0.0
         };

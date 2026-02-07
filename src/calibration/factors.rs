@@ -625,8 +625,7 @@ impl Factor for TemporalSuperResolutionFactor {
         // Compute residuals for each temporal observation
         let mut residuals = na::DVector::zeros(self.temporal_observations.len() * 4);
         let jacobian = if compute_jacobian {
-            // Hardcoded parameter dimensions: [9, 9, 6, 6, 3] = 33 total
-            Some(na::DMatrix::zeros(self.temporal_observations.len() * 4, 33))
+            None // Return None to trigger solver's numerical differentiation fallback
         } else {
             None
         };
@@ -758,7 +757,7 @@ impl Factor for TemporalConsistencyFactor {
 
         // TODO: Add proper Jacobians for optimization
         let jacobian = if compute_jacobian {
-            Some(na::DMatrix::zeros(8, 6))
+            None // Return None to trigger solver's numerical differentiation fallback
         } else {
             None
         };
@@ -945,7 +944,7 @@ impl Factor for CameraGraphFactor {
 
         // TODO: Compute Jacobians for pose graph optimization
         let jacobian = if compute_jacobian {
-            Some(na::DMatrix::zeros(6, 12)) // 6 residuals, 12 parameters (6D + 6D)
+            None // Return None to trigger solver's numerical differentiation fallback
         } else {
             None
         };

@@ -311,7 +311,7 @@ pub fn calculate_ate(
     // Collect estimated poses into a vector for parallel iteration
     let estimated_poses: Vec<_> = estimated.poses().collect();
 
-    let (errors, failed_matches) = estimated_poses
+    let (mut errors, failed_matches) = estimated_poses
         .par_iter()
         .fold(
             || (Vec::new(), 0),
@@ -350,9 +350,8 @@ pub fn calculate_ate(
         let mean = sum / n;
         let rmse = (errors.par_iter().map(|e| e * e).sum::<f64>() / n).sqrt();
 
-        let mut sorted = errors.clone();
-        #[allow(clippy::unwrap_used)]
-        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
+        errors.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
+        let sorted = &errors;
         let median = if sorted.len() % 2 == 0 {
             (sorted[sorted.len() / 2 - 1] + sorted[sorted.len() / 2]) / 2.0
         } else {
@@ -773,6 +772,7 @@ mod benchmarks {
     use std::time::Instant;
 
     #[test]
+    #[ignore] // Ad-hoc benchmark — run with `cargo test -- --ignored`
     fn benchmark_ate_calculation() {
         let num_poses = 20_000;
         let mut gt = GroundTruthTrajectory::new("bench_gt");
@@ -806,6 +806,7 @@ mod benchmarks {
     }
 
     #[test]
+    #[ignore] // Ad-hoc benchmark — run with `cargo test -- --ignored`
     fn benchmark_rpe_calculation() {
         let num_poses = 50_000; // Increase to 50k
         let mut gt = GroundTruthTrajectory::new("bench_gt");

@@ -637,7 +637,13 @@ impl SlidingWindow {
                         log::warn!("Optimizer returned unknown keyframe index {frame_id}");
                         return;
                     };
-                    kf.state.T_W_B = mat.try_inverse().expect("T_W_B should be invertible");
+                    match mat.try_inverse() {
+                        Some(inv) => kf.state.T_W_B = inv,
+                        None => {
+                            log::warn!("[SlidingWindow] Near-singular matrix for KF_{frame_id}, skipping update");
+                            return;
+                        }
+                    }
                 }
             }
         });

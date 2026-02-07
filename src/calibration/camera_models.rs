@@ -122,8 +122,14 @@ impl CameraModel for PinholeCamera {
             let y_d = y;
             for _ in 0..10 {
                 let (dx, dy) = self.apply_distortion(x, y, &intrinsics[4..]);
-                x = x_d - (dx - x);
-                y = y_d - (dy - y);
+                let x_new = x_d - (dx - x);
+                let y_new = y_d - (dy - y);
+                let converged = (x_new - x).abs() + (y_new - y).abs() < 1e-12;
+                x = x_new;
+                y = y_new;
+                if converged {
+                    break;
+                }
             }
         }
 

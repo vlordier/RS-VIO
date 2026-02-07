@@ -229,12 +229,14 @@ impl EnhancedFeatureDetector {
 
     /// Compute basic image statistics (mean and variance)
     fn compute_image_stats(&self, image: &image::GrayImage) -> (f32, f32) {
-        let mut sum = 0.0;
-        let mut sum_sq = 0.0;
-        let count = (image.width() * image.height()) as f32;
+        // Accumulate in f64 to avoid catastrophic cancellation on large images
+        // (f32 sum_sq overflows exact-integer range at ~640×480)
+        let mut sum: f64 = 0.0;
+        let mut sum_sq: f64 = 0.0;
+        let count = (image.width() * image.height()) as f64;
 
         for pixel in image.pixels() {
-            let val = pixel[0] as f32;
+            let val = pixel[0] as f64;
             sum += val;
             sum_sq += val * val;
         }
@@ -242,7 +244,7 @@ impl EnhancedFeatureDetector {
         let mean = sum / count;
         let variance = (sum_sq / count) - (mean * mean);
 
-        (mean, variance)
+        (mean as f32, variance as f32)
     }
 
     /// FAST corner detection
@@ -356,10 +358,8 @@ impl EnhancedFeatureDetector {
             let bit = if val1 > val2 { 1 } else { 0 };
             let byte_idx = i / 8;
             let bit_idx = i % 8;
-
-            if byte_idx < 16 {
-                descriptor[byte_idx] |= (bit as u8) << bit_idx;
-            }
+            // byte_idx is always < 16 since i ranges 0..128
+            descriptor[byte_idx] |= (bit as u8) << bit_idx;
         }
 
         descriptor
@@ -444,7 +444,7 @@ impl EnhancedFeatureDetector {
         let new_width = (image.width() as f32 * scale) as u32;
         let new_height = (image.height() as f32 * scale) as u32;
 
-        imageops::resize(image, new_width, new_height, imageops::FilterType::Lanczos3)
+        imageops::resize(image, new_width, new_height, imageops::FilterType::Triangle)
     }
 
     /// Apply non-maximum suppression
@@ -458,20 +458,21 @@ impl EnhancedFeatureDetector {
         });
 
         let min_dist_sq = self.config.min_distance * self.config.min_distance;
-        let mut kept = Vec::with_capacity(features.len());
+        let mut kept_positions: Vec<na::Vector2<f32>> = Vec::with_capacity(features.len());
 
-        for f in features.iter() {
-            let dominated = kept.iter().any(|k: &EnhancedFeature| {
-                let dx = f.point.x - k.point.x;
-                let dy = f.point.y - k.point.y;
+        features.retain(|f| {
+            let dominated = kept_positions.iter().any(|k| {
+                let dx = f.point.x - k.x;
+                let dy = f.point.y - k.y;
                 dx * dx + dy * dy < min_dist_sq
             });
             if !dominated {
-                kept.push(f.clone());
+                kept_positions.push(f.point);
+                true
+            } else {
+                false
             }
-        }
-
-        *features = kept;
+        });
     }
 }
 
