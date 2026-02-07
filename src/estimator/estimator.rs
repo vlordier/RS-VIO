@@ -299,8 +299,16 @@ impl Estimator {
                     self.right_image_buffer = right_img.into_raw();
                     return Ok(());
                 };
-                #[allow(clippy::unwrap_used)] // T_W_B is guaranteed invertible
-                let T_rel = T_W_B * T_W_B_last_kf.try_inverse().unwrap();
+                let T_W_B_last_kf_inv = match T_W_B_last_kf.try_inverse() {
+                    Some(inv) => inv,
+                    None => {
+                        log::warn!("[Estimator] Last keyframe pose is singular, skipping keyframe decision");
+                        self.left_image_buffer = left_img.into_raw();
+                        self.right_image_buffer = right_img.into_raw();
+                        return Ok(());
+                    },
+                };
+                let T_rel = T_W_B * T_W_B_last_kf_inv;
                 let t_rel = T_rel.fixed_view::<3, 1>(0, 3).into_owned();
                 let R_rel = T_rel.fixed_view::<3, 3>(0, 0).into_owned();
                 let angle_rel = UnitQuaternion::from_matrix(&R_rel).angle();

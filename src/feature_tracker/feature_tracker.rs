@@ -452,6 +452,7 @@ fn track_one_point<const LEVELS: u32>(
     Some(transform1)
 }
 
+#[inline]
 pub fn track_point_at_level(
     grayscale_image: &GrayImage,
     dp: &patch::Pattern52,

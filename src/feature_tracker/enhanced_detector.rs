@@ -385,6 +385,7 @@ impl EnhancedFeatureDetector {
     }
 
     /// Bilinear sampling for subpixel accuracy
+    #[inline]
     fn sample_bilinear(&self, image: &image::GrayImage, x: f32, y: f32) -> f32 {
         let x0 = x.floor() as i32;
         let y0 = y.floor() as i32;

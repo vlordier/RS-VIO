@@ -319,6 +319,11 @@ impl CameraModel for FisheyeCamera {
         let y = point_3d.y;
         let z = point_3d.z;
 
+        // Cheirality check: reject behind-camera points
+        if z < 1e-12 {
+            return na::Vector2::new(f64::NAN, f64::NAN);
+        }
+
         // Incidence angle: angle between the ray and the optical axis
         let r_xy = (x * x + y * y).sqrt();
         let theta = r_xy.atan2(z);
@@ -355,7 +360,7 @@ impl CameraModel for FisheyeCamera {
 
         // Invert the projection model to recover incidence angle θ
         let theta = match self.model {
-            FisheyeModel::Equidistant => r, // r = θ  ⇒  θ = r
+            FisheyeModel::Equidistant => r.clamp(0.0, std::f64::consts::PI), // r = θ  ⇒  θ = r, clamped to valid range
             FisheyeModel::Equisolid => 2.0 * (r / 2.0).clamp(-1.0, 1.0).asin(), // r = 2·sin(θ/2) ⇒ θ = 2·asin(r/2)
             FisheyeModel::Stereographic => 2.0 * (r / 2.0).atan(), // r = 2·tan(θ/2) ⇒ θ = 2·atan(r/2)
         };

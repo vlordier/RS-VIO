@@ -294,7 +294,7 @@ impl Eskf {
     /// * `measurement_uncertainty` - Estimated measurement uncertainty [m/s]
     pub fn update_zero_velocity(&mut self, measurement_uncertainty: f64) {
         let measurement_cov =
-            na::SMatrix::<f64, 3, 3>::from_element(measurement_uncertainty.powi(2));
+            na::SMatrix::<f64, 3, 3>::from_diagonal_element(measurement_uncertainty.powi(2));
         self.update_velocity(na::Vector3::zeros(), measurement_cov);
     }
 
@@ -340,7 +340,11 @@ impl Eskf {
     /// Get velocity uncertainty (standard deviation)
     pub fn get_velocity_std(&self) -> na::Vector3<f64> {
         let var = self.state.covariance.fixed_view::<3, 3>(0, 0).diagonal();
-        na::Vector3::new(var[0].sqrt(), var[1].sqrt(), var[2].sqrt())
+        na::Vector3::new(
+            var[0].max(0.0).sqrt(),
+            var[1].max(0.0).sqrt(),
+            var[2].max(0.0).sqrt(),
+        )
     }
 
     /// Get bias uncertainties
@@ -348,11 +352,15 @@ impl Eskf {
         let gyro_var = self.state.covariance.fixed_view::<3, 3>(3, 3).diagonal();
         let accel_var = self.state.covariance.fixed_view::<3, 3>(6, 6).diagonal();
 
-        let gyro_std = na::Vector3::new(gyro_var[0].sqrt(), gyro_var[1].sqrt(), gyro_var[2].sqrt());
+        let gyro_std = na::Vector3::new(
+            gyro_var[0].max(0.0).sqrt(),
+            gyro_var[1].max(0.0).sqrt(),
+            gyro_var[2].max(0.0).sqrt(),
+        );
         let accel_std = na::Vector3::new(
-            accel_var[0].sqrt(),
-            accel_var[1].sqrt(),
-            accel_var[2].sqrt(),
+            accel_var[0].max(0.0).sqrt(),
+            accel_var[1].max(0.0).sqrt(),
+            accel_var[2].max(0.0).sqrt(),
         );
 
         (gyro_std, accel_std)

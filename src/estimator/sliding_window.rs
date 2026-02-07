@@ -109,16 +109,19 @@ impl SlidingWindow {
     }
 
     /// Get the current number of keyframes in the window.
+    #[inline]
     pub fn len(&self) -> usize {
         self.keyframes.len()
     }
 
     /// Check if the sliding window is empty.
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.keyframes.is_empty()
     }
 
     /// Check if the sliding window is full.
+    #[inline]
     pub fn is_full(&self) -> bool {
         self.keyframes.len() >= self.max_frames
     }
@@ -716,28 +719,22 @@ impl SlidingWindow {
             for feat in features.iter() {
                 let feature_id = feat.feature_id;
 
-                let point = self.map_points.get(&feature_id);
-                match point {
-                    Some(point) => {
-                        // Create PnP factor
-                        let factor = PnPFactor::new(
-                            na::Vector2::new(feat.undistorted_coord[0], feat.undistorted_coord[1])
-                                .cast::<f64>(),
-                            *T_C_B,
-                            na::Vector3::new(point[0] as f64, point[1] as f64, point[2] as f64),
-                        );
-                        // Add residual block with Huber loss
-                        let huber_loss =
-                            HuberLoss::new(2.0).expect("HuberLoss threshold must be positive");
-                        problem.add_residual_block(
-                            &[&kf_var],
-                            Box::new(factor),
-                            Some(Box::new(huber_loss)),
-                        );
-                    },
-                    None => {
-                        // log::debug!("[SlidingWindow] Motion tracking: point {} is not in the map", feature_id);
-                    },
+                if let Some(point) = self.map_points.get(&feature_id) {
+                    // Create PnP factor
+                    let factor = PnPFactor::new(
+                        na::Vector2::new(feat.undistorted_coord[0], feat.undistorted_coord[1])
+                            .cast::<f64>(),
+                        *T_C_B,
+                        na::Vector3::new(point[0] as f64, point[1] as f64, point[2] as f64),
+                    );
+                    // Add residual block with Huber loss
+                    let huber_loss =
+                        HuberLoss::new(2.0).expect("HuberLoss threshold must be positive");
+                    problem.add_residual_block(
+                        &[&kf_var],
+                        Box::new(factor),
+                        Some(Box::new(huber_loss)),
+                    );
                 }
             }
         }

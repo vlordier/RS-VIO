@@ -264,10 +264,7 @@ impl ImuInitializer {
     /// Check if initialization has converged
     fn check_convergence(&mut self) -> Result<()> {
         // Check if measurements are in static period (low gyro and accel variance)
-        let gyro_norm = self.bias_estimate.gyro_bias.norm();
-        let _accel_norm = self.bias_estimate.accel_bias.norm();
-
-        let is_static = gyro_norm < self.config.gyro_norm_threshold
+        let is_static = self.gyro_variance < self.config.gyro_norm_threshold.powi(2)
             && self.accel_variance < self.config.accel_variance_threshold;
 
         if is_static {

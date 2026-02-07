@@ -10,6 +10,15 @@ use rerun::Pinhole;
 use rerun::{RecordingStream, RecordingStreamBuilder};
 use std::io::Cursor;
 
+/// Macro to log to rerun with standardized error handling.
+macro_rules! rr_log {
+    ($rec:expr, $path:expr, $data:expr) => {
+        if let Err(e) = $rec.log($path, $data) {
+            log::warn!("[RerunViewer] Failed to log {}: {}", $path, e);
+        }
+    };
+}
+
 /// Basic RerunViewer implementation
 pub struct RerunViewer {
     rec: Option<RecordingStream>,
@@ -169,15 +178,14 @@ impl Viewer for RerunViewer {
             let quaternion =
                 rerun::Quaternion::from_xyzw([q.i as f32, q.j as f32, q.k as f32, q.w as f32]);
 
-            if let Err(e) = rec.log(
+            rr_log!(
+                rec,
                 entity_path,
                 &rerun::Transform3D::from_translation_rotation(
                     translation,
                     rerun::Rotation3D::Quaternion(rerun::components::RotationQuat(quaternion)),
-                ),
-            ) {
-                log::warn!("[RerunViewer] Failed to log pose to {}: {}", entity_path, e);
-            }
+                )
+            );
         }
     }
 
@@ -285,12 +293,11 @@ impl Viewer for RerunViewer {
             if !features.is_empty() {
                 let points: Vec<[f32; 2]> = features.to_vec();
 
-                if let Err(e) = rec.log(
+                rr_log!(
+                    rec,
                     format!("{}/features", entity_path).as_str(),
-                    &rerun::Points2D::new(points),
-                ) {
-                    log::warn!("[RerunViewer] Failed to log features: {}", e);
-                }
+                    &rerun::Points2D::new(points)
+                );
             }
         }
     }
@@ -326,14 +333,13 @@ impl Viewer for RerunViewer {
                     .collect();
 
                 let radii: Vec<f32> = vec![3.0; points.len()];
-                if let Err(e) = rec.log(
+                rr_log!(
+                    rec,
                     format!("{}/features", entity_path).as_str(),
                     &rerun::Points2D::new(points)
                         .with_colors(colors)
-                        .with_radii(radii),
-                ) {
-                    log::warn!("[RerunViewer] Failed to log colored features: {}", e);
-                }
+                        .with_radii(radii)
+                );
             }
         }
     }
@@ -357,13 +363,7 @@ impl Viewer for RerunViewer {
                 })
                 .collect();
 
-            if let Err(e) = rec.log(entity_path, &rerun::Points3D::new(points_3d)) {
-                log::warn!(
-                    "[RerunViewer] Failed to log points to {}: {}",
-                    entity_path,
-                    e
-                );
-            }
+            rr_log!(rec, entity_path, &rerun::Points3D::new(points_3d));
         }
     }
 
@@ -385,16 +385,11 @@ impl Viewer for RerunViewer {
                 })
                 .collect();
 
-            if let Err(e) = rec.log(
+            rr_log!(
+                rec,
                 entity_path,
-                &rerun::Points3D::new(points_3d).with_colors(colors),
-            ) {
-                log::warn!(
-                    "[RerunViewer] Failed to log colored points to {}: {}",
-                    entity_path,
-                    e
-                );
-            }
+                &rerun::Points3D::new(points_3d).with_colors(colors)
+            );
         }
     }
 
@@ -435,13 +430,7 @@ impl Viewer for RerunViewer {
             let pinhole = Pinhole::from_focal_length_and_resolution(focal_vec, resolution_vec)
                 .with_image_plane_distance(size);
 
-            if let Err(e) = rec.log(entity_path, &pinhole) {
-                log::warn!(
-                    "[RerunViewer] Failed to log camera frustum to {}: {}",
-                    entity_path,
-                    e
-                );
-            }
+            rr_log!(rec, entity_path, &pinhole);
         }
     }
 
@@ -468,13 +457,7 @@ impl Viewer for RerunViewer {
             let trajectory_color = rerun::Color::from_rgb(255, 165, 0); // Orange
             let line_strip = line_strip.with_colors([trajectory_color]);
 
-            if let Err(e) = rec.log(entity_path, &line_strip) {
-                log::warn!(
-                    "[RerunViewer] Failed to log trajectory to {}: {}",
-                    entity_path,
-                    e
-                );
-            }
+            rr_log!(rec, entity_path, &line_strip);
         }
     }
 }
