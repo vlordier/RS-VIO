@@ -262,10 +262,7 @@ impl SlidingWindow {
                 let se3_data = DVector::from_column_slice(&[
                     t_B_W.x, t_B_W.y, t_B_W.z, q_B_W.w, q_B_W.i, q_B_W.j, q_B_W.k,
                 ]);
-                local_initials.push((
-                    (*kf_var).clone(),
-                    (ManifoldType::SE3, se3_data.cast::<f64>()),
-                ));
+                local_initials.push(((*kf_var).clone(), (ManifoldType::SE3, se3_data)));
 
                 // Pre-compute fixed pose Arc for frame 0 (avoids recomputing inversion per-feature)
                 let fixed_pose_arc = if id_frame == 0 {
@@ -684,7 +681,7 @@ impl SlidingWindow {
         let se3_data = DVector::from_column_slice(&[
             t_B_W.x, t_B_W.y, t_B_W.z, q_B_W.w, q_B_W.i, q_B_W.j, q_B_W.k,
         ]);
-        initial_values.insert(kf_var.clone(), (ManifoldType::SE3, se3_data.cast::<f64>()));
+        initial_values.insert(kf_var.clone(), (ManifoldType::SE3, se3_data));
 
         // Add factors: for both the left and right cameras, each point that was already in the map is used to optimize the new frame
         // Fetch transforms between cameras and body

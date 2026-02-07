@@ -175,6 +175,27 @@ impl Config {
             }
         }
 
+        // Sanity check principal point is within image bounds
+        for (name, intrinsics) in [
+            ("left", &cam.left_intrinsics),
+            ("right", &cam.right_intrinsics),
+        ] {
+            if intrinsics[2] <= 0.0
+                || intrinsics[2] >= cam.image_width as f64
+                || intrinsics[3] <= 0.0
+                || intrinsics[3] >= cam.image_height as f64
+            {
+                anyhow::bail!(
+                    "{} principal point ({}, {}) outside image bounds ({}x{})",
+                    name,
+                    intrinsics[2],
+                    intrinsics[3],
+                    cam.image_width,
+                    cam.image_height
+                );
+            }
+        }
+
         // Validate camera model names and distortion param counts
         for (name, model_opt, distortion) in [
             ("left", &cam.left_model, &cam.left_distortion),

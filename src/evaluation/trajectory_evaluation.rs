@@ -536,6 +536,14 @@ mod tests {
         // Both trajectories should have same poses
         assert_eq!(gt.len(), est.len());
         assert_eq!(gt.len(), 5);
+
+        // Identical trajectories should have zero ATE
+        let eval = super::calculate_ate(&gt, &est);
+        assert!(
+            eval.ate_rmse < 1e-9,
+            "Identical trajectories should have zero ATE, got {}",
+            eval.ate_rmse
+        );
     }
 
     #[test]
@@ -565,6 +573,14 @@ mod tests {
         // Both trajectories should have same number of poses
         assert_eq!(gt.len(), est.len());
         assert_eq!(est.len(), 5);
+
+        // Constant 1.0m offset in X should produce ATE RMSE of 1.0
+        let eval = super::calculate_ate(&gt, &est);
+        assert!(
+            (eval.ate_rmse - 1.0).abs() < 0.01,
+            "ATE RMSE should be ~1.0, got {}",
+            eval.ate_rmse
+        );
     }
 
     #[test]
@@ -591,6 +607,14 @@ mod tests {
         // Just verify that both trajectories have the right number of poses
         assert_eq!(gt.len(), 10);
         assert_eq!(est.len(), 10);
+
+        // Constant 0.5m offset should have zero RPE (relative motion is correct)
+        let (trans_rmse, _rot_rmse) = super::calculate_rpe(&gt, &est, 1000);
+        assert!(
+            trans_rmse < 1e-9,
+            "Constant offset should give zero RPE, got {}",
+            trans_rmse
+        );
     }
 
     #[test]

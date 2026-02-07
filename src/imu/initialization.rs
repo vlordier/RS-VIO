@@ -208,8 +208,8 @@ impl ImuInitializer {
             accel_var_sum += accel_dev.norm_squared();
         }
 
-        self.gyro_variance = gyro_var_sum / n;
-        self.accel_variance = accel_var_sum / n;
+        self.gyro_variance = gyro_var_sum / (n - 1.0).max(1.0);
+        self.accel_variance = accel_var_sum / (n - 1.0).max(1.0);
 
         // Update bias estimates
         self.bias_estimate.gyro_bias = gyro_mean;

@@ -164,7 +164,7 @@ impl Viewer for RerunViewer {
             let rotation = Matrix3x3::from(T_W_B.fixed_view::<3, 3>(0, 0));
 
             // Convert rotation matrix to quaternion using nalgebra
-            let rot3 = na::Rotation3::from_matrix_unchecked(rotation);
+            let rot3 = na::Rotation3::from_matrix(&rotation);
             let q = na::UnitQuaternion::from_rotation_matrix(&rot3);
             let quaternion =
                 rerun::Quaternion::from_xyzw([q.i as f32, q.j as f32, q.k as f32, q.w as f32]);
@@ -465,7 +465,7 @@ impl Viewer for RerunViewer {
             let line_strip = LineStrips3D::new([positions]);
 
             // Use a distinct color for the trajectory (e.g., yellow/orange)
-            let trajectory_color = Color::from_rgb(255, 165, 0); // Orange
+            let trajectory_color = rerun::Color::from_rgb(255, 165, 0); // Orange
             let line_strip = line_strip.with_colors([trajectory_color]);
 
             if let Err(e) = rec.log(entity_path, &line_strip) {

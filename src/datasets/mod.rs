@@ -117,10 +117,10 @@ pub fn create_camera_models_from_config(config: &Config) -> (CameraModelType, Ca
     } else {
         // OpenCVModel5: [fx, fy, cx, cy, k1, k2, p1, p2, k3]
         let left_params_vec: Vec<f64> = vec![
-            cam.left_intrinsics.first().copied().unwrap_or(500.0),
-            cam.left_intrinsics.get(1).copied().unwrap_or(500.0),
-            cam.left_intrinsics.get(2).copied().unwrap_or(320.0),
-            cam.left_intrinsics.get(3).copied().unwrap_or(240.0),
+            cam.left_intrinsics[0],                              // fx (validated)
+            cam.left_intrinsics[1],                              // fy
+            cam.left_intrinsics[2],                              // cx
+            cam.left_intrinsics[3],                              // cy
             cam.left_distortion.first().copied().unwrap_or(0.0), // k1
             cam.left_distortion.get(1).copied().unwrap_or(0.0),  // k2
             cam.left_distortion.get(2).copied().unwrap_or(0.0),  // p1
@@ -152,10 +152,10 @@ pub fn create_camera_models_from_config(config: &Config) -> (CameraModelType, Ca
     } else {
         // OpenCVModel5: [fx, fy, cx, cy, k1, k2, p1, p2, k3]
         let right_params_vec: Vec<f64> = vec![
-            cam.right_intrinsics.first().copied().unwrap_or(500.0),
-            cam.right_intrinsics.get(1).copied().unwrap_or(500.0),
-            cam.right_intrinsics.get(2).copied().unwrap_or(320.0),
-            cam.right_intrinsics.get(3).copied().unwrap_or(240.0),
+            cam.right_intrinsics[0],                              // fx (validated)
+            cam.right_intrinsics[1],                              // fy
+            cam.right_intrinsics[2],                              // cx
+            cam.right_intrinsics[3],                              // cy
             cam.right_distortion.first().copied().unwrap_or(0.0), // k1
             cam.right_distortion.get(1).copied().unwrap_or(0.0),  // k2
             cam.right_distortion.get(2).copied().unwrap_or(0.0),  // p1

@@ -105,15 +105,12 @@ impl EnhancedFeatureDetector {
 
         // Sort by score and limit to max features
         let mut sorted_features = features;
-        sorted_features.sort_by(|a, b| {
-            b.quality
-                .partial_cmp(&a.quality)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-        sorted_features.truncate(adaptive_config.max_features);
+        // Limit features before NMS (NMS sorts by score internally)
+        sorted_features.truncate(adaptive_config.max_features * 2);
 
-        // Apply non-maximum suppression
         self.apply_nms(&mut sorted_features);
+
+        sorted_features.truncate(adaptive_config.max_features);
 
         sorted_features
     }

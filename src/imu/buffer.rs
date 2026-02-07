@@ -153,6 +153,10 @@ impl ImuBuffer {
         let m1 = &self.measurements[idx];
 
         let dt = (m1.timestamp - m0.timestamp) as f64;
+        if dt <= 0.0 {
+            // Duplicate timestamps — return the earlier measurement
+            return Some(self.measurements[idx - 1].clone());
+        }
         let alpha = ((t - m0.timestamp) as f64) / dt;
 
         // Linear interpolation

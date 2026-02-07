@@ -52,7 +52,7 @@ impl Default for StereoMatcherConfig {
             enable_geometric_check: true,
             ransac_iterations: 1000,
             ransac_threshold: 1.0,
-            enable_hierarchical_matching: true,
+            enable_hierarchical_matching: false,
             pyramid_levels: 3,
         }
     }
