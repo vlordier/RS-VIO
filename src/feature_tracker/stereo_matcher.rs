@@ -85,7 +85,11 @@ impl StereoMatcher {
             self.hierarchical_matching(left_features, right_features, camera_intrinsics)
         } else {
             // Fallback to standard matching
-            let mut candidate_matches = self.descriptor_matching(left_features, right_features);
+            let mut candidate_matches = self.descriptor_matching_with_params(
+                left_features,
+                right_features,
+                self.config.max_descriptor_distance,
+            );
 
             if candidate_matches.is_empty() {
                 return Vec::new();
@@ -368,9 +372,12 @@ impl StereoMatcher {
         // Adaptive threshold based on median error
         // Clone before sorting: sorted order must not decouple errors[i] from candidate_matches[i]
         let median_error = {
-            let mut sorted = errors.clone();
-            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-            sorted[sorted.len() / 2]
+            let mut buf = errors.clone();
+            let mid = buf.len() / 2;
+            buf.select_nth_unstable_by(mid, |a, b| {
+                a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+            });
+            buf[mid]
         };
         let adaptive_threshold = (median_error * 2.0).min(self.config.max_epipolar_error);
 
@@ -395,61 +402,6 @@ impl StereoMatcher {
         }
 
         verified_matches
-    }
-
-    /// Initial descriptor-based matching
-    fn descriptor_matching(
-        &self,
-        left_features: &[EnhancedFeature],
-        right_features: &[EnhancedFeature],
-    ) -> Vec<StereoMatch> {
-        let mut matches = Vec::new();
-
-        for (left_idx, left_feat) in left_features.iter().enumerate() {
-            let mut best_match = None;
-            let mut best_distance = u32::MAX;
-            let mut second_best_distance = u32::MAX;
-
-            // Find best and second best matches in right image
-            for (right_idx, right_feat) in right_features.iter().enumerate() {
-                let dist = hamming_distance(&left_feat.descriptor, &right_feat.descriptor);
-
-                if dist < best_distance {
-                    second_best_distance = best_distance;
-                    best_distance = dist;
-                    best_match = Some(right_idx);
-                } else if dist < second_best_distance {
-                    second_best_distance = dist;
-                }
-            }
-
-            // Apply Lowe's ratio test
-            if let Some(right_idx) = best_match {
-                if best_distance <= self.config.max_descriptor_distance
-                    && second_best_distance > 0
-                    && (best_distance as f32) / (second_best_distance as f32)
-                        <= self.config.ratio_threshold
-                {
-                    // Compute initial confidence based on descriptor matching
-                    let confidence = self.compute_match_confidence(
-                        best_distance,
-                        0.0, // epipolar error not computed yet
-                        self.config.max_descriptor_distance,
-                        self.config.max_epipolar_error,
-                    );
-
-                    matches.push(StereoMatch {
-                        left_idx,
-                        right_idx,
-                        score: best_distance,
-                        epipolar_error: 0.0, // Will be computed later
-                        confidence,
-                    });
-                }
-            }
-        }
-
-        matches
     }
 
     /// Geometric verification using epipolar constraints

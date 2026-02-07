@@ -271,7 +271,8 @@ fn build_pyramid_in_place(base: &GrayImage, pyramid: &mut [GrayImage]) {
 
     // Copy or resize base image to pyramid level 0
     if pyramid[0].width() == base.width() && pyramid[0].height() == base.height() {
-        pyramid[0] = base.clone();
+        // Reuse existing buffer: memcpy instead of clone avoids allocation
+        pyramid[0].copy_from_slice(base);
     } else {
         let resized = imageops::resize(
             base,
@@ -308,19 +309,12 @@ fn add_points(
             0.0,
         )
     }));
-    // let curr_img_luma8 = DynamicImage::ImageLuma16(grayscale_image.clone()).into_luma8();
     image_utilities::detect_key_points(
         grayscale_image,
         grid_size,
         &current_corners,
         num_points_in_cell,
     )
-    // let mut prev_points =
-    // Eigen::aligned_vector<Eigen::Vector2d> pts0;
-
-    // for (const auto &kv : observations.at(0)) {
-    //   pts0.emplace_back(kv.second.translation().template cast<double>());
-    // }
 }
 fn track_points<const LEVELS: u32>(
     image_pyramid0: &[GrayImage],

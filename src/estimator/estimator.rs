@@ -296,7 +296,10 @@ impl Estimator {
                     // Skip to keyframe insertion
                     let optimization_start = Instant::now();
                     {
-                        let mut sliding_window = self.sliding_window.lock().unwrap();
+                        let mut sliding_window = self
+                            .sliding_window
+                            .lock()
+                            .map_err(|e| anyhow::anyhow!("Sliding window lock poisoned: {}", e))?;
                         sliding_window.add_frame(current_frame);
                     }
                     self.schedule_optimization();
@@ -355,7 +358,10 @@ impl Estimator {
         if current_frame.is_keyframe {
             let optimization_start = Instant::now();
             {
-                let mut sliding_window = self.sliding_window.lock().unwrap();
+                let mut sliding_window = self
+                    .sliding_window
+                    .lock()
+                    .map_err(|e| anyhow::anyhow!("Sliding window lock poisoned: {}", e))?;
                 sliding_window.add_frame(current_frame);
             }
             self.schedule_optimization();

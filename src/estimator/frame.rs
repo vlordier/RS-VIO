@@ -101,16 +101,6 @@ impl Frame {
 
     /// Append a new feature to the left image.
     pub fn add_left_feature(&mut self, mut feature: Feature) {
-        // Use nalgebra034::Vector2 since OpenCVModel5 uses nalgebra 0.34.1
-
-        // Center radius around the center of the image (256, 256)
-        /*
-        let x = feature.pixel_coord[0] as f64 - 256.0;
-        let y = feature.pixel_coord[1] as f64 - 256.0;
-        let radius = (x * x + y * y).sqrt();
-        if radius > 400.0 {
-            return;
-        } */
         let undist_coord =
             self.left_cam
                 .as_camera_model()

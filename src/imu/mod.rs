@@ -124,6 +124,7 @@
 //! - **Buffer**: Handles out-of-order measurements and interpolation
 //! - **Initialization**: Static period bias estimation
 
+#[cfg(test)]
 pub mod bias_feedback_tests;
 pub mod buffer;
 pub mod eskf;

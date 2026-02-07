@@ -235,76 +235,30 @@ impl Factor for ImuFactor {
             let eps = 1e-7;
             let mut jac = DMatrix::zeros(9, 26); // 9 residuals x 26 parameters
 
-            // Jacobian w.r.t. R_i (4 params)
-            for i in 0..4 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[0][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(i).copy_from(&col);
-            }
+            // Clone once and perturb/restore in-place to avoid 26 full clones
+            let mut params_pert = params.to_vec();
 
-            // Jacobian w.r.t. v_i (3 params, offset 4)
-            for i in 0..3 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[1][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(4 + i).copy_from(&col);
-            }
-
-            // Jacobian w.r.t. p_i (3 params, offset 7)
-            for i in 0..3 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[2][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(7 + i).copy_from(&col);
-            }
-
-            // Jacobian w.r.t. R_j (4 params, offset 10)
-            for i in 0..4 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[3][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(10 + i).copy_from(&col);
-            }
-
-            // Jacobian w.r.t. v_j (3 params, offset 14)
-            for i in 0..3 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[4][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(14 + i).copy_from(&col);
-            }
-
-            // Jacobian w.r.t. p_j (3 params, offset 17)
-            for i in 0..3 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[5][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(17 + i).copy_from(&col);
-            }
-
-            // Jacobian w.r.t. b_g (3 params, offset 20)
-            for i in 0..3 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[6][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(20 + i).copy_from(&col);
-            }
-
-            // Jacobian w.r.t. b_a (3 params, offset 23)
-            for i in 0..3 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[7][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(23 + i).copy_from(&col);
+            // Helper: perturb a single element, compute residual, restore
+            let block_sizes: [(usize, usize); 8] = [
+                (0, 4), // R_i → col offset 0
+                (1, 3), // v_i → col offset 4
+                (2, 3), // p_i → col offset 7
+                (3, 4), // R_j → col offset 10
+                (4, 3), // v_j → col offset 14
+                (5, 3), // p_j → col offset 17
+                (6, 3), // b_g → col offset 20
+                (7, 3), // b_a → col offset 23
+            ];
+            let mut col_offset = 0usize;
+            for &(block_idx, block_size) in &block_sizes {
+                for i in 0..block_size {
+                    params_pert[block_idx][i] += eps;
+                    let (r_pert, _) = self.linearize(&params_pert, false);
+                    let col = (r_pert - &weighted_residual) / eps;
+                    jac.column_mut(col_offset + i).copy_from(&col);
+                    params_pert[block_idx][i] -= eps; // restore
+                }
+                col_offset += block_size;
             }
 
             Some(jac)
@@ -382,52 +336,27 @@ impl Factor for ImuFactorSe3 {
             let eps = 1e-7;
             let mut jac = DMatrix::zeros(9, 26);
 
-            for i in 0..7 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[0][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(i).copy_from(&col);
-            }
+            // Clone once and perturb/restore in-place
+            let mut params_pert = params.to_vec();
 
-            for i in 0..3 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[1][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(7 + i).copy_from(&col);
-            }
-
-            for i in 0..7 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[2][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(10 + i).copy_from(&col);
-            }
-
-            for i in 0..3 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[3][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(17 + i).copy_from(&col);
-            }
-
-            for i in 0..3 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[4][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(20 + i).copy_from(&col);
-            }
-
-            for i in 0..3 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[5][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(23 + i).copy_from(&col);
+            let block_sizes: [(usize, usize); 6] = [
+                (0, 7), // T_B_W_i → col offset 0
+                (1, 3), // v_i     → col offset 7
+                (2, 7), // T_B_W_j → col offset 10
+                (3, 3), // v_j     → col offset 17
+                (4, 3), // b_g     → col offset 20
+                (5, 3), // b_a     → col offset 23
+            ];
+            let mut col_offset = 0usize;
+            for &(block_idx, block_size) in &block_sizes {
+                for i in 0..block_size {
+                    params_pert[block_idx][i] += eps;
+                    let (r_pert, _) = self.linearize(&params_pert, false);
+                    let col = (r_pert - &weighted_residual) / eps;
+                    jac.column_mut(col_offset + i).copy_from(&col);
+                    params_pert[block_idx][i] -= eps; // restore
+                }
+                col_offset += block_size;
             }
 
             Some(jac)

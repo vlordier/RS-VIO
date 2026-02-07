@@ -177,8 +177,9 @@ fn detect_features_in_region(
     let estimated_features = (region_pixels / 100).max(10);
     let mut features = Vec::with_capacity(estimated_features);
 
-    // Compute safe iteration bounds that avoid underflow for small images
-    let y_start = start_row.saturating_add(3);
+    // FAST-like detector needs 3-pixel border. Only pad at actual image edges,
+    // not at internal task boundaries where the pixel data is contiguous.
+    let y_start = if start_row < 3 { 3 } else { start_row };
     let y_end = std::cmp::min(end_row, height.saturating_sub(3));
     let x_start = 3usize;
     let x_end = width.saturating_sub(3);

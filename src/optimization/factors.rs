@@ -124,9 +124,8 @@ impl Factor for PinholeProjectionFactor {
             // Chain rule: ∂r/∂point_world = ∂proj/∂point_cam * R_world_to_camera
             let jac_wrt_point = jac_proj_wrt_point_cam * R_C_W;
 
-            let mut jac = DMatrix::zeros(2, 3);
-            jac.copy_from(&jac_wrt_point);
-            Some(jac)
+            // as_slice() is column-major, matching DMatrix default storage
+            Some(DMatrix::from_column_slice(2, 3, jac_wrt_point.as_slice()))
         } else {
             None
         };
@@ -203,6 +202,29 @@ impl Factor for BundleAdjustmentFactorTranslationOnly {
         let t_C_B = self.T_C_B.fixed_view::<3, 1>(0, 3);
         let p_C = R_C_B * (p_W + t_B_W) + t_C_B;
 
+        // Cheirality check: point must be in front of camera
+        if p_C.z <= 1e-6 {
+            let residuals = DVector::from_column_slice(&[1e6, 1e6]);
+            if compute_jacobian {
+                // Gradient pushes the 3D point toward positive camera z
+                let ncols = if self.fixed_position.is_some() { 3 } else { 6 };
+                let mut jac = DMatrix::zeros(2, ncols);
+                for c in 0..3 {
+                    jac[(0, c)] = -R_C_B[(2, c)] * 1e3;
+                    jac[(1, c)] = -R_C_B[(2, c)] * 1e3;
+                }
+                if ncols == 6 {
+                    // Translation Jacobian: same direction since ∂p_C/∂t_B_W = R_C_B
+                    for c in 0..3 {
+                        jac[(0, 3 + c)] = -R_C_B[(2, c)] * 1e3;
+                        jac[(1, 3 + c)] = -R_C_B[(2, c)] * 1e3;
+                    }
+                }
+                return (residuals, Some(jac));
+            }
+            return (residuals, None);
+        }
+
         // Project to normalized coordinates (simple pinhole: x/z, y/z)
         let proj = project_normalized(p_C);
 
@@ -221,10 +243,10 @@ impl Factor for BundleAdjustmentFactorTranslationOnly {
                 jac.copy_from(&jac_r_wrt_p_W);
                 Some(jac)
             } else {
-                let jac_r_wrt_t_B_W = jac_r_wrt_p_C * R_C_B;
+                // ∂r/∂t_B_W = ∂r/∂p_W (same since p_C depends on p_W + t_B_W)
                 let mut jac = DMatrix::zeros(2, 6);
                 jac.view_mut((0, 0), (2, 3)).copy_from(&jac_r_wrt_p_W);
-                jac.view_mut((0, 3), (2, 3)).copy_from(&jac_r_wrt_t_B_W);
+                jac.view_mut((0, 3), (2, 3)).copy_from(&jac_r_wrt_p_W);
                 Some(jac)
             }
         } else {
@@ -381,8 +403,7 @@ impl Factor for BundleAdjustmentFactor {
             let fz_x = -p_C.x * inv_z_sq;
             let fz_y = -p_C.y * inv_z_sq;
 
-            // Compute R_total = R_C_B * R_B_W
-            let R_C_B = self.T_C_B.fixed_view::<3, 3>(0, 0);
+            // Compute R_total = R_C_B * R_B_W (R_C_B already extracted above)
             let R_total = R_C_B * R_B_W;
 
             // ∂r/∂p_W = jac_proj * R_total
@@ -435,15 +456,11 @@ impl Factor for BundleAdjustmentFactor {
 
                 // ∂r/∂δρ = jac_proj * R_C_B * R_B_W = jac_proj * R_total
                 // Under SE3 right-perturbation: t' = t + R_B_W * δρ, so ∂t/∂δρ = R_B_W
-                let mut jac_r_wrt_t = na::Matrix2x3::<f64>::zeros();
-                for i in 0..3 {
-                    jac_r_wrt_t[(0, i)] = fx * R_total[(0, i)] + fz_x * R_total[(2, i)];
-                    jac_r_wrt_t[(1, i)] = fy * R_total[(1, i)] + fz_y * R_total[(2, i)];
-                }
+                // ∂r/∂t_B_W equals ∂r/∂p_W (both = jac_proj * R_total), reuse it
 
                 let mut jac = DMatrix::zeros(2, 9);
                 jac.view_mut((0, 0), (2, 3)).copy_from(&jac_r_wrt_p_W); // ∂r/∂p_W
-                jac.view_mut((0, 3), (2, 3)).copy_from(&jac_r_wrt_t); // ∂r/∂t_B_W
+                jac.view_mut((0, 3), (2, 3)).copy_from(&jac_r_wrt_p_W); // ∂r/∂t_B_W
                 jac.view_mut((0, 6), (2, 3)).copy_from(&jac_r_wrt_rot); // ∂r/∂ω
                 Some(jac)
             }

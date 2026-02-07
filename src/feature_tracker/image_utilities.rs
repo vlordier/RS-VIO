@@ -91,7 +91,7 @@ pub fn se2_exp_matrix(a: &na::SVector<f32, 3>) -> na::SMatrix<f32, 3, 3> {
     let sin_theta_by_theta;
     let one_minus_cos_theta_by_theta;
 
-    if theta.abs() < f32::EPSILON {
+    if theta.abs() < 1e-4 {
         let theta_sq = theta * theta;
         sin_theta_by_theta = 1.0f32 - 1.0 / 6.0 * theta_sq;
         one_minus_cos_theta_by_theta = 0.5f32 * theta - 1. / 24. * theta * theta_sq;
@@ -121,6 +121,12 @@ pub fn detect_key_points(
     const EDGE_THRESHOLD: u32 = 19;
     let h = image.height();
     let w = image.width();
+
+    // Guard: image must be at least one grid cell in each dimension
+    if w < grid_size || h < grid_size {
+        return vec![];
+    }
+
     let mut all_corners = vec![];
     let mut grids =
         na::DMatrix::<i32>::zeros((h / grid_size + 1) as usize, (w / grid_size + 1) as usize);

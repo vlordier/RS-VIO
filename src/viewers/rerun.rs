@@ -4,7 +4,6 @@ use crate::types::{Array3, Float, Matrix3x3, Matrix4x4, ToArray};
 use anyhow::Result;
 use image::{DynamicImage, ImageBuffer, Luma};
 use nalgebra as na;
-use rerun::components::Color;
 use rerun::time::Timestamp;
 use rerun::LineStrips3D;
 use rerun::Pinhole;

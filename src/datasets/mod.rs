@@ -102,7 +102,7 @@ pub fn create_camera_models_from_config(config: &Config) -> (CameraModelType, Ca
     // TODO make this code more generic (and elegant)
     // Using unwrap_or doesn't make sense here, if we can't get the params, we should error out
     let left_model_str = cam.left_model.as_deref().unwrap_or("pinhole-radtan");
-    let left_cam = if left_model_str == "EUCM" || left_model_str == "eucm" {
+    let left_cam = if left_model_str.eq_ignore_ascii_case("eucm") {
         // EUCM model: [fx, fy, cx, cy, alpha, beta]
         let eucm_params_vec: Vec<f64> = vec![
             cam.left_intrinsics.first().copied().unwrap_or(500.0), // fx
@@ -137,7 +137,7 @@ pub fn create_camera_models_from_config(config: &Config) -> (CameraModelType, Ca
 
     // Determine right camera model type
     let right_model_str = cam.right_model.as_deref().unwrap_or("pinhole-radtan");
-    let right_cam = if right_model_str == "EUCM" || right_model_str == "eucm" {
+    let right_cam = if right_model_str.eq_ignore_ascii_case("eucm") {
         // EUCM model: [fx, fy, cx, cy, alpha, beta]
         let eucm_params_vec: Vec<f64> = vec![
             cam.right_intrinsics.first().copied().unwrap_or(500.0), // fx
