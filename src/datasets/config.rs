@@ -180,9 +180,9 @@ impl Config {
             ("left", &cam.left_intrinsics),
             ("right", &cam.right_intrinsics),
         ] {
-            if intrinsics[2] <= 0.0
+            if intrinsics[2] < 0.0
                 || intrinsics[2] >= cam.image_width as f64
-                || intrinsics[3] <= 0.0
+                || intrinsics[3] < 0.0
                 || intrinsics[3] >= cam.image_height as f64
             {
                 anyhow::bail!(
