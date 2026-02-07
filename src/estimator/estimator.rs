@@ -74,7 +74,8 @@ impl Estimator {
         // Use provided cameras or create from config
         let (left_cam, right_cam) = match (left_cam, right_cam) {
             (Some(l), Some(r)) => (l, r),
-            _ => crate::datasets::create_camera_models_from_config(&config),
+            _ => crate::datasets::create_camera_models_from_config(&config)
+                .expect("Config must be validated before creating camera models (use Config::load() or ensure intrinsics/distortion arrays have correct lengths)"),
         };
 
         // Compute the transformation from left to right (T_C1_C0) as in compute_stereo.

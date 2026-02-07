@@ -95,21 +95,47 @@ impl CameraModelType {
 /// Create camera models from config
 /// This helper function creates camera models from the configuration
 /// for both left and right cameras. Supports OpenCVModel5 and EUCM models.
-pub fn create_camera_models_from_config(config: &Config) -> (CameraModelType, CameraModelType) {
+///
+/// # Errors
+/// Returns an error if:
+/// - Intrinsics vectors don't have exactly 4 elements [fx, fy, cx, cy]
+/// - EUCM model is specified but distortion doesn't have at least 2 elements [alpha, beta]
+pub fn create_camera_models_from_config(
+    config: &Config,
+) -> anyhow::Result<(CameraModelType, CameraModelType)> {
     let cam = &config.camera;
 
+    // Validate intrinsics arrays
+    if cam.left_intrinsics.len() != 4 {
+        anyhow::bail!(
+            "left_intrinsics must have exactly 4 elements [fx, fy, cx, cy], got {}",
+            cam.left_intrinsics.len()
+        );
+    }
+    if cam.right_intrinsics.len() != 4 {
+        anyhow::bail!(
+            "right_intrinsics must have exactly 4 elements [fx, fy, cx, cy], got {}",
+            cam.right_intrinsics.len()
+        );
+    }
+
     // Determine left camera model type
-    // TODO make this code more generic (and elegant)
-    // Using unwrap_or doesn't make sense here, if we can't get the params, we should error out
     let left_model_str = cam.left_model.as_deref().unwrap_or("pinhole-radtan");
     let left_cam = if left_model_str.eq_ignore_ascii_case("eucm") {
+        // EUCM model requires at least 2 distortion params: [alpha, beta]
+        if cam.left_distortion.len() < 2 {
+            anyhow::bail!(
+                "left camera uses EUCM but distortion has {} params (need >= 2 for alpha, beta)",
+                cam.left_distortion.len()
+            );
+        }
         // EUCM model: [fx, fy, cx, cy, alpha, beta]
         let eucm_params_vec: Vec<f64> = vec![
-            cam.left_intrinsics[0], // fx (validated)
+            cam.left_intrinsics[0], // fx
             cam.left_intrinsics[1], // fy
             cam.left_intrinsics[2], // cx
             cam.left_intrinsics[3], // cy
-            cam.left_distortion[0], // alpha (validated: EUCM requires >= 2 distortion)
+            cam.left_distortion[0], // alpha
             cam.left_distortion[1], // beta
         ];
         let eucm_params = nalgebra034::DVector::from_vec(eucm_params_vec);
@@ -117,7 +143,7 @@ pub fn create_camera_models_from_config(config: &Config) -> (CameraModelType, Ca
     } else {
         // OpenCVModel5: [fx, fy, cx, cy, k1, k2, p1, p2, k3]
         let left_params_vec: Vec<f64> = vec![
-            cam.left_intrinsics[0],                              // fx (validated)
+            cam.left_intrinsics[0],                              // fx
             cam.left_intrinsics[1],                              // fy
             cam.left_intrinsics[2],                              // cx
             cam.left_intrinsics[3],                              // cy
@@ -138,13 +164,20 @@ pub fn create_camera_models_from_config(config: &Config) -> (CameraModelType, Ca
     // Determine right camera model type
     let right_model_str = cam.right_model.as_deref().unwrap_or("pinhole-radtan");
     let right_cam = if right_model_str.eq_ignore_ascii_case("eucm") {
+        // EUCM model requires at least 2 distortion params: [alpha, beta]
+        if cam.right_distortion.len() < 2 {
+            anyhow::bail!(
+                "right camera uses EUCM but distortion has {} params (need >= 2 for alpha, beta)",
+                cam.right_distortion.len()
+            );
+        }
         // EUCM model: [fx, fy, cx, cy, alpha, beta]
         let eucm_params_vec: Vec<f64> = vec![
-            cam.right_intrinsics[0], // fx (validated)
+            cam.right_intrinsics[0], // fx
             cam.right_intrinsics[1], // fy
             cam.right_intrinsics[2], // cx
             cam.right_intrinsics[3], // cy
-            cam.right_distortion[0], // alpha (validated: EUCM requires >= 2 distortion)
+            cam.right_distortion[0], // alpha
             cam.right_distortion[1], // beta
         ];
         let eucm_params = nalgebra034::DVector::from_vec(eucm_params_vec);
@@ -152,7 +185,7 @@ pub fn create_camera_models_from_config(config: &Config) -> (CameraModelType, Ca
     } else {
         // OpenCVModel5: [fx, fy, cx, cy, k1, k2, p1, p2, k3]
         let right_params_vec: Vec<f64> = vec![
-            cam.right_intrinsics[0],                              // fx (validated)
+            cam.right_intrinsics[0],                              // fx
             cam.right_intrinsics[1],                              // fy
             cam.right_intrinsics[2],                              // cx
             cam.right_intrinsics[3],                              // cy
@@ -170,7 +203,7 @@ pub fn create_camera_models_from_config(config: &Config) -> (CameraModelType, Ca
         ))
     };
 
-    (left_cam, right_cam)
+    Ok((left_cam, right_cam))
 }
 
 #[cfg(test)]
@@ -201,5 +234,176 @@ pub(crate) mod test_utils {
 
     pub(crate) fn timestamps(data: &[ImuData]) -> Vec<i64> {
         data.iter().map(|imu| imu.timestamp).collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::datasets::config::{
+        CameraConfig, Config, FeatureDetectionConfig, KeyframeManagementConfig,
+        OptimizationConfig,
+    };
+
+    fn create_test_config(
+        left_intrinsics: Vec<f64>,
+        left_distortion: Vec<f64>,
+        right_intrinsics: Vec<f64>,
+        right_distortion: Vec<f64>,
+        left_model: Option<String>,
+        right_model: Option<String>,
+    ) -> Config {
+        Config {
+            camera: CameraConfig {
+                image_width: 640,
+                image_height: 480,
+                left_intrinsics,
+                left_distortion,
+                right_intrinsics,
+                right_distortion,
+                left_model,
+                right_model,
+                T_B_Cl: vec![
+                    1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
+                    1.0,
+                ],
+                T_B_Cr: vec![
+                    1.0, 0.0, 0.0, -0.12, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
+                    1.0,
+                ],
+            },
+            keyframe_management: KeyframeManagementConfig {
+                keyframe_window_size: 10,
+                translation_threshold: 0.1,
+                rotation_threshold: 0.05,
+            },
+            feature_detection: FeatureDetectionConfig {
+                grid_cols: 8,
+                max_features_per_grid: 10,
+                optical_flow_max_iterations: 30,
+                optical_flow_convergence_threshold: 0.01,
+            },
+            optimization: OptimizationConfig {
+                bundle_adjustment_max_iterations: 10,
+                pnp_max_iterations: 50,
+            },
+            calibration: None,
+        }
+    }
+
+    #[test]
+    fn test_create_camera_models_valid_opencv() {
+        let config = create_test_config(
+            vec![500.0, 500.0, 320.0, 240.0],
+            vec![0.0, 0.0, 0.0, 0.0, 0.0],
+            vec![500.0, 500.0, 320.0, 240.0],
+            vec![0.0, 0.0, 0.0, 0.0, 0.0],
+            Some("pinhole-radtan".to_string()),
+            Some("pinhole-radtan".to_string()),
+        );
+
+        let result = create_camera_models_from_config(&config);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_create_camera_models_valid_eucm() {
+        let config = create_test_config(
+            vec![500.0, 500.0, 320.0, 240.0],
+            vec![0.5, 1.0],
+            vec![500.0, 500.0, 320.0, 240.0],
+            vec![0.5, 1.0],
+            Some("EUCM".to_string()),
+            Some("EUCM".to_string()),
+        );
+
+        let result = create_camera_models_from_config(&config);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_create_camera_models_invalid_left_intrinsics() {
+        let config = create_test_config(
+            vec![500.0, 500.0], // Only 2 elements instead of 4
+            vec![0.0, 0.0],
+            vec![500.0, 500.0, 320.0, 240.0],
+            vec![0.0, 0.0],
+            Some("EUCM".to_string()),
+            Some("EUCM".to_string()),
+        );
+
+        let result = create_camera_models_from_config(&config);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("left_intrinsics must have exactly 4 elements"));
+    }
+
+    #[test]
+    fn test_create_camera_models_invalid_right_intrinsics() {
+        let config = create_test_config(
+            vec![500.0, 500.0, 320.0, 240.0],
+            vec![0.0, 0.0],
+            vec![500.0, 500.0, 320.0], // Only 3 elements instead of 4
+            vec![0.0, 0.0],
+            Some("EUCM".to_string()),
+            Some("EUCM".to_string()),
+        );
+
+        let result = create_camera_models_from_config(&config);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("right_intrinsics must have exactly 4 elements"));
+    }
+
+    #[test]
+    fn test_create_camera_models_eucm_insufficient_distortion_left() {
+        let config = create_test_config(
+            vec![500.0, 500.0, 320.0, 240.0],
+            vec![0.5], // Only 1 element, EUCM needs at least 2
+            vec![500.0, 500.0, 320.0, 240.0],
+            vec![0.5, 1.0],
+            Some("EUCM".to_string()),
+            Some("EUCM".to_string()),
+        );
+
+        let result = create_camera_models_from_config(&config);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("left camera uses EUCM"));
+        assert!(err_msg.contains("need >= 2 for alpha, beta"));
+    }
+
+    #[test]
+    fn test_create_camera_models_eucm_insufficient_distortion_right() {
+        let config = create_test_config(
+            vec![500.0, 500.0, 320.0, 240.0],
+            vec![0.5, 1.0],
+            vec![500.0, 500.0, 320.0, 240.0],
+            vec![0.5], // Only 1 element, EUCM needs at least 2
+            Some("EUCM".to_string()),
+            Some("EUCM".to_string()),
+        );
+
+        let result = create_camera_models_from_config(&config);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("right camera uses EUCM"));
+        assert!(err_msg.contains("need >= 2 for alpha, beta"));
+    }
+
+    #[test]
+    fn test_create_camera_models_opencv_with_empty_distortion() {
+        // OpenCV model should work with empty distortion (defaults to 0.0)
+        let config = create_test_config(
+            vec![500.0, 500.0, 320.0, 240.0],
+            vec![],
+            vec![500.0, 500.0, 320.0, 240.0],
+            vec![],
+            Some("pinhole-radtan".to_string()),
+            Some("pinhole-radtan".to_string()),
+        );
+
+        let result = create_camera_models_from_config(&config);
+        assert!(result.is_ok());
     }
 }
