@@ -133,7 +133,7 @@ impl StereoMatcher {
             // If not the finest level, use matches to guide next level
             if level > 0 {
                 // Propagate matches to guide finer level
-                all_matches = self.propagate_matches_to_next_level(&level_matches, scale);
+                all_matches = self.propagate_matches_to_next_level(level_matches, scale);
             } else {
                 // Finest level - collect final matches
                 all_matches.extend(level_matches);
@@ -207,16 +207,14 @@ impl StereoMatcher {
             .collect()
     }
 
-    /// Propagate matches from coarse to fine level
+    /// Propagate matches from coarse to fine level (identity — indices don't change)
+    #[inline]
     fn propagate_matches_to_next_level(
         &self,
-        coarse_matches: &[StereoMatch],
+        coarse_matches: Vec<StereoMatch>,
         _scale: f32,
     ) -> Vec<StereoMatch> {
-        // Indices are into the same feature arrays at every pyramid level
-        // (only the .point coordinates are scaled by scale_features),
-        // so no index remapping is needed.
-        coarse_matches.to_vec()
+        coarse_matches
     }
 
     /// Descriptor matching with custom parameters
@@ -812,28 +810,35 @@ impl StereoMatcher {
         score_confidence * score_weight + error_confidence * error_weight
     }
 
-    /// Randomly sample k indices from n
-    fn random_sample(&self, n: usize, k: usize) -> Vec<usize> {
-        if n == 0 {
-            return Vec::new();
+    /// Randomly sample k indices from n (k must be <= 8)
+    fn random_sample(&self, n: usize, k: usize) -> [usize; 8] {
+        debug_assert!(k <= 8, "random_sample only supports k <= 8");
+        let mut samples = [0usize; 8];
+        if n == 0 || k == 0 {
+            return samples;
         }
         if k >= n {
-            return (0..n).collect();
+            for (i, s) in samples.iter_mut().enumerate().take(n.min(8)) {
+                *s = i;
+            }
+            return samples;
         }
-
-        use std::collections::HashSet;
 
         let seed = self.rng_counter.get();
         self.rng_counter.set(seed.wrapping_add(1));
         let mut rng = oorandom::Rand32::new(seed);
 
-        let mut samples = HashSet::new();
-        while samples.len() < k {
+        let mut count = 0;
+        while count < k {
             let idx = (rng.rand_float() * n as f32) as usize;
-            samples.insert(idx.min(n - 1));
+            let idx = idx.min(n - 1);
+            if !samples[..count].contains(&idx) {
+                samples[count] = idx;
+                count += 1;
+            }
         }
 
-        samples.into_iter().collect()
+        samples
     }
 }
 

@@ -283,14 +283,35 @@ fn build_pyramid_in_place(base: &GrayImage, pyramid: &mut [GrayImage]) {
         pyramid[0] = resized;
     }
 
-    // Build remaining pyramid levels by downsampling
+    // Build remaining pyramid levels by downsampling with 2×2 box filter (in-place, zero alloc)
     for level in 1..pyramid.len() {
         let (left, right) = pyramid.split_at_mut(level);
         let src = &left[level - 1];
-        let dst_w = (src.width() / 2).max(1);
-        let dst_h = (src.height() / 2).max(1);
-        let downsampled = imageops::resize(src, dst_w, dst_h, imageops::FilterType::Triangle);
-        right[0] = downsampled;
+        let sw = src.width();
+        let sh = src.height();
+        let dw = (sw / 2).max(1);
+        let dh = (sh / 2).max(1);
+        let dst = &mut right[0];
+        debug_assert!(dst.width() == dw && dst.height() == dh);
+        let src_raw = src.as_raw();
+        let dst_raw = dst.as_mut();
+        for dy in 0..dh {
+            for dx in 0..dw {
+                let sx = (dx * 2) as usize;
+                let sy = (dy * 2) as usize;
+                let i = sy * sw as usize + sx;
+                // 2×2 average — sufficient for tracking pyramids and avoids allocation
+                let v = (src_raw[i] as u16
+                    + src_raw.get(i + 1).copied().unwrap_or(src_raw[i]) as u16
+                    + src_raw.get(i + sw as usize).copied().unwrap_or(src_raw[i]) as u16
+                    + src_raw
+                        .get(i + sw as usize + 1)
+                        .copied()
+                        .unwrap_or(src_raw[i]) as u16)
+                    / 4;
+                dst_raw[(dy * dw + dx) as usize] = v as u8;
+            }
+        }
     }
 }
 
