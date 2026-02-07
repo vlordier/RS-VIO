@@ -211,20 +211,6 @@ impl Estimator {
             },
         };
 
-        /*
-        // For debugging with TUM-VI: undistort the images with EUCM and save the result
-        let eucm = match &self.left_cam {
-            crate::datasets::CameraModelType::EUCM(cam) => cam,
-            _ => panic!("left_cam is not an EUCM instance"),
-        };
-        let model1 = GenericModel::EUCM(*eucm);
-        let p = model1.estimate_new_camera_matrix_for_undistort(0.0, Some((1024, 1024)));
-        let (xmap, ymap) = model1.init_undistort_map(&p, (1024, 1024), None);
-        let img_l8 = DynamicImage::ImageLuma8(right_img.clone());
-        let remaped = camera_intrinsic_model::remap(&img_l8, &xmap, &ymap);
-        remaped.save("remaped0.png").unwrap();
-        */
-
         // Create frame (images are not stored, only features will be added)
         let mut current_frame = Frame::from_stereo_images(
             timestamp_ns,

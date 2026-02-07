@@ -231,6 +231,11 @@ impl StereoMatcher {
 
             // Find best and second best matches in right image
             for (right_idx, right_feat) in right_features.iter().enumerate() {
+                // Epipolar row-band pre-filter: skip features far from same scanline
+                const MAX_VERTICAL_DISPARITY: f32 = 5.0;
+                if (left_feat.point.y - right_feat.point.y).abs() > MAX_VERTICAL_DISPARITY {
+                    continue;
+                }
                 let dist = hamming_distance(&left_feat.descriptor, &right_feat.descriptor);
 
                 if dist < best_distance {
@@ -366,16 +371,14 @@ impl StereoMatcher {
         }
 
         // Adaptive threshold based on median error
-        // Use an index-based partial sort to avoid cloning the errors vec
+        // Sort a copy of errors in-place to compute median without index indirection
         let median_error = {
-            let mut indices: Vec<usize> = (0..errors.len()).collect();
-            let mid = indices.len() / 2;
-            indices.select_nth_unstable_by(mid, |&a, &b| {
-                errors[a]
-                    .partial_cmp(&errors[b])
-                    .unwrap_or(std::cmp::Ordering::Equal)
+            let mut sorted_errors = errors.clone();
+            let mid = sorted_errors.len() / 2;
+            sorted_errors.select_nth_unstable_by(mid, |a, b| {
+                a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
             });
-            errors[indices[mid]]
+            sorted_errors[mid]
         };
         let adaptive_threshold = (median_error * 2.0).min(self.config.max_epipolar_error);
 

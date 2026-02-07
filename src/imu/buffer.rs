@@ -97,7 +97,7 @@ impl ImuBuffer {
         // Binary search for end position (first element > t_end)
         let end = self
             .measurements
-            .binary_search_by_key(&(t_end + 1), |m| m.timestamp)
+            .binary_search_by_key(&t_end.saturating_add(1), |m| m.timestamp)
             .unwrap_or_else(|pos| pos);
         self.measurements.range(start..end).cloned().collect()
     }
@@ -107,7 +107,7 @@ impl ImuBuffer {
         // Binary search for start position (first element > t_start)
         let start = self
             .measurements
-            .binary_search_by_key(&(t_start + 1), |m| m.timestamp)
+            .binary_search_by_key(&t_start.saturating_add(1), |m| m.timestamp)
             .unwrap_or_else(|pos| pos);
         // Binary search for end position (first element >= t_end)
         let end = self

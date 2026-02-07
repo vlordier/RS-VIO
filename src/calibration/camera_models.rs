@@ -133,6 +133,14 @@ impl CameraModel for PinholeCamera {
             }
         }
 
+        // Guard against undistortion divergence
+        if !x.is_finite() || !y.is_finite() {
+            // Fall back to distorted coordinates
+            let x_d = (point_2d.x - intrinsics[2]) / intrinsics[0];
+            let y_d = (point_2d.y - intrinsics[3]) / intrinsics[1];
+            return na::Vector3::new(x_d, y_d, 1.0).normalize();
+        }
+
         na::Vector3::new(x, y, 1.0).normalize()
     }
 
@@ -479,12 +487,7 @@ pub struct CameraConfig {
 }
 
 impl CameraConfig {
-    pub const fn new(
-        id: String,
-        model: CameraModelEnum,
-        image_width: u32,
-        image_height: u32,
-    ) -> Self {
+    pub fn new(id: String, model: CameraModelEnum, image_width: u32, image_height: u32) -> Self {
         Self {
             id,
             model,

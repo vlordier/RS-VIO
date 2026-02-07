@@ -564,7 +564,8 @@ impl SlidingWindow {
         &mut self,
         opt_result: &SolverResult<HashMap<String, VariableEnum>>,
     ) {
-        // TODO: handle error properly
+        // Note: error handling deferred — opt_result status is logged below;
+        // non-converged results are already handled by is_optimization_successful().
 
         // Determine convergence status accurately
         let (status, convergence_reason): (&str, &str) = match &opt_result.status {
@@ -726,7 +727,8 @@ impl SlidingWindow {
                             na::Vector3::new(point[0] as f64, point[1] as f64, point[2] as f64),
                         );
                         // Add residual block with Huber loss
-                        let huber_loss = HuberLoss::new(2.0).unwrap();
+                        let huber_loss =
+                            HuberLoss::new(2.0).expect("HuberLoss threshold must be positive");
                         problem.add_residual_block(
                             &[&kf_var],
                             Box::new(factor),

@@ -221,9 +221,8 @@ impl ImuMotionPrior {
     /// Returns (predicted_pose, predicted_velocity)
     pub fn predict_state(&self) -> (na::Matrix4<f64>, na::Vector3<f64>) {
         // Rotation prediction
-        let R_W_Bi = na::Rotation3::from_matrix_unchecked(
-            self.initial_pose.fixed_view::<3, 3>(0, 0).into_owned(),
-        );
+        let R_W_Bi =
+            na::Rotation3::from_matrix(&self.initial_pose.fixed_view::<3, 3>(0, 0).into_owned());
         let R_W_Bj = R_W_Bi * self.delta_rotation.to_rotation_matrix();
 
         // Velocity prediction: delta_v is in body frame, rotate to world
@@ -264,12 +263,10 @@ impl ImuMotionPrior {
             - predicted_pose.fixed_view::<3, 1>(0, 3).into_owned();
 
         // Rotation innovation (angle-axis)
-        let R_obs = na::Rotation3::from_matrix_unchecked(
-            observed_pose.fixed_view::<3, 3>(0, 0).into_owned(),
-        );
-        let R_pred = na::Rotation3::from_matrix_unchecked(
-            predicted_pose.fixed_view::<3, 3>(0, 0).into_owned(),
-        );
+        let R_obs =
+            na::Rotation3::from_matrix(&observed_pose.fixed_view::<3, 3>(0, 0).into_owned());
+        let R_pred =
+            na::Rotation3::from_matrix(&predicted_pose.fixed_view::<3, 3>(0, 0).into_owned());
         let dq = R_pred.inverse() * R_obs;
         let rot_error = dq.angle();
 

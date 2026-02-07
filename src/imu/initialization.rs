@@ -41,7 +41,7 @@ pub struct ImuInitializationConfig {
     /// Used to detect if device is stationary
     pub gyro_norm_threshold: f64,
 
-    /// Maximum accelerometer variance for static period [m/s²]
+    /// Maximum accelerometer variance for static period [(m/s²)²]
     pub accel_variance_threshold: f64,
 
     /// Variance of initial bias estimates (gyroscope) [rad/s]
@@ -165,6 +165,12 @@ impl ImuInitializer {
 
         self.state = InitializationState::Initializing;
         self.measurements.push(imu.clone());
+        // Cap measurements buffer to prevent unbounded growth
+        const MAX_INIT_MEASUREMENTS: usize = 10_000;
+        if self.measurements.len() > MAX_INIT_MEASUREMENTS {
+            self.measurements
+                .drain(..self.measurements.len() - MAX_INIT_MEASUREMENTS);
+        }
         self.last_timestamp = Some(imu.timestamp);
 
         // Check if we have enough measurements
