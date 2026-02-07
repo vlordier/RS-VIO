@@ -21,17 +21,36 @@ fn main() {
         })
         .collect();
 
-    if enabled.len() > 1 {
+    // Separate default strategy from explicit non-default strategies
+    let non_default_strategies: Vec<_> = enabled
+        .iter()
+        .filter(|&&s| s != &"matching-basic-ransac")
+        .collect();
+
+    // Check mutual exclusivity only among non-default strategies
+    if non_default_strategies.len() > 1 {
         panic!(
             "Only one matching strategy can be enabled at a time, but found: {:?}. \
-             Use --features <strategy> to select one.",
-            enabled
+             Use --features <strategy> --no-default-features to select one, \
+             or use --no-default-features --features <strategy> to avoid conflicts.",
+            non_default_strategies
         );
     }
 
-    if enabled.is_empty() {
+    // If a non-default strategy is enabled, it takes precedence over the default
+    if !non_default_strategies.is_empty() {
+        println!(
+            "cargo::warning=Using matching strategy: {}",
+            non_default_strategies[0]
+        );
+    } else if enabled.is_empty() {
         println!(
             "cargo::warning=No matching strategy enabled, using default (matching-basic-ransac)"
+        );
+    } else {
+        // Only matching-basic-ransac is enabled (either explicitly or via default)
+        println!(
+            "cargo::warning=Using matching strategy: matching-basic-ransac"
         );
     }
 }
