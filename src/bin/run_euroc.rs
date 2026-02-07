@@ -1,32 +1,10 @@
 use clap::Parser;
-use env_logger::{Builder, Env};
-use log::{error, info, LevelFilter};
-use rs_vio::{DatasetPlayer, EurocPlayer, PlayerConfig};
+use log::{error, info};
+use rs_vio::{init_logger, DatasetPlayer, EurocPlayer, PlayerConfig};
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
-    // Initialize logger for immediate colored output
-    Builder::from_env(Env::default().default_filter_or("debug"))
-        // Silence rerun noise unless it's a warning or worse
-        .filter_module("rerun", LevelFilter::Warn)
-        .format(|buf, record| {
-            use std::io::Write;
-            let level = match record.level() {
-                log::Level::Error => "\x1b[31mERROR\x1b[0m",
-                log::Level::Warn => "\x1b[33mWARN\x1b[0m",
-                log::Level::Info => "\x1b[32mINFO\x1b[0m",
-                log::Level::Debug => "\x1b[34mDEBUG\x1b[0m",
-                log::Level::Trace => "\x1b[36mTRACE\x1b[0m",
-            };
-            writeln!(
-                buf,
-                "[{}] [{}] {}",
-                buf.timestamp_millis(),
-                level,
-                record.args()
-            )
-        })
-        .init();
+    init_logger();
 
     // Parse command line arguments
     let args = Args::parse();

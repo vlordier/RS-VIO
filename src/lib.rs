@@ -40,3 +40,4 @@ pub use evaluation::{
     TrajectoryEvaluation,
 };
 pub use logging::PerformanceMetrics;
+pub use logging::init_logger;

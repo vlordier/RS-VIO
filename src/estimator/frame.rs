@@ -3,7 +3,9 @@ use crate::datasets::ImuData;
 use crate::estimator::state::State;
 use crate::feature_tracker::Feature;
 use crate::types::Matrix4x4;
+#[cfg(any(test, feature = "benchmarks"))]
 use camera_intrinsic_model::models::opencv5::OpenCVModel5;
+#[cfg(any(test, feature = "benchmarks"))]
 use nalgebra034;
 
 /// Type of frame (only Stereo used for now; RGBD omitted).
@@ -41,7 +43,11 @@ pub struct Frame {
 }
 
 impl Frame {
-    /// Construct an empty stereo frame with default intrinsics and identity state.
+    /// Construct an empty stereo frame with default (dummy) intrinsics and identity state.
+    ///
+    /// **Only available in tests and benchmarks.** Production code must use
+    /// [`Frame::from_stereo_images`] with real camera models from config.
+    #[cfg(any(test, feature = "benchmarks"))]
     pub fn new(timestamp_ns: i64, frame_id: i32) -> Self {
         Self {
             timestamp_ns,

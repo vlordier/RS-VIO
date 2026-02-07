@@ -142,11 +142,12 @@ impl StereoMatcher {
 
         // Final geometric verification on all matches
         if self.config.enable_geometric_check {
-            all_matches = self.geometric_verification(
+            all_matches = self.geometric_verification_with_params(
                 &all_matches,
                 left_features,
                 right_features,
                 camera_intrinsics,
+                self.config.max_epipolar_error,
             );
         }
 
@@ -403,63 +404,6 @@ impl StereoMatcher {
         }
 
         verified_matches
-    }
-
-    /// Geometric verification using epipolar constraints
-    fn geometric_verification(
-        &self,
-        candidate_matches: &[StereoMatch],
-        left_features: &[EnhancedFeature],
-        right_features: &[EnhancedFeature],
-        camera_intrinsics: &na::Matrix3<f64>,
-    ) -> Vec<StereoMatch> {
-        if candidate_matches.len() < 8 {
-            // Not enough points for robust estimation
-            return candidate_matches.to_vec();
-        }
-
-        // Estimate fundamental matrix using RANSAC
-        let fundamental_matrix = self.estimate_fundamental_matrix_ransac(
-            candidate_matches,
-            left_features,
-            right_features,
-            camera_intrinsics,
-        );
-
-        // Filter matches using epipolar constraint
-        candidate_matches
-            .iter()
-            .filter_map(|match_| {
-                let left_point = left_features[match_.left_idx].point;
-                let right_point = right_features[match_.right_idx].point;
-
-                let epipolar_error = self.compute_epipolar_error(
-                    &fundamental_matrix,
-                    &na::Vector2::new(left_point.x as f64, left_point.y as f64),
-                    &na::Vector2::new(right_point.x as f64, right_point.y as f64),
-                );
-
-                if epipolar_error <= self.config.max_epipolar_error {
-                    // Update confidence with final epipolar error
-                    let confidence = self.compute_match_confidence(
-                        match_.score,
-                        epipolar_error,
-                        self.config.max_descriptor_distance,
-                        self.config.max_epipolar_error,
-                    );
-
-                    Some(StereoMatch {
-                        left_idx: match_.left_idx,
-                        right_idx: match_.right_idx,
-                        score: match_.score,
-                        epipolar_error,
-                        confidence,
-                    })
-                } else {
-                    None
-                }
-            })
-            .collect()
     }
 
     /// Estimate fundamental matrix using RANSAC
