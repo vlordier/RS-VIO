@@ -1,3 +1,20 @@
+//! # RS-VIO: Real-time Stereo Visual-Inertial Odometry
+//!
+//! A tightly-coupled stereo VIO system designed for embedded real-time
+//! operation on resource-constrained platforms (drones, robots).
+//!
+//! ## Architecture
+//!
+//! - **Feature tracker**: Patch-based stereo optical flow with pyramid tracking
+//! - **Estimator**: Sliding-window bundle adjustment with Schur complement
+//! - **IMU integration**: Preintegration factors with ESKF for high-rate prediction
+//! - **Async pipeline**: Non-blocking frame processing with priority scheduling
+//!
+//! ## Precision
+//!
+//! Float precision is configurable at compile time via the `use_f32` feature flag.
+//! Default is `f64` (double precision).
+
 pub mod calibration;
 pub mod datasets;
 pub mod estimator;
@@ -29,15 +46,26 @@ macro_rules! fl {
 }
 
 // Re-export commonly used types for convenience
+
+// --- Core pipeline types ---
+pub use estimator::{Estimator, MotionModel};
+pub use feature_tracker::{Feature, StereoPatchTracker};
+pub use viewers::Viewer;
+
+// --- Dataset player types ---
 pub use datasets::config::Config;
 pub use datasets::euroc_player::EurocPlayer;
 pub use datasets::fourseasons_player::FourSeasonsPlayer;
 pub use datasets::player::DatasetPlayer;
 pub use datasets::tum_vi_player::TUMVIPlayer;
 pub use datasets::{PlayerConfig, PlayerResult};
+
+// --- Evaluation types ---
 pub use evaluation::{
     calculate_ate, calculate_rpe, EstimatedTrajectory, GroundTruthPose, GroundTruthTrajectory,
     TrajectoryEvaluation,
 };
-pub use logging::PerformanceMetrics;
+
+// --- Logging ---
 pub use logging::init_logger;
+pub use logging::PerformanceMetrics;
