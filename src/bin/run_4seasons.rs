@@ -62,6 +62,6 @@ struct Args {
     config_file: String,
 
     /// Path to 4Seasons dataset directory
-    #[arg(help = "Path to 4Seasons dataset directory (e.g., /path/to/old_town_1_train)")]
+    #[arg(help = "Path to 4Seasons dataset directory (e.g., /path/to/recording_2021-01-07_13-03-56)")]
     dataset_path: String,
 }
