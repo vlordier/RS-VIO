@@ -40,6 +40,17 @@ impl AsyncOptimizer {
         Arc::ptr_eq(&self.sliding_window, &other.sliding_window)
     }
 
+    /// Add a frame to the sliding window
+    ///
+    /// Only keyframes will be added; non-keyframes are rejected.
+    ///
+    /// # Returns
+    /// `true` if the frame was added, `false` if it was rejected
+    pub async fn add_frame(&self, frame: crate::estimator::Frame) -> bool {
+        let mut window = self.sliding_window.lock().await;
+        window.add_frame(frame)
+    }
+
     /// Run optimization on the current sliding window
     pub async fn optimize(&self) -> Result<u64> {
         let start = Instant::now();
@@ -103,5 +114,36 @@ mod tests {
         assert_eq!(kf_count, 0);
         assert_eq!(mp_count, 0);
         assert!(!is_full);
+    }
+
+    #[tokio::test]
+    async fn test_add_frame() {
+        use crate::estimator::Frame;
+
+        let optimizer = AsyncOptimizer::new();
+
+        // Create a keyframe
+        let mut keyframe = Frame::new(1000, 1);
+        keyframe.is_keyframe = true;
+
+        // Add keyframe
+        let added = optimizer.add_frame(keyframe).await;
+        assert!(added, "Keyframe should be added successfully");
+
+        // Verify keyframe count increased
+        let kf_count = optimizer.keyframe_count().await;
+        assert_eq!(kf_count, 1, "Should have 1 keyframe after adding");
+
+        // Create a non-keyframe
+        let non_keyframe = Frame::new(2000, 2);
+        // is_keyframe defaults to false
+
+        // Try to add non-keyframe
+        let added = optimizer.add_frame(non_keyframe).await;
+        assert!(!added, "Non-keyframe should be rejected");
+
+        // Verify keyframe count unchanged
+        let kf_count = optimizer.keyframe_count().await;
+        assert_eq!(kf_count, 1, "Should still have 1 keyframe");
     }
 }
