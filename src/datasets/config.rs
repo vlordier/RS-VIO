@@ -3,32 +3,22 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub camera: CameraConfig,
-    #[serde(rename = "keyframe_management")]
     pub keyframe_management: KeyframeManagementConfig,
-    #[serde(rename = "feature_detection")]
     pub feature_detection: FeatureDetectionConfig,
     pub optimization: OptimizationConfig,
-    #[serde(rename = "calibration", default)]
+    #[serde(default)]
     pub calibration: Option<CalibrationRefinementConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CameraConfig {
-    #[serde(rename = "image_width")]
     pub image_width: u32,
-    #[serde(rename = "image_height")]
     pub image_height: u32,
-    #[serde(rename = "left_intrinsics")]
     pub left_intrinsics: Vec<f64>,
-    #[serde(rename = "left_distortion")]
     pub left_distortion: Vec<f64>,
-    #[serde(rename = "right_intrinsics")]
     pub right_intrinsics: Vec<f64>,
-    #[serde(rename = "right_distortion")]
     pub right_distortion: Vec<f64>,
-    #[serde(rename = "left_model")]
     pub left_model: Option<String>,
-    #[serde(rename = "right_model")]
     pub right_model: Option<String>,
     #[serde(rename = "T_B_Cl")]
     pub T_B_Cl: Vec<f64>,
@@ -38,11 +28,8 @@ pub struct CameraConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeyframeManagementConfig {
-    #[serde(rename = "keyframe_window_size")]
     pub keyframe_window_size: u32,
-    #[serde(rename = "translation_threshold")]
     pub translation_threshold: f64,
-    #[serde(rename = "rotation_threshold")]
     pub rotation_threshold: f64,
 }
 
@@ -50,19 +37,14 @@ pub struct KeyframeManagementConfig {
 pub struct FeatureDetectionConfig {
     #[serde(rename = "grid_size")]
     pub grid_cols: u32,
-    #[serde(rename = "max_features_per_grid")]
     pub max_features_per_grid: u32,
-    #[serde(rename = "optical_flow_max_iterations")]
     pub optical_flow_max_iterations: u32,
-    #[serde(rename = "optical_flow_convergence_threshold")]
     pub optical_flow_convergence_threshold: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OptimizationConfig {
-    #[serde(rename = "bundle_adjustment_max_iterations")]
     pub bundle_adjustment_max_iterations: u32,
-    #[serde(rename = "pnp_max_iterations")]
     pub pnp_max_iterations: u32,
 }
 
@@ -70,31 +52,25 @@ pub struct OptimizationConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CalibrationRefinementConfig {
     /// Enable online intrinsics refinement during VIO
-    #[serde(rename = "optimize_intrinsics", default)]
+    #[serde(default)]
     pub optimize_intrinsics: bool,
     /// Optimize focal length (fx, fy)
-    #[serde(rename = "optimize_focal_length", default = "default_true")]
+    #[serde(default = "default_true")]
     pub optimize_focal_length: bool,
     /// Optimize principal point (cx, cy)
-    #[serde(rename = "optimize_principal_point", default)]
+    #[serde(default)]
     pub optimize_principal_point: bool,
     /// Optimize distortion parameters
-    #[serde(rename = "optimize_distortion", default)]
+    #[serde(default)]
     pub optimize_distortion: bool,
     /// Refine intrinsics every N keyframes
-    #[serde(rename = "intrinsics_refinement_frequency", default = "default_five")]
+    #[serde(default = "default_five")]
     pub intrinsics_refinement_frequency: usize,
     /// Max change per update (pixels, regularization)
-    #[serde(
-        rename = "max_intrinsics_change_per_update",
-        default = "default_max_change"
-    )]
+    #[serde(default = "default_max_change")]
     pub max_intrinsics_change_per_update: f64,
     /// Weight of regularization to original intrinsics
-    #[serde(
-        rename = "intrinsics_regularization_weight",
-        default = "default_reg_weight"
-    )]
+    #[serde(default = "default_reg_weight")]
     pub intrinsics_regularization_weight: f64,
 }
 

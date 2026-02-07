@@ -242,7 +242,7 @@ impl PinholeCamera {
                     let p2 = distortion_coeffs[3];
                     let k3 = distortion_coeffs[4];
 
-                    let r2 = x * x + y * y;
+                    // Reuse r2 computed at top of function
                     let r4 = r2 * r2;
                     let r6 = r4 * r2;
 
@@ -304,9 +304,13 @@ impl CameraModel for FisheyeCamera {
 
         // Apply fisheye projection model to get projected radius
         let r = match self.model {
-            FisheyeModel::Equidistant => theta,                       // r = θ
-            FisheyeModel::Equisolid => 2.0 * (theta / 2.0).sin(),     // r = 2·sin(θ/2)
-            FisheyeModel::Stereographic => 2.0 * (theta / 2.0).tan(), // r = 2·tan(θ/2)
+            FisheyeModel::Equidistant => theta,                   // r = θ
+            FisheyeModel::Equisolid => 2.0 * (theta / 2.0).sin(), // r = 2·sin(θ/2)
+            FisheyeModel::Stereographic => {
+                // Clamp θ to avoid tan(π/2) divergence for points behind camera
+                let half = (theta.min(std::f64::consts::PI - 1e-6)) / 2.0;
+                2.0 * half.tan() // r = 2·tan(θ/2)
+            },
         };
 
         // Convert to image coordinates

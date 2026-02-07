@@ -2,9 +2,9 @@ use clap::Parser;
 use env_logger::{Builder, Env};
 use log::{error, info, LevelFilter};
 use rs_vio::{DatasetPlayer, EurocPlayer, PlayerConfig};
-use std::process;
+use std::process::ExitCode;
 
-fn main() {
+fn main() -> ExitCode {
     // Initialize logger for immediate colored output
     Builder::from_env(Env::default().default_filter_or("debug"))
         // Silence rerun noise unless it's a warning or worse
@@ -45,10 +45,10 @@ fn main() {
 
     if result.success {
         info!("[Main] processing completed successfully!");
-        process::exit(0);
+        ExitCode::SUCCESS
     } else {
         error!("[Main] processing failed: {}", result.error_message);
-        process::exit(1);
+        ExitCode::FAILURE
     }
 }
 

@@ -1,8 +1,16 @@
 use image::GrayImage;
 use nalgebra as na;
 use std::ops::AddAssign;
+use std::sync::LazyLock;
 
 use super::image_utilities;
+
+/// Pre-computed pattern matrix (2×52) — avoids recomputing on every Pattern52::new() call.
+/// With ~200 tracked points × 3 pyramid levels = 600 constructions per frame, this
+/// eliminates 600 × 104-element divisions per frame.
+static PATTERN52_MATRIX: LazyLock<na::SMatrix<f32, 2, PATTERN52_SIZE>> = LazyLock::new(|| {
+    na::SMatrix::<f32, 2, PATTERN52_SIZE>::from_fn(|i, j| Pattern52::PATTERN_RAW[j][i] / 2.0)
+});
 
 pub const PATTERN52_SIZE: usize = 52;
 pub struct Pattern52 {
@@ -129,11 +137,6 @@ impl Pattern52 {
         let mut j_se2 = na::SMatrix::<f32, 3, PATTERN52_SIZE>::zeros();
         let pattern_scale_down = 2.0;
 
-        // Pre-compute pattern matrix once (2x52, transposed from 52x2)
-        let pattern_matrix = na::SMatrix::<f32, 2, PATTERN52_SIZE>::from_fn(|i, j| {
-            Self::PATTERN_RAW[j][i] / pattern_scale_down
-        });
-
         let mut p = Pattern52 {
             valid: false,
             mean: 1.0,
@@ -141,7 +144,7 @@ impl Pattern52 {
             data: [0.0; PATTERN52_SIZE], // negative if the point is not valid
             h_se2_inv_j_se2_t: na::SMatrix::<f32, 3, 52>::zeros(),
             pattern_scale_down,
-            pattern_matrix,
+            pattern_matrix: *PATTERN52_MATRIX,
         };
         p.set_data_jac_se2(greyscale_image, &mut j_se2);
         let h_se2 = j_se2 * j_se2.transpose();

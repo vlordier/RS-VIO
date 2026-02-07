@@ -351,8 +351,9 @@ impl Factor for BundleAdjustmentFactor {
 
         // Check cheirality: point behind camera gets a large residual with
         // a finite Jacobian so the optimizer can recover (zero Jacobian
-        // would stall the solver).
-        if p_C.z <= 0.0 {
+        // would stall the solver).  Threshold 1e-6 (not 0.0) to prevent
+        // Inf from project_normalized dividing by ~0.
+        if p_C.z <= 1e-6 {
             let residuals = DVector::from_column_slice(&[1e6, 1e6]);
             if !compute_jacobian {
                 return (residuals, None);
@@ -536,8 +537,9 @@ impl Factor for PnPFactor {
         let p_C = R_C_B * p_B + t_C_B;
 
         // Cheirality check: point behind camera gets large residual with
-        // gradient signal so the optimizer can recover
-        if p_C.z <= 0.0 {
+        // gradient signal so the optimizer can recover.  Threshold 1e-6
+        // (not 0.0) to prevent Inf from project_normalized dividing by ~0.
+        if p_C.z <= 1e-6 {
             let residuals = DVector::from_column_slice(&[1e6, 1e6]);
             if compute_jacobian {
                 // Negate so GN descent (δ = -(J^TJ+λI)^{-1} J^T r) pushes

@@ -127,7 +127,6 @@ pub fn detect_key_points(
         return vec![];
     }
 
-    let mut all_corners = vec![];
     let mut grids =
         na::DMatrix::<i32>::zeros((h / grid_size + 1) as usize, (w / grid_size + 1) as usize);
 
@@ -201,8 +200,7 @@ pub fn detect_key_points(
         })
         .collect();
 
-    all_corners.extend(new_corners);
-    all_corners
+    new_corners
 }
 
 #[cfg(test)]

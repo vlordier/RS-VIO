@@ -276,6 +276,13 @@ impl SlidingWindow {
                     (ManifoldType::SE3, se3_data.cast::<f64>()),
                 ));
 
+                // Pre-compute fixed pose Arc for frame 0 (avoids recomputing inversion per-feature)
+                let fixed_pose_arc = if id_frame == 0 {
+                    Some(Arc::new(T_B_W))
+                } else {
+                    None
+                };
+
                 let camera_features = [
                     (&frame.left_features, T_Cl_B.clone()),
                     (&frame.right_features, T_Cr_B.clone()),
@@ -298,10 +305,11 @@ impl SlidingWindow {
                                 if !self.map_points.contains_key(&feature_id)
                                     && id_frame == *first_frame_idx
                                 {
+                                    let default_depth = 2.0_f64;
                                     let p_C = Vector3::new(
-                                        feat.undistorted_coord[0] as f64,
-                                        feat.undistorted_coord[1] as f64,
-                                        2.0_f64,
+                                        feat.undistorted_coord[0] as f64 * default_depth,
+                                        feat.undistorted_coord[1] as f64 * default_depth,
+                                        default_depth,
                                     );
                                     let (R_W_B, t_W_B) = (
                                         frame.state.T_W_B.fixed_view::<3, 3>(0, 0).into_owned(),
@@ -329,13 +337,8 @@ impl SlidingWindow {
                                     (*T_C_B).clone(),
                                 );
 
-                                if id_frame == 0 {
-                                    let T_B_W_inv = frame
-                                        .state
-                                        .T_W_B
-                                        .try_inverse()
-                                        .expect("T_W_B should be invertible");
-                                    factor = factor.with_fixed_pose(Arc::new(T_B_W_inv));
+                                if let Some(ref pose_arc) = fixed_pose_arc {
+                                    factor = factor.with_fixed_pose(Arc::clone(pose_arc));
                                 }
 
                                 let kf_var_opt = if id_frame == 0 {
@@ -580,46 +583,40 @@ impl SlidingWindow {
         // TODO: handle error properly
 
         // Determine convergence status accurately
-        let (status, convergence_reason) = match &opt_result.status {
-            apex_solver::optimizer::OptimizationStatus::Converged => {
-                ("CONVERGED", "Converged".to_string())
-            },
+        let (status, convergence_reason): (&str, &str) = match &opt_result.status {
+            apex_solver::optimizer::OptimizationStatus::Converged => ("CONVERGED", "Converged"),
             apex_solver::optimizer::OptimizationStatus::CostToleranceReached => {
-                ("CONVERGED", "CostTolerance".to_string())
+                ("CONVERGED", "CostTolerance")
             },
             apex_solver::optimizer::OptimizationStatus::ParameterToleranceReached => {
-                ("CONVERGED", "ParameterTolerance".to_string())
+                ("CONVERGED", "ParameterTolerance")
             },
             apex_solver::optimizer::OptimizationStatus::GradientToleranceReached => {
-                ("CONVERGED", "GradientTolerance".to_string())
+                ("CONVERGED", "GradientTolerance")
             },
             apex_solver::optimizer::OptimizationStatus::TrustRegionRadiusTooSmall => {
-                ("CONVERGED", "TrustRegionRadiusTooSmall".to_string())
+                ("CONVERGED", "TrustRegionRadiusTooSmall")
             },
             apex_solver::optimizer::OptimizationStatus::MinCostThresholdReached => {
-                ("CONVERGED", "MinCostThresholdReached".to_string())
+                ("CONVERGED", "MinCostThresholdReached")
             },
             apex_solver::optimizer::OptimizationStatus::MaxIterationsReached => {
-                ("NOT_CONVERGED", "MaxIterations".to_string())
+                ("NOT_CONVERGED", "MaxIterations")
             },
-            apex_solver::optimizer::OptimizationStatus::Timeout => {
-                ("NOT_CONVERGED", "Timeout".to_string())
-            },
+            apex_solver::optimizer::OptimizationStatus::Timeout => ("NOT_CONVERGED", "Timeout"),
             apex_solver::optimizer::OptimizationStatus::NumericalFailure => {
-                ("NOT_CONVERGED", "NumericalFailure".to_string())
+                ("NOT_CONVERGED", "NumericalFailure")
             },
             apex_solver::optimizer::OptimizationStatus::IllConditionedJacobian => {
-                ("NOT_CONVERGED", "IllConditionedJacobian".to_string())
+                ("NOT_CONVERGED", "IllConditionedJacobian")
             },
             apex_solver::optimizer::OptimizationStatus::InvalidNumericalValues => {
-                ("NOT_CONVERGED", "InvalidNumericalValues".to_string())
+                ("NOT_CONVERGED", "InvalidNumericalValues")
             },
             apex_solver::optimizer::OptimizationStatus::UserTerminated => {
-                ("NOT_CONVERGED", "UserTerminated".to_string())
+                ("NOT_CONVERGED", "UserTerminated")
             },
-            apex_solver::optimizer::OptimizationStatus::Failed(msg) => {
-                ("NOT_CONVERGED", format!("Failed:{}", msg))
-            },
+            apex_solver::optimizer::OptimizationStatus::Failed(_msg) => ("NOT_CONVERGED", "Failed"),
         };
         log::debug!(
             "[SlidingWindow] Optimization status: {}, convergence_reason: {}",

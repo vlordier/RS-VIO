@@ -187,6 +187,7 @@ impl PreintegratedImu {
         let Jr = right_jacobian_so3(omega * dt);
         let R_k = *self.delta_R.to_rotation_matrix().matrix();
         let acc_skew = skew_symmetric(acc);
+        let R_k_acc_skew = R_k * acc_skew; // Cache: used 5× across Jacobians + covariance
         let J_R_bg_k = self.J_R_bg; // Cache BEFORE update
         let J_v_bg_k = self.J_v_bg; // Cache BEFORE update
         let J_v_ba_k = self.J_v_ba; // Cache BEFORE update
@@ -195,19 +196,19 @@ impl PreintegratedImu {
         self.J_R_bg = delta_R_k.to_rotation_matrix().matrix() * J_R_bg_k - Jr * dt;
 
         // J_{v,bg}^{k+1} = J_{v,bg}^k - R_k * [a]_× * J_{R,bg}^k * dt (Eq. 28, uses J_R_bg at step k)
-        self.J_v_bg = J_v_bg_k - R_k * acc_skew * J_R_bg_k * dt;
+        self.J_v_bg = J_v_bg_k - R_k_acc_skew * J_R_bg_k * dt;
 
         // J_{v,ba}^{k+1} = J_{v,ba}^k - R_k * dt (Eq. 29)
         self.J_v_ba = J_v_ba_k - R_k * dt;
 
         // J_{p,bg}^{k+1} = J_{p,bg}^k + J_{v,bg}^k * dt - 0.5 * R_k * [a]_× * J_{R,bg}^k * dt² (Eq. 30)
-        self.J_p_bg = self.J_p_bg + J_v_bg_k * dt - 0.5 * R_k * acc_skew * J_R_bg_k * dt2;
+        self.J_p_bg = self.J_p_bg + J_v_bg_k * dt - 0.5 * R_k_acc_skew * J_R_bg_k * dt2;
 
         // J_{p,ba}^{k+1} = J_{p,ba}^k + J_{v,ba}^k * dt - 0.5 * R_k * dt² (Eq. 31)
         self.J_p_ba = self.J_p_ba + J_v_ba_k * dt - 0.5 * R_k * dt2;
 
-        // Propagate covariance
-        self.propagate_covariance(omega, acc, dt);
+        // Propagate covariance (reuse precomputed Jr, R_k, acc_skew, R_k_acc_skew)
+        self.propagate_covariance_with_cached(&Jr, &R_k, &acc_skew, &R_k_acc_skew, omega, dt);
 
         // Update preintegrated values
         self.delta_R = new_delta_R;
@@ -224,7 +225,17 @@ impl PreintegratedImu {
     ///
     /// Note: Noise covariance Q is computed by multiplying noise power spectral
     /// density (PSD) by integration interval dt. PSD has units like (rad/s)²/Hz.
-    fn propagate_covariance(&mut self, omega: na::Vector3<f64>, acc: na::Vector3<f64>, dt: f64) {
+    ///
+    /// Takes precomputed values from `integrate()` to avoid redundant work on the hot path.
+    fn propagate_covariance_with_cached(
+        &mut self,
+        Jr: &na::Matrix3<f64>,
+        R_k: &na::Matrix3<f64>,
+        _acc_skew: &na::Matrix3<f64>,
+        R_k_acc_skew: &na::Matrix3<f64>,
+        _omega: na::Vector3<f64>,
+        dt: f64,
+    ) {
         // ✓ FIXED: Multiply by dt (was dividing - made filter behavior backwards)
         // Noise covariance from PSD integrated over time interval
         let gyro_cov = self.noise.gyro_noise_density.powi(2) * dt;
@@ -236,11 +247,8 @@ impl PreintegratedImu {
         Q.fixed_view_mut::<3, 3>(3, 3).fill_diagonal(accel_cov);
 
         // State transition matrix A (9x9)
-        let R_k_rot = self.delta_R.to_rotation_matrix();
-        let R_k = R_k_rot.matrix();
-        let Jr = right_jacobian_so3(omega * dt);
+        // Jr, R_k, R_k_acc_skew passed from integrate() to avoid recomputation
         let dt2 = dt * dt;
-        let acc_skew = skew_symmetric(acc);
 
         let mut A = na::SMatrix::<f64, 9, 9>::identity();
 
@@ -251,28 +259,28 @@ impl PreintegratedImu {
         );
         A.fixed_view_mut::<3, 3>(0, 0).copy_from(&Jr_inv_t);
 
-        // Velocity-rotation coupling
+        // Velocity-rotation coupling (reuses cached R_k * acc_skew)
         A.fixed_view_mut::<3, 3>(3, 0)
-            .copy_from(&(-R_k * acc_skew * dt));
+            .copy_from(&(-R_k_acc_skew * dt));
 
         // Position-velocity coupling
         A.fixed_view_mut::<3, 3>(6, 3)
             .copy_from(&(na::Matrix3::identity() * dt));
 
-        // Position-rotation coupling
+        // Position-rotation coupling (reuses cached R_k * acc_skew)
         A.fixed_view_mut::<3, 3>(6, 0)
-            .copy_from(&(-0.5 * R_k * acc_skew * dt2));
+            .copy_from(&(-0.5 * R_k_acc_skew * dt2));
 
         // Noise gain matrix B (9x6)
         // Maps measurement noise to state error: ξ = B * [η_g; η_a]
         let mut B = na::SMatrix::<f64, 9, 6>::zeros();
-        B.fixed_view_mut::<3, 3>(0, 0).copy_from(&Jr); // Gyro noise → rotation error
-        B.fixed_view_mut::<3, 3>(3, 3).copy_from(&R_k); // Accel noise → velocity error
+        B.fixed_view_mut::<3, 3>(0, 0).copy_from(Jr); // Gyro noise → rotation error
+        B.fixed_view_mut::<3, 3>(3, 3).copy_from(R_k); // Accel noise → velocity error
 
         // Gyro noise affects position through rotation error
-        // dP/dη_g = -0.5 * R_k * [acc]_× * Jr * dt²
+        // dP/dη_g = -0.5 * R_k * [acc]_× * Jr * dt² (reuses R_k_acc_skew)
         B.fixed_view_mut::<3, 3>(6, 0)
-            .copy_from(&(-0.5 * R_k * acc_skew * Jr * dt2));
+            .copy_from(&(-0.5 * R_k_acc_skew * Jr * dt2));
 
         // Accel noise → position error
         B.fixed_view_mut::<3, 3>(6, 3).copy_from(&(0.5 * R_k * dt2));
@@ -330,10 +338,18 @@ pub fn exp_map_so3(omega: na::Vector3<f64>) -> na::UnitQuaternion<f64> {
     let theta = omega.norm();
 
     if theta < 1e-8 {
-        // Small angle approximation
-        na::UnitQuaternion::from_scaled_axis(omega)
+        // Small angle: q ≈ [1, ω/2] (first-order Taylor)
+        // Avoid from_scaled_axis which recomputes the norm internally
+        na::UnitQuaternion::new_unchecked(na::Quaternion::new(
+            1.0,
+            omega.x * 0.5,
+            omega.y * 0.5,
+            omega.z * 0.5,
+        ))
     } else {
-        na::UnitQuaternion::from_axis_angle(&na::Unit::new_normalize(omega), theta)
+        // Reuse already-computed theta to avoid redundant norm in new_normalize
+        let axis = na::Unit::new_unchecked(omega / theta);
+        na::UnitQuaternion::from_axis_angle(&axis, theta)
     }
 }
 
@@ -354,8 +370,9 @@ pub fn right_jacobian_so3(omega: na::Vector3<f64>) -> na::Matrix3<f64> {
     let W = skew_symmetric(omega);
     let W2 = W * W;
 
-    na::Matrix3::identity() - ((1.0 - theta.cos()) / theta2) * W
-        + ((theta - theta.sin()) / theta3) * W2
+    let (sin_theta, cos_theta) = theta.sin_cos();
+
+    na::Matrix3::identity() - ((1.0 - cos_theta) / theta2) * W + ((theta - sin_theta) / theta3) * W2
 }
 
 /// Skew-symmetric matrix from vector: [v]_×

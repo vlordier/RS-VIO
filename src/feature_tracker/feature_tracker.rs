@@ -295,19 +295,36 @@ fn build_pyramid_in_place(base: &GrayImage, pyramid: &mut [GrayImage]) {
         debug_assert!(dst.width() == dw && dst.height() == dh);
         let src_raw = src.as_raw();
         let dst_raw = dst.as_mut();
+        let sw_usize = sw as usize;
+        // Fast interior: all four 2×2 neighbors guaranteed in-bounds
+        let safe_dh = if sh >= 2 { dh.saturating_sub(1) } else { 0 };
+        let safe_dw = if sw >= 2 { dw.saturating_sub(1) } else { 0 };
+        for dy in 0..safe_dh {
+            let sy = (dy * 2) as usize;
+            let row0 = sy * sw_usize;
+            let row1 = row0 + sw_usize;
+            let dst_row = (dy * dw) as usize;
+            for dx in 0..safe_dw {
+                let sx = (dx * 2) as usize;
+                let v = (src_raw[row0 + sx] as u16
+                    + src_raw[row0 + sx + 1] as u16
+                    + src_raw[row1 + sx] as u16
+                    + src_raw[row1 + sx + 1] as u16)
+                    / 4;
+                dst_raw[dst_row + dx as usize] = v as u8;
+            }
+        }
+        // Border pixels: last row and/or last column need bounds-checked access
         for dy in 0..dh {
-            for dx in 0..dw {
+            let start_dx = if dy < safe_dh { safe_dw } else { 0 };
+            for dx in start_dx..dw {
                 let sx = (dx * 2) as usize;
                 let sy = (dy * 2) as usize;
-                let i = sy * sw as usize + sx;
-                // 2×2 average — sufficient for tracking pyramids and avoids allocation
+                let i = sy * sw_usize + sx;
                 let v = (src_raw[i] as u16
                     + src_raw.get(i + 1).copied().unwrap_or(src_raw[i]) as u16
-                    + src_raw.get(i + sw as usize).copied().unwrap_or(src_raw[i]) as u16
-                    + src_raw
-                        .get(i + sw as usize + 1)
-                        .copied()
-                        .unwrap_or(src_raw[i]) as u16)
+                    + src_raw.get(i + sw_usize).copied().unwrap_or(src_raw[i]) as u16
+                    + src_raw.get(i + sw_usize + 1).copied().unwrap_or(src_raw[i]) as u16)
                     / 4;
                 dst_raw[(dy * dw + dx) as usize] = v as u8;
             }

@@ -611,7 +611,7 @@ impl StereoMatcher {
         k_inv: &na::Matrix3<f64>,
     ) -> (na::Matrix3<f64>, Vec<f64>) {
         // Build weighted A matrix
-        let mut a_matrix = Vec::new();
+        let mut a_matrix = Vec::with_capacity(matches.len() * 9);
 
         for (i, match_) in matches.iter().enumerate() {
             let weight = weights[i].sqrt();

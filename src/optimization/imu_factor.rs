@@ -118,9 +118,9 @@ impl ImuFactor {
         (corrected_delta_R, corrected_delta_v, corrected_delta_p)
     }
 
-    /// Compute weighted residual for given states and biases
+    /// Compute weighted residual for given states and biases (stack-allocated)
     #[allow(clippy::too_many_arguments)]
-    fn compute_weighted_residual(
+    fn compute_weighted_residual_svec(
         &self,
         R_i: UnitQuaternion<f64>,
         v_i: Vector3<f64>,
@@ -130,7 +130,7 @@ impl ImuFactor {
         p_j: Vector3<f64>,
         bias_g: Vector3<f64>,
         bias_a: Vector3<f64>,
-    ) -> DVector<f64> {
+    ) -> na::SVector<f64, 9> {
         let (corrected_delta_R, corrected_delta_v, corrected_delta_p) =
             self.correct_for_bias(&bias_g, &bias_a);
 
@@ -156,7 +156,24 @@ impl ImuFactor {
         residual.rows_mut(3, 3).copy_from(&r_v);
         residual.rows_mut(6, 3).copy_from(&r_p);
 
-        let weighted = self.sqrt_information * residual;
+        self.sqrt_information * residual
+    }
+
+    /// Compute weighted residual (heap-allocated, for trait interface)
+    #[allow(clippy::too_many_arguments)]
+    fn compute_weighted_residual(
+        &self,
+        R_i: UnitQuaternion<f64>,
+        v_i: Vector3<f64>,
+        p_i: Vector3<f64>,
+        R_j: UnitQuaternion<f64>,
+        v_j: Vector3<f64>,
+        p_j: Vector3<f64>,
+        bias_g: Vector3<f64>,
+        bias_a: Vector3<f64>,
+    ) -> DVector<f64> {
+        let weighted =
+            self.compute_weighted_residual_svec(R_i, v_i, p_i, R_j, v_j, p_j, bias_g, bias_a);
         DVector::from_column_slice(weighted.as_slice())
     }
 
@@ -225,20 +242,39 @@ impl Factor for ImuFactor {
         let bias_g = Vector3::new(params[6][0], params[6][1], params[6][2]);
         let bias_a = Vector3::new(params[7][0], params[7][1], params[7][2]);
 
-        let weighted_residual =
-            self.compute_weighted_residual(R_i, v_i, p_i, R_j, v_j, p_j, bias_g, bias_a);
+        let weighted_residual_svec =
+            self.compute_weighted_residual_svec(R_i, v_i, p_i, R_j, v_j, p_j, bias_g, bias_a);
+        let weighted_residual = DVector::from_column_slice(weighted_residual_svec.as_slice());
 
         // Compute Jacobians if requested
         let jacobian = if compute_jacobian {
             // Use numerical differentiation for now
             // TODO: Implement analytical Jacobians for performance
             let eps = 1e-7;
+            let inv_eps = 1.0 / eps;
             let mut jac = DMatrix::zeros(9, 26); // 9 residuals x 26 parameters
 
             // Clone once and perturb/restore in-place to avoid 26 full clones
             let mut params_pert = params.to_vec();
 
-            // Helper: perturb a single element, compute residual, restore
+            // Helper closure: extract params → call compute_weighted_residual_svec directly,
+            // avoiding re-parsing asserts and DVector allocs per column
+            let extract_and_eval = |p: &[DVector<f64>]| -> na::SVector<f64, 9> {
+                let r_i = UnitQuaternion::new_normalize(na::Quaternion::new(
+                    p[0][0], p[0][1], p[0][2], p[0][3],
+                ));
+                let vi = Vector3::new(p[1][0], p[1][1], p[1][2]);
+                let pi = Vector3::new(p[2][0], p[2][1], p[2][2]);
+                let r_j = UnitQuaternion::new_normalize(na::Quaternion::new(
+                    p[3][0], p[3][1], p[3][2], p[3][3],
+                ));
+                let vj = Vector3::new(p[4][0], p[4][1], p[4][2]);
+                let pj = Vector3::new(p[5][0], p[5][1], p[5][2]);
+                let bg = Vector3::new(p[6][0], p[6][1], p[6][2]);
+                let ba = Vector3::new(p[7][0], p[7][1], p[7][2]);
+                self.compute_weighted_residual_svec(r_i, vi, pi, r_j, vj, pj, bg, ba)
+            };
+
             let block_sizes: [(usize, usize); 8] = [
                 (0, 4), // R_i → col offset 0
                 (1, 3), // v_i → col offset 4
@@ -253,8 +289,9 @@ impl Factor for ImuFactor {
             for &(block_idx, block_size) in &block_sizes {
                 for i in 0..block_size {
                     params_pert[block_idx][i] += eps;
-                    let (r_pert, _) = self.linearize(&params_pert, false);
-                    let col = (r_pert - &weighted_residual) / eps;
+                    // SVector path: no heap allocs for residual or diff
+                    let r_pert = extract_and_eval(&params_pert);
+                    let col = (r_pert - weighted_residual_svec) * inv_eps;
                     jac.column_mut(col_offset + i).copy_from(&col);
                     params_pert[block_idx][i] -= eps; // restore
                 }

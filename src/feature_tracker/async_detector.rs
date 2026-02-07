@@ -189,28 +189,30 @@ fn detect_features_in_region(
     for y in y_start..y_end {
         for x in x_start..x_end {
             let idx = y * width + x;
-            if idx + width < image_data.len() {
-                let center = image_data[idx] as f32;
+            debug_assert!(
+                idx + width < image_data.len(),
+                "Bounds violated in detect_features_in_region"
+            );
+            let center = image_data[idx] as f32;
 
-                // Check 8 neighbors in circle pattern
-                let n1 = image_data[idx - width] as f32;
-                let n2 = image_data[idx + width] as f32;
-                let n3 = image_data[idx - 1] as f32;
-                let n4 = image_data[idx + 1] as f32;
+            // Check 8 neighbors in circle pattern
+            let n1 = image_data[idx - width] as f32;
+            let n2 = image_data[idx + width] as f32;
+            let n3 = image_data[idx - 1] as f32;
+            let n4 = image_data[idx + 1] as f32;
 
-                let corner_score = ((n1 - center).abs()
-                    + (n2 - center).abs()
-                    + (n3 - center).abs()
-                    + (n4 - center).abs())
-                    / 4.0;
+            let corner_score = ((n1 - center).abs()
+                + (n2 - center).abs()
+                + (n3 - center).abs()
+                + (n4 - center).abs())
+                / 4.0;
 
-                if corner_score > threshold {
-                    features.push(DetectedFeature {
-                        x: x as f32,
-                        y: y as f32,
-                        score: corner_score,
-                    });
-                }
+            if corner_score > threshold {
+                features.push(DetectedFeature {
+                    x: x as f32,
+                    y: y as f32,
+                    score: corner_score,
+                });
             }
         }
     }
