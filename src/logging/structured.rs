@@ -29,8 +29,6 @@ impl LogContext {
 /// Real-time structured logger with performance metrics
 pub struct StructuredLogger {
     context: Option<LogContext>,
-    #[allow(dead_code)]
-    metrics_enabled: bool,
     log_file: Option<Mutex<std::fs::File>>,
     metadata: BTreeMap<String, String>,
 }
@@ -51,15 +49,9 @@ impl StructuredLogger {
 
         Ok(Self {
             context: None,
-            metrics_enabled: false,
             log_file: file,
             metadata: BTreeMap::new(),
         })
-    }
-
-    /// Enable metrics collection
-    pub fn enable_metrics(&self) {
-        // Metrics collection enabled
     }
 
     /// Set logging context

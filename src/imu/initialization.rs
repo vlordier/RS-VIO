@@ -24,6 +24,8 @@
 //! - Forster et al., "On-Manifold Preintegration for Real-Time Visual-Inertial Odometry", RSS 2017
 //! - Solà et al., "Quaternion kinematics for the error-state Kalman filter", 2017
 
+use std::collections::VecDeque;
+
 use crate::datasets::ImuData;
 use anyhow::{bail, Result};
 use nalgebra as na;
@@ -39,7 +41,7 @@ pub struct ImuInitializationConfig {
     /// Used to detect if device is stationary
     pub gyro_norm_threshold: f64,
 
-    /// Maximum accelerometer variance for static period [m/s²]
+    /// Maximum accelerometer variance for static period [(m/s²)²]
     pub accel_variance_threshold: f64,
 
     /// Variance of initial bias estimates (gyroscope) [rad/s]
@@ -163,6 +165,12 @@ impl ImuInitializer {
 
         self.state = InitializationState::Initializing;
         self.measurements.push(imu.clone());
+        // Cap measurements buffer to prevent unbounded growth
+        const MAX_INIT_MEASUREMENTS: usize = 10_000;
+        if self.measurements.len() > MAX_INIT_MEASUREMENTS {
+            self.measurements
+                .drain(..self.measurements.len() - MAX_INIT_MEASUREMENTS);
+        }
         self.last_timestamp = Some(imu.timestamp);
 
         // Check if we have enough measurements
@@ -206,8 +214,8 @@ impl ImuInitializer {
             accel_var_sum += accel_dev.norm_squared();
         }
 
-        self.gyro_variance = gyro_var_sum / n;
-        self.accel_variance = accel_var_sum / n;
+        self.gyro_variance = gyro_var_sum / (n - 1.0).max(1.0);
+        self.accel_variance = accel_var_sum / (n - 1.0).max(1.0);
 
         // Update bias estimates
         self.bias_estimate.gyro_bias = gyro_mean;
@@ -256,10 +264,7 @@ impl ImuInitializer {
     /// Check if initialization has converged
     fn check_convergence(&mut self) -> Result<()> {
         // Check if measurements are in static period (low gyro and accel variance)
-        let gyro_norm = self.bias_estimate.gyro_bias.norm();
-        let _accel_norm = self.bias_estimate.accel_bias.norm();
-
-        let is_static = gyro_norm < self.config.gyro_norm_threshold
+        let is_static = self.gyro_variance < self.config.gyro_norm_threshold.powi(2)
             && self.accel_variance < self.config.accel_variance_threshold;
 
         if is_static {
@@ -322,7 +327,7 @@ pub struct AdaptiveNoiseEstimator {
     /// Window size for noise estimation
     window_size: usize,
     /// Recent measurements
-    recent_measurements: Vec<ImuData>,
+    recent_measurements: VecDeque<ImuData>,
 }
 
 impl AdaptiveNoiseEstimator {
@@ -332,17 +337,17 @@ impl AdaptiveNoiseEstimator {
             base_accel_noise,
             base_gyro_noise,
             window_size: 50,
-            recent_measurements: Vec::new(),
+            recent_measurements: VecDeque::new(),
         }
     }
 
     /// Add measurement and update noise estimates
     pub fn add_measurement(&mut self, imu: &ImuData) {
-        self.recent_measurements.push(imu.clone());
+        self.recent_measurements.push_back(imu.clone());
 
         // Keep only recent measurements
         if self.recent_measurements.len() > self.window_size {
-            self.recent_measurements.remove(0);
+            self.recent_measurements.pop_front();
         }
     }
 
@@ -364,7 +369,7 @@ impl AdaptiveNoiseEstimator {
             let dev = na::Vector3::from(imu.accel) - accel_mean;
             variance += dev.norm_squared();
         }
-        variance /= self.recent_measurements.len() as f64;
+        variance /= (self.recent_measurements.len() - 1).max(1) as f64;
 
         // Adaptive scaling: increase noise if variance is high
         let std = variance.sqrt();
@@ -389,7 +394,7 @@ impl AdaptiveNoiseEstimator {
             let dev = na::Vector3::from(imu.gyro) - gyro_mean;
             variance += dev.norm_squared();
         }
-        variance /= self.recent_measurements.len() as f64;
+        variance /= (self.recent_measurements.len() - 1).max(1) as f64;
 
         // Adaptive scaling
         let std = variance.sqrt();

@@ -1,8 +1,16 @@
 use image::GrayImage;
 use nalgebra as na;
 use std::ops::AddAssign;
+use std::sync::LazyLock;
 
 use super::image_utilities;
+
+/// Pre-computed pattern matrix (2×52) — avoids recomputing on every Pattern52::new() call.
+/// With ~200 tracked points × 3 pyramid levels = 600 constructions per frame, this
+/// eliminates 600 × 104-element divisions per frame.
+static PATTERN52_MATRIX: LazyLock<na::SMatrix<f32, 2, PATTERN52_SIZE>> = LazyLock::new(|| {
+    na::SMatrix::<f32, 2, PATTERN52_SIZE>::from_fn(|i, j| Pattern52::PATTERN_RAW[j][i] / 2.0)
+});
 
 pub const PATTERN52_SIZE: usize = 52;
 pub struct Pattern52 {
@@ -12,8 +20,6 @@ pub struct Pattern52 {
     pub data: [f32; PATTERN52_SIZE], // negative if the point is not valid
     pub h_se2_inv_j_se2_t: na::SMatrix<f32, 3, PATTERN52_SIZE>,
     pub pattern_scale_down: f32,
-    // Pre-computed pattern matrix to avoid recomputation
-    pub pattern_matrix: na::SMatrix<f32, 2, PATTERN52_SIZE>,
 }
 impl Pattern52 {
     pub const PATTERN_RAW: [[f32; 2]; PATTERN52_SIZE] = [
@@ -83,14 +89,12 @@ impl Pattern52 {
 
         let mut jw_se2 = na::SMatrix::<f32, 2, 3>::identity();
 
-        for (i, pattern_pos) in Self::PATTERN_RAW.into_iter().enumerate() {
-            let p = self.pos
-                + na::SVector::<f32, 2>::new(
-                    pattern_pos[0] / self.pattern_scale_down,
-                    pattern_pos[1] / self.pattern_scale_down,
-                );
-            jw_se2[(0, 2)] = -pattern_pos[1] / self.pattern_scale_down;
-            jw_se2[(1, 2)] = pattern_pos[0] / self.pattern_scale_down;
+        for i in 0..PATTERN52_SIZE {
+            let px = PATTERN52_MATRIX[(0, i)];
+            let py = PATTERN52_MATRIX[(1, i)];
+            let p = self.pos + na::SVector::<f32, 2>::new(px, py);
+            jw_se2[(0, 2)] = -py;
+            jw_se2[(1, 2)] = px;
 
             if image_utilities::inbound(greyscale_image, p.x, p.y, 2) {
                 let val_grad = image_utilities::image_grad(greyscale_image, p.x, p.y);
@@ -106,6 +110,10 @@ impl Pattern52 {
             }
         }
 
+        if num_valid_points == 0 {
+            self.mean = 0.0;
+            return;
+        }
         self.mean = sum / num_valid_points as f32;
 
         let mean_inv = num_valid_points as f32 / sum;
@@ -125,11 +133,6 @@ impl Pattern52 {
         let mut j_se2 = na::SMatrix::<f32, 3, PATTERN52_SIZE>::zeros();
         let pattern_scale_down = 2.0;
 
-        // Pre-compute pattern matrix once (2x52, transposed from 52x2)
-        let pattern_matrix = na::SMatrix::<f32, 2, PATTERN52_SIZE>::from_fn(|i, j| {
-            Self::PATTERN_RAW[j][i] / pattern_scale_down
-        });
-
         let mut p = Pattern52 {
             valid: false,
             mean: 1.0,
@@ -137,7 +140,6 @@ impl Pattern52 {
             data: [0.0; PATTERN52_SIZE], // negative if the point is not valid
             h_se2_inv_j_se2_t: na::SMatrix::<f32, 3, 52>::zeros(),
             pattern_scale_down,
-            pattern_matrix,
         };
         p.set_data_jac_se2(greyscale_image, &mut j_se2);
         let h_se2 = j_se2 * j_se2.transpose();
@@ -184,8 +186,8 @@ impl Pattern52 {
         let ty = m.m23;
 
         for i in 0..PATTERN52_SIZE {
-            let px_raw = self.pattern_matrix[(0, i)];
-            let py_raw = self.pattern_matrix[(1, i)];
+            let px_raw = PATTERN52_MATRIX[(0, i)];
+            let py_raw = PATTERN52_MATRIX[(1, i)];
 
             let x = r11 * px_raw + r12 * py_raw + tx;
             let y = r21 * px_raw + r22 * py_raw + ty;

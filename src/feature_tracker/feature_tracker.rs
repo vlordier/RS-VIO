@@ -6,8 +6,6 @@ use std::collections::HashMap;
 
 use super::{image_utilities, patch};
 
-use log::info;
-
 #[derive(Debug, Clone)]
 pub struct Feature {
     /// Unique identifier of this feature (within the current frame or globally).
@@ -26,79 +24,6 @@ impl Feature {
             feature_id,
             pixel_coord,
             undistorted_coord: [-1.0, -1.0],
-        }
-    }
-}
-
-#[derive(Default)]
-pub struct PatchTracker<const N: u32> {
-    last_keypoint_id: usize,
-    tracked_points_map: HashMap<usize, na::Affine2<f32>>,
-    previous_image_pyramid: Vec<GrayImage>,
-    current_image_pyramid: Vec<GrayImage>,
-    has_previous: bool,
-}
-impl<const LEVELS: u32> PatchTracker<LEVELS> {
-    pub fn process_frame(&mut self, greyscale_image: &GrayImage) {
-        // build current image pyramid (reuse buffers)
-        ensure_pyramid_buffers(
-            &mut self.current_image_pyramid,
-            greyscale_image.width(),
-            greyscale_image.height(),
-            LEVELS,
-        );
-        ensure_pyramid_buffers(
-            &mut self.previous_image_pyramid,
-            greyscale_image.width(),
-            greyscale_image.height(),
-            LEVELS,
-        );
-        build_pyramid_in_place(greyscale_image, &mut self.current_image_pyramid);
-
-        if self.has_previous {
-            info!("old points {}", self.tracked_points_map.len());
-            // track prev points
-            // Default values for PatchTracker (not used in estimator)
-            const DEFAULT_OPTICAL_FLOW_MAX_ITERATIONS: usize = 30;
-            const DEFAULT_OPTICAL_FLOW_CONVERGENCE_THRESHOLD: f32 = 0.005;
-            self.tracked_points_map = track_points::<LEVELS>(
-                &self.previous_image_pyramid,
-                &self.current_image_pyramid,
-                &self.tracked_points_map,
-                DEFAULT_OPTICAL_FLOW_MAX_ITERATIONS,
-                DEFAULT_OPTICAL_FLOW_CONVERGENCE_THRESHOLD,
-            );
-            info!("tracked old points {}", self.tracked_points_map.len());
-        }
-        // add new points
-        // Default grid_size for PatchTracker (not used in estimator)
-        const DEFAULT_GRID_SIZE: u32 = 30;
-        let new_points = add_points(&self.tracked_points_map, greyscale_image, DEFAULT_GRID_SIZE);
-        for point in &new_points {
-            let mut v = na::Affine2::<f32>::identity();
-
-            v.matrix_mut_unchecked().m13 = point.x as f32;
-            v.matrix_mut_unchecked().m23 = point.y as f32;
-            self.tracked_points_map.insert(self.last_keypoint_id, v);
-            self.last_keypoint_id += 1;
-        }
-
-        // update saved image pyramid (swap to reuse allocations)
-        std::mem::swap(
-            &mut self.previous_image_pyramid,
-            &mut self.current_image_pyramid,
-        );
-        self.has_previous = true;
-    }
-    pub fn get_track_points(&self) -> HashMap<usize, (f32, f32)> {
-        self.tracked_points_map
-            .iter()
-            .map(|(k, v)| (*k, (v.matrix().m13, v.matrix().m23)))
-            .collect()
-    }
-    pub fn remove_id(&mut self, ids: &[usize]) {
-        for id in ids {
-            self.tracked_points_map.remove(id);
         }
     }
 }
@@ -270,15 +195,14 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
         );
         self.has_previous = true;
 
-        // Populate the frame's feature lists from the stereo tracks
-        let [tracked_left, tracked_right] = self.get_track_points();
-        for (id, (x, y)) in tracked_left {
-            let f = Feature::new(id, [x, y]);
+        // Populate the frame's feature lists directly from tracked_points_maps
+        // (avoids allocating 2 temporary HashMaps per frame)
+        for (&id, v) in &self.tracked_points_map_cam0 {
+            let f = Feature::new(id, [v.matrix().m13, v.matrix().m23]);
             frame.add_left_feature(f);
         }
-
-        for (id, (x, y)) in tracked_right {
-            let f = Feature::new(id, [x, y]);
+        for (&id, v) in &self.tracked_points_map_cam1 {
+            let f = Feature::new(id, [v.matrix().m13, v.matrix().m23]);
             frame.add_right_feature(f);
         }
     }
@@ -294,12 +218,6 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
             .map(|(k, v)| (*k, (v.matrix().m13, v.matrix().m23)))
             .collect();
         [tracked_pts0, tracked_pts1]
-    }
-    pub fn remove_id(&mut self, ids: &[usize]) {
-        for id in ids {
-            self.tracked_points_map_cam0.remove(id);
-            self.tracked_points_map_cam1.remove(id);
-        }
     }
 }
 
@@ -352,7 +270,8 @@ fn build_pyramid_in_place(base: &GrayImage, pyramid: &mut [GrayImage]) {
 
     // Copy or resize base image to pyramid level 0
     if pyramid[0].width() == base.width() && pyramid[0].height() == base.height() {
-        pyramid[0] = base.clone();
+        // Reuse existing buffer: memcpy instead of clone avoids allocation
+        pyramid[0].copy_from_slice(base);
     } else {
         let resized = imageops::resize(
             base,
@@ -363,13 +282,52 @@ fn build_pyramid_in_place(base: &GrayImage, pyramid: &mut [GrayImage]) {
         pyramid[0] = resized;
     }
 
-    // Build remaining pyramid levels by downsampling
+    // Build remaining pyramid levels by downsampling with 2×2 box filter (in-place, zero alloc)
     for level in 1..pyramid.len() {
-        let src = pyramid[level - 1].clone();
-        let dst_w = (pyramid[level - 1].width() / 2).max(1);
-        let dst_h = (pyramid[level - 1].height() / 2).max(1);
-        let downsampled = imageops::resize(&src, dst_w, dst_h, imageops::FilterType::Triangle);
-        pyramid[level] = downsampled;
+        let (left, right) = pyramid.split_at_mut(level);
+        let src = &left[level - 1];
+        let sw = src.width();
+        let sh = src.height();
+        let dw = (sw / 2).max(1);
+        let dh = (sh / 2).max(1);
+        let dst = &mut right[0];
+        debug_assert!(dst.width() == dw && dst.height() == dh);
+        let src_raw = src.as_raw();
+        let dst_raw = dst.as_mut();
+        let sw_usize = sw as usize;
+        // Fast interior: all four 2×2 neighbors guaranteed in-bounds
+        let safe_dh = if sh >= 2 { dh.saturating_sub(1) } else { 0 };
+        let safe_dw = if sw >= 2 { dw.saturating_sub(1) } else { 0 };
+        for dy in 0..safe_dh {
+            let sy = (dy * 2) as usize;
+            let row0 = sy * sw_usize;
+            let row1 = row0 + sw_usize;
+            let dst_row = (dy * dw) as usize;
+            for dx in 0..safe_dw {
+                let sx = (dx * 2) as usize;
+                let v = (src_raw[row0 + sx] as u16
+                    + src_raw[row0 + sx + 1] as u16
+                    + src_raw[row1 + sx] as u16
+                    + src_raw[row1 + sx + 1] as u16)
+                    / 4;
+                dst_raw[dst_row + dx as usize] = v as u8;
+            }
+        }
+        // Border pixels: last row and/or last column need bounds-checked access
+        for dy in 0..dh {
+            let start_dx = if dy < safe_dh { safe_dw } else { 0 };
+            for dx in start_dx..dw {
+                let sx = (dx * 2) as usize;
+                let sy = (dy * 2) as usize;
+                let i = sy * sw_usize + sx;
+                let v = (src_raw[i] as u16
+                    + src_raw.get(i + 1).copied().unwrap_or(src_raw[i]) as u16
+                    + src_raw.get(i + sw_usize).copied().unwrap_or(src_raw[i]) as u16
+                    + src_raw.get(i + sw_usize + 1).copied().unwrap_or(src_raw[i]) as u16)
+                    / 4;
+                dst_raw[(dy * dw + dx) as usize] = v as u8;
+            }
+        }
     }
 }
 
@@ -388,19 +346,12 @@ fn add_points(
             0.0,
         )
     }));
-    // let curr_img_luma8 = DynamicImage::ImageLuma16(grayscale_image.clone()).into_luma8();
     image_utilities::detect_key_points(
         grayscale_image,
         grid_size,
         &current_corners,
         num_points_in_cell,
     )
-    // let mut prev_points =
-    // Eigen::aligned_vector<Eigen::Vector2d> pts0;
-
-    // for (const auto &kv : observations.at(0)) {
-    //   pts0.emplace_back(kv.second.translation().template cast<double>());
-    // }
 }
 fn track_points<const LEVELS: u32>(
     image_pyramid0: &[GrayImage],
@@ -448,6 +399,7 @@ fn track_points<const LEVELS: u32>(
 
     transform_maps1
 }
+#[inline]
 fn track_one_point<const LEVELS: u32>(
     image_pyramid0: &[GrayImage],
     image_pyramid1: &[GrayImage],
@@ -500,6 +452,7 @@ fn track_one_point<const LEVELS: u32>(
     Some(transform1)
 }
 
+#[inline]
 pub fn track_point_at_level(
     grayscale_image: &GrayImage,
     dp: &patch::Pattern52,
@@ -516,12 +469,13 @@ pub fn track_point_at_level(
             if !inc.iter().all(|x| x.is_finite()) {
                 return false;
             }
-            if inc.norm() > 1e6 {
+            let inc_norm = inc.norm();
+            if inc_norm > 1e6 {
                 return false;
             }
 
             // Early termination if converged
-            if inc.norm() < optical_flow_convergence_threshold {
+            if inc_norm < optical_flow_convergence_threshold {
                 break;
             }
 
@@ -530,8 +484,8 @@ pub fn track_point_at_level(
             let filter_margin = 2;
             if !image_utilities::inbound(
                 grayscale_image,
-                transform.matrix_mut_unchecked().m13,
-                transform.matrix_mut_unchecked().m23,
+                transform.matrix().m13,
+                transform.matrix().m23,
                 filter_margin,
             ) {
                 return false;

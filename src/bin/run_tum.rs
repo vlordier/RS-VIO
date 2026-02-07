@@ -1,20 +1,14 @@
 use clap::Parser;
 use env_logger::{Builder, Env};
 use log::{error, info, LevelFilter};
-use rand::rngs::StdRng;
-use rand::SeedableRng;
-use rs_vio::{PlayerConfig, TUMVIPlayer};
-use std::process;
+use rs_vio::{DatasetPlayer, PlayerConfig, TUMVIPlayer};
+use std::process::ExitCode;
 
-fn main() {
-    // Set random seed for reproducibility
-    let _rng = StdRng::seed_from_u64(42);
-
+fn main() -> ExitCode {
     // Initialize logger for immediate colored output
     Builder::from_env(Env::default().default_filter_or("debug"))
         // Silence rerun noise unless it's a warning or worse
         .filter_module("rerun", LevelFilter::Warn)
-        .format_timestamp_millis()
         .format(|buf, record| {
             use std::io::Write;
             let level = match record.level() {
@@ -46,28 +40,28 @@ fn main() {
         step_mode: false,
     };
 
-    // Create and run EuRoC player
+    // Create and run TUM-VI player
     let player = TUMVIPlayer::new();
     let result = player.run(player_config);
 
     if result.success {
         info!("[Main] processing completed successfully!");
-        process::exit(0);
+        ExitCode::SUCCESS
     } else {
         error!("[Main] processing failed: {}", result.error_message);
-        process::exit(-1);
+        ExitCode::FAILURE
     }
 }
 
 #[derive(Parser, Debug)]
-#[command(name = "euroc_vio")]
-#[command(about = "EuRoC VIO/VO Dataset Player")]
+#[command(name = "run_tum")]
+#[command(about = "TUM-VI VIO/VO Dataset Player")]
 struct Args {
     /// Path to configuration file (YAML)
-    #[arg(help = "Path to configuration file (e.g., config/euroc_vio.yaml)")]
+    #[arg(help = "Path to configuration file (e.g., config/tum_vi.yaml)")]
     config_file: String,
 
-    /// Path to EuRoC dataset directory
-    #[arg(help = "Path to EuRoC dataset directory (e.g., /path/to/MH_01_easy)")]
+    /// Path to TUM-VI dataset directory
+    #[arg(help = "Path to TUM-VI dataset directory (e.g., /path/to/dataset-corridor1_512_16)")]
     dataset_path: String,
 }

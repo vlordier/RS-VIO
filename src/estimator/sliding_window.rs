@@ -109,28 +109,31 @@ impl SlidingWindow {
     }
 
     /// Get the current number of keyframes in the window.
+    #[inline]
     pub fn len(&self) -> usize {
         self.keyframes.len()
     }
 
     /// Check if the sliding window is empty.
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.keyframes.is_empty()
     }
 
     /// Check if the sliding window is full.
+    #[inline]
     pub fn is_full(&self) -> bool {
         self.keyframes.len() >= self.max_frames
-    }
-
-    /// Get a reference to a specific keyframe by index.
-    pub fn get_frame(&self, index: usize) -> Option<&Frame> {
-        self.keyframes.get(index)
     }
 
     pub fn get_keyframe_poses(&self) -> Vec<Matrix4x4> {
         // Return poses of body in world frame
         self.keyframes.iter().map(|f| f.state.T_W_B).collect()
+    }
+
+    /// Get the pose of the last keyframe without allocating.
+    pub fn last_keyframe_pose(&self) -> Option<Matrix4x4> {
+        self.keyframes.back().map(|f| f.state.T_W_B)
     }
 
     /// Clear all keyframes from the sliding window.
@@ -178,41 +181,28 @@ impl SlidingWindow {
 
         // PART 1: Count observations and find first observation frame (Parallel)
         // Map: feature_id -> (left_count, right_count, first_frame_idx)
-        let landmark_stats = self
-            .keyframes
-            .par_iter()
-            .enumerate()
-            .fold(
-                HashMap::new,
-                |mut acc: HashMap<usize, (usize, usize, usize)>, (frame_idx, frame)| {
-                    for feat in &frame.left_features {
-                        let entry = acc.entry(feat.feature_id).or_insert((0, 0, usize::MAX));
-                        entry.0 += 1;
-                        if frame_idx < entry.2 {
-                            entry.2 = frame_idx;
-                        }
-                    }
-                    for feat in &frame.right_features {
-                        let entry = acc.entry(feat.feature_id).or_insert((0, 0, usize::MAX));
-                        entry.1 += 1;
-                        if frame_idx < entry.2 {
-                            entry.2 = frame_idx;
-                        }
-                    }
-                    acc
-                },
-            )
-            .reduce(HashMap::new, |mut map1, map2| {
-                for (k, (l, r, f)) in map2 {
-                    let entry = map1.entry(k).or_insert((0, 0, usize::MAX));
-                    entry.0 += l;
-                    entry.1 += r;
-                    if f < entry.2 {
-                        entry.2 = f;
-                    }
+        // Sequential scan — with only 8-16 keyframes, rayon overhead exceeds benefit
+        let mut landmark_stats: HashMap<usize, (usize, usize, usize)> = HashMap::new();
+        for (frame_idx, frame) in self.keyframes.iter().enumerate() {
+            for feat in &frame.left_features {
+                let entry = landmark_stats
+                    .entry(feat.feature_id)
+                    .or_insert((0, 0, usize::MAX));
+                entry.0 += 1;
+                if frame_idx < entry.2 {
+                    entry.2 = frame_idx;
                 }
-                map1
-            });
+            }
+            for feat in &frame.right_features {
+                let entry = landmark_stats
+                    .entry(feat.feature_id)
+                    .or_insert((0, 0, usize::MAX));
+                entry.1 += 1;
+                if frame_idx < entry.2 {
+                    entry.2 = frame_idx;
+                }
+            }
+        }
 
         // Pre-generate feature variable strings
         // This avoids calling format!("LM_{}") thousands of times during building
@@ -243,6 +233,10 @@ impl SlidingWindow {
                 .expect("T_B_Cr should be invertible"),
         );
 
+        // Pre-compute body-from-camera transforms once (these are the originals, no double-inversion)
+        let T_B_Cl = first_frame.state.T_B_Cl;
+        let T_B_Cr = first_frame.state.T_B_Cr;
+
         // PART 2: Build Factors (Parallel)
         let results: Vec<_> = self
             .keyframes
@@ -268,20 +262,26 @@ impl SlidingWindow {
                 let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
                 let R_B_W = Matrix3x3::from(T_B_W.fixed_view::<3, 3>(0, 0));
                 let q_B_W = UnitQuaternion::from_matrix(&R_B_W);
-                let se3_data = DVector::from_vec(vec![
+                let se3_data = DVector::from_column_slice(&[
                     t_B_W.x, t_B_W.y, t_B_W.z, q_B_W.w, q_B_W.i, q_B_W.j, q_B_W.k,
                 ]);
-                local_initials.push((
-                    (*kf_var).clone(),
-                    (ManifoldType::SE3, se3_data.cast::<f64>()),
-                ));
+                local_initials.push(((*kf_var).clone(), (ManifoldType::SE3, se3_data)));
 
+                // Pre-compute fixed pose Arc for frame 0 (avoids recomputing inversion per-feature)
+                let fixed_pose_arc = if id_frame == 0 {
+                    Some(Arc::new(T_B_W))
+                } else {
+                    None
+                };
+
+                // Use pre-computed body-from-camera transforms (hoisted before par_iter,
+                // avoids double-inversion of T_C_B→T_B_C per frame)
                 let camera_features = [
-                    (&frame.left_features, T_Cl_B.clone()),
-                    (&frame.right_features, T_Cr_B.clone()),
+                    (&frame.left_features, T_Cl_B.clone(), &T_B_Cl),
+                    (&frame.right_features, T_Cr_B.clone(), &T_B_Cr),
                 ];
 
-                for (features, T_C_B) in camera_features.iter() {
+                for (features, T_C_B, T_B_C) in camera_features.iter() {
                     for feat in features.iter() {
                         let feature_id = feat.feature_id;
 
@@ -298,23 +298,22 @@ impl SlidingWindow {
                                 if !self.map_points.contains_key(&feature_id)
                                     && id_frame == *first_frame_idx
                                 {
+                                    let default_depth = 2.0_f64;
                                     let p_C = Vector3::new(
-                                        feat.undistorted_coord[0] as f64,
-                                        feat.undistorted_coord[1] as f64,
-                                        2.0_f64,
+                                        feat.undistorted_coord[0] as f64 * default_depth,
+                                        feat.undistorted_coord[1] as f64 * default_depth,
+                                        default_depth,
                                     );
                                     let (R_W_B, t_W_B) = (
                                         frame.state.T_W_B.fixed_view::<3, 3>(0, 0).into_owned(),
                                         frame.state.T_W_B.fixed_view::<3, 1>(0, 3).into_owned(),
                                     );
-                                    let T_B_C =
-                                        T_C_B.try_inverse().expect("T_C_B should be invertible");
                                     let (R_B_C, t_B_C) = (
                                         T_B_C.fixed_view::<3, 3>(0, 0).into_owned(),
                                         T_B_C.fixed_view::<3, 1>(0, 3).into_owned(),
                                     );
                                     let p_W = R_W_B * (R_B_C * p_C + t_B_C) + t_W_B;
-                                    let data = DVector::from_vec(vec![p_W.x, p_W.y, p_W.z]);
+                                    let data = DVector::from_column_slice(&[p_W.x, p_W.y, p_W.z]);
                                     local_initials
                                         .push(((**lm_var_arc).clone(), (ManifoldType::RN, data)));
                                 }
@@ -329,13 +328,8 @@ impl SlidingWindow {
                                     (*T_C_B).clone(),
                                 );
 
-                                if id_frame == 0 {
-                                    let T_B_W_inv = frame
-                                        .state
-                                        .T_W_B
-                                        .try_inverse()
-                                        .expect("T_W_B should be invertible");
-                                    factor = factor.with_fixed_pose(Arc::new(T_B_W_inv));
+                                if let Some(ref pose_arc) = fixed_pose_arc {
+                                    factor = factor.with_fixed_pose(Arc::clone(pose_arc));
                                 }
 
                                 let kf_var_opt = if id_frame == 0 {
@@ -367,23 +361,17 @@ impl SlidingWindow {
             .collect();
 
         // PART 3: Aggregate into Problem and Initial Values
-        let (all_initials_maps, all_residuals_vecs): (Vec<_>, Vec<_>) =
-            results.into_par_iter().unzip();
+        let (all_initials_maps, all_residuals_vecs): (Vec<_>, Vec<_>) = results.into_iter().unzip();
 
-        let mut initial_values = all_initials_maps
-            .into_par_iter()
-            .fold(HashMap::new, |mut acc, block_initials| {
-                for (k, v) in block_initials {
-                    acc.entry(k).or_insert(v);
-                }
-                acc
-            })
-            .reduce(HashMap::new, |mut left, right| {
-                for (k, v) in right {
-                    left.entry(k).or_insert(v);
-                }
-                left
-            });
+        let mut initial_values =
+            all_initials_maps
+                .into_iter()
+                .fold(HashMap::new(), |mut acc, block_initials| {
+                    for (k, v) in block_initials {
+                        acc.entry(k).or_insert(v);
+                    }
+                    acc
+                });
 
         // Add already known landmarks (avoid re-computing them in every frame)
         // Use the cache to filter only ACTIVE landmarks
@@ -395,7 +383,11 @@ impl SlidingWindow {
                     .or_insert_with(|| {
                         (
                             ManifoldType::RN,
-                            DVector::from_vec(vec![pos[0] as f64, pos[1] as f64, pos[2] as f64]),
+                            DVector::from_column_slice(&[
+                                pos[0] as f64,
+                                pos[1] as f64,
+                                pos[2] as f64,
+                            ]),
                         )
                     });
             }
@@ -466,77 +458,47 @@ impl SlidingWindow {
             return Ok(false);
         }
 
-        // Try optimization with Schur complement first (fallback to SparseCholesky as needed)
-        let has_landmarks = landmark_variables > 0;
-        let opt_result = if !has_landmarks {
-            log::warn!(
-                "[SlidingWindow] No landmark variables found; using fallback solver (SparseCholesky)"
-            );
-            let mut fallback_solver = LevenbergMarquardt::with_config(
-                LevenbergMarquardtConfig::new()
-                    .with_linear_solver_type(LinearSolverType::SparseCholesky)
-                    .with_max_iterations(20)
-                    .with_cost_tolerance(1e-6)
-                    .with_parameter_tolerance(1e-9)
-                    .with_jacobi_scaling(false),
-            );
-            match fallback_solver.optimize(&problem, &initial_values) {
-                Ok(result) => {
-                    log::debug!("[SlidingWindow] Fallback solver succeeded");
-                    result
-                },
-                Err(e2) => {
-                    log::error!("[SlidingWindow] Fallback solver failed: {:?} - reverting to previous state", e2);
+        // Try optimization with Schur complement (fallback to SparseCholesky on singular matrix)
+        let opt_result = match solver.optimize(&problem, &initial_values) {
+            Ok(result) => result,
+            Err(e) => {
+                // Check if it's a linear solve failure (singular matrix)
+                let error_str = format!("{:?}", e);
+                if error_str.contains("LinearSolveFailed") || error_str.contains("Singular matrix")
+                {
+                    log::warn!("[SlidingWindow] Schur complement failed with singular matrix, trying fallback solver (SparseQR)");
+
+                    // Create fallback solver with SparseQR (handles rank-deficient systems)
+                    let mut fallback_solver = LevenbergMarquardt::with_config(
+                        LevenbergMarquardtConfig::new()
+                            .with_linear_solver_type(LinearSolverType::SparseQR)
+                            .with_max_iterations(20)
+                            .with_cost_tolerance(1e-6)
+                            .with_parameter_tolerance(1e-9)
+                            .with_jacobi_scaling(false),
+                    );
+
+                    match fallback_solver.optimize(&problem, &initial_values) {
+                        Ok(result) => {
+                            log::debug!("[SlidingWindow] Fallback solver succeeded");
+                            result
+                        },
+                        Err(e2) => {
+                            log::error!("[SlidingWindow] Both Schur complement and fallback solver failed: {:?} - reverting to previous state", e2);
+                            self.revert_to_saved_state(&saved_keyframe_poses, &saved_map_points);
+                            return Ok(false);
+                        },
+                    }
+                } else {
+                    // Other optimization errors - revert to saved state
+                    log::error!(
+                        "[SlidingWindow] Optimization error: {:?} - reverting to previous state",
+                        e
+                    );
                     self.revert_to_saved_state(&saved_keyframe_poses, &saved_map_points);
                     return Ok(false);
-                },
-            }
-        } else {
-            match solver.optimize(&problem, &initial_values) {
-                Ok(result) => result,
-                Err(e) => {
-                    // Check if it's a linear solve failure (singular matrix)
-                    let error_str = format!("{:?}", e);
-                    if error_str.contains("LinearSolveFailed")
-                        || error_str.contains("Singular matrix")
-                    {
-                        log::warn!("[SlidingWindow] Schur complement failed with singular matrix, trying fallback solver (SparseCholesky)");
-
-                        // Create fallback solver with direct Cholesky
-                        let mut fallback_solver = LevenbergMarquardt::with_config(
-                            LevenbergMarquardtConfig::new()
-                                .with_linear_solver_type(LinearSolverType::SparseCholesky)
-                                .with_max_iterations(20)
-                                .with_cost_tolerance(1e-6)
-                                .with_parameter_tolerance(1e-9)
-                                .with_jacobi_scaling(false),
-                        );
-
-                        match fallback_solver.optimize(&problem, &initial_values) {
-                            Ok(result) => {
-                                log::debug!("[SlidingWindow] Fallback solver succeeded");
-                                result
-                            },
-                            Err(e2) => {
-                                log::error!("[SlidingWindow] Both Schur complement and fallback solver failed: {:?} - reverting to previous state", e2);
-                                self.revert_to_saved_state(
-                                    &saved_keyframe_poses,
-                                    &saved_map_points,
-                                );
-                                return Ok(false);
-                            },
-                        }
-                    } else {
-                        // Other optimization errors - revert to saved state
-                        log::error!(
-                            "[SlidingWindow] Optimization error: {:?} - reverting to previous state",
-                            e
-                        );
-                        self.revert_to_saved_state(&saved_keyframe_poses, &saved_map_points);
-                        return Ok(false);
-                    }
-                },
-            }
+                }
+            },
         };
 
         // Check if optimization was successful based on status
@@ -575,7 +537,6 @@ impl SlidingWindow {
                 | apex_solver::optimizer::OptimizationStatus::GradientToleranceReached
                 | apex_solver::optimizer::OptimizationStatus::TrustRegionRadiusTooSmall
                 | apex_solver::optimizer::OptimizationStatus::MinCostThresholdReached
-                | apex_solver::optimizer::OptimizationStatus::MaxIterationsReached
         )
     }
 
@@ -592,10 +553,8 @@ impl SlidingWindow {
             }
         }
 
-        // Restore map points
-        self.map_points.clear();
-        self.map_points
-            .extend(saved_map_points.iter().map(|(k, v)| (*k, *v)));
+        // Restore map points (clone_from reuses existing allocation)
+        self.map_points.clone_from(saved_map_points);
 
         log::debug!(
             "[SlidingWindow] Reverted {} keyframe poses and {} map points",
@@ -608,49 +567,44 @@ impl SlidingWindow {
         &mut self,
         opt_result: &SolverResult<HashMap<String, VariableEnum>>,
     ) {
-        // TODO: handle error properly
+        // Note: error handling deferred — opt_result status is logged below;
+        // non-converged results are already handled by is_optimization_successful().
 
         // Determine convergence status accurately
-        let (status, convergence_reason) = match &opt_result.status {
-            apex_solver::optimizer::OptimizationStatus::Converged => {
-                ("CONVERGED", "Converged".to_string())
-            },
+        let (status, convergence_reason): (&str, &str) = match &opt_result.status {
+            apex_solver::optimizer::OptimizationStatus::Converged => ("CONVERGED", "Converged"),
             apex_solver::optimizer::OptimizationStatus::CostToleranceReached => {
-                ("CONVERGED", "CostTolerance".to_string())
+                ("CONVERGED", "CostTolerance")
             },
             apex_solver::optimizer::OptimizationStatus::ParameterToleranceReached => {
-                ("CONVERGED", "ParameterTolerance".to_string())
+                ("CONVERGED", "ParameterTolerance")
             },
             apex_solver::optimizer::OptimizationStatus::GradientToleranceReached => {
-                ("CONVERGED", "GradientTolerance".to_string())
+                ("CONVERGED", "GradientTolerance")
             },
             apex_solver::optimizer::OptimizationStatus::TrustRegionRadiusTooSmall => {
-                ("CONVERGED", "TrustRegionRadiusTooSmall".to_string())
+                ("CONVERGED", "TrustRegionRadiusTooSmall")
             },
             apex_solver::optimizer::OptimizationStatus::MinCostThresholdReached => {
-                ("CONVERGED", "MinCostThresholdReached".to_string())
+                ("CONVERGED", "MinCostThresholdReached")
             },
             apex_solver::optimizer::OptimizationStatus::MaxIterationsReached => {
-                ("NOT_CONVERGED", "MaxIterations".to_string())
+                ("NOT_CONVERGED", "MaxIterations")
             },
-            apex_solver::optimizer::OptimizationStatus::Timeout => {
-                ("NOT_CONVERGED", "Timeout".to_string())
-            },
+            apex_solver::optimizer::OptimizationStatus::Timeout => ("NOT_CONVERGED", "Timeout"),
             apex_solver::optimizer::OptimizationStatus::NumericalFailure => {
-                ("NOT_CONVERGED", "NumericalFailure".to_string())
+                ("NOT_CONVERGED", "NumericalFailure")
             },
             apex_solver::optimizer::OptimizationStatus::IllConditionedJacobian => {
-                ("NOT_CONVERGED", "IllConditionedJacobian".to_string())
+                ("NOT_CONVERGED", "IllConditionedJacobian")
             },
             apex_solver::optimizer::OptimizationStatus::InvalidNumericalValues => {
-                ("NOT_CONVERGED", "InvalidNumericalValues".to_string())
+                ("NOT_CONVERGED", "InvalidNumericalValues")
             },
             apex_solver::optimizer::OptimizationStatus::UserTerminated => {
-                ("NOT_CONVERGED", "UserTerminated".to_string())
+                ("NOT_CONVERGED", "UserTerminated")
             },
-            apex_solver::optimizer::OptimizationStatus::Failed(msg) => {
-                ("NOT_CONVERGED", format!("Failed:{}", msg))
-            },
+            apex_solver::optimizer::OptimizationStatus::Failed(_msg) => ("NOT_CONVERGED", "Failed"),
         };
         log::debug!(
             "[SlidingWindow] Optimization status: {}, convergence_reason: {}",
@@ -665,60 +619,84 @@ impl SlidingWindow {
             if let Some(feature_id_str) = var_name.strip_prefix("LM_") {
                 if let Ok(feature_id) = feature_id_str.parse::<usize>() {
                     let vec = value.to_vector();
-                    // TODO check if points are estimated at obviously wrong locations (negative depths, etc.)
+                    // NaN/Inf guard: skip corrupted landmarks to prevent cascading failures
+                    if !vec.iter().all(|v| v.is_finite()) {
+                        log::warn!("[SlidingWindow] Skipping NaN/Inf landmark LM_{feature_id}");
+                        return;
+                    }
                     self.map_points
                         .insert(feature_id, [vec[0] as f32, vec[1] as f32, vec[2] as f32]);
                 }
             }
             // Update keyframe poses
             else if let Some(frame_id_str) = var_name.strip_prefix("KF_") {
-                if let Ok(frame_id) = frame_id_str.parse::<i32>() {
+                if let Ok(frame_id) = frame_id_str.parse::<usize>() {
                     let mat = apex_solver::manifold::se3::SE3::from(value.to_vector()).matrix();
-                    // println!("KF_{} optimized pose: {:?}", frame_id, mat);
-                    self.keyframes
-                        .get_mut(frame_id as usize)
-                        .unwrap()
-                        .state
-                        .T_W_B = mat.try_inverse().expect("T_W_B should be invertible");
+                    // NaN/Inf guard: skip corrupted poses
+                    if !mat.iter().all(|v| v.is_finite()) {
+                        log::warn!("[SlidingWindow] Skipping NaN/Inf keyframe KF_{frame_id}");
+                        return;
+                    }
+                    let Some(kf) = self.keyframes.get_mut(frame_id) else {
+                        log::warn!("Optimizer returned unknown keyframe index {frame_id}");
+                        return;
+                    };
+                    match mat.try_inverse() {
+                        Some(inv) => kf.state.T_W_B = inv,
+                        None => {
+                            log::warn!("[SlidingWindow] Near-singular matrix for KF_{frame_id}, skipping update");
+                            return;
+                        }
+                    }
                 }
             }
         });
     }
 
-    /// Track the motion of the system by solving a PnP-like problem
-    /// The map points and existing keyframes are kept constant, only the new frame is optimized
-    pub fn track_motion(&mut self, frame: &Frame) -> Result<Option<Matrix4x4>, std::io::Error> {
+    /// Track the motion of the system by solving a PnP-like problem.
+    /// The map points and existing keyframes are kept constant, only the new frame is optimized.
+    ///
+    /// # Arguments
+    /// * `frame` - The current frame with detected features
+    /// * `predicted_pose` - Optional predicted T_W_B from constant-velocity model.
+    ///   Falls back to last keyframe pose if `None`.
+    pub fn track_motion(
+        &mut self,
+        frame: &Frame,
+        predicted_pose: Option<Matrix4x4>,
+    ) -> Result<Option<Matrix4x4>, std::io::Error> {
+        // Guard: need at least one keyframe
+        if self.keyframes.is_empty() {
+            return Ok(None);
+        }
+
         // Create a new problem and solver
         let mut problem = Problem::new();
         let mut solver = LevenbergMarquardt::with_config(
             LevenbergMarquardtConfig::new()
                 .with_linear_solver_type(LinearSolverType::SparseCholesky)
-                .with_max_iterations(10)
+                .with_max_iterations(20)
                 .with_cost_tolerance(1e-6)
                 .with_parameter_tolerance(1e-9)
                 .with_jacobi_scaling(false),
         );
         let mut initial_values = HashMap::new();
-        // solver.add_observer(TerminalObserver::new());
 
         // Add variable for the new frame
-        // Only the new frame is optimized and it's initialized from the last keyframe
+        // Use predicted pose if available, otherwise fall back to last keyframe
         let kf_var = "F".to_string();
-        let T_B_W = self
-            .keyframes
-            .back()
-            .unwrap()
-            .state
-            .T_W_B
+        let T_W_B_init =
+            predicted_pose.unwrap_or_else(|| self.keyframes.back().unwrap().state.T_W_B);
+        let T_B_W = T_W_B_init
             .try_inverse()
             .expect("T_W_B should be invertible");
         let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
         let R_B_W = Matrix3x3::from(T_B_W.fixed_view::<3, 3>(0, 0));
         let q_B_W = UnitQuaternion::from_matrix(&R_B_W);
-        let se3_data = DVector::from_vec(vec![
+        let se3_data = DVector::from_column_slice(&[
             t_B_W.x, t_B_W.y, t_B_W.z, q_B_W.w, q_B_W.i, q_B_W.j, q_B_W.k,
         ]);
-        initial_values.insert(kf_var.clone(), (ManifoldType::SE3, se3_data.cast::<f64>()));
+        initial_values.insert(kf_var.clone(), (ManifoldType::SE3, se3_data));
 
         // Add factors: for both the left and right cameras, each point that was already in the map is used to optimize the new frame
         // Fetch transforms between cameras and body
@@ -746,29 +724,33 @@ impl SlidingWindow {
             for feat in features.iter() {
                 let feature_id = feat.feature_id;
 
-                let point = self.map_points.get(&feature_id);
-                match point {
-                    Some(point) => {
-                        // Create PnP factor
-                        let factor = PnPFactor::new(
-                            na::Vector2::new(feat.undistorted_coord[0], feat.undistorted_coord[1])
-                                .cast::<f64>(),
-                            *T_C_B,
-                            na::Vector3::new(point[0] as f64, point[1] as f64, point[2] as f64),
-                        );
-                        // Add residual block with Huber loss
-                        let huber_loss = HuberLoss::new(2.0).unwrap();
-                        problem.add_residual_block(
-                            &[&kf_var],
-                            Box::new(factor),
-                            Some(Box::new(huber_loss)),
-                        );
-                    },
-                    None => {
-                        // log::debug!("[SlidingWindow] Motion tracking: point {} is not in the map", feature_id);
-                    },
+                if let Some(point) = self.map_points.get(&feature_id) {
+                    // Create PnP factor
+                    let factor = PnPFactor::new(
+                        na::Vector2::new(feat.undistorted_coord[0], feat.undistorted_coord[1])
+                            .cast::<f64>(),
+                        *T_C_B,
+                        na::Vector3::new(point[0] as f64, point[1] as f64, point[2] as f64),
+                    );
+                    // Add residual block with Huber loss
+                    let huber_loss =
+                        HuberLoss::new(2.0).expect("HuberLoss threshold must be positive");
+                    problem.add_residual_block(
+                        &[&kf_var],
+                        Box::new(factor),
+                        Some(Box::new(huber_loss)),
+                    );
                 }
             }
+        }
+
+        // Minimum correspondences check: PnP needs at least 6 2D-3D correspondences
+        let num_residuals = problem.num_residual_blocks();
+        if num_residuals < 6 {
+            log::warn!(
+                "[SlidingWindow] Motion tracking: too few 2D-3D correspondences ({num_residuals}), need >= 6"
+            );
+            return Ok(None);
         }
 
         // Initialize variables in the problem

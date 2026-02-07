@@ -63,15 +63,14 @@ impl ImuFactor {
         // sqrt_information such that sqrt_information^T * sqrt_information = Information
         let cov = preintegration.covariance;
 
-        // Try to compute Cholesky of inverse
-        // If covariance is singular, use identity (unit information)
-        let information = cov.try_inverse().unwrap_or_else(na::SMatrix::identity);
-
-        // Compute Cholesky decomposition of information matrix
-        let sqrt_information = if let Some(chol) = information.cholesky() {
-            chol.l()
+        // Compute square root of information matrix via Cholesky of covariance.
+        // cov = L * L^T, so cov^{-1} = L^{-T} * L^{-1}.
+        // Setting M = L^{-1} gives M^T * M = cov^{-1} = Information.
+        // This avoids the numerically unstable explicit dense inverse.
+        let sqrt_information = if let Some(chol) = cov.cholesky() {
+            chol.l().try_inverse().unwrap_or_else(na::SMatrix::identity)
         } else {
-            // Fallback: use identity if information is not positive definite
+            // Fallback: use identity if covariance is not positive definite
             na::SMatrix::identity()
         };
 
@@ -86,7 +85,7 @@ impl ImuFactor {
     ///
     /// Uses first-order approximation from Forster et al. 2017:
     /// ```text
-    /// ΔR' = ΔR * Exp(-J_R_bg * δb_g)
+    /// ΔR' = ΔR * Exp(J_R_bg * δb_g)
     /// Δv' = Δv - J_v_bg * δb_g - J_v_ba * δb_a
     /// Δp' = Δp - J_p_bg * δb_g - J_p_ba * δb_a
     /// ```
@@ -99,8 +98,9 @@ impl ImuFactor {
         let d_bias_g = bias_g - self.preintegration.linearization_point_bg;
         let d_bias_a = bias_a - self.preintegration.linearization_point_ba;
 
-        // Correct rotation: ΔR' = ΔR * Exp(-J_R_bg * δb_g)
-        let delta_R_correction = exp_map_so3(-self.preintegration.J_R_bg * d_bias_g);
+        // Correct rotation: ΔR' = ΔR * Exp(J_R_bg * δb_g)
+        // J_R_bg already encodes the negative sign from ∂Exp((ω-bg)dt)/∂bg
+        let delta_R_correction = exp_map_so3(self.preintegration.J_R_bg * d_bias_g);
         let corrected_delta_R = self.preintegration.delta_R * delta_R_correction;
 
         // Correct velocity: Δv' = Δv - J_v_bg * δb_g - J_v_ba * δb_a
@@ -116,9 +116,9 @@ impl ImuFactor {
         (corrected_delta_R, corrected_delta_v, corrected_delta_p)
     }
 
-    /// Compute weighted residual for given states and biases
+    /// Compute weighted residual for given states and biases (stack-allocated)
     #[allow(clippy::too_many_arguments)]
-    fn compute_weighted_residual(
+    fn compute_weighted_residual_svec(
         &self,
         R_i: UnitQuaternion<f64>,
         v_i: Vector3<f64>,
@@ -128,25 +128,29 @@ impl ImuFactor {
         p_j: Vector3<f64>,
         bias_g: Vector3<f64>,
         bias_a: Vector3<f64>,
-    ) -> DVector<f64> {
+    ) -> na::SVector<f64, 9> {
         let (corrected_delta_R, corrected_delta_v, corrected_delta_p) =
             self.correct_for_bias(&bias_g, &bias_a);
 
         let dt = self.preintegration.delta_t;
+        let dt2 = dt * dt;
+
+        // Cache R_i inverse — used by rotation, velocity, and position residuals
+        let R_i_inv = R_i.inverse();
 
         // ==================== Rotation Residual ====================
-        let predicted_R_ij = R_i.inverse() * R_j;
+        let predicted_R_ij = R_i_inv * R_j;
         let rotation_error_quat = corrected_delta_R.inverse() * predicted_R_ij;
         let r_R = Self::quat_to_rotation_vector(&rotation_error_quat);
 
         // ==================== Velocity Residual ====================
         let predicted_dv_world = v_j - v_i - self.gravity * dt;
-        let predicted_dv_i = R_i.inverse() * predicted_dv_world;
+        let predicted_dv_i = R_i_inv * predicted_dv_world;
         let r_v = predicted_dv_i - corrected_delta_v;
 
         // ==================== Position Residual ====================
-        let predicted_dp_world = p_j - p_i - v_i * dt - 0.5 * self.gravity * dt.powi(2);
-        let predicted_dp_i = R_i.inverse() * predicted_dp_world;
+        let predicted_dp_world = p_j - p_i - v_i * dt - 0.5 * self.gravity * dt2;
+        let predicted_dp_i = R_i_inv * predicted_dp_world;
         let r_p = predicted_dp_i - corrected_delta_p;
 
         let mut residual = na::SVector::<f64, 9>::zeros();
@@ -154,32 +158,12 @@ impl ImuFactor {
         residual.rows_mut(3, 3).copy_from(&r_v);
         residual.rows_mut(6, 3).copy_from(&r_p);
 
-        let weighted = self.sqrt_information * residual;
-        DVector::from_vec(weighted.as_slice().to_vec())
+        self.sqrt_information * residual
     }
 
     /// Convert unit quaternion to rotation vector (Log map)
-    ///
-    /// This is the inverse of exp_map (Rodrigues formula)
     fn quat_to_rotation_vector(q: &UnitQuaternion<f64>) -> Vector3<f64> {
-        // For unit quaternion q = [w, x, y, z]
-        // The rotation angle θ = 2 * acos(w)
-        // The rotation axis n = [x, y, z] / sin(θ/2)
-        // Rotation vector = θ * n
-
-        let w = q.w;
-        let vec = Vector3::new(q.i, q.j, q.k);
-
-        // Small angle approximation for numerical stability
-        if vec.norm() < 1e-8 {
-            // θ ≈ 0, so rotation vector ≈ 2 * [x, y, z]
-            return 2.0 * vec;
-        }
-
-        let theta = 2.0 * w.acos();
-        let axis = vec / vec.norm();
-
-        theta * axis
+        q.scaled_axis()
     }
 }
 
@@ -221,7 +205,7 @@ impl Factor for ImuFactor {
         assert_eq!(params[7].len(), 3, "b_a must be 3D");
 
         // Extract parameters
-        let R_i = UnitQuaternion::from_quaternion(na::Quaternion::new(
+        let R_i = UnitQuaternion::new_normalize(na::Quaternion::new(
             params[0][0],
             params[0][1],
             params[0][2],
@@ -230,7 +214,7 @@ impl Factor for ImuFactor {
         let v_i = Vector3::new(params[1][0], params[1][1], params[1][2]);
         let p_i = Vector3::new(params[2][0], params[2][1], params[2][2]);
 
-        let R_j = UnitQuaternion::from_quaternion(na::Quaternion::new(
+        let R_j = UnitQuaternion::new_normalize(na::Quaternion::new(
             params[3][0],
             params[3][1],
             params[3][2],
@@ -242,86 +226,60 @@ impl Factor for ImuFactor {
         let bias_g = Vector3::new(params[6][0], params[6][1], params[6][2]);
         let bias_a = Vector3::new(params[7][0], params[7][1], params[7][2]);
 
-        let weighted_residual =
-            self.compute_weighted_residual(R_i, v_i, p_i, R_j, v_j, p_j, bias_g, bias_a);
+        let weighted_residual_svec =
+            self.compute_weighted_residual_svec(R_i, v_i, p_i, R_j, v_j, p_j, bias_g, bias_a);
+        let weighted_residual = DVector::from_column_slice(weighted_residual_svec.as_slice());
 
         // Compute Jacobians if requested
         let jacobian = if compute_jacobian {
             // Use numerical differentiation for now
             // TODO: Implement analytical Jacobians for performance
             let eps = 1e-7;
+            let inv_eps = 1.0 / eps;
             let mut jac = DMatrix::zeros(9, 26); // 9 residuals x 26 parameters
 
-            // Jacobian w.r.t. R_i (4 params)
-            for i in 0..4 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[0][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(i).copy_from(&col);
-            }
+            // Clone once and perturb/restore in-place to avoid 26 full clones
+            let mut params_pert = params.to_vec();
 
-            // Jacobian w.r.t. v_i (3 params, offset 4)
-            for i in 0..3 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[1][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(4 + i).copy_from(&col);
-            }
+            // Helper closure: extract params → call compute_weighted_residual_svec directly,
+            // avoiding re-parsing asserts and DVector allocs per column
+            let extract_and_eval = |p: &[DVector<f64>]| -> na::SVector<f64, 9> {
+                let r_i = UnitQuaternion::new_normalize(na::Quaternion::new(
+                    p[0][0], p[0][1], p[0][2], p[0][3],
+                ));
+                let vi = Vector3::new(p[1][0], p[1][1], p[1][2]);
+                let pi = Vector3::new(p[2][0], p[2][1], p[2][2]);
+                let r_j = UnitQuaternion::new_normalize(na::Quaternion::new(
+                    p[3][0], p[3][1], p[3][2], p[3][3],
+                ));
+                let vj = Vector3::new(p[4][0], p[4][1], p[4][2]);
+                let pj = Vector3::new(p[5][0], p[5][1], p[5][2]);
+                let bg = Vector3::new(p[6][0], p[6][1], p[6][2]);
+                let ba = Vector3::new(p[7][0], p[7][1], p[7][2]);
+                self.compute_weighted_residual_svec(r_i, vi, pi, r_j, vj, pj, bg, ba)
+            };
 
-            // Jacobian w.r.t. p_i (3 params, offset 7)
-            for i in 0..3 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[2][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(7 + i).copy_from(&col);
-            }
-
-            // Jacobian w.r.t. R_j (4 params, offset 10)
-            for i in 0..4 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[3][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(10 + i).copy_from(&col);
-            }
-
-            // Jacobian w.r.t. v_j (3 params, offset 14)
-            for i in 0..3 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[4][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(14 + i).copy_from(&col);
-            }
-
-            // Jacobian w.r.t. p_j (3 params, offset 17)
-            for i in 0..3 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[5][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(17 + i).copy_from(&col);
-            }
-
-            // Jacobian w.r.t. b_g (3 params, offset 20)
-            for i in 0..3 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[6][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(20 + i).copy_from(&col);
-            }
-
-            // Jacobian w.r.t. b_a (3 params, offset 23)
-            for i in 0..3 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[7][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(23 + i).copy_from(&col);
+            let block_sizes: [(usize, usize); 8] = [
+                (0, 4), // R_i → col offset 0
+                (1, 3), // v_i → col offset 4
+                (2, 3), // p_i → col offset 7
+                (3, 4), // R_j → col offset 10
+                (4, 3), // v_j → col offset 14
+                (5, 3), // p_j → col offset 17
+                (6, 3), // b_g → col offset 20
+                (7, 3), // b_a → col offset 23
+            ];
+            let mut col_offset = 0usize;
+            for &(block_idx, block_size) in &block_sizes {
+                for i in 0..block_size {
+                    params_pert[block_idx][i] += eps;
+                    // SVector path: no heap allocs for residual or diff
+                    let r_pert = extract_and_eval(&params_pert);
+                    let col = (r_pert - weighted_residual_svec) * inv_eps;
+                    jac.column_mut(col_offset + i).copy_from(&col);
+                    params_pert[block_idx][i] -= eps; // restore
+                }
+                col_offset += block_size;
             }
 
             Some(jac)
@@ -357,7 +315,7 @@ impl ImuFactorSe3 {
 
     fn pose_from_se3(param: &DVector<f64>) -> (UnitQuaternion<f64>, Vector3<f64>) {
         let t_B_W = Vector3::new(param[0], param[1], param[2]);
-        let q_B_W = UnitQuaternion::from_quaternion(na::Quaternion::new(
+        let q_B_W = UnitQuaternion::new_normalize(na::Quaternion::new(
             param[3], param[4], param[5], param[6],
         ));
         let q_W_B = q_B_W.inverse();
@@ -391,60 +349,52 @@ impl Factor for ImuFactorSe3 {
         let bias_g = Vector3::new(params[4][0], params[4][1], params[4][2]);
         let bias_a = Vector3::new(params[5][0], params[5][1], params[5][2]);
 
-        let weighted_residual = self
+        // Use stack-allocated SVector for base residual, convert to DVector only at return
+        let weighted_svec = self
             .inner
-            .compute_weighted_residual(R_i, v_i, p_i, R_j, v_j, p_j, bias_g, bias_a);
+            .compute_weighted_residual_svec(R_i, v_i, p_i, R_j, v_j, p_j, bias_g, bias_a);
+        let weighted_residual = DVector::from_column_slice(weighted_svec.as_slice());
 
         let jacobian = if compute_jacobian {
             let eps = 1e-7;
+            let inv_eps = 1.0 / eps;
             let mut jac = DMatrix::zeros(9, 26);
 
-            for i in 0..7 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[0][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(i).copy_from(&col);
-            }
+            // Clone once and perturb/restore in-place
+            let mut params_pert = params.to_vec();
 
-            for i in 0..3 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[1][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(7 + i).copy_from(&col);
-            }
+            // Inline extraction+eval closure: avoids recursive self.linearize() call
+            // which would heap-allocate 3 DVectors per column (78 total for 26 columns)
+            let eval_svec = |p: &[DVector<f64>]| -> na::SVector<f64, 9> {
+                let (r_i, pos_i) = Self::pose_from_se3(&p[0]);
+                let vi = Vector3::new(p[1][0], p[1][1], p[1][2]);
+                let (r_j, pos_j) = Self::pose_from_se3(&p[2]);
+                let vj = Vector3::new(p[3][0], p[3][1], p[3][2]);
+                let bg = Vector3::new(p[4][0], p[4][1], p[4][2]);
+                let ba = Vector3::new(p[5][0], p[5][1], p[5][2]);
+                self.inner
+                    .compute_weighted_residual_svec(r_i, vi, pos_i, r_j, vj, pos_j, bg, ba)
+            };
 
-            for i in 0..7 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[2][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(10 + i).copy_from(&col);
-            }
-
-            for i in 0..3 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[3][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(17 + i).copy_from(&col);
-            }
-
-            for i in 0..3 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[4][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(20 + i).copy_from(&col);
-            }
-
-            for i in 0..3 {
-                let mut params_perturbed = params.to_vec();
-                params_perturbed[5][i] += eps;
-                let (r_pert, _) = self.linearize(&params_perturbed, false);
-                let col = (r_pert - &weighted_residual) / eps;
-                jac.column_mut(23 + i).copy_from(&col);
+            let block_sizes: [(usize, usize); 6] = [
+                (0, 7), // T_B_W_i → col offset 0
+                (1, 3), // v_i     → col offset 7
+                (2, 7), // T_B_W_j → col offset 10
+                (3, 3), // v_j     → col offset 17
+                (4, 3), // b_g     → col offset 20
+                (5, 3), // b_a     → col offset 23
+            ];
+            let mut col_offset = 0usize;
+            for &(block_idx, block_size) in &block_sizes {
+                for i in 0..block_size {
+                    params_pert[block_idx][i] += eps;
+                    // SVector path: zero heap allocs for residual computation and diff
+                    let r_pert = eval_svec(&params_pert);
+                    let col = (r_pert - weighted_svec) * inv_eps;
+                    jac.column_mut(col_offset + i).copy_from(&col);
+                    params_pert[block_idx][i] -= eps; // restore
+                }
+                col_offset += block_size;
             }
 
             Some(jac)

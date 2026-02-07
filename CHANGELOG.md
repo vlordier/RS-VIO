@@ -8,39 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.0] - 2026-01-11
 
 ### Added
-- **Ultra-tight safety configuration** for embedded and safety-critical systems
-- **SAFETY.md**: Comprehensive 323-line safety documentation
-- **Build profiles**: Three-tier strategy (release, embedded-safe, ultra-critical)
-- **Deny-level lints**: expect_used, todo, unimplemented, box_collection, rc_buffer
-- **Sanitizer support**: Memory, thread, and address sanitizers for pre-deployment testing
-- **Pre-deployment checklist**: 11-step validation process for critical deployments
-- Support for medical devices, aerospace systems, and autonomous vehicles
+- **Safety lint configuration** for embedded and safety-critical systems
+- **SAFETY.md**: Comprehensive safety documentation
+- **Deny-level lints**: todo, unimplemented, box_collection, rc_buffer
 
 ### Changed
-- Promoted unsafe patterns to deny-level in Cargo.toml clippy lints
-- Enhanced integer overflow protection in all build profiles
-- Strengthened panic handling with abort strategy
-- Updated description to emphasize safety-critical capabilities
+- Promoted unsafe_code to forbid in Cargo.toml
 
 ### Security
-- **unsafe_code = forbid**: 100% safe Rust guarantee
-- **panic = deny**: No panics in production code
-- **expect_used = deny**: Must use Result<T> instead
-- All 27 tests passing with strict safety validation
+- **unsafe_code = forbid**: Safe Rust only
+- **expect_used/unwrap_used = warn**: Tightening toward deny
 
 ## [Unreleased]
 
 ### Added
 - Comprehensive unit and integration tests
 - Performance benchmarks using Criterion
-- Profiling examples with pprof support
-- Docker containerization for deployment
-- Structured logging with tracing
-- Custom error types with thiserror
 - Security audits with cargo-audit
-- Code coverage reporting with cargo-tarpaulin
 - GitHub Actions CI/CD pipeline
-- API documentation publishing
 
 ### Changed
 - Improved code formatting and linting
@@ -51,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Compilation errors in estimator and datasets modules
 - Various clippy warnings and code quality issues
 
-## [0.1.0] - 2024-01-XX
+## [0.1.0] - 2024-01-15
 
 ### Added
 - Initial implementation of Visual-Inertial Odometry system

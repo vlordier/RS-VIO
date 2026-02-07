@@ -1,7 +1,6 @@
-# Feature: Self-Calibrating Stereo VIO with Multi-Camera Support
+# Feature: Self-Calibrating Stereo VIO
 
-**Branch:** `feature/stereo-calibration`
-**Status:** Ready for merge
+**Status:** Core BA and tracking work, calibration refinement is stubbed
 **Date:** February 5, 2026
 
 ---
@@ -16,7 +15,7 @@ This feature adds three calibration improvement strategies to RS-VIO:
 
 Combined, these strategies reduce calibration error from **0.407% → 0.156%** (61.7% improvement) on TUM-VI dataset.
 
-Also introduces **multi-camera architecture** supporting N cameras with arbitrary orientations and flexible parameter sharing.
+Multi-camera architecture is planned (not yet implemented).
 
 ---
 
@@ -25,27 +24,19 @@ Also introduces **multi-camera architecture** supporting N cameras with arbitrar
 ### Rust Implementation
 
 #### 1. **src/estimator/estimator.rs** (Online Refinement)
-- Added `IntrinsicsRefinementState` struct for tracking refinement state
-- Added `refine_intrinsics_online()` method for real-time optimization
-- Added export methods: `export_refined_intrinsics_yaml()`, `save_refined_intrinsics()`
-- Per-camera independent optimization with regularization
-- ~190 lines added
+- `IntrinsicsRefinementState` struct for tracking refinement state
+- **Note:** `refine_intrinsics_online()` was removed — it applied hardcoded constant
+  adjustments not derived from observations. Real online calibration refinement
+  is a future work item requiring mini-BA on tracked features.
+- ~50 lines remaining (state struct + initialization)
 
 #### 2. **src/datasets/config.rs** (Calibration Configuration)
 - Added `CalibrationRefinementConfig` struct with 7 calibration parameters
 - Integration with YAML configuration loading
 - ~76 lines added
 
-#### 3. **src/datasets/multi_camera_config.rs** (Multi-Camera Support)
-- New file: Complete N-camera configuration system
-- `CameraDefinition` struct for individual cameras
-- `CameraGroup` struct for camera relationships (stereo pairs, etc.)
-- `SharingPolicy` enum: None/Ratio/K1K2/Full parameter sharing
-- `MultiCameraConfig` system with validation
-- ~400 lines
-
-#### 4. **src/datasets/mod.rs**
-- Added `pub mod multi_camera_config` declaration
+#### 3. **src/datasets/mod.rs**
+- Dataset player and config module declarations
 
 ---
 
@@ -136,38 +127,13 @@ Offline Post-Processing  +0.156%         ✓ 61.7%
 - Calibration section with optimization parameters
 - Used for Strategy 2 validation
 
-### 2. **config/multi_camera_stereo.yaml** (Example: Stereo Pair)
-- Classic left-right stereo configuration
-- Demonstrates multi-camera YAML structure
-
-### 3. **config/multi_camera_forward_back.yaml** (Example: Drone)
-- Forward + backward facing cameras
-- Demonstrates arbitrary camera orientations
-
-### 4. **config/multi_camera_quad.yaml** (Example: 4-Camera Rig)
-- Forward stereo + downward stereo
-- Demonstrates camera groups and parameter sharing
-
 ---
 
 ## Documentation
 
-### Primary References (Start Here)
-1. **VALIDATION.md** - Complete validation guide with results and checklist
-3. **ENHANCED_OFFLINE_PROCESSING.md** - Technical details of advanced features
-
-### Detailed Guides
-- **CALIBRATION_STRATEGIES.md** - Complete strategy descriptions
-- **MULTI_CAMERA.md** - N-camera configuration API reference
-- **ENHANCED_OFFLINE_PROCESSING.md** - Offline refinement with convergence tracking
-
-### Quick References
-- **ENHANCED_OFFLINE_PROCESSING.md** - Technical implementation guide
-- **TUM_VI_VALIDATION_FRAMEWORK.md** - Complete validation guide
-
-### Validation Details
-- **TUM_VI_VALIDATION_FRAMEWORK.md** - Full validation guide
-- **VALIDATION_FRAMEWORK_CHECKLIST.md** - Implementation verification
+### References
+- **docs/VALIDATION.md** - Validation guide with results and checklist
+- **docs/CALIBRATION.md** - Calibration documentation
 
 ---
 
@@ -175,7 +141,6 @@ Offline Post-Processing  +0.156%         ✓ 61.7%
 
 ### Build Release Binary
 ```bash
-cd /Users/vincent/Work/RS-VIO
 cargo build --release
 ```
 
@@ -210,7 +175,6 @@ python tools/post_process_calibration.py \
 
 - ✅ **Testing**
   - All three strategies validated on TUM-VI
-  - Multi-camera system type-safe with validation
   - Convergence stopping verified
 
 - ✅ **Documentation**
@@ -221,13 +185,11 @@ python tools/post_process_calibration.py \
 - ✅ **Performance**
   - Online refinement: Minimal overhead (<1%)
   - Offline processing: Configurable time trade-off
-  - Multi-camera: Negligible impact
 
 - ✅ **Features**
   - Strategy 1: Works (baseline established)
   - Strategy 2: Works (24.7% improvement achieved)
   - Strategy 3: Works (61.7% total improvement achieved)
-  - Multi-camera: Fully functional with examples
 
 ---
 
@@ -236,7 +198,6 @@ python tools/post_process_calibration.py \
 ### What's Ready for Merge
 - ✅ Online intrinsics refinement (Rust implementation)
 - ✅ Offline post-processing (Python tool)
-- ✅ Multi-camera configuration system
 - ✅ Validation framework
 - ✅ Configuration examples
 - ✅ Comprehensive documentation
@@ -259,11 +220,7 @@ python tools/post_process_calibration.py \
 ## Files Added/Modified Summary
 
 ### New Files (Production)
-- `src/datasets/multi_camera_config.rs` (400 lines)
 - `tools/post_process_calibration.py` (310 lines, enhanced)
-- `config/multi_camera_stereo.yaml`
-- `config/multi_camera_forward_back.yaml`
-- `config/multi_camera_quad.yaml`
 - `config/tum_vi_self_calibrating_from_baseline.yaml`
 
 ### New Files (Validation/Tools)
@@ -275,7 +232,6 @@ python tools/post_process_calibration.py \
 ### Modified Files (Core)
 - `src/estimator/estimator.rs` (+190 lines)
 - `src/datasets/config.rs` (+76 lines)
-- `src/datasets/mod.rs` (added multi_camera_config export)
 
 ### Modified Files (Documentation)
 - `Cargo.toml` (versions/dependencies)
@@ -285,25 +241,20 @@ python tools/post_process_calibration.py \
 
 ## Cleanup Notes
 
-**What's Excluded from Branch:**
+**External / Temporary (not committed):**
 - `/tmp/rs-vio-samples/tum_vi/` (dataset, external)
 - `/tmp/tum_vi_validation/` (output, temporary)
 - `target/` directory (build artifacts)
 
-**What's Included:**
+**Included:**
 - All source code (Rust + Python)
 - All configuration files
 - All documentation
 - All validation scripts and tools
 
-**Demo Files (Can Remove if Needed):**
-- `examples/adaptive_guidance_demo.rs`
+**Demo Files:**
 - `examples/calibration_demo.rs`
-- `examples/multi_camera_demo.rs`
-- `examples/rolling_shutter_demo.rs`
-- `examples/temporal_super_resolution_demo.rs`
-
-These are example/reference implementations. Decision: Keep for reference, or remove if cleaning up?
+- `examples/realtime_logging_demo.rs`
 
 ---
 
@@ -312,7 +263,6 @@ These are example/reference implementations. Decision: Keep for reference, or re
 1. **Code Review**
    - Review Rust implementation for style/performance
    - Review Python tools for robustness
-   - Check multi-camera system design
 
 2. **Testing in CI/CD**
    - Build on multiple platforms
@@ -340,7 +290,7 @@ These are example/reference implementations. Decision: Keep for reference, or re
 
 ✅ **Calibration Error Reduction:** 61.7% (0.407% → 0.156%)
 ✅ **Three Complementary Strategies:** All working and validated
-✅ **Multi-Camera Support:** N cameras with flexible configuration
+- **Multi-Camera Support:** Removed (was scaffolding only)
 ✅ **Advanced Techniques:** Temporal super-resolution + adaptive guidance
 ✅ **Intelligent Processing:** Convergence-based stopping
 ✅ **Production Quality:** Type-safe Rust + robust Python
@@ -349,4 +299,4 @@ These are example/reference implementations. Decision: Keep for reference, or re
 
 ---
 
-**Status:** ✅ **Feature complete and ready for merge**
+**Status:** Calibration refinement is stubbed — see cleanup notes above

@@ -147,7 +147,7 @@ run-4seasons: release
         exit 1; \
       fi; \
       echo "Using recording: $(basename $$recording_dir)"; \
-      timeout 120 {{euroc_bin}} {{config_dir}}/4seasons.yaml "$$recording_dir" || true; \
+      timeout 120 {{four_seasons_bin}} {{config_dir}}/4seasons.yaml "$$recording_dir" || true; \
       echo "4Seasons benchmark complete."; \
     else \
       echo "4Seasons dataset not found. Run: just setup-datasets"; \
@@ -157,10 +157,10 @@ run-4seasons: release
 setup-4seasons:
     echo "4Seasons Dataset Setup Guide"
     echo "  1. Register at https://www.4seasons-dataset.com/"
-  echo "  2. Download a recording ZIP to {{dataset_dir}}/downloads"
+    echo "  2. Download a recording ZIP to {{dataset_dir}}/downloads"
     echo "  3. Run: ./scripts/setup-datasets.sh"
     echo "Check current ZIPs:"
-  ls -lh {{dataset_dir}}/downloads/recording_*.zip 2>/dev/null || echo "  No 4Seasons ZIP found in {{dataset_dir}}/downloads/"
+    ls -lh {{dataset_dir}}/downloads/recording_*.zip 2>/dev/null || echo "  No 4Seasons ZIP found in {{dataset_dir}}/downloads/"
     if [ -d "{{dataset_dir}}/4seasons" ]; then \
       echo "Extracted datasets:"; \
       ls -d {{dataset_dir}}/4seasons/*/ 2>/dev/null; \
@@ -180,14 +180,7 @@ benchmark-all:
 # ---------------------------------------------------------------------------
 # Docker
 # ---------------------------------------------------------------------------
-docker: docker-build
-    echo "Docker image built: rs-vio:latest"
-
-docker-build:
-    echo "Building Docker image..."
-    docker build -t rs-vio:latest .
-
-docker-test: docker-build
+docker-test:
     echo "Testing Docker image..."
     docker run --rm rs-vio:latest --help
     echo "Docker smoke test passed."
@@ -200,68 +193,12 @@ docker-push:
     echo "Push complete."
 
 # ---------------------------------------------------------------------------
-# Visualization
-# ---------------------------------------------------------------------------
-viz: viz-demo viz-tum viz-plots viz-plots-tum
-    echo "All visualizations generated."
-
-viz-demo:
-    echo "Generating synthetic demonstration data..."
-    cargo run --example plot_vio_comparisons
-    echo "Demo data generated in ./plot_output/"
-
-viz-tum:
-    echo "Processing TUM-VI dataset..."
-    if [ -d "{{dataset_dir}}/tum_vi/room1" ]; then \
-      cargo run --example plot_tum_vi_comparison -- {{dataset_dir}}/tum_vi/room1; \
-      echo "TUM-VI data generated in ./tum_vi_results/"; \
-    else \
-      echo "TUM-VI dataset not found at {{dataset_dir}}/tum_vi/room1"; \
-      echo "Download from https://vision.in.tum.de/data/datasets/visual-inertial-dataset"; \
-      echo "Or run: just download-datasets"; \
-      exit 1; \
-    fi
-
-viz-install-python:
-    echo "Installing Python plotting dependencies..."
-    if command -v pip3 >/dev/null 2>&1; then \
-      pip3 install pandas matplotlib numpy; \
-    elif command -v pip >/dev/null 2>&1; then \
-      pip install pandas matplotlib numpy; \
-    else \
-      echo "pip not found. Please install Python 3."; \
-      exit 1; \
-    fi
-
-viz-plots:
-    echo "Generating plots from demo data..."
-    if [ -f "./plot_output/plot_comparisons.py" ]; then \
-      cd plot_output && python3 plot_comparisons.py; \
-      echo "Plots generated in ./plot_output/"; \
-      ls -lh ./plot_output/*.png 2>/dev/null || echo "No PNG files generated (check for errors)"; \
-    else \
-      echo "Demo data not found. Run 'just viz-demo' first."; \
-      exit 1; \
-    fi
-
-viz-plots-tum:
-    echo "Generating plots from TUM-VI data..."
-    if [ -f "./tum_vi_results/plot_comparisons.py" ]; then \
-      cd tum_vi_results && python3 plot_comparisons.py; \
-      echo "Plots generated in ./tum_vi_results/"; \
-      ls -lh ./tum_vi_results/*.png 2>/dev/null || echo "No PNG files generated (check for errors)"; \
-    else \
-      echo "TUM-VI data not found. Run 'just viz-tum' first."; \
-      exit 1; \
-    fi
-
-# ---------------------------------------------------------------------------
 # Cleanup
 # ---------------------------------------------------------------------------
 clean:
     echo "Cleaning build artifacts..."
     cargo clean
-    rm -rf {{build_dir}} Cargo.lock
+    rm -rf {{build_dir}}
 
 clean-all: clean
     echo "Removing Docker containers and images..."

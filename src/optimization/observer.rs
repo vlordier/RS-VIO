@@ -38,8 +38,8 @@ impl TerminalObserver {
 
     /// Print header for the metrics output.
     pub fn print_header() {
-        println!("Iter\tCost\t\tGradNorm\tDamping\t\tStepNorm\tStepQuality");
-        println!("{}", "-".repeat(80));
+        log::debug!("Iter\tCost\t\tGradNorm\tDamping\t\tStepNorm\tStepQuality");
+        log::debug!("{}", "-".repeat(80));
     }
 }
 
@@ -52,9 +52,14 @@ impl OptObserver for TerminalObserver {
         let step_norm = metrics.step_norm.unwrap_or(0.0);
         let step_quality = metrics.step_quality.unwrap_or(0.0);
 
-        println!(
+        log::debug!(
             "{}\t{:.6e}\t{:.6e}\t{:.6e}\t{:.6e}\t{:.6e}",
-            iteration, cost, grad_norm, damping, step_norm, step_quality
+            iteration,
+            cost,
+            grad_norm,
+            damping,
+            step_norm,
+            step_quality
         );
     }
 

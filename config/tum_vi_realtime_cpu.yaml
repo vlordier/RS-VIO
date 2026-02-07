@@ -2,14 +2,6 @@
 # Strategy: smaller window, very low BA/PnP iterations, fewer features,
 # diagonal Hessian with higher damping, minimal priors, optional downscale.
 
-debug:
-  use_imu: true
-  use_feature_tracking: true
-  use_triangulation: true
-  use_fallback_depth: false
-  min_stereo_matches: 2
-  log_stereo_undistorted: false
-
 camera:
   # Keep at dataset resolution; loader enforces exact size.
   image_width: 512
@@ -29,7 +21,6 @@ keyframe_management:
   keyframe_window_size: 10
   translation_threshold: 0.08
   rotation_threshold: 0.08
-  processing_timeout_ms: 4000
 
 feature_detection:
   grid_size: 14              # fewer cells
@@ -37,28 +28,6 @@ feature_detection:
   optical_flow_max_iterations: 8
   optical_flow_convergence_threshold: 0.02
 
-depth:
-  min_depth: 0.1
-  max_depth: 50.0
-
 optimization:
   pnp_max_iterations: 3
   bundle_adjustment_max_iterations: 3
-  imu_prior_enable: false
-  imu_prior_weight_pos: 0.2
-  imu_prior_weight_rot: 0.5
-  imu_prior_huber_delta: 1.0
-
-marginalization:
-  enabled: true
-  max_keyframes: 10
-  num_marginalize_per_step: 1
-  min_landmark_observations: 2
-  landmark_age_limit: 30
-  use_fej: false
-  damping: 1e-6
-  prior_weight: 1.0
-  prior_info_scale: 1.0
-  hessian_approximator: "Diagonal"
-  gradient_computer: "Standard"
-  prior_constructor: "Standard"

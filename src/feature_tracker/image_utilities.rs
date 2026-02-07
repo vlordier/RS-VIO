@@ -3,10 +3,16 @@ use imageproc::corners::{corners_fast9, Corner};
 use nalgebra as na;
 use rayon::prelude::*;
 
+#[inline]
 pub fn image_grad(grayscale_image: &GrayImage, x: f32, y: f32) -> na::SVector<f32, 3> {
-    // inbound
     let ix = x.floor() as u32;
     let iy = y.floor() as u32;
+    let width = grayscale_image.width();
+    let height = grayscale_image.height();
+    debug_assert!(
+        ix >= 1 && iy >= 1 && ix + 2 < width && iy + 2 < height,
+        "image_grad out of bounds: ({ix},{iy}) in {width}x{height}"
+    );
 
     let dx = x - ix as f32;
     let dy = y - iy as f32;
@@ -15,7 +21,6 @@ pub fn image_grad(grayscale_image: &GrayImage, x: f32, y: f32) -> na::SVector<f3
     let ddy = 1.0 - dy;
 
     // Use direct pixel access instead of get_pixel for better performance
-    let width = grayscale_image.width();
     let raw_pixels = grayscale_image.as_raw();
 
     let idx00 = (iy * width + ix) as usize;
@@ -68,39 +73,43 @@ pub fn image_grad(grayscale_image: &GrayImage, x: f32, y: f32) -> na::SVector<f3
 
 pub const fn point_in_bound(keypoint: &Corner, height: u32, width: u32, radius: u32) -> bool {
     keypoint.x >= radius
-        && keypoint.x <= width - radius
+        && keypoint.x + radius < width
         && keypoint.y >= radius
-        && keypoint.y <= height - radius
+        && keypoint.y + radius < height
 }
 
+#[inline]
 pub fn inbound(image: &GrayImage, x: f32, y: f32, radius: u32) -> bool {
-    let x = x.round() as u32;
-    let y = y.round() as u32;
-
-    x >= radius && y >= radius && x < image.width() - radius && y < image.height() - radius
+    let r = radius as f32;
+    x.round() >= r
+        && y.round() >= r
+        && x.round() < image.width() as f32 - r
+        && y.round() < image.height() as f32 - r
 }
 
+#[inline]
 pub fn se2_exp_matrix(a: &na::SVector<f32, 3>) -> na::SMatrix<f32, 3, 3> {
     let theta = a[2];
-    let mut so2 = na::Rotation2::new(theta);
+    let so2 = na::Rotation2::new(theta);
     let sin_theta_by_theta;
     let one_minus_cos_theta_by_theta;
 
-    if theta.abs() < f32::EPSILON {
+    if theta.abs() < 1e-4 {
         let theta_sq = theta * theta;
         sin_theta_by_theta = 1.0f32 - 1.0 / 6.0 * theta_sq;
         one_minus_cos_theta_by_theta = 0.5f32 * theta - 1. / 24. * theta * theta_sq;
     } else {
-        let cos = so2.matrix_mut_unchecked().m22;
-        let sin = so2.matrix_mut_unchecked().m21;
+        let cos = so2.matrix().m22;
+        let sin = so2.matrix().m21;
         sin_theta_by_theta = sin / theta;
         one_minus_cos_theta_by_theta = (1. - cos) / theta;
     }
+    let rot = so2.matrix();
     let mut se2_mat = na::SMatrix::<f32, 3, 3>::identity();
-    se2_mat.m11 = so2.matrix_mut_unchecked().m11;
-    se2_mat.m12 = so2.matrix_mut_unchecked().m12;
-    se2_mat.m21 = so2.matrix_mut_unchecked().m21;
-    se2_mat.m22 = so2.matrix_mut_unchecked().m22;
+    se2_mat.m11 = rot.m11;
+    se2_mat.m12 = rot.m12;
+    se2_mat.m21 = rot.m21;
+    se2_mat.m22 = rot.m22;
     se2_mat.m13 = sin_theta_by_theta * a[0] - one_minus_cos_theta_by_theta * a[1];
     se2_mat.m23 = one_minus_cos_theta_by_theta * a[0] + sin_theta_by_theta * a[1];
     se2_mat
@@ -109,13 +118,21 @@ pub fn se2_exp_matrix(a: &na::SVector<f32, 3>) -> na::SMatrix<f32, 3, 3> {
 pub fn detect_key_points(
     image: &GrayImage,
     grid_size: u32,
-    current_corners: &Vec<Corner>,
+    current_corners: &[Corner],
     num_points_in_cell: u32,
 ) -> Vec<Corner> {
-    const EDGE_THRESHOLD: u32 = 19;
+    // Margin must accommodate Pattern52 at coarsest pyramid level:
+    // Pattern radius ~7px / pattern_scale_down=2 = 3.5px + 2px interpolation border = ~6px
+    // At 3 pyramid levels (scale factor 2): 6 * 2^(3-1) = 24px at full resolution
+    const EDGE_THRESHOLD: u32 = 24;
     let h = image.height();
     let w = image.width();
-    let mut all_corners = vec![];
+
+    // Guard: image must be at least one grid cell in each dimension
+    if w < grid_size || h < grid_size {
+        return vec![];
+    }
+
     let mut grids =
         na::DMatrix::<i32>::zeros((h / grid_size + 1) as usize, (w / grid_size + 1) as usize);
 
@@ -189,8 +206,7 @@ pub fn detect_key_points(
         })
         .collect();
 
-    all_corners.extend(new_corners);
-    all_corners
+    new_corners
 }
 
 #[cfg(test)]

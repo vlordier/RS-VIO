@@ -210,10 +210,10 @@ impl ConstantVelocityModel {
     pub fn predict_pose(&self, time_delta: f64) -> Result<na::Isometry3<f64>> {
         let position_delta = self.velocity * time_delta;
 
-        // Create a new isometry with predicted position and same rotation
-        Ok(na::Isometry3::new(
-            self.last_pose.translation.vector + position_delta,
-            self.last_pose.rotation.scaled_axis(),
+        // Construct isometry directly (avoids log→exp roundtrip drift near ±π)
+        Ok(na::Isometry3::from_parts(
+            na::Translation3::from(self.last_pose.translation.vector + position_delta),
+            self.last_pose.rotation,
         ))
     }
 

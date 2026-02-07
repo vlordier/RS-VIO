@@ -97,9 +97,10 @@ cargo run --release --bin run_tum config/tum_vi.yaml /tmp/rs-vio-samples/tum_vi/
 cargo run --release --bin run_4seasons config/4seasons.yaml /tmp/rs-vio-samples/4seasons/recording_2021-01-07_13-03-56
 ```
 
-## Docker with Datasets
+## Docker with Datasets (Planned)
 
-Mount datasets as volumes:
+> **Note:** No Dockerfile exists yet. The commands below show the intended workflow
+> once a Dockerfile is added.
 
 ```bash
 # Build image
@@ -131,8 +132,8 @@ docker run --rm \
 | Dataset | Format | Cameras | IMU | Distortion Model | Status |
 |---------|--------|---------|-----|------------------|--------|
 | EuRoC | mav0/ CSV | Stereo | Yes | Radtan | ✓ Supported |
-| TUM-VI | RGB-D + CSV | Mono/Stereo | Yes | Various | ✓ Supported |
-| 4Seasons | undistorted_images/ | Stereo | No | None | ✓ Supported |
+| TUM-VI | EuRoC format / CSV | Stereo | Yes | EUCM / OpenCV5 | ✓ Supported |
+| 4Seasons | undistorted_images/ | Stereo | Yes | None (pre-rectified) | ✓ Supported |
 
 ## Troubleshooting
 
@@ -176,13 +177,13 @@ If using these datasets, please cite:
 }
 ```
 
-**TUM RGB-D Dataset**:
+**TUM-VI Dataset**:
 ```
-@article{sturm2012benchmark,
-  title={A benchmark for the evaluation of {RGB-D} SLAM systems},
-  author={Sturm, J. and others},
-  journal={IROS},
-  year={2012}
+@inproceedings{schubert2018tumvi,
+  title={The {TUM VI} Benchmark for Evaluating Visual-Inertial Odometry},
+  author={Schubert, David and Goll, Thore and Demmel, Nikolaus and Usenko, Vladyslav and St{\"u}ckler, J{\"o}rg and Cremers, Daniel},
+  booktitle={IROS},
+  year={2018}
 }
 ```
 

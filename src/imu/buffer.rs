@@ -89,20 +89,32 @@ impl ImuBuffer {
 
     /// Get all measurements in time range [t_start, t_end]
     pub fn get_range(&self, t_start: i64, t_end: i64) -> Vec<ImuData> {
-        self.measurements
-            .iter()
-            .filter(|m| m.timestamp >= t_start && m.timestamp <= t_end)
-            .cloned()
-            .collect()
+        // Binary search for start position (first element >= t_start)
+        let start = self
+            .measurements
+            .binary_search_by_key(&t_start, |m| m.timestamp)
+            .unwrap_or_else(|pos| pos);
+        // Binary search for end position (first element > t_end)
+        let end = self
+            .measurements
+            .binary_search_by_key(&t_end.saturating_add(1), |m| m.timestamp)
+            .unwrap_or_else(|pos| pos);
+        self.measurements.range(start..end).cloned().collect()
     }
 
     /// Get measurements strictly between two timestamps
     pub fn get_between(&self, t_start: i64, t_end: i64) -> Vec<ImuData> {
-        self.measurements
-            .iter()
-            .filter(|m| m.timestamp > t_start && m.timestamp < t_end)
-            .cloned()
-            .collect()
+        // Binary search for start position (first element > t_start)
+        let start = self
+            .measurements
+            .binary_search_by_key(&t_start.saturating_add(1), |m| m.timestamp)
+            .unwrap_or_else(|pos| pos);
+        // Binary search for end position (first element >= t_end)
+        let end = self
+            .measurements
+            .binary_search_by_key(&t_end, |m| m.timestamp)
+            .unwrap_or_else(|pos| pos);
+        self.measurements.range(start..end).cloned().collect()
     }
 
     /// Interpolate IMU measurement at arbitrary timestamp
@@ -141,6 +153,10 @@ impl ImuBuffer {
         let m1 = &self.measurements[idx];
 
         let dt = (m1.timestamp - m0.timestamp) as f64;
+        if dt <= 0.0 {
+            // Duplicate timestamps — return the earlier measurement
+            return Some(self.measurements[idx - 1].clone());
+        }
         let alpha = ((t - m0.timestamp) as f64) / dt;
 
         // Linear interpolation

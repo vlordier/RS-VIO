@@ -3,12 +3,21 @@ use super::Viewer;
 use crate::types::{Array3, Float, Matrix3x3, Matrix4x4, ToArray};
 use anyhow::Result;
 use image::{DynamicImage, ImageBuffer, Luma};
-use rerun::components::Color;
+use nalgebra as na;
 use rerun::time::Timestamp;
 use rerun::LineStrips3D;
 use rerun::Pinhole;
 use rerun::{RecordingStream, RecordingStreamBuilder};
 use std::io::Cursor;
+
+/// Macro to log to rerun with standardized error handling.
+macro_rules! rr_log {
+    ($rec:expr, $path:expr, $data:expr) => {
+        if let Err(e) = $rec.log($path, $data) {
+            log::warn!("[RerunViewer] Failed to log {}: {}", $path, e);
+        }
+    };
+}
 
 /// Basic RerunViewer implementation
 pub struct RerunViewer {
@@ -16,8 +25,6 @@ pub struct RerunViewer {
     initialized: bool,
     frame_id: i64,
     timestamp_ns: i64,
-    #[allow(dead_code)] // TODO: use for relative time calculation
-    first_timestamp_ns: Option<i64>,
 }
 
 impl Default for RerunViewer {
@@ -33,7 +40,6 @@ impl RerunViewer {
             initialized: false,
             frame_id: 0,
             timestamp_ns: 0,
-            first_timestamp_ns: None,
         }
     }
 
@@ -166,24 +172,20 @@ impl Viewer for RerunViewer {
             let translation = Array3::from(T_W_B.fixed_view::<3, 1>(0, 3));
             let rotation = Matrix3x3::from(T_W_B.fixed_view::<3, 3>(0, 0));
 
-            // Convert rotation matrix to quaternion
-            let quat = matrix_to_quaternion(Matrix3x3::from(rotation).to_array());
-            let quaternion = rerun::Quaternion::from_xyzw([
-                quat[0] as f32,
-                quat[1] as f32,
-                quat[2] as f32,
-                quat[3] as f32,
-            ]);
+            // Convert rotation matrix to quaternion using nalgebra
+            let rot3 = na::Rotation3::from_matrix(&rotation);
+            let q = na::UnitQuaternion::from_rotation_matrix(&rot3);
+            let quaternion =
+                rerun::Quaternion::from_xyzw([q.i as f32, q.j as f32, q.k as f32, q.w as f32]);
 
-            if let Err(e) = rec.log(
+            rr_log!(
+                rec,
                 entity_path,
                 &rerun::Transform3D::from_translation_rotation(
                     translation,
                     rerun::Rotation3D::Quaternion(rerun::components::RotationQuat(quaternion)),
-                ),
-            ) {
-                log::warn!("[RerunViewer] Failed to log pose to {}: {}", entity_path, e);
-            }
+                )
+            );
         }
     }
 
@@ -291,12 +293,11 @@ impl Viewer for RerunViewer {
             if !features.is_empty() {
                 let points: Vec<[f32; 2]> = features.to_vec();
 
-                if let Err(e) = rec.log(
+                rr_log!(
+                    rec,
                     format!("{}/features", entity_path).as_str(),
-                    &rerun::Points2D::new(points),
-                ) {
-                    log::warn!("[RerunViewer] Failed to log features: {}", e);
-                }
+                    &rerun::Points2D::new(points)
+                );
             }
         }
     }
@@ -332,14 +333,13 @@ impl Viewer for RerunViewer {
                     .collect();
 
                 let radii: Vec<f32> = vec![3.0; points.len()];
-                if let Err(e) = rec.log(
+                rr_log!(
+                    rec,
                     format!("{}/features", entity_path).as_str(),
                     &rerun::Points2D::new(points)
                         .with_colors(colors)
-                        .with_radii(radii),
-                ) {
-                    log::warn!("[RerunViewer] Failed to log colored features: {}", e);
-                }
+                        .with_radii(radii)
+                );
             }
         }
     }
@@ -353,7 +353,6 @@ impl Viewer for RerunViewer {
             rec.set_time_sequence("frame", self.frame_id);
             rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
 
-            let _points_3d: Vec<[f32; 3]> = points.to_vec();
             // Exclude points that are further than 300m
             let points_3d: Vec<[f32; 3]> = points
                 .iter()
@@ -364,13 +363,7 @@ impl Viewer for RerunViewer {
                 })
                 .collect();
 
-            if let Err(e) = rec.log(entity_path, &rerun::Points3D::new(points_3d)) {
-                log::warn!(
-                    "[RerunViewer] Failed to log points to {}: {}",
-                    entity_path,
-                    e
-                );
-            }
+            rr_log!(rec, entity_path, &rerun::Points3D::new(points_3d));
         }
     }
 
@@ -392,16 +385,11 @@ impl Viewer for RerunViewer {
                 })
                 .collect();
 
-            if let Err(e) = rec.log(
+            rr_log!(
+                rec,
                 entity_path,
-                &rerun::Points3D::new(points_3d).with_colors(colors),
-            ) {
-                log::warn!(
-                    "[RerunViewer] Failed to log colored points to {}: {}",
-                    entity_path,
-                    e
-                );
-            }
+                &rerun::Points3D::new(points_3d).with_colors(colors)
+            );
         }
     }
 
@@ -442,13 +430,7 @@ impl Viewer for RerunViewer {
             let pinhole = Pinhole::from_focal_length_and_resolution(focal_vec, resolution_vec)
                 .with_image_plane_distance(size);
 
-            if let Err(e) = rec.log(entity_path, &pinhole) {
-                log::warn!(
-                    "[RerunViewer] Failed to log camera frustum to {}: {}",
-                    entity_path,
-                    e
-                );
-            }
+            rr_log!(rec, entity_path, &pinhole);
         }
     }
 
@@ -472,52 +454,12 @@ impl Viewer for RerunViewer {
             let line_strip = LineStrips3D::new([positions]);
 
             // Use a distinct color for the trajectory (e.g., yellow/orange)
-            let trajectory_color = Color::from_rgb(255, 165, 0); // Orange
+            let trajectory_color = rerun::Color::from_rgb(255, 165, 0); // Orange
             let line_strip = line_strip.with_colors([trajectory_color]);
 
-            if let Err(e) = rec.log(entity_path, &line_strip) {
-                log::warn!(
-                    "[RerunViewer] Failed to log trajectory to {}: {}",
-                    entity_path,
-                    e
-                );
-            }
+            rr_log!(rec, entity_path, &line_strip);
         }
     }
-}
-
-// Helper function to convert 3x3 rotation matrix to quaternion [x, y, z, w]
-fn matrix_to_quaternion(rot: [[Float; 3]; 3]) -> [Float; 4] {
-    let trace = rot[0][0] + rot[1][1] + rot[2][2];
-    let mut quat = [0.0 as Float; 4];
-
-    if trace > 0.0 {
-        let s = (trace + 1.0).sqrt() * 2.0;
-        quat[3] = 0.25 * s;
-        quat[0] = (rot[2][1] - rot[1][2]) / s;
-        quat[1] = (rot[0][2] - rot[2][0]) / s;
-        quat[2] = (rot[1][0] - rot[0][1]) / s;
-    } else if rot[0][0] > rot[1][1] && rot[0][0] > rot[2][2] {
-        let s = (1.0 + rot[0][0] - rot[1][1] - rot[2][2]).sqrt() * 2.0;
-        quat[3] = (rot[2][1] - rot[1][2]) / s;
-        quat[0] = 0.25 * s;
-        quat[1] = (rot[0][1] + rot[1][0]) / s;
-        quat[2] = (rot[0][2] + rot[2][0]) / s;
-    } else if rot[1][1] > rot[2][2] {
-        let s = (1.0 + rot[1][1] - rot[0][0] - rot[2][2]).sqrt() * 2.0;
-        quat[3] = (rot[0][2] - rot[2][0]) / s;
-        quat[0] = (rot[0][1] + rot[1][0]) / s;
-        quat[1] = 0.25 * s;
-        quat[2] = (rot[1][2] + rot[2][1]) / s;
-    } else {
-        let s = (1.0 + rot[2][2] - rot[0][0] - rot[1][1]).sqrt() * 2.0;
-        quat[3] = (rot[1][0] - rot[0][1]) / s;
-        quat[0] = (rot[0][2] + rot[2][0]) / s;
-        quat[1] = (rot[1][2] + rot[2][1]) / s;
-        quat[2] = 0.25 * s;
-    }
-
-    quat
 }
 
 // Helper function to create a RerunViewer

@@ -1,10 +1,11 @@
 # Cargo configuration for RS-VIO build system
-# Note: Metal framework linking is now conditional in build.rs
-# and only applied when the "gpu" feature is enabled on macOS.
 
 [build]
-# Incremental compilation cache (enabled by default in dev)
-incremental = true
+# Incremental compilation cache (enabled by default in dev).
+# Avoid setting this globally here, as it can override profile-level `incremental = false`
+# (e.g., in `[profile.release]`). Prefer per-profile settings in Cargo.toml or
+# the CARGO_INCREMENTAL env var for local development.
+# incremental = true
 
 # Use faster linker on macOS (if lld is installed: brew install llvm)
 # Uncomment if lld is available

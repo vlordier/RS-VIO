@@ -68,7 +68,7 @@ fn main() {
     println!("✅ Stability analysis over time");
     println!();
 
-    println!("� Rolling Shutter Auto-Detection Demo:");
+    println!("📷 Rolling Shutter Auto-Detection Demo:");
     println!("--------------------------------------\n");
 
     // Create a calibrator with auto-detection enabled (None = auto-detect)

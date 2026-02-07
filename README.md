@@ -11,9 +11,8 @@ This project is a stereo visual-inertial odometry (VIO) system, written fully in
 - **PnP motion tracking**: Perspective-n-Point pose estimation for inter-frame tracking between keyframes.
 - **Keyframe selection**: Automatic keyframe selection based on translation and rotation thresholds.
 - **Async Pipeline Processing**: Non-blocking frame processing with concurrent bundle adjustment offload for real-time performance (19.7x speedup, <100 bytes/frame memory usage).
-- **Multi-camera model support**: Supports pinhole-radtan and EUCM camera models with distortion handling, more camera models can be integrated easily.
+- **Camera model support**: Supports pinhole-radtan and EUCM camera models with distortion handling, more camera models can be integrated easily.
 - **Self-calibrating stereo VIO**: Three complementary intrinsics refinement strategies (online, offline, and baseline) with 61.7% error reduction on TUM-VI.
-- **Multi-camera architecture**: N-camera configuration system with flexible orientations and parameter sharing policies.
 - **Dataset support**: Players for EuRoC, TUM-VI, and 4Seasons datasets with configurable parameters.
 - **3D visualization**: Real-time visualization of trajectories, map points, and camera frustums using Rerun.
 
@@ -50,26 +49,7 @@ RS-VIO includes three complementary strategies for camera intrinsics refinement:
 - **Offline Post-Processing** (Strategy 3): Batch refinement after VIO with convergence-based stopping (~61.7% total reduction)
 - **Baseline Analysis** (Strategy 1): Establish reference calibration quality
 
-See [FEATURE_SUMMARY.md](FEATURE_SUMMARY.md) for complete details, or [VALIDATION.md](VALIDATION.md) for validation guides.
-
-### Multi-Camera Support
-
-Configure multiple cameras in any orientation with flexible parameter sharing:
-
-```yaml
-cameras:
-  - name: "left"
-    image_width: 512
-    image_height: 512
-    intrinsics: [fx, fy, cx, cy]
-
-  - name: "right"
-    image_width: 512
-    image_height: 512
-    intrinsics: [fx, fy, cx, cy]
-```
-
-See [MULTI_CAMERA_GUIDE.md](MULTI_CAMERA_GUIDE.md) for API reference and examples.
+See [docs/FEATURE_SUMMARY.md](docs/FEATURE_SUMMARY.md) for complete details, or [docs/VALIDATION.md](docs/VALIDATION.md) for validation guides.
 
 ## Variable naming conventions
 
@@ -120,7 +100,6 @@ This project builds on excellent open-source work:
 
 ### Dependencies:
 - [apex-solver](https://github.com/amin-abouee/apex-solver)
-- [faer](https://github.com/sarah-quinones/faer-rs)
 - [camera-intrinsic-model-rs](https://github.com/powei-lin/camera-intrinsic-model-rs)
 - [patch-tracker-rs](https://github.com/powei-lin/patch-tracker-rs)
 

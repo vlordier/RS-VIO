@@ -79,6 +79,11 @@ impl Default for PinholeCamera {
 
 impl CameraModel for PinholeCamera {
     fn project(&self, point_3d: &na::Vector3<f64>, intrinsics: &[f64]) -> na::Vector2<f64> {
+        // Guard against division by zero and behind-camera points
+        if point_3d.z < 1e-12 {
+            return na::Vector2::new(f64::NAN, f64::NAN);
+        }
+
         // Extract parameters
         let fx = intrinsics[0];
         let fy = intrinsics[1];
@@ -107,11 +112,35 @@ impl CameraModel for PinholeCamera {
         let cy = intrinsics[3];
 
         // Remove principal point and focal length
-        let x = (point_2d.x - cx) / fx;
-        let y = (point_2d.y - cy) / fy;
+        let mut x = (point_2d.x - cx) / fx;
+        let mut y = (point_2d.y - cy) / fy;
 
-        // TODO: Implement undistortion for unprojection
-        // For now, assume no distortion in unprojection
+        // Iterative undistortion: find the undistorted point that, when distorted,
+        // maps back to (x_d, y_d). Typically converges in 5-10 iterations.
+        if self.has_distortion && intrinsics.len() > 4 {
+            let x_d = x;
+            let y_d = y;
+            for _ in 0..10 {
+                let (dx, dy) = self.apply_distortion(x, y, &intrinsics[4..]);
+                let x_new = x_d - (dx - x);
+                let y_new = y_d - (dy - y);
+                let converged = (x_new - x).abs() + (y_new - y).abs() < 1e-12;
+                x = x_new;
+                y = y_new;
+                if converged {
+                    break;
+                }
+            }
+        }
+
+        // Guard against undistortion divergence
+        if !x.is_finite() || !y.is_finite() {
+            // Fall back to distorted coordinates
+            let x_d = (point_2d.x - intrinsics[2]) / intrinsics[0];
+            let y_d = (point_2d.y - intrinsics[3]) / intrinsics[1];
+            return na::Vector3::new(x_d, y_d, 1.0).normalize();
+        }
+
         na::Vector3::new(x, y, 1.0).normalize()
     }
 
@@ -237,7 +266,7 @@ impl PinholeCamera {
                     let p2 = distortion_coeffs[3];
                     let k3 = distortion_coeffs[4];
 
-                    let r2 = x * x + y * y;
+                    // Reuse r2 computed at top of function
                     let r4 = r2 * r2;
                     let r6 = r4 * r2;
 
@@ -286,28 +315,59 @@ impl CameraModel for FisheyeCamera {
         let cx = intrinsics[2];
         let cy = intrinsics[3];
 
-        // Compute angle from optical axis
-        let theta = (point_3d.x / point_3d.z).atan2(point_3d.y / point_3d.z);
+        let x = point_3d.x;
+        let y = point_3d.y;
+        let z = point_3d.z;
 
-        // Compute radius (distance from optical axis)
-        let rho = (point_3d.x * point_3d.x + point_3d.y * point_3d.y).sqrt() / point_3d.z.abs();
+        // Cheirality check: reject behind-camera points
+        if z < 1e-12 {
+            return na::Vector2::new(f64::NAN, f64::NAN);
+        }
 
-        // Apply fisheye projection model
+        // Incidence angle: angle between the ray and the optical axis
+        let r_xy = (x * x + y * y).sqrt();
+        let theta = r_xy.atan2(z);
+
+        // Azimuth angle in the image plane
+        let phi = y.atan2(x);
+
+        // Apply fisheye projection model to get projected radius
         let r = match self.model {
-            FisheyeModel::Equidistant => rho,                       // r = theta
-            FisheyeModel::Equisolid => 2.0 * (rho / 2.0).sin(),     // r = 2*sin(theta/2)
-            FisheyeModel::Stereographic => 2.0 * (rho / 2.0).tan(), // r = 2*tan(theta/2)
+            FisheyeModel::Equidistant => theta,                   // r = θ
+            FisheyeModel::Equisolid => 2.0 * (theta / 2.0).sin(), // r = 2·sin(θ/2)
+            FisheyeModel::Stereographic => {
+                // Clamp θ to avoid tan(π/2) divergence for points behind camera
+                let half = (theta.min(std::f64::consts::PI - 1e-6)) / 2.0;
+                2.0 * half.tan() // r = 2·tan(θ/2)
+            },
         };
 
         // Convert to image coordinates
-        na::Vector2::new(fx * r * theta.cos() + cx, fy * r * theta.sin() + cy)
+        na::Vector2::new(fx * r * phi.cos() + cx, fy * r * phi.sin() + cy)
     }
 
-    fn unproject(&self, _point_2d: &na::Vector2<f64>, _intrinsics: &[f64]) -> na::Vector3<f64> {
-        // TODO: Implement fisheye unprojection
-        // This is complex and requires solving transcendental equations
-        // For now, return a placeholder
-        na::Vector3::new(0.0, 0.0, 1.0)
+    fn unproject(&self, point_2d: &na::Vector2<f64>, intrinsics: &[f64]) -> na::Vector3<f64> {
+        let fx = intrinsics[0];
+        let fy = intrinsics[1];
+        let cx = intrinsics[2];
+        let cy = intrinsics[3];
+
+        // Normalized image coordinates
+        let mx = (point_2d.x - cx) / fx;
+        let my = (point_2d.y - cy) / fy;
+        let r = (mx * mx + my * my).sqrt();
+        let phi = my.atan2(mx);
+
+        // Invert the projection model to recover incidence angle θ
+        let theta = match self.model {
+            FisheyeModel::Equidistant => r.clamp(0.0, std::f64::consts::PI), // r = θ  ⇒  θ = r, clamped to valid range
+            FisheyeModel::Equisolid => 2.0 * (r / 2.0).clamp(-1.0, 1.0).asin(), // r = 2·sin(θ/2) ⇒ θ = 2·asin(r/2)
+            FisheyeModel::Stereographic => 2.0 * (r / 2.0).atan(), // r = 2·tan(θ/2) ⇒ θ = 2·atan(r/2)
+        };
+
+        // Reconstruct the 3D bearing vector
+        let sin_theta = theta.sin();
+        na::Vector3::new(sin_theta * phi.cos(), sin_theta * phi.sin(), theta.cos())
     }
 
     fn num_intrinsics(&self) -> usize {
@@ -373,54 +433,43 @@ pub enum CameraModelEnum {
     Fisheye(FisheyeCamera),
 }
 
+/// Dispatch a method call through `CameraModelEnum` to the inner model.
+macro_rules! dispatch_camera {
+    ($self:expr, $method:ident ( $($arg:expr),* $(,)? )) => {
+        match $self {
+            CameraModelEnum::Pinhole(m) => m.$method($($arg),*),
+            CameraModelEnum::Fisheye(m) => m.$method($($arg),*),
+        }
+    };
+}
+
 impl CameraModel for CameraModelEnum {
     fn project(&self, point_3d: &na::Vector3<f64>, intrinsics: &[f64]) -> na::Vector2<f64> {
-        match self {
-            CameraModelEnum::Pinhole(model) => model.project(point_3d, intrinsics),
-            CameraModelEnum::Fisheye(model) => model.project(point_3d, intrinsics),
-        }
+        dispatch_camera!(self, project(point_3d, intrinsics))
     }
 
     fn unproject(&self, point_2d: &na::Vector2<f64>, intrinsics: &[f64]) -> na::Vector3<f64> {
-        match self {
-            CameraModelEnum::Pinhole(model) => model.unproject(point_2d, intrinsics),
-            CameraModelEnum::Fisheye(model) => model.unproject(point_2d, intrinsics),
-        }
+        dispatch_camera!(self, unproject(point_2d, intrinsics))
     }
 
     fn num_intrinsics(&self) -> usize {
-        match self {
-            CameraModelEnum::Pinhole(model) => model.num_intrinsics(),
-            CameraModelEnum::Fisheye(model) => model.num_intrinsics(),
-        }
+        dispatch_camera!(self, num_intrinsics())
     }
 
     fn default_intrinsics(&self, image_width: u32, image_height: u32) -> Vec<f64> {
-        match self {
-            CameraModelEnum::Pinhole(model) => model.default_intrinsics(image_width, image_height),
-            CameraModelEnum::Fisheye(model) => model.default_intrinsics(image_width, image_height),
-        }
+        dispatch_camera!(self, default_intrinsics(image_width, image_height))
     }
 
     fn parameter_names(&self) -> Vec<String> {
-        match self {
-            CameraModelEnum::Pinhole(model) => model.parameter_names(),
-            CameraModelEnum::Fisheye(model) => model.parameter_names(),
-        }
+        dispatch_camera!(self, parameter_names())
     }
 
     fn validate_intrinsics(&self, intrinsics: &[f64]) -> Result<(), String> {
-        match self {
-            CameraModelEnum::Pinhole(model) => model.validate_intrinsics(intrinsics),
-            CameraModelEnum::Fisheye(model) => model.validate_intrinsics(intrinsics),
-        }
+        dispatch_camera!(self, validate_intrinsics(intrinsics))
     }
 
     fn name(&self) -> &str {
-        match self {
-            CameraModelEnum::Pinhole(model) => model.name(),
-            CameraModelEnum::Fisheye(model) => model.name(),
-        }
+        dispatch_camera!(self, name())
     }
 
     fn clone_box(&self) -> Box<dyn CameraModel> {
@@ -443,12 +492,7 @@ pub struct CameraConfig {
 }
 
 impl CameraConfig {
-    pub const fn new(
-        id: String,
-        model: CameraModelEnum,
-        image_width: u32,
-        image_height: u32,
-    ) -> Self {
+    pub fn new(id: String, model: CameraModelEnum, image_width: u32, image_height: u32) -> Self {
         Self {
             id,
             model,

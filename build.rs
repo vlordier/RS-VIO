@@ -1,6 +1,8 @@
 // Build script to enforce mutual exclusivity of matching strategies
 
 fn main() {
+    // Only re-run when the build script itself changes (not on every build)
+    println!("cargo::rerun-if-changed=build.rs");
     let strategies = [
         "matching-basic-ransac",
         "matching-imu-guided",
@@ -28,19 +30,8 @@ fn main() {
     }
 
     if enabled.is_empty() {
-        eprintln!("warning: No matching strategy enabled, using default (matching-basic-ransac)");
-    }
-
-    // ========================================================================
-    // Metal GPU Framework Configuration
-    // ========================================================================
-    // Only link the Metal framework when GPU support is explicitly enabled
-    // on macOS. This keeps the build cleaner and avoids linking unnecessary
-    // frameworks when GPU features aren't used.
-    if std::env::var("CARGO_FEATURE_GPU").is_ok() {
-        if let Ok("macos") = std::env::var("CARGO_CFG_TARGET_OS").as_deref() {
-            println!("cargo:rustc-link-arg=-framework");
-            println!("cargo:rustc-link-arg=Metal");
-        }
+        println!(
+            "cargo::warning=No matching strategy enabled, using default (matching-basic-ransac)"
+        );
     }
 }

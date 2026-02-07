@@ -49,21 +49,6 @@ This document outlines security measures implemented in RS-VIO and best practice
 - [ ] Implement resource limits
 - [ ] Enable security features in container runtime
 
-## Security Headers (for web interfaces)
-
-If RS-VIO is deployed with web interfaces, implement:
-
-```rust
-// Example security headers middleware
-use actix_web::{http::header, middleware::DefaultHeaders};
-
-let security_headers = DefaultHeaders::new()
-    .add((header::X_FRAME_OPTIONS, "DENY"))
-    .add((header::X_CONTENT_TYPE_OPTIONS, "nosniff"))
-    .add((header::X_XSS_PROTECTION, "1; mode=block"))
-    .add((header::STRICT_TRANSPORT_SECURITY, "max-age=31536000; includeSubDomains"));
-```
-
 ## Container Security
 
 ### Dockerfile Best Practices
@@ -102,17 +87,9 @@ let security_headers = DefaultHeaders::new()
 5. Post-mortem analysis and prevention measures
 
 ### Vulnerability Disclosure
-- Report security issues to security@rs-vio-project.com
+- Report security issues via GitHub Issues (private vulnerability reporting)
 - Allow 90 days for fixes before public disclosure
 - Credit security researchers appropriately
-
-## Compliance Considerations
-
-Depending on use case, consider:
-- GDPR compliance for data processing
-- HIPAA compliance for medical applications
-- ISO 27001 for information security management
-- Industry-specific security standards
 
 ## Tools and Commands
 

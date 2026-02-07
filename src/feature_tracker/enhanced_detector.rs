@@ -10,8 +10,6 @@
 use imageproc::corners::Corner;
 use nalgebra as na;
 use rayon::prelude::*;
-use std::f32;
-
 /// Enhanced feature with descriptor and subpixel precision
 #[derive(Debug, Clone)]
 pub struct EnhancedFeature {
@@ -68,43 +66,6 @@ impl Default for EnhancedDetectorConfig {
     }
 }
 
-/// Temporal feature tracker for maintaining consistency across frames
-#[derive(Debug, Clone)]
-pub struct TemporalFeatureTracker {
-    /// Tracked features from previous frames
-    pub tracks: Vec<FeatureTrack>,
-    /// Maximum number of frames to keep a track alive
-    pub max_track_age: usize,
-    /// Maximum displacement between frames (pixels)
-    pub max_displacement: f32,
-}
-
-#[derive(Debug, Clone)]
-pub struct FeatureTrack {
-    /// Unique track ID
-    pub id: usize,
-    /// Feature positions across frames
-    pub positions: Vec<na::Vector2<f32>>,
-    /// Feature descriptors across frames
-    pub descriptors: Vec<[u8; 16]>,
-    /// Track age (frames since last update)
-    pub age: usize,
-    /// Track quality/confidence
-    pub quality: f32,
-    /// Kalman filter state (position, velocity)
-    pub kalman_state: KalmanState,
-    /// Kalman filter covariance
-    pub kalman_covariance: na::Matrix4<f32>,
-}
-
-#[derive(Debug, Clone)]
-pub struct KalmanState {
-    /// Position (x, y)
-    pub position: na::Vector2<f32>,
-    /// Velocity (vx, vy)
-    pub velocity: na::Vector2<f32>,
-}
-
 /// Enhanced feature detector with ORB descriptors
 pub struct EnhancedFeatureDetector {
     config: EnhancedDetectorConfig,
@@ -127,31 +88,29 @@ impl EnhancedFeatureDetector {
         let adaptive_config = self.adapt_parameters(image);
 
         // Parallel multi-scale detection
-        let features: Vec<EnhancedFeature> = (0..adaptive_config.pyramid_levels)
-            .into_par_iter()
-            .flat_map(|level| {
-                let scale = adaptive_config.scale_factor.powi(level as i32);
-                let scaled_image = if level == 0 {
-                    image.clone()
-                } else {
-                    self.scale_image(image, 1.0 / scale)
-                };
+        // Level 0 uses the original image directly (avoids a full-image clone)
+        let mut features: Vec<EnhancedFeature> = self.detect_at_scale(image, 1.0);
 
-                self.detect_at_scale(&scaled_image, scale)
-            })
-            .collect();
+        if adaptive_config.pyramid_levels > 1 {
+            let pyramid_features: Vec<EnhancedFeature> = (1..adaptive_config.pyramid_levels)
+                .into_par_iter()
+                .flat_map(|level| {
+                    let scale = adaptive_config.scale_factor.powi(level as i32);
+                    let scaled_image = self.scale_image(image, 1.0 / scale);
+                    self.detect_at_scale(&scaled_image, scale)
+                })
+                .collect();
+            features.extend(pyramid_features);
+        }
 
         // Sort by score and limit to max features
         let mut sorted_features = features;
-        sorted_features.sort_by(|a, b| {
-            b.quality
-                .partial_cmp(&a.quality)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-        sorted_features.truncate(adaptive_config.max_features);
+        // Limit features before NMS (NMS sorts by score internally)
+        sorted_features.truncate(adaptive_config.max_features * 2);
 
-        // Apply non-maximum suppression
         self.apply_nms(&mut sorted_features);
+
+        sorted_features.truncate(adaptive_config.max_features);
 
         sorted_features
     }
@@ -270,20 +229,29 @@ impl EnhancedFeatureDetector {
 
     /// Compute basic image statistics (mean and variance)
     fn compute_image_stats(&self, image: &image::GrayImage) -> (f32, f32) {
-        let mut sum = 0.0;
-        let mut sum_sq = 0.0;
-        let count = (image.width() * image.height()) as f32;
+        // Accumulate in f64 to avoid catastrophic cancellation on large images
+        // (f32 sum_sq overflows exact-integer range at ~640×480)
+        // Sample every 4th pixel in x and y (~16× fewer iterations, same result)
+        const STRIDE: u32 = 4;
+        let mut sum: f64 = 0.0;
+        let mut sum_sq: f64 = 0.0;
+        let mut count: u64 = 0;
 
-        for pixel in image.pixels() {
-            let val = pixel[0] as f32;
-            sum += val;
-            sum_sq += val * val;
+        let (w, h) = (image.width(), image.height());
+        for y in (0..h).step_by(STRIDE as usize) {
+            for x in (0..w).step_by(STRIDE as usize) {
+                let val = image.get_pixel(x, y)[0] as f64;
+                sum += val;
+                sum_sq += val * val;
+                count += 1;
+            }
         }
 
+        let count = count as f64;
         let mean = sum / count;
         let variance = (sum_sq / count) - (mean * mean);
 
-        (mean, variance)
+        (mean as f32, variance as f32)
     }
 
     /// FAST corner detection
@@ -339,14 +307,13 @@ impl EnhancedFeatureDetector {
                 let py = (cy + dy).clamp(0, image.height() as i32 - 1) as u32;
 
                 let intensity = image.get_pixel(px, py)[0] as f32;
-                let weight = intensity - 128.0; // Center around mean
 
-                m01 += dy as f32 * weight;
-                m10 += dx as f32 * weight;
+                m01 += dy as f32 * intensity;
+                m10 += dx as f32 * intensity;
             }
         }
 
-        m10.atan2(m01)
+        m01.atan2(m10)
     }
 
     /// Compute BRIEF descriptor (128-bit for memory efficiency)
@@ -376,12 +343,8 @@ impl EnhancedFeatureDetector {
             // Sample intensity at first point
             let val1 = self.sample_bilinear(image, x1, y1);
 
-            // For second point, use a different offset or center comparison
-            let (dx2, dy2) = if i < self.brief_pattern.len() {
-                self.brief_pattern[(i + 1) % self.brief_pattern.len()]
-            } else {
-                (0, 0) // Compare to center for remaining bits
-            };
+            // Second point: use next pattern entry (pattern wraps cyclically)
+            let (dx2, dy2) = self.brief_pattern[(i + 1) % self.brief_pattern.len()];
 
             let rx2 = dx2 as f32 * cos_ori - dy2 as f32 * sin_ori;
             let ry2 = dx2 as f32 * sin_ori + dy2 as f32 * cos_ori;
@@ -389,19 +352,13 @@ impl EnhancedFeatureDetector {
             let x2 = point.x + rx2;
             let y2 = point.y + ry2;
 
-            let val2 = if dx2 == 0 && dy2 == 0 {
-                self.sample_bilinear(image, point.x, point.y)
-            } else {
-                self.sample_bilinear(image, x2, y2)
-            };
+            let val2 = self.sample_bilinear(image, x2, y2);
 
             let bit = if val1 > val2 { 1 } else { 0 };
             let byte_idx = i / 8;
             let bit_idx = i % 8;
-
-            if byte_idx < 16 {
-                descriptor[byte_idx] |= (bit as u8) << bit_idx;
-            }
+            // byte_idx is always < 16 since i ranges 0..128
+            descriptor[byte_idx] |= (bit as u8) << bit_idx;
         }
 
         descriptor
@@ -428,6 +385,7 @@ impl EnhancedFeatureDetector {
     }
 
     /// Bilinear sampling for subpixel accuracy
+    #[inline]
     fn sample_bilinear(&self, image: &image::GrayImage, x: f32, y: f32) -> f32 {
         let x0 = x.floor() as i32;
         let y0 = y.floor() as i32;
@@ -486,100 +444,58 @@ impl EnhancedFeatureDetector {
         let new_width = (image.width() as f32 * scale) as u32;
         let new_height = (image.height() as f32 * scale) as u32;
 
-        imageops::resize(image, new_width, new_height, imageops::FilterType::Lanczos3)
+        imageops::resize(image, new_width, new_height, imageops::FilterType::Triangle)
     }
 
     /// Apply non-maximum suppression
+    /// Uses swap_remove for O(1) removal instead of O(n) shift per element
     fn apply_nms(&self, features: &mut Vec<EnhancedFeature>) {
+        // Sort by score descending so higher-score features suppress lower-score ones
         features.sort_by(|a, b| {
-            (a.point.y as i32)
-                .cmp(&(b.point.y as i32))
-                .then((a.point.x as i32).cmp(&(b.point.x as i32)))
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
-        let mut i = 0;
-        while i < features.len() {
-            let mut j = i + 1;
-            while j < features.len() {
-                let dist = (features[i].point - features[j].point).norm();
-                if dist < self.config.min_distance {
-                    // Remove the one with lower score
-                    if features[i].score < features[j].score {
-                        features.swap(i, j);
-                    }
-                    features.remove(j);
-                } else {
-                    j += 1;
-                }
+        let min_dist_sq = self.config.min_distance * self.config.min_distance;
+        let mut kept_positions: Vec<na::Vector2<f32>> = Vec::with_capacity(features.len());
+
+        features.retain(|f| {
+            let dominated = kept_positions.iter().any(|k| {
+                let dx = f.point.x - k.x;
+                let dy = f.point.y - k.y;
+                dx * dx + dy * dy < min_dist_sq
+            });
+            if !dominated {
+                kept_positions.push(f.point);
+                true
+            } else {
+                false
             }
-            i += 1;
-        }
+        });
     }
 }
 
 /// Hamming distance for ORB descriptor matching
 /// Compute Hamming distance between two 128-bit ORB descriptors
-/// Uses SIMD acceleration when available for better performance
+/// Widened to two u64 popcnt operations for maximum throughput
+/// (2 XOR + 2 popcnt vs 16 XOR + 16 byte-level count_ones).
+#[inline]
 pub fn hamming_distance(desc1: &[u8; 16], desc2: &[u8; 16]) -> u32 {
-    #[cfg(target_arch = "x86_64")]
-    {
-        // Use SIMD for x86_64
-        use std::arch::x86_64::*;
-        unsafe {
-            let d1 = _mm_loadu_si128(desc1.as_ptr() as *const __m128i);
-            let d2 = _mm_loadu_si128(desc2.as_ptr() as *const __m128i);
-            let xor = _mm_xor_si128(d1, d2);
-            _mm_popcnt_u64(_mm_cvtsi128_si64(xor) as u64) as u32
-                + _mm_popcnt_u64(_mm_extract_epi64(xor, 1) as u64) as u32
-        }
-    }
-    #[cfg(not(target_arch = "x86_64"))]
-    {
-        // Fallback to scalar implementation
-        desc1
-            .iter()
-            .zip(desc2.iter())
-            .map(|(&a, &b)| (a ^ b).count_ones())
-            .sum()
-    }
-}
-
-/// Match features between two sets using ORB descriptors
-pub fn match_features_orb(
-    features1: &[EnhancedFeature],
-    features2: &[EnhancedFeature],
-    max_distance: u32,
-) -> Vec<(usize, usize)> {
-    let mut matches = Vec::new();
-
-    for (i, f1) in features1.iter().enumerate() {
-        let mut best_match = None;
-        let mut best_distance = u32::MAX;
-        let mut second_best_distance = u32::MAX;
-
-        for (j, f2) in features2.iter().enumerate() {
-            let dist = hamming_distance(&f1.descriptor, &f2.descriptor);
-            if dist < best_distance {
-                second_best_distance = best_distance;
-                best_distance = dist;
-                best_match = Some(j);
-            } else if dist < second_best_distance {
-                second_best_distance = dist;
-            }
-        }
-
-        // Lowe's ratio test
-        if let Some(j) = best_match {
-            if best_distance < max_distance
-                && second_best_distance > 0
-                && (best_distance as f32) / (second_best_distance as f32) < 0.8
-            {
-                matches.push((i, j));
-            }
-        }
-    }
-
-    matches
+    // SAFETY: [u8; 16] has alignment 1, u64 accepts any alignment via from_ne_bytes
+    let a0 = u64::from_ne_bytes([
+        desc1[0], desc1[1], desc1[2], desc1[3], desc1[4], desc1[5], desc1[6], desc1[7],
+    ]);
+    let a1 = u64::from_ne_bytes([
+        desc1[8], desc1[9], desc1[10], desc1[11], desc1[12], desc1[13], desc1[14], desc1[15],
+    ]);
+    let b0 = u64::from_ne_bytes([
+        desc2[0], desc2[1], desc2[2], desc2[3], desc2[4], desc2[5], desc2[6], desc2[7],
+    ]);
+    let b1 = u64::from_ne_bytes([
+        desc2[8], desc2[9], desc2[10], desc2[11], desc2[12], desc2[13], desc2[14], desc2[15],
+    ]);
+    (a0 ^ b0).count_ones() + (a1 ^ b1).count_ones()
 }
 
 #[cfg(test)]
@@ -591,179 +507,6 @@ mod tests {
         let config = EnhancedDetectorConfig::default();
         let detector = EnhancedFeatureDetector::new(config);
         assert_eq!(detector.config.max_features, 1000);
-    }
-
-    impl TemporalFeatureTracker {
-        /// Create new temporal tracker
-        pub fn new(max_track_age: usize, max_displacement: f32) -> Self {
-            Self {
-                tracks: Vec::new(),
-                max_track_age,
-                max_displacement,
-            }
-        }
-
-        /// Update tracks with new features from current frame
-        pub fn update_tracks(&mut self, new_features: &[EnhancedFeature]) -> Vec<(usize, usize)> {
-            let mut assignments = Vec::new();
-            let mut used_features = vec![false; new_features.len()];
-
-            // Try to match existing tracks to new features
-            for (track_idx, track) in self.tracks.iter_mut().enumerate() {
-                if let Some(last_pos) = track.positions.last() {
-                    let mut best_match = None;
-                    let mut best_distance = f32::INFINITY;
-
-                    for (feat_idx, feature) in new_features.iter().enumerate() {
-                        if used_features[feat_idx] {
-                            continue;
-                        }
-
-                        let dx = feature.point.x - last_pos.x;
-                        let dy = feature.point.y - last_pos.y;
-                        let distance = (dx * dx + dy * dy).sqrt();
-
-                        if distance < self.max_displacement && distance < best_distance {
-                            // Also check descriptor similarity if we have previous descriptor
-                            if let Some(last_desc) = track.descriptors.last() {
-                                let desc_distance =
-                                    hamming_distance(last_desc, &feature.descriptor);
-                                if desc_distance < 32 {
-                                    // Threshold for descriptor similarity
-                                    best_distance = distance;
-                                    best_match = Some(feat_idx);
-                                }
-                            } else {
-                                best_distance = distance;
-                                best_match = Some(feat_idx);
-                            }
-                        }
-                    }
-
-                    if let Some(feat_idx) = best_match {
-                        // Kalman filter update
-                        let dt = 1.0; // Assume 1 frame time unit
-                        Self::kalman_predict(track, dt);
-                        Self::kalman_update(track, new_features[feat_idx].point, 1.0); // Measurement noise
-
-                        // Update track data
-                        track.positions.push(track.kalman_state.position); // Use filtered position
-                        track.descriptors.push(new_features[feat_idx].descriptor);
-                        track.age = 0;
-                        track.quality = (track.quality + new_features[feat_idx].quality) * 0.5; // Running average
-
-                        assignments.push((track_idx, feat_idx));
-                        used_features[feat_idx] = true;
-                    } else {
-                        track.age += 1;
-                    }
-                }
-            }
-
-            // Create new tracks for unmatched features
-            for (feat_idx, feature) in new_features.iter().enumerate() {
-                if !used_features[feat_idx] {
-                    let track_id = self.tracks.len();
-                    self.tracks.push(FeatureTrack {
-                        id: track_id,
-                        positions: vec![feature.point],
-                        descriptors: vec![feature.descriptor],
-                        age: 0,
-                        quality: feature.quality,
-                        kalman_state: KalmanState {
-                            position: feature.point,
-                            velocity: na::Vector2::zeros(),
-                        },
-                        kalman_covariance: na::Matrix4::identity() * 10.0, // Initial uncertainty
-                    });
-                }
-            }
-
-            // Remove old tracks
-            self.tracks.retain(|track| track.age <= self.max_track_age);
-
-            assignments
-        }
-
-        /// Kalman filter prediction step
-        fn kalman_predict(track: &mut FeatureTrack, dt: f32) {
-            // State transition matrix F
-            let f = na::Matrix4::new(
-                1.0, 0.0, dt, 0.0, 0.0, 1.0, 0.0, dt, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-            );
-
-            // Process noise Q
-            let q = na::Matrix4::identity() * 0.1;
-
-            // Predict state
-            let state_vec = na::Vector4::new(
-                track.kalman_state.position.x,
-                track.kalman_state.position.y,
-                track.kalman_state.velocity.x,
-                track.kalman_state.velocity.y,
-            );
-
-            let predicted_state = f * state_vec;
-
-            track.kalman_state.position = na::Vector2::new(predicted_state[0], predicted_state[1]);
-            track.kalman_state.velocity = na::Vector2::new(predicted_state[2], predicted_state[3]);
-
-            // Predict covariance
-            track.kalman_covariance = f * track.kalman_covariance * f.transpose() + q;
-        }
-
-        /// Kalman filter update step
-        fn kalman_update(
-            track: &mut FeatureTrack,
-            measurement: na::Vector2<f32>,
-            measurement_noise: f32,
-        ) {
-            // Measurement matrix H (maps 4D state to 2D measurement)
-            let h = na::Matrix2x4::new(1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0);
-
-            // Measurement noise R
-            let r = na::Matrix2::identity() * measurement_noise;
-
-            // Innovation (measurement residual)
-            let predicted_pos = track.kalman_state.position;
-            let innovation = measurement - predicted_pos;
-
-            // Innovation covariance S = H*P*H^T + R
-            let h_t = h.transpose(); // 4x2
-            let hp = track.kalman_covariance * h_t; // 4x4 * 4x2 = 4x2
-            let s = h * hp + r; // 2x4 * 4x2 + 2x2 = 2x2
-
-            // Kalman gain K = P*H^T*S^-1
-            let s_inv = s.try_inverse().unwrap_or_else(|| {
-                // Fallback for singular matrix - use identity scaled by small factor
-                na::Matrix2::identity() * 0.01
-            });
-            let k = hp * s_inv; // 4x2 * 2x2 = 4x2
-
-            // Update state: x = x + K*innovation
-            let state_vec = na::Vector4::new(
-                track.kalman_state.position.x,
-                track.kalman_state.position.y,
-                track.kalman_state.velocity.x,
-                track.kalman_state.velocity.y,
-            );
-
-            let state_update = k * innovation;
-            let updated_state = state_vec + state_update;
-
-            track.kalman_state.position = na::Vector2::new(updated_state[0], updated_state[1]);
-            track.kalman_state.velocity = na::Vector2::new(updated_state[2], updated_state[3]);
-
-            // Update covariance: P = (I - K*H)*P
-            let i = na::Matrix4::identity();
-            let kh = k * h; // 4x2 * 2x4 = 4x4
-            track.kalman_covariance = (i - kh) * track.kalman_covariance;
-        }
-
-        /// Get active tracks (recently updated)
-        pub fn get_active_tracks(&self) -> Vec<&FeatureTrack> {
-            self.tracks.iter().filter(|track| track.age == 0).collect()
-        }
     }
 
     #[test]

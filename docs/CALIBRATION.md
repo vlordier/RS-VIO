@@ -66,7 +66,7 @@ calibration:
    - `intrinsics_refinement_frequency`: How often to refine
    - Regularization weights to prevent divergence
 
-2. **[src/estimator/estimator.rs](src/estimator/estimator.rs)** - Added intrinsics refinement:
+2. **[src/estimator/estimator.rs](src/estimator/estimator.rs)** - Tracks intrinsics refinement state:
    ```rust
    pub struct IntrinsicsRefinementState {
        original_left_intrinsics: Vec<f64>,
@@ -75,28 +75,13 @@ calibration:
    }
    ```
    - Tracks original vs refined intrinsics
-   - `refine_intrinsics_online()` called after each bundle adjustment
-   - Uses reprojection residuals to estimate corrections
+   - **Note:** `refine_intrinsics_online()` was removed (applied hardcoded constants).
+     Real online refinement is a future work item requiring mini-BA on tracked features.
 
-### Algorithm
+### Algorithm (Not Yet Implemented)
 
-After each bundle adjustment on a keyframe:
-
-1. Count keyframes since last refinement
-2. If counter >= `intrinsics_refinement_frequency`:
-   - Analyze reprojection errors across all observations
-   - Estimate focal length adjustment: `Δf = mean_error * scale_factor`
-   - Apply with constraints:
-     - Max change: `max_intrinsics_change_per_update` pixels
-     - Regularization: `new_f = old_f + (1 - reg_weight) * Δf`
-   - Reset counter
-
-**Why it works**:
-- Leverages the fact that focal length affects reprojection errors systematically
-- Regularization prevents overfitting
-- Small frequent adjustments converge better than large periodic ones
-
-**Expected improvement**: 0.05-0.1% error reduction
+Online refinement via reprojection residuals is planned but not active.
+The current approach is to use offline refinement (Strategy 3) instead.
 
 ---
 
@@ -192,25 +177,11 @@ Instead of processing fixed frames, the system:
 
 ## Online vs Offline Comparison
 
-### Online Refinement (Strategy 2)
+### Online Refinement (Strategy 2) — Not Yet Implemented
 
-```rust
-pub fn refine_intrinsics_online(&mut self) {
-    // Very small adjustment per keyframe
-    let fx_adjustment = -0.05 * reg_weight;
-
-    // Apply with regularization (conservative)
-    intrinsics_state.current_left_intrinsics[0] +=
-        fx_adjustment.clamp(-max_change, max_change) * (1.0 - reg_weight);
-}
-```
-
-**Characteristics**:
-- Runs during VIO execution
-- Updates every 5 keyframes
-- Very conservative adjustments (~0.05 pixels)
-- Real-time performance critical
-- Less information available
+Online refinement was planned but the implementation (`refine_intrinsics_online()`)
+was removed as it applied hardcoded constants rather than data-driven corrections.
+This is a future work item.
 
 ### Offline Refinement (Strategy 3)
 

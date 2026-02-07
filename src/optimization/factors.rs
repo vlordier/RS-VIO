@@ -1,7 +1,36 @@
 use apex_solver::factors::Factor;
-use na::{DMatrix, DVector, Matrix3, Matrix4, Quaternion, UnitQuaternion, Vector2, Vector3};
+use na::{DMatrix, DVector, Matrix4, Quaternion, UnitQuaternion, Vector2, Vector3};
 use nalgebra as na;
 use std::sync::Arc;
+
+// ─── Shared projection helpers (used by all visual factors) ───
+
+/// Project a 3D point in camera frame to normalized coordinates: `[x/z, y/z]`.
+///
+/// Caller must ensure `p_C.z > 0` (cheirality).
+#[inline]
+fn project_normalized(p_C: Vector3<f64>) -> Vector2<f64> {
+    Vector2::new(p_C[0] / p_C[2], p_C[1] / p_C[2])
+}
+
+/// Jacobian of normalized pinhole projection w.r.t. 3D point in camera frame.
+///
+/// `∂[x/z, y/z] / ∂[x, y, z]`
+///
+/// Caller must ensure `p_C.z > 0`.
+#[inline]
+fn jacobian_proj_wrt_p_C(p_C: Vector3<f64>) -> na::Matrix2x3<f64> {
+    let inv_z = 1.0 / p_C[2];
+    let inv_z_sq = inv_z * inv_z;
+    na::Matrix2x3::new(
+        inv_z,
+        0.0,
+        -p_C[0] * inv_z_sq,
+        0.0,
+        inv_z,
+        -p_C[1] * inv_z_sq,
+    )
+}
 
 /// Pinhole projection factor for optimizing 3D point positions from camera observations.
 ///
@@ -41,36 +70,6 @@ impl PinholeProjectionFactor {
     pub const fn new(observation: Vector2<f64>, T_C_W: Matrix4<f64>) -> Self {
         Self { observation, T_C_W }
     }
-
-    /// Project a 3D point in camera frame to normalized coordinates (simple pinhole: x/z, y/z).
-    fn project_normalized(&self, point_3d_cam: Vector3<f64>) -> Vector2<f64> {
-        let x = point_3d_cam[0] / point_3d_cam[2];
-        let y = point_3d_cam[1] / point_3d_cam[2];
-        Vector2::new(x, y)
-    }
-
-    /// Compute Jacobian of normalized projection w.r.t. 3D point in camera frame.
-    /// For pinhole: [x/z, y/z], so ∂[x/z, y/z]/∂[x, y, z]
-    fn jacobian_proj_wrt_point(&self, point_3d_cam: Vector3<f64>) -> na::Matrix2x3<f64> {
-        let x = point_3d_cam[0];
-        let y = point_3d_cam[1];
-        let z = point_3d_cam[2];
-
-        // ∂(x/z)/∂x = 1/z, ∂(x/z)/∂y = 0, ∂(x/z)/∂z = -x/z²
-        // ∂(y/z)/∂x = 0, ∂(y/z)/∂y = 1/z, ∂(y/z)/∂z = -y/z²
-        let inv_z = 1.0 / z;
-        let inv_z_sq = inv_z * inv_z;
-
-        let mut jac = na::Matrix2x3::zeros();
-        jac[(0, 0)] = inv_z; // ∂(x/z)/∂x
-        jac[(0, 1)] = 0.0; // ∂(x/z)/∂y
-        jac[(0, 2)] = -x * inv_z_sq; // ∂(x/z)/∂z
-        jac[(1, 0)] = 0.0; // ∂(y/z)/∂x
-        jac[(1, 1)] = inv_z; // ∂(y/z)/∂y
-        jac[(1, 2)] = -y * inv_z_sq; // ∂(y/z)/∂z
-
-        jac
-    }
 }
 
 impl Factor for PinholeProjectionFactor {
@@ -92,25 +91,41 @@ impl Factor for PinholeProjectionFactor {
         // Transform 3D point from world to camera frame
         let R_C_W = self.T_C_W.fixed_view::<3, 3>(0, 0);
         let t_C_W = self.T_C_W.fixed_view::<3, 1>(0, 3);
-        //println!("t_C_W: {:?}", t_C_W.to_owned().to_string());
         let point_camera = R_C_W * point_world + t_C_W;
 
+        // Cheirality check: point must be in front of camera
+        if point_camera.z <= 1e-6 {
+            let residuals = DVector::from_column_slice(&[1e6, 1e6]);
+            if compute_jacobian {
+                // Gradient pushes the 3D point toward positive camera z in world frame
+                let mut jac = DMatrix::zeros(2, 3);
+                // Direction that increases p_C.z w.r.t. p_W is R_C_W[2, :]
+                // Negate so GN descent moves point *in front of* camera
+                for c in 0..3 {
+                    jac[(0, c)] = -R_C_W[(2, c)] * 1e3;
+                    jac[(1, c)] = -R_C_W[(2, c)] * 1e3;
+                }
+                return (residuals, Some(jac));
+            }
+            return (residuals, None);
+        }
+
         // Project to normalized coordinates (simple pinhole: x/z, y/z)
-        let proj = self.project_normalized(point_camera);
+        let proj = project_normalized(point_camera);
 
         // Compute residuals (2D: u, v)
-        let mut residuals = DVector::zeros(2);
-        residuals[0] = proj[0] - self.observation[0];
-        residuals[1] = proj[1] - self.observation[1];
+        let residuals = DVector::from_column_slice(&[
+            proj[0] - self.observation[0],
+            proj[1] - self.observation[1],
+        ]);
 
         let jacobian_matrix = if compute_jacobian {
-            let jac_proj_wrt_point_cam = self.jacobian_proj_wrt_point(point_camera);
+            let jac_proj_wrt_point_cam = jacobian_proj_wrt_p_C(point_camera);
             // Chain rule: ∂r/∂point_world = ∂proj/∂point_cam * R_world_to_camera
             let jac_wrt_point = jac_proj_wrt_point_cam * R_C_W;
 
-            let mut jac = DMatrix::zeros(2, 3);
-            jac.copy_from(&jac_wrt_point);
-            Some(jac)
+            // as_slice() is column-major, matching DMatrix default storage
+            Some(DMatrix::from_column_slice(2, 3, jac_wrt_point.as_slice()))
         } else {
             None
         };
@@ -121,11 +136,6 @@ impl Factor for PinholeProjectionFactor {
     fn get_dimension(&self) -> usize {
         2 // 2D residual (u, v)
     }
-}
-
-#[inline]
-pub fn skew_symmetric(v: &Vector3<f64>) -> Matrix3<f64> {
-    Matrix3::new(0.0, -v.z, v.y, v.z, 0.0, -v.x, -v.y, v.x, 0.0)
 }
 
 /// BA factor for optimizing only the translation of a camera pose - development purposes
@@ -156,36 +166,6 @@ impl BundleAdjustmentFactorTranslationOnly {
         self.fixed_position = Some(position);
         self
     }
-
-    /// Project a 3D point in camera frame to normalized coordinates (simple pinhole: x/z, y/z).
-    fn project_normalized(&self, point_3d_cam: Vector3<f64>) -> Vector2<f64> {
-        let x = point_3d_cam[0] / point_3d_cam[2];
-        let y = point_3d_cam[1] / point_3d_cam[2];
-        Vector2::new(x, y)
-    }
-
-    /// Compute Jacobian of normalized projection w.r.t. 3D point in camera frame.
-    /// For pinhole: [x/z, y/z], so ∂[x/z, y/z]/∂[x, y, z]
-    fn jacobian_r_wrt_p_C(&self, point_3d_cam: Vector3<f64>) -> na::Matrix2x3<f64> {
-        let x = point_3d_cam[0];
-        let y = point_3d_cam[1];
-        let z = point_3d_cam[2];
-
-        // ∂(x/z)/∂x = 1/z, ∂(x/z)/∂y = 0, ∂(x/z)/∂z = -x/z²
-        // ∂(y/z)/∂x = 0, ∂(y/z)/∂y = 1/z, ∂(y/z)/∂z = -y/z²
-        let inv_z = 1.0 / z;
-        let inv_z_sq = inv_z * inv_z;
-
-        let mut jac = na::Matrix2x3::zeros();
-        jac[(0, 0)] = inv_z; // ∂(x/z)/∂x
-        jac[(0, 1)] = 0.0; // ∂(x/z)/∂y
-        jac[(0, 2)] = -x * inv_z_sq; // ∂(x/z)/∂z
-        jac[(1, 0)] = 0.0; // ∂(y/z)/∂x
-        jac[(1, 1)] = inv_z; // ∂(y/z)/∂y
-        jac[(1, 2)] = -y * inv_z_sq; // ∂(y/z)/∂z
-
-        jac
-    }
 }
 
 impl Factor for BundleAdjustmentFactorTranslationOnly {
@@ -196,14 +176,14 @@ impl Factor for BundleAdjustmentFactorTranslationOnly {
     ) -> (DVector<f64>, Option<DMatrix<f64>>) {
         // params[0] = 3D point in world frame (3 params: x, y, z)
 
-        let p_W = Vector3::new(params[0][0], params[0][1], params[0][2]);
-        let t_B_W: Vector3<f64>;
-        if let Some(fixed_position) = self.fixed_position {
-            t_B_W = fixed_position;
+        let (p_W, t_B_W) = if let Some(fixed_position) = self.fixed_position {
             assert_eq!(params.len(), 1, "BundleAdjustmentFactorTranslationOnly with fixed position requires 1 parameter vector");
             assert_eq!(params[0].len(), 3, "3D point must have 3 parameters");
+            (
+                Vector3::new(params[0][0], params[0][1], params[0][2]),
+                fixed_position,
+            )
         } else {
-            t_B_W = Vector3::new(params[1][0], params[1][1], params[1][2]);
             assert_eq!(
                 params.len(),
                 2,
@@ -211,36 +191,51 @@ impl Factor for BundleAdjustmentFactorTranslationOnly {
             );
             assert_eq!(params[0].len(), 3, "3D point must have 3 parameters");
             assert_eq!(params[1].len(), 3, "Translation must have 3 parameters");
-        }
+            (
+                Vector3::new(params[0][0], params[0][1], params[0][2]),
+                Vector3::new(params[1][0], params[1][1], params[1][2]),
+            )
+        };
 
         // Transform 3D point from world to camera frame
-        let R_C_B: nalgebra::Matrix<
-            f64,
-            nalgebra::Const<3>,
-            nalgebra::Const<3>,
-            nalgebra::ViewStorage<
-                '_,
-                f64,
-                nalgebra::Const<3>,
-                nalgebra::Const<3>,
-                nalgebra::Const<1>,
-                nalgebra::Const<4>,
-            >,
-        > = self.T_C_B.fixed_view::<3, 3>(0, 0);
+        let R_C_B = self.T_C_B.fixed_view::<3, 3>(0, 0);
         let t_C_B = self.T_C_B.fixed_view::<3, 1>(0, 3);
-        //println!("t_C_W: {:?}", t_C_W.to_owned().to_string());
         let p_C = R_C_B * (p_W + t_B_W) + t_C_B;
 
+        // Cheirality check: point must be in front of camera
+        if p_C.z <= 1e-6 {
+            let residuals = DVector::from_column_slice(&[1e6, 1e6]);
+            if compute_jacobian {
+                // Gradient pushes the 3D point toward positive camera z
+                let ncols = if self.fixed_position.is_some() { 3 } else { 6 };
+                let mut jac = DMatrix::zeros(2, ncols);
+                for c in 0..3 {
+                    jac[(0, c)] = -R_C_B[(2, c)] * 1e3;
+                    jac[(1, c)] = -R_C_B[(2, c)] * 1e3;
+                }
+                if ncols == 6 {
+                    // Translation Jacobian: same direction since ∂p_C/∂t_B_W = R_C_B
+                    for c in 0..3 {
+                        jac[(0, 3 + c)] = -R_C_B[(2, c)] * 1e3;
+                        jac[(1, 3 + c)] = -R_C_B[(2, c)] * 1e3;
+                    }
+                }
+                return (residuals, Some(jac));
+            }
+            return (residuals, None);
+        }
+
         // Project to normalized coordinates (simple pinhole: x/z, y/z)
-        let proj = self.project_normalized(p_C);
+        let proj = project_normalized(p_C);
 
         // Compute residuals (2D: u, v)
-        let mut residuals = DVector::zeros(2);
-        residuals[0] = proj[0] - self.observation[0];
-        residuals[1] = proj[1] - self.observation[1];
+        let residuals = DVector::from_column_slice(&[
+            proj[0] - self.observation[0],
+            proj[1] - self.observation[1],
+        ]);
 
         let jacobian_matrix = if compute_jacobian {
-            let jac_r_wrt_p_C = self.jacobian_r_wrt_p_C(p_C); // 2x3
+            let jac_r_wrt_p_C = jacobian_proj_wrt_p_C(p_C); // 2x3
             let jac_r_wrt_p_W = jac_r_wrt_p_C * R_C_B; // 2x3
 
             if self.fixed_position.is_some() {
@@ -248,10 +243,10 @@ impl Factor for BundleAdjustmentFactorTranslationOnly {
                 jac.copy_from(&jac_r_wrt_p_W);
                 Some(jac)
             } else {
-                let jac_r_wrt_t_B_W = jac_r_wrt_p_C * R_C_B;
+                // ∂r/∂t_B_W = ∂r/∂p_W (same since p_C depends on p_W + t_B_W)
                 let mut jac = DMatrix::zeros(2, 6);
                 jac.view_mut((0, 0), (2, 3)).copy_from(&jac_r_wrt_p_W);
-                jac.view_mut((0, 3), (2, 3)).copy_from(&jac_r_wrt_t_B_W);
+                jac.view_mut((0, 3), (2, 3)).copy_from(&jac_r_wrt_p_W);
                 Some(jac)
             }
         } else {
@@ -297,37 +292,6 @@ impl BundleAdjustmentFactor {
     pub fn with_fixed_pose(mut self, T_B_W: Arc<Matrix4<f64>>) -> Self {
         self.fixed_pose = Some(T_B_W);
         self
-    }
-
-    /// Project a 3D point in camera frame to normalized coordinates (simple pinhole: x/z, y/z).
-    fn project_normalized(&self, point_3d_cam: Vector3<f64>) -> Vector2<f64> {
-        let x = point_3d_cam[0] / point_3d_cam[2];
-        let y = point_3d_cam[1] / point_3d_cam[2];
-        Vector2::new(x, y)
-    }
-
-    /// Compute Jacobian of normalized projection w.r.t. 3D point in camera frame.
-    /// For pinhole: [x/z, y/z], so ∂[x/z, y/z]/∂[x, y, z]
-    #[allow(dead_code)]
-    fn jacobian_r_wrt_p_C(&self, point_3d_cam: Vector3<f64>) -> na::Matrix2x3<f64> {
-        let x = point_3d_cam[0];
-        let y = point_3d_cam[1];
-        let z = point_3d_cam[2];
-
-        // ∂(x/z)/∂x = 1/z, ∂(x/z)/∂y = 0, ∂(x/z)/∂z = -x/z²
-        // ∂(y/z)/∂x = 0, ∂(y/z)/∂y = 1/z, ∂(y/z)/∂z = -y/z²
-        let inv_z = 1.0 / z;
-        let inv_z_sq = inv_z * inv_z;
-
-        let mut jac = na::Matrix2x3::zeros();
-        jac[(0, 0)] = inv_z; // ∂(x/z)/∂x
-        jac[(0, 1)] = 0.0; // ∂(x/z)/∂y
-        jac[(0, 2)] = -x * inv_z_sq; // ∂(x/z)/∂z
-        jac[(1, 0)] = 0.0; // ∂(y/z)/∂x
-        jac[(1, 1)] = inv_z; // ∂(y/z)/∂y
-        jac[(1, 2)] = -y * inv_z_sq; // ∂(y/z)/∂z
-
-        jac
     }
 }
 
@@ -385,25 +349,48 @@ impl Factor for BundleAdjustmentFactor {
         let p_B = R_B_W * p_W + t_B_W;
         let p_C = R_C_B * p_B + t_C_B;
 
-        //println!("p_C: {:?}", p_C.to_owned().to_string());
-        // Check cheirality of the 3D point
-        // TODO fix this because it does not help
-        if p_C.z <= 0.0 {
-            // log::warn!("3D point is behind the camera, skipping optimization");
-            let residuals = DVector::from_vec(vec![1e6, 1e6]);
+        // Check cheirality: point behind camera gets a large residual with
+        // a finite Jacobian so the optimizer can recover (zero Jacobian
+        // would stall the solver).  Threshold 1e-6 (not 0.0) to prevent
+        // Inf from project_normalized dividing by ~0.
+        if p_C.z <= 1e-6 {
+            let residuals = DVector::from_column_slice(&[1e6, 1e6]);
+            if !compute_jacobian {
+                return (residuals, None);
+            }
+            // R_total = R_C_B * R_B_W.  Row 2 of R_total is the direction in
+            // world coords that increases p_C.z.  We NEGATE so that GN descent
+            // (δ = -(J^T J + λI)^{-1} J^T r) moves in the +camera-z direction
+            // when r = [+1e6, +1e6].
+            let R_total = R_C_B * R_B_W;
             if self.fixed_pose.is_some() {
-                // Only optimize 3D point
-                let jac = DMatrix::zeros(2, 3);
+                let mut jac = DMatrix::zeros(2, 3);
+                for c in 0..3 {
+                    jac[(0, c)] = -R_total[(2, c)] * 1e3;
+                    jac[(1, c)] = -R_total[(2, c)] * 1e3;
+                }
                 return (residuals, Some(jac));
             } else {
-                let jac = DMatrix::zeros(2, 9);
+                let mut jac = DMatrix::zeros(2, 9);
+                // Point Jacobian (columns 0-2)
+                for c in 0..3 {
+                    jac[(0, c)] = -R_total[(2, c)] * 1e3;
+                    jac[(1, c)] = -R_total[(2, c)] * 1e3;
+                }
+                // Pose translation Jacobian (columns 3-5): same direction under
+                // right-perturbation since ∂p_C/∂δρ = R_C_B * R_B_W = R_total
+                for c in 0..3 {
+                    jac[(0, 3 + c)] = -R_total[(2, c)] * 1e3;
+                    jac[(1, 3 + c)] = -R_total[(2, c)] * 1e3;
+                }
+                // Rotation Jacobian (columns 6-8): leave zero (under-determined)
                 return (residuals, Some(jac));
             }
         }
 
         // Project and compute residuals
-        let proj = self.project_normalized(p_C);
-        let residuals = DVector::from_vec(vec![
+        let proj = project_normalized(p_C);
+        let residuals = DVector::from_column_slice(&[
             proj[0] - self.observation[0],
             proj[1] - self.observation[1],
         ]);
@@ -417,8 +404,7 @@ impl Factor for BundleAdjustmentFactor {
             let fz_x = -p_C.x * inv_z_sq;
             let fz_y = -p_C.y * inv_z_sq;
 
-            // Compute R_total = R_C_B * R_B_W
-            let R_C_B = self.T_C_B.fixed_view::<3, 3>(0, 0);
+            // Compute R_total = R_C_B * R_B_W (R_C_B already extracted above)
             let R_total = R_C_B * R_B_W;
 
             // ∂r/∂p_W = jac_proj * R_total
@@ -469,9 +455,13 @@ impl Factor for BundleAdjustmentFactor {
                 // We computed J * skew, so negate
                 jac_r_wrt_rot.neg_mut();
 
+                // ∂r/∂δρ = jac_proj * R_C_B * R_B_W = jac_proj * R_total
+                // Under SE3 right-perturbation: t' = t + R_B_W * δρ, so ∂t/∂δρ = R_B_W
+                // ∂r/∂t_B_W equals ∂r/∂p_W (both = jac_proj * R_total), reuse it
+
                 let mut jac = DMatrix::zeros(2, 9);
                 jac.view_mut((0, 0), (2, 3)).copy_from(&jac_r_wrt_p_W); // ∂r/∂p_W
-                jac.view_mut((0, 3), (2, 3)).copy_from(&jac_r_wrt_p_W); // ∂r/∂t (Following original logic)
+                jac.view_mut((0, 3), (2, 3)).copy_from(&jac_r_wrt_p_W); // ∂r/∂t_B_W
                 jac.view_mut((0, 6), (2, 3)).copy_from(&jac_r_wrt_rot); // ∂r/∂ω
                 Some(jac)
             }
@@ -507,36 +497,6 @@ impl PnPFactor {
             p_W,
         }
     }
-
-    /// Project a 3D point in camera frame to normalized coordinates (simple pinhole: x/z, y/z).
-    fn project_normalized(&self, p_C: Vector3<f64>) -> Vector2<f64> {
-        let x = p_C[0] / p_C[2];
-        let y = p_C[1] / p_C[2];
-        Vector2::new(x, y)
-    }
-
-    /// Compute Jacobian of normalized projection w.r.t. 3D point in camera frame.
-    /// For pinhole: [x/z, y/z], so ∂[x/z, y/z]/∂[x, y, z]
-    fn jacobian_r_wrt_p_C(&self, p_C: Vector3<f64>) -> na::Matrix2x3<f64> {
-        let x = p_C[0];
-        let y = p_C[1];
-        let z = p_C[2];
-
-        // ∂(x/z)/∂x = 1/z, ∂(x/z)/∂y = 0, ∂(x/z)/∂z = -x/z²
-        // ∂(y/z)/∂x = 0, ∂(y/z)/∂y = 1/z, ∂(y/z)/∂z = -y/z²
-        let inv_z = 1.0 / z;
-        let inv_z_sq = inv_z * inv_z;
-
-        let mut jac = na::Matrix2x3::zeros();
-        jac[(0, 0)] = inv_z; // ∂(x/z)/∂x
-        jac[(0, 1)] = 0.0; // ∂(x/z)/∂y
-        jac[(0, 2)] = -x * inv_z_sq; // ∂(x/z)/∂z
-        jac[(1, 0)] = 0.0; // ∂(y/z)/∂x
-        jac[(1, 1)] = inv_z; // ∂(y/z)/∂y
-        jac[(1, 2)] = -y * inv_z_sq; // ∂(y/z)/∂z
-
-        jac
-    }
 }
 
 impl Factor for PnPFactor {
@@ -565,8 +525,7 @@ impl Factor for PnPFactor {
 
         // Construct rotation/translation manually
         let t_B_W = Vector3::new(tx, ty, tz);
-        // We assume valid unit quaternion from solver
-        let q_B_W = UnitQuaternion::new_unchecked(Quaternion::new(qw, qx, qy, qz));
+        let q_B_W = UnitQuaternion::new_normalize(Quaternion::new(qw, qx, qy, qz));
         let R_B_W = q_B_W.to_rotation_matrix();
 
         // Pre-compute camera transform components (reused in jacobian)
@@ -577,16 +536,35 @@ impl Factor for PnPFactor {
         let p_B = R_B_W * self.p_W + t_B_W;
         let p_C = R_C_B * p_B + t_C_B;
 
+        // Cheirality check: point behind camera gets large residual with
+        // gradient signal so the optimizer can recover.  Threshold 1e-6
+        // (not 0.0) to prevent Inf from project_normalized dividing by ~0.
+        if p_C.z <= 1e-6 {
+            let residuals = DVector::from_column_slice(&[1e6, 1e6]);
+            if compute_jacobian {
+                // Negate so GN descent (δ = -(J^TJ+λI)^{-1} J^T r) pushes
+                // the pose to move the point in front of the camera.
+                let R_total = R_C_B * R_B_W.matrix();
+                let mut jac = DMatrix::zeros(2, 6);
+                for c in 0..3 {
+                    jac[(0, c)] = -R_total[(2, c)] * 1e3;
+                    jac[(1, c)] = -R_total[(2, c)] * 1e3;
+                }
+                // Rotation Jacobian (columns 3-5): leave zero
+                return (residuals, Some(jac));
+            }
+            return (residuals, None);
+        }
+
         // Project and compute residuals
-        let proj = self.project_normalized(p_C);
-        let residuals = DVector::from_vec(vec![
+        let proj = project_normalized(p_C);
+        let residuals = DVector::from_column_slice(&[
             proj[0] - self.observation[0],
             proj[1] - self.observation[1],
         ]);
 
         let jacobian_matrix = if compute_jacobian {
-            // Using helper method but could inline for further speed (helper is small though)
-            let jac_proj = self.jacobian_r_wrt_p_C(p_C); // 2x3
+            let jac_proj = jacobian_proj_wrt_p_C(p_C); // 2x3
 
             // Dense multiplication optimization: Expand jac_proj * R_C_B manually
             // R_C_B is 3x3, jac_proj is 2x3.

@@ -4,7 +4,7 @@ use crate::datasets::ImuData;
 use crate::estimator::sliding_window::SlidingWindow;
 use crate::estimator::Frame;
 use crate::feature_tracker::StereoPatchTracker;
-use crate::types::{Matrix4x4, UnitQuaternion, Vector3};
+use crate::types::{Matrix4x4, UnitQuaternion};
 use crate::viewers::Viewer;
 use anyhow::Result;
 use image::GrayImage;
@@ -15,29 +15,11 @@ use std::sync::{
 };
 use std::time::Instant;
 
-/// Tracks intrinsics refinement state
-#[derive(Debug, Clone)]
-pub struct IntrinsicsRefinementState {
-    /// Original left camera intrinsics [fx, fy, cx, cy]
-    pub original_left_intrinsics: Vec<f64>,
-    /// Original right camera intrinsics [fx, fy, cx, cy]
-    pub original_right_intrinsics: Vec<f64>,
-    /// Current refined left intrinsics
-    pub current_left_intrinsics: Vec<f64>,
-    /// Current refined right intrinsics
-    pub current_right_intrinsics: Vec<f64>,
-    /// Number of keyframes since last refinement
-    pub frames_since_refinement: usize,
-}
-
-/// Placeholder estimator implementation.
-/// Currently mimics the control flow and logging structure of the C++ Estimator::process_frame,
-/// but uses dummy values for tracking, optimization, and mapping.
+/// Stereo visual odometry estimator.
+/// Processes stereo frames through feature tracking, motion estimation,
+/// keyframe management, and sliding-window bundle adjustment.
 pub struct Estimator {
     frame_id_counter: u64,
-    frames_since_last_keyframe: u64,
-    /// When true, emit detailed per-frame logs (equivalent to Config::m_enable_debug_output).
-    enable_debug_output: bool,
     /// Full configuration loaded from YAML (used to derive intrinsics, etc.).
     pub(crate) config: Config,
     /// Patch-based stereo tracker reused across all frames.
@@ -56,15 +38,18 @@ pub struct Estimator {
     T_B_Cl: Matrix4x4,
     // Transformation from body to right camera
     T_B_Cr: Matrix4x4,
-    // Full trajectory of keyframes
-    /// Online intrinsics refinement state
-    intrinsics_refinement: Option<IntrinsicsRefinementState>,
     /// Pre-allocated image buffer for left camera (reused each frame - zero allocation)
     left_image_buffer: Vec<u8>,
     /// Pre-allocated image buffer for right camera (reused each frame - zero allocation)
     right_image_buffer: Vec<u8>,
     /// Pre-allocated IMU buffer (reused each frame - zero allocation)
     imu_buffer: Vec<ImuData>,
+    /// Last two successfully tracked poses for constant-velocity prediction.
+    /// (previous, current) — used to extrapolate initial guess for track_motion.
+    last_two_poses: (Option<Matrix4x4>, Option<Matrix4x4>),
+    /// Counter for consecutive motion tracking failures.
+    /// When this exceeds a threshold, we force a keyframe to prevent map staleness.
+    consecutive_tracking_failures: u32,
 }
 
 impl Estimator {
@@ -101,23 +86,6 @@ impl Estimator {
         let optical_flow_convergence_threshold =
             config.feature_detection.optical_flow_convergence_threshold;
 
-        // Initialize intrinsics refinement if enabled
-        let intrinsics_refinement = if let Some(calib_cfg) = &config.calibration {
-            if calib_cfg.optimize_intrinsics {
-                Some(IntrinsicsRefinementState {
-                    original_left_intrinsics: config.camera.left_intrinsics.clone(),
-                    original_right_intrinsics: config.camera.right_intrinsics.clone(),
-                    current_left_intrinsics: config.camera.left_intrinsics.clone(),
-                    current_right_intrinsics: config.camera.right_intrinsics.clone(),
-                    frames_since_refinement: 0,
-                })
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
         // Pre-allocate image buffers for zero-allocation frame processing
         let image_size = (config.camera.image_width * config.camera.image_height) as usize;
         let left_image_buffer = vec![0u8; image_size];
@@ -127,8 +95,6 @@ impl Estimator {
 
         Estimator {
             frame_id_counter: 0,
-            frames_since_last_keyframe: 0,
-            enable_debug_output: true,
             config,
             stereo_patch_tracker: StereoPatchTracker::<6>::new(
                 grid_size,
@@ -142,10 +108,11 @@ impl Estimator {
             right_cam,
             T_B_Cl,
             T_B_Cr,
-            intrinsics_refinement,
             left_image_buffer,
             right_image_buffer,
             imu_buffer,
+            last_two_poses: (None, None),
+            consecutive_tracking_failures: 0,
         }
     }
 
@@ -161,14 +128,11 @@ impl Estimator {
 
         // New frame: update counters
         self.frame_id_counter += 1;
-        self.frames_since_last_keyframe += 1;
 
-        if self.enable_debug_output {
-            log::debug!(
-                "============================== Frame {} ==============================",
-                self.frame_id_counter
-            );
-        }
+        log::debug!(
+            "============================== Frame {} ==============================",
+            self.frame_id_counter
+        );
 
         // Timing placeholders (warning: assigned before read in log::debug below)
         #[allow(unused_assignments)]
@@ -196,7 +160,14 @@ impl Estimator {
                 img_w,
                 img_h
             );
-            return Ok(());
+            anyhow::bail!(
+                "Invalid image size: left={}, right={}, expected={} ({}x{})",
+                left_image.len(),
+                right_image.len(),
+                expected_size,
+                img_w,
+                img_h
+            );
         }
 
         // Copy into pre-allocated buffers (memcpy - fast, no malloc)
@@ -211,13 +182,21 @@ impl Estimator {
         let left_img = match GrayImage::from_raw(img_w, img_h, left_buffer) {
             Some(img) => img,
             None => {
+                // Recover right buffer (not yet consumed); left buffer lost in from_raw
+                self.right_image_buffer = right_buffer;
+                self.left_image_buffer = vec![0u8; left_image.len()];
                 log::error!(
                     "[Estimator] Failed to construct GrayImage for left camera ({}x{}, len={})",
                     img_w,
                     img_h,
                     left_image.len()
                 );
-                return Ok(());
+                anyhow::bail!(
+                    "Failed to construct GrayImage for left camera ({}x{}, len={})",
+                    img_w,
+                    img_h,
+                    left_image.len()
+                );
             },
         };
         let right_img = match GrayImage::from_raw(img_w, img_h, right_buffer) {
@@ -231,28 +210,19 @@ impl Estimator {
                 );
                 // Recover left buffer
                 self.left_image_buffer = left_img.into_raw();
-                return Ok(());
+                anyhow::bail!(
+                    "Failed to construct GrayImage for right camera ({}x{}, len={})",
+                    img_w,
+                    img_h,
+                    right_image.len()
+                );
             },
         };
-
-        /*
-        // For debugging with TUM-VI: undistort the images with EUCM and save the result
-        let eucm = match &self.left_cam {
-            crate::datasets::CameraModelType::EUCM(cam) => cam,
-            _ => panic!("left_cam is not an EUCM instance"),
-        };
-        let model1 = GenericModel::EUCM(*eucm);
-        let p = model1.estimate_new_camera_matrix_for_undistort(0.0, Some((1024, 1024)));
-        let (xmap, ymap) = model1.init_undistort_map(&p, (1024, 1024), None);
-        let img_l8 = DynamicImage::ImageLuma8(right_img.clone());
-        let remaped = camera_intrinsic_model::remap(&img_l8, &xmap, &ymap);
-        remaped.save("remaped0.png").unwrap();
-        */
 
         // Create frame (images are not stored, only features will be added)
         let mut current_frame = Frame::from_stereo_images(
             timestamp_ns,
-            self.frame_id_counter as i32,
+            i32::try_from(self.frame_id_counter).unwrap_or(i32::MAX),
             self.left_cam.clone(),
             self.right_cam.clone(),
             self.T_B_Cl,
@@ -263,7 +233,8 @@ impl Estimator {
         if let Some(imu) = imu_data {
             self.imu_buffer.clear();
             self.imu_buffer.extend_from_slice(imu);
-            current_frame.imu_from_last_frame = self.imu_buffer.clone();
+            current_frame.imu_from_last_frame =
+                std::mem::replace(&mut self.imu_buffer, Vec::with_capacity(100));
         }
 
         frame_creation_time_ms = frame_creation_start.elapsed().as_secs_f64() * 1000.0;
@@ -276,17 +247,37 @@ impl Estimator {
         self.view_patch_tracking_results(&current_frame, &left_img, &right_img, img_w, img_h);
 
         // Motion tracking - only if the sliding window is full (has initialized keyframes)
+        let mut is_bootstrap = false;
+        // last_kf_pose extracted while holding the try_lock guard to avoid a
+        // second blocking lock() after the guard is dropped.
+        let mut last_kf_pose: Option<Matrix4x4> = None;
+
+        // Constant-velocity prediction: extrapolate from last two successful poses
+        let predicted_pose = match self.last_two_poses {
+            (Some(prev), Some(curr)) => {
+                // delta = curr * prev^{-1}, predicted = delta * curr
+                prev.try_inverse().map(|prev_inv| {
+                    let delta = curr * prev_inv;
+                    delta * curr
+                })
+            },
+            (_, Some(curr)) => Some(curr), // Only one pose: use it directly
+            _ => None,
+        };
+
         let motion_tracking_result = match self.sliding_window.try_lock() {
             Ok(mut sliding_window) => {
                 if sliding_window.is_full() {
-                    // DEBUG
                     let motion_tracking_start = Instant::now();
-                    let result = sliding_window.track_motion(&current_frame);
-                    drop(sliding_window); // Drop lock before borrowing self mutably
+                    let result = sliding_window.track_motion(&current_frame, predicted_pose);
+                    // Grab last keyframe pose while we still hold the lock
+                    last_kf_pose = sliding_window.last_keyframe_pose();
+                    drop(sliding_window);
                     let motion_tracking_elapsed =
                         motion_tracking_start.elapsed().as_secs_f64() * 1000.0;
                     (result, motion_tracking_elapsed)
                 } else {
+                    is_bootstrap = true;
                     drop(sliding_window);
                     (Ok(None), 0.0)
                 }
@@ -302,34 +293,58 @@ impl Estimator {
 
         match motion_tracking_result.0 {
             Ok(Some(T_W_B)) => {
+                // Tracking succeeded: update pose history and reset failure counter
+                self.last_two_poses = (self.last_two_poses.1, Some(T_W_B));
+                self.consecutive_tracking_failures = 0;
+
                 // Apply the optimized pose to the current frame
                 current_frame.state.T_W_B = T_W_B;
 
-                // Check if translation and rotation since last keyframe is large enough to trigger a keyframe
-                #[allow(clippy::unwrap_used)] // Validated by sliding_window - keyframes exist
-                let T_W_B_last_kf = *self
-                    .sliding_window
-                    .lock()
-                    .unwrap()
-                    .get_keyframe_poses()
-                    .last()
-                    .unwrap();
-                #[allow(clippy::unwrap_used)] // T_W_B is guaranteed invertible
-                let T_rel = T_W_B * T_W_B_last_kf.try_inverse().unwrap();
+                // Use pre-fetched last keyframe pose (grabbed while holding try_lock)
+                let Some(T_W_B_last_kf) = last_kf_pose else {
+                    log::warn!("[Estimator] No last keyframe pose available for keyframe decision");
+                    current_frame.is_keyframe = true;
+                    motion_tracking_time_ms = motion_tracking_result.1;
+                    // Skip to keyframe insertion
+                    let optimization_start = Instant::now();
+                    {
+                        let mut sliding_window = self
+                            .sliding_window
+                            .lock()
+                            .map_err(|e| anyhow::anyhow!("Sliding window lock poisoned: {}", e))?;
+                        sliding_window.add_frame(current_frame);
+                    }
+                    self.schedule_optimization();
+                    optimization_time_ms = optimization_start.elapsed().as_secs_f64() * 1000.0;
+                    let total_duration_ms = total_start_time.elapsed().as_secs_f64() * 1000.0;
+                    log::debug!(
+                        "[Timing] frame_creation={:.3} ms, patch_tracking={:.3} ms, motion_tracking={:.3} ms, optimization={:.3} ms, total={:.3} ms",
+                        frame_creation_time_ms, patch_tracking_time_ms, motion_tracking_time_ms, optimization_time_ms, total_duration_ms
+                    );
+                    self.left_image_buffer = left_img.into_raw();
+                    self.right_image_buffer = right_img.into_raw();
+                    return Ok(());
+                };
+                let T_W_B_last_kf_inv = match T_W_B_last_kf.try_inverse() {
+                    Some(inv) => inv,
+                    None => {
+                        log::warn!("[Estimator] Last keyframe pose is singular, skipping keyframe decision");
+                        self.left_image_buffer = left_img.into_raw();
+                        self.right_image_buffer = right_img.into_raw();
+                        return Ok(());
+                    },
+                };
+                let T_rel = T_W_B * T_W_B_last_kf_inv;
                 let t_rel = T_rel.fixed_view::<3, 1>(0, 3).into_owned();
                 let R_rel = T_rel.fixed_view::<3, 3>(0, 0).into_owned();
-                let e_rel = Vector3::from([
-                    UnitQuaternion::from_matrix(&R_rel).euler_angles().0,
-                    UnitQuaternion::from_matrix(&R_rel).euler_angles().1,
-                    UnitQuaternion::from_matrix(&R_rel).euler_angles().2,
-                ]);
-                log::debug!("[Estimator] Translation since last keyframe: {:.2?}, Euler angles since last keyframe: {:.2?}", t_rel, e_rel);
+                let angle_rel = UnitQuaternion::from_matrix(&R_rel).angle();
+                log::debug!("[Estimator] Translation since last keyframe: {:.2?}, Rotation angle since last keyframe: {:.4} rad", t_rel, angle_rel);
 
                 // Check if translation and rotation since last keyframe is large enough to trigger a keyframe
                 let translation_threshold = self.config.keyframe_management.translation_threshold;
                 let rotation_threshold = self.config.keyframe_management.rotation_threshold;
 
-                if t_rel.norm() > translation_threshold || e_rel.norm() > rotation_threshold {
+                if t_rel.norm() > translation_threshold || angle_rel > rotation_threshold {
                     log::debug!("[Estimator] Translation and rotation since last keyframe are large enough to trigger a keyframe");
                     current_frame.is_keyframe = true;
                 } else {
@@ -338,10 +353,39 @@ impl Estimator {
                 self.view_motion_tracking_results(&T_W_B);
             },
             Ok(None) => {
-                log::warn!("[Estimator] Motion tracking failed (optimization did not converge)");
+                if is_bootstrap {
+                    log::info!("[Estimator] Bootstrap: adding keyframe (window not yet full)");
+                    // is_keyframe stays true (default from from_stereo_images)
+                } else {
+                    self.consecutive_tracking_failures += 1;
+                    // Force keyframe after 5 consecutive failures to refresh the map
+                    // and prevent death spiral from stale map_points
+                    const MAX_CONSECUTIVE_FAILURES: u32 = 5;
+                    if self.consecutive_tracking_failures >= MAX_CONSECUTIVE_FAILURES {
+                        log::warn!(
+                            "[Estimator] Motion tracking failed {} consecutive times, forcing keyframe to refresh map",
+                            self.consecutive_tracking_failures
+                        );
+                        // Use the predicted pose (or last known pose) for the forced keyframe
+                        if let Some(pose) = predicted_pose.or(self.last_two_poses.1) {
+                            current_frame.state.T_W_B = pose;
+                        }
+                        current_frame.is_keyframe = true;
+                        self.consecutive_tracking_failures = 0;
+                    } else {
+                        log::warn!(
+                            "[Estimator] Motion tracking failed (optimization did not converge) [{}/{}]",
+                            self.consecutive_tracking_failures,
+                            MAX_CONSECUTIVE_FAILURES
+                        );
+                        current_frame.is_keyframe = false;
+                    }
+                }
             },
             Err(e) => {
                 log::error!("[Estimator] Motion tracking error: {:?}", e);
+                self.consecutive_tracking_failures += 1;
+                current_frame.is_keyframe = false;
             },
         }
         motion_tracking_time_ms = motion_tracking_result.1;
@@ -351,7 +395,10 @@ impl Estimator {
         if current_frame.is_keyframe {
             let optimization_start = Instant::now();
             {
-                let mut sliding_window = self.sliding_window.lock().unwrap();
+                let mut sliding_window = self
+                    .sliding_window
+                    .lock()
+                    .map_err(|e| anyhow::anyhow!("Sliding window lock poisoned: {}", e))?;
                 sliding_window.add_frame(current_frame);
             }
             self.schedule_optimization();
@@ -379,21 +426,21 @@ impl Estimator {
 
     /// Schedule background bundle adjustment on keyframes (non-blocking)
     fn schedule_optimization(&self) {
-        if !self.optimization_in_flight.swap(true, Ordering::Relaxed) {
+        if !self.optimization_in_flight.swap(true, Ordering::AcqRel) {
             let sliding_window = Arc::clone(&self.sliding_window);
             let in_flight = Arc::clone(&self.optimization_in_flight);
 
             std::thread::spawn(move || match sliding_window.lock() {
                 Ok(mut window) => {
                     let _ = window.optimize();
-                    in_flight.store(false, Ordering::Relaxed);
+                    in_flight.store(false, Ordering::Release);
                 },
                 Err(e) => {
                     log::error!(
                         "Failed to acquire sliding window lock for optimization: {}",
                         e
                     );
-                    in_flight.store(false, Ordering::Relaxed);
+                    in_flight.store(false, Ordering::Release);
                 },
             });
         }
@@ -447,269 +494,16 @@ impl Estimator {
 
     fn view_motion_tracking_results(&mut self, T_W_B: &Matrix4x4) {
         if let Some(v) = &mut self.viewer {
-            let pose_path = "pose_current".to_string();
-            v.log_pose(*T_W_B, pose_path.as_str());
+            v.log_pose(*T_W_B, "pose_current");
 
             let width = self.config.camera.image_width;
             let height = self.config.camera.image_height;
 
             // Log left camera frustum at the pose location (left camera is at the pose)
             let left_focal_length = self.config.camera.left_intrinsics[0] as f32;
-            let left_cam_path = format!("{}_left", pose_path);
             let T_W_Cl = T_W_B * self.T_B_Cl;
-            v.log_pose(T_W_Cl, left_cam_path.as_str());
-            v.log_camera_frustum(
-                left_focal_length,
-                width,
-                height,
-                left_cam_path.as_str(),
-                0.4,
-            );
+            v.log_pose(T_W_Cl, "pose_current_left");
+            v.log_camera_frustum(left_focal_length, width, height, "pose_current_left", 0.4);
         }
-    }
-
-    /// Visualize optimization results: map points, keyframe poses, and camera frustums.
-    /// Refine camera intrinsics based on accumulated reprojection errors
-    pub fn refine_intrinsics_online(&mut self) {
-        if let Some(ref mut intrinsics_state) = self.intrinsics_refinement {
-            if let Some(calib_cfg) = &self.config.calibration {
-                if !calib_cfg.optimize_intrinsics {
-                    return;
-                }
-
-                intrinsics_state.frames_since_refinement += 1;
-
-                // Only refine every N keyframes
-                if intrinsics_state.frames_since_refinement
-                    < calib_cfg.intrinsics_refinement_frequency
-                {
-                    return;
-                }
-
-                intrinsics_state.frames_since_refinement = 0;
-
-                // Get keyframe poses from sliding window
-                let keyframe_poses = self.sliding_window.lock().unwrap().get_keyframe_poses();
-                if keyframe_poses.is_empty() {
-                    return;
-                }
-
-                log::info!(
-                    "[Estimator] Refining intrinsics using {} keyframes",
-                    keyframe_poses.len()
-                );
-
-                // Simplified online refinement:
-                // Accumulate small adjustments based on tracking quality
-                // In full implementation, this would run mini bundle adjustment
-
-                let max_change = calib_cfg.max_intrinsics_change_per_update;
-                let reg_weight = calib_cfg.intrinsics_regularization_weight;
-
-                // Estimate small focal length adjustment
-                // Based on typical convergence patterns
-                let fx_adjustment = -0.05 * reg_weight; // Very small adjustment
-                let fy_adjustment = -0.05 * reg_weight;
-
-                if calib_cfg.optimize_focal_length {
-                    intrinsics_state.current_left_intrinsics[0] +=
-                        fx_adjustment.clamp(-max_change, max_change) * (1.0 - reg_weight);
-                    intrinsics_state.current_left_intrinsics[1] +=
-                        fy_adjustment.clamp(-max_change, max_change) * (1.0 - reg_weight);
-
-                    // Right camera slightly different
-                    intrinsics_state.current_right_intrinsics[0] +=
-                        fx_adjustment.clamp(-max_change, max_change) * (1.0 - reg_weight) * 0.95;
-                    intrinsics_state.current_right_intrinsics[1] +=
-                        fy_adjustment.clamp(-max_change, max_change) * (1.0 - reg_weight) * 0.95;
-
-                    log::debug!(
-                        "[Estimator] Intrinsics refined: left_fx={:.4}, left_fy={:.4}",
-                        intrinsics_state.current_left_intrinsics[0],
-                        intrinsics_state.current_left_intrinsics[1]
-                    );
-                }
-            }
-        }
-    }
-
-    /// Get current refined intrinsics
-    pub fn get_refined_intrinsics(&self) -> Option<(Vec<f64>, Vec<f64>)> {
-        self.intrinsics_refinement.as_ref().map(|state| {
-            (
-                state.current_left_intrinsics.clone(),
-                state.current_right_intrinsics.clone(),
-            )
-        })
-    }
-
-    /// Export refined intrinsics as YAML string
-    pub fn export_refined_intrinsics_yaml(&self) -> String {
-        let mut yaml_content = String::from("# Refined Camera Intrinsics\n");
-        yaml_content.push_str("# Generated from online refinement during VIO estimation\n");
-        yaml_content.push('\n');
-        yaml_content.push_str("camera:\n");
-        yaml_content.push_str("  image_width: ");
-        yaml_content.push_str(&self.config.camera.image_width.to_string());
-        yaml_content.push('\n');
-        yaml_content.push_str("  image_height: ");
-        yaml_content.push_str(&self.config.camera.image_height.to_string());
-        yaml_content.push('\n');
-        yaml_content.push('\n');
-
-        if let Some(ref intrinsics_state) = self.intrinsics_refinement {
-            // Left camera intrinsics
-            yaml_content.push_str("  left_intrinsics:\n");
-            yaml_content.push_str("    - ");
-            yaml_content.push_str(&format!(
-                "{:.6}",
-                intrinsics_state.current_left_intrinsics[0]
-            ));
-            yaml_content.push_str("  # fx\n");
-            yaml_content.push_str("    - ");
-            yaml_content.push_str(&format!(
-                "{:.6}",
-                intrinsics_state.current_left_intrinsics[1]
-            ));
-            yaml_content.push_str("  # fy\n");
-            yaml_content.push_str("    - ");
-            yaml_content.push_str(&format!(
-                "{:.6}",
-                intrinsics_state.current_left_intrinsics[2]
-            ));
-            yaml_content.push_str("  # cx\n");
-            yaml_content.push_str("    - ");
-            yaml_content.push_str(&format!(
-                "{:.6}",
-                intrinsics_state.current_left_intrinsics[3]
-            ));
-            yaml_content.push_str("  # cy\n");
-            yaml_content.push('\n');
-
-            // Right camera intrinsics
-            yaml_content.push_str("  right_intrinsics:\n");
-            yaml_content.push_str("    - ");
-            yaml_content.push_str(&format!(
-                "{:.6}",
-                intrinsics_state.current_right_intrinsics[0]
-            ));
-            yaml_content.push_str("  # fx\n");
-            yaml_content.push_str("    - ");
-            yaml_content.push_str(&format!(
-                "{:.6}",
-                intrinsics_state.current_right_intrinsics[1]
-            ));
-            yaml_content.push_str("  # fy\n");
-            yaml_content.push_str("    - ");
-            yaml_content.push_str(&format!(
-                "{:.6}",
-                intrinsics_state.current_right_intrinsics[2]
-            ));
-            yaml_content.push_str("  # cx\n");
-            yaml_content.push_str("    - ");
-            yaml_content.push_str(&format!(
-                "{:.6}",
-                intrinsics_state.current_right_intrinsics[3]
-            ));
-            yaml_content.push_str("  # cy\n");
-            yaml_content.push('\n');
-
-            // Original intrinsics for reference
-            yaml_content.push_str("  original_left_intrinsics:\n");
-            yaml_content.push_str("    - ");
-            yaml_content.push_str(&format!(
-                "{:.6}",
-                intrinsics_state.original_left_intrinsics[0]
-            ));
-            yaml_content.push_str("  # fx\n");
-            yaml_content.push_str("    - ");
-            yaml_content.push_str(&format!(
-                "{:.6}",
-                intrinsics_state.original_left_intrinsics[1]
-            ));
-            yaml_content.push_str("  # fy\n");
-            yaml_content.push_str("    - ");
-            yaml_content.push_str(&format!(
-                "{:.6}",
-                intrinsics_state.original_left_intrinsics[2]
-            ));
-            yaml_content.push_str("  # cx\n");
-            yaml_content.push_str("    - ");
-            yaml_content.push_str(&format!(
-                "{:.6}",
-                intrinsics_state.original_left_intrinsics[3]
-            ));
-            yaml_content.push_str("  # cy\n");
-            yaml_content.push('\n');
-
-            yaml_content.push_str("  original_right_intrinsics:\n");
-            yaml_content.push_str("    - ");
-            yaml_content.push_str(&format!(
-                "{:.6}",
-                intrinsics_state.original_right_intrinsics[0]
-            ));
-            yaml_content.push_str("  # fx\n");
-            yaml_content.push_str("    - ");
-            yaml_content.push_str(&format!(
-                "{:.6}",
-                intrinsics_state.original_right_intrinsics[1]
-            ));
-            yaml_content.push_str("  # fy\n");
-            yaml_content.push_str("    - ");
-            yaml_content.push_str(&format!(
-                "{:.6}",
-                intrinsics_state.original_right_intrinsics[2]
-            ));
-            yaml_content.push_str("  # cx\n");
-            yaml_content.push_str("    - ");
-            yaml_content.push_str(&format!(
-                "{:.6}",
-                intrinsics_state.original_right_intrinsics[3]
-            ));
-            yaml_content.push_str("  # cy\n");
-        } else {
-            yaml_content.push_str("  # Intrinsics refinement not enabled\n");
-            yaml_content.push_str("  left_intrinsics:\n");
-            yaml_content.push_str("    - ");
-            yaml_content.push_str(&format!("{:.6}", self.config.camera.left_intrinsics[0]));
-            yaml_content.push_str("  # fx\n");
-            yaml_content.push_str("    - ");
-            yaml_content.push_str(&format!("{:.6}", self.config.camera.left_intrinsics[1]));
-            yaml_content.push_str("  # fy\n");
-            yaml_content.push_str("    - ");
-            yaml_content.push_str(&format!("{:.6}", self.config.camera.left_intrinsics[2]));
-            yaml_content.push_str("  # cx\n");
-            yaml_content.push_str("    - ");
-            yaml_content.push_str(&format!("{:.6}", self.config.camera.left_intrinsics[3]));
-            yaml_content.push_str("  # cy\n");
-            yaml_content.push('\n');
-
-            yaml_content.push_str("  right_intrinsics:\n");
-            yaml_content.push_str("    - ");
-            yaml_content.push_str(&format!("{:.6}", self.config.camera.right_intrinsics[0]));
-            yaml_content.push_str("  # fx\n");
-            yaml_content.push_str("    - ");
-            yaml_content.push_str(&format!("{:.6}", self.config.camera.right_intrinsics[1]));
-            yaml_content.push_str("  # fy\n");
-            yaml_content.push_str("    - ");
-            yaml_content.push_str(&format!("{:.6}", self.config.camera.right_intrinsics[2]));
-            yaml_content.push_str("  # cx\n");
-            yaml_content.push_str("    - ");
-            yaml_content.push_str(&format!("{:.6}", self.config.camera.right_intrinsics[3]));
-            yaml_content.push_str("  # cy\n");
-        }
-
-        yaml_content
-    }
-
-    /// Save refined intrinsics to a YAML file
-    pub fn save_refined_intrinsics(&self, path: &str) -> Result<()> {
-        use std::fs;
-        let yaml_content = self.export_refined_intrinsics_yaml();
-        fs::write(path, yaml_content).map_err(|e| {
-            anyhow::anyhow!("Failed to write refined intrinsics to {}: {}", path, e)
-        })?;
-        log::info!("[Estimator] Refined intrinsics saved to {}", path);
-        Ok(())
     }
 }

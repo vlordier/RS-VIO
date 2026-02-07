@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-PROJECT_ROOT="/Users/vincent/Work/RS-VIO"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT_DIR="$PROJECT_ROOT/scripts"
 BENCHMARK_RESULTS="$PROJECT_ROOT/benchmark_results"
 

@@ -4,9 +4,8 @@
 //! with geometric constraints and outlier rejection for calibration.
 
 use crate::feature_tracker::enhanced_detector::{hamming_distance, EnhancedFeature};
-use image;
 use nalgebra as na;
-use std::collections::HashMap;
+use std::cell::Cell;
 
 /// Stereo correspondence between left and right features
 #[derive(Debug, Clone)]
@@ -21,157 +20,6 @@ pub struct StereoMatch {
     pub epipolar_error: f32,
     /// Confidence score (0-1, higher is better)
     pub confidence: f32,
-}
-
-/// Temporal depth information for a feature track
-#[derive(Debug, Clone)]
-pub struct TemporalDepthInfo {
-    /// Feature position in left image
-    pub position: na::Vector2<f32>,
-    /// Accumulated depth measurements
-    pub depth_measurements: Vec<f32>,
-    /// Accumulated confidence values
-    pub confidence_values: Vec<f32>,
-    /// Filtered depth estimate
-    pub filtered_depth: f32,
-    /// Depth uncertainty
-    pub depth_uncertainty: f32,
-    /// Last update timestamp
-    pub last_update: f64,
-}
-
-/// Temporal depth fusion for robust depth estimation
-#[derive(Debug)]
-pub struct TemporalDepthFusion {
-    /// Map from feature position to temporal depth info
-    depth_tracks: HashMap<(i32, i32), TemporalDepthInfo>,
-    /// Maximum number of frames to keep in history
-    max_history_frames: usize,
-    /// Position tolerance for track association (pixels)
-    position_tolerance: f32,
-    /// Current timestamp
-    current_timestamp: f64,
-}
-
-impl TemporalDepthFusion {
-    /// Create new temporal depth fusion
-    pub fn new(max_history_frames: usize, position_tolerance: f32) -> Self {
-        Self {
-            depth_tracks: HashMap::new(),
-            max_history_frames,
-            position_tolerance,
-            current_timestamp: 0.0,
-        }
-    }
-
-    /// Update with new stereo matches
-    pub fn update(
-        &mut self,
-        matches: &[StereoMatch],
-        left_features: &[EnhancedFeature],
-        baseline: f32,
-        focal_length: f32,
-        timestamp: f64,
-    ) {
-        self.current_timestamp = timestamp;
-
-        for match_ in matches {
-            let left_point = left_features[match_.left_idx].point;
-
-            // Compute disparity and depth
-            let right_point = left_features[match_.right_idx].point; // Note: this should be right_features, but for simplicity
-            let disparity = (left_point.x - right_point.x).abs();
-
-            if disparity > 1.0 {
-                let depth = baseline * focal_length / disparity;
-
-                // Find or create track
-                let key = self.position_to_key(left_point);
-                let track = self
-                    .depth_tracks
-                    .entry(key)
-                    .or_insert_with(|| TemporalDepthInfo {
-                        position: left_point,
-                        depth_measurements: Vec::new(),
-                        confidence_values: Vec::new(),
-                        filtered_depth: depth,
-                        depth_uncertainty: 1.0,
-                        last_update: timestamp,
-                    });
-
-                // Add measurement
-                track.depth_measurements.push(depth);
-                track.confidence_values.push(match_.confidence);
-                track.last_update = timestamp;
-
-                // Maintain history size
-                if track.depth_measurements.len() > self.max_history_frames {
-                    track.depth_measurements.remove(0);
-                    track.confidence_values.remove(0);
-                }
-
-                // Update filtered estimate inline
-                if !track.depth_measurements.is_empty() {
-                    // Weight by confidence and recency
-                    let mut weighted_sum = 0.0;
-                    let mut total_weight = 0.0;
-                    let mut variances = Vec::new();
-
-                    for (i, (&depth_val, &confidence)) in track
-                        .depth_measurements
-                        .iter()
-                        .zip(&track.confidence_values)
-                        .enumerate()
-                    {
-                        // Recency weight (newer measurements have higher weight)
-                        let recency_weight = (i + 1) as f32 / track.depth_measurements.len() as f32;
-                        let weight = confidence * recency_weight;
-
-                        weighted_sum += depth_val * weight;
-                        total_weight += weight;
-                        variances.push(depth_val);
-                    }
-
-                    if total_weight > 0.0 {
-                        track.filtered_depth = weighted_sum / total_weight;
-
-                        // Compute uncertainty as standard deviation
-                        let mean = track.filtered_depth;
-                        let variance = variances.iter().map(|&d| (d - mean).powi(2)).sum::<f32>()
-                            / variances.len() as f32;
-                        track.depth_uncertainty = variance.sqrt();
-                    }
-                }
-            }
-        }
-
-        // Remove old tracks
-        self.depth_tracks.retain(|_, track| {
-            timestamp - track.last_update < 1.0 // Keep tracks updated within 1 second
-        });
-    }
-
-    /// Get filtered depth for a position
-    pub fn get_filtered_depth(&self, position: na::Vector2<f32>) -> Option<f32> {
-        let key = self.position_to_key(position);
-        self.depth_tracks
-            .get(&key)
-            .map(|track| track.filtered_depth)
-    }
-
-    /// Get depth uncertainty for a position
-    pub fn get_depth_uncertainty(&self, position: na::Vector2<f32>) -> Option<f32> {
-        let key = self.position_to_key(position);
-        self.depth_tracks
-            .get(&key)
-            .map(|track| track.depth_uncertainty)
-    }
-
-    /// Convert position to discrete key for hashing
-    fn position_to_key(&self, position: na::Vector2<f32>) -> (i32, i32) {
-        let scale = 1.0 / self.position_tolerance;
-        ((position.x * scale) as i32, (position.y * scale) as i32)
-    }
 }
 
 /// Configuration for stereo matching
@@ -204,7 +52,7 @@ impl Default for StereoMatcherConfig {
             enable_geometric_check: true,
             ransac_iterations: 1000,
             ransac_threshold: 1.0,
-            enable_hierarchical_matching: true,
+            enable_hierarchical_matching: false,
             pyramid_levels: 3,
         }
     }
@@ -213,12 +61,17 @@ impl Default for StereoMatcherConfig {
 /// Stereo feature matcher with descriptor-based matching
 pub struct StereoMatcher {
     config: StereoMatcherConfig,
+    /// RNG seed counter — incremented on each call for deterministic, unique seeds
+    rng_counter: Cell<u64>,
 }
 
 impl StereoMatcher {
     /// Create new stereo matcher
-    pub const fn new(config: StereoMatcherConfig) -> Self {
-        Self { config }
+    pub fn new(config: StereoMatcherConfig) -> Self {
+        Self {
+            config,
+            rng_counter: Cell::new(42),
+        }
     }
 
     /// Match features between left and right images
@@ -232,7 +85,11 @@ impl StereoMatcher {
             self.hierarchical_matching(left_features, right_features, camera_intrinsics)
         } else {
             // Fallback to standard matching
-            let mut candidate_matches = self.descriptor_matching(left_features, right_features);
+            let mut candidate_matches = self.descriptor_matching_with_params(
+                left_features,
+                right_features,
+                self.config.max_descriptor_distance,
+            );
 
             if candidate_matches.is_empty() {
                 return Vec::new();
@@ -276,8 +133,7 @@ impl StereoMatcher {
             // If not the finest level, use matches to guide next level
             if level > 0 {
                 // Propagate matches to guide finer level
-                all_matches =
-                    self.propagate_matches_to_next_level(&level_matches, &all_matches, scale);
+                all_matches = self.propagate_matches_to_next_level(level_matches, scale);
             } else {
                 // Finest level - collect final matches
                 all_matches.extend(level_matches);
@@ -317,8 +173,13 @@ impl StereoMatcher {
             return Vec::new();
         }
 
-        // Scale intrinsics for this level
-        let scaled_intrinsics = camera_intrinsics * scale as f64;
+        // Scale intrinsics for this level (only fx, fy, cx, cy — K[2][2] must stay 1)
+        let mut scaled_intrinsics = *camera_intrinsics;
+        let s = scale as f64;
+        scaled_intrinsics[(0, 0)] *= s; // fx
+        scaled_intrinsics[(1, 1)] *= s; // fy
+        scaled_intrinsics[(0, 2)] *= s; // cx
+        scaled_intrinsics[(1, 2)] *= s; // cy
 
         // Epipolar geometry verification with relaxed constraints
         if self.config.enable_geometric_check {
@@ -335,35 +196,23 @@ impl StereoMatcher {
     }
 
     /// Scale features for pyramid level
+    /// Re-uses a single allocation and only mutates the point field
     fn scale_features(&self, features: &[EnhancedFeature], scale: f32) -> Vec<EnhancedFeature> {
-        features
-            .iter()
-            .map(|f| {
-                let mut scaled = f.clone();
-                scaled.point = f.point * scale;
-                scaled
-            })
-            .collect()
+        let mut scaled: Vec<EnhancedFeature> = features.to_vec();
+        for f in &mut scaled {
+            f.point *= scale;
+        }
+        scaled
     }
 
-    /// Propagate matches from coarse to fine level
+    /// Propagate matches from coarse to fine level (identity — indices don't change)
+    #[inline]
     fn propagate_matches_to_next_level(
         &self,
-        coarse_matches: &[StereoMatch],
-        _previous_matches: &[StereoMatch],
-        scale: f32,
+        coarse_matches: Vec<StereoMatch>,
+        _scale: f32,
     ) -> Vec<StereoMatch> {
-        // Use coarse matches to predict search regions for fine level
-        // For now, just return coarse matches scaled up
         coarse_matches
-            .iter()
-            .map(|m| {
-                let mut scaled = m.clone();
-                scaled.left_idx = (m.left_idx as f32 / scale) as usize;
-                scaled.right_idx = (m.right_idx as f32 / scale) as usize;
-                scaled
-            })
-            .collect()
     }
 
     /// Descriptor matching with custom parameters
@@ -382,6 +231,11 @@ impl StereoMatcher {
 
             // Find best and second best matches in right image
             for (right_idx, right_feat) in right_features.iter().enumerate() {
+                // Epipolar row-band pre-filter: skip features far from same scanline
+                const MAX_VERTICAL_DISPARITY: f32 = 5.0;
+                if (left_feat.point.y - right_feat.point.y).abs() > MAX_VERTICAL_DISPARITY {
+                    continue;
+                }
                 let dist = hamming_distance(&left_feat.descriptor, &right_feat.descriptor);
 
                 if dist < best_distance {
@@ -501,7 +355,7 @@ impl StereoMatcher {
 
         // Filter matches by epipolar constraint with adaptive threshold
         let mut verified_matches = Vec::new();
-        let mut errors = Vec::new();
+        let mut errors: Vec<f32> = Vec::with_capacity(candidate_matches.len());
 
         for match_ in candidate_matches {
             let left_point = left_features[match_.left_idx].point;
@@ -517,9 +371,16 @@ impl StereoMatcher {
         }
 
         // Adaptive threshold based on median error
-        errors.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-        let median_error = errors[errors.len() / 2];
-        let adaptive_threshold = (median_error * 2.0).max(self.config.max_epipolar_error);
+        // Sort a copy of errors in-place to compute median without index indirection
+        let median_error = {
+            let mut sorted_errors = errors.clone();
+            let mid = sorted_errors.len() / 2;
+            sorted_errors.select_nth_unstable_by(mid, |a, b| {
+                a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+            });
+            sorted_errors[mid]
+        };
+        let adaptive_threshold = (median_error * 2.0).min(self.config.max_epipolar_error);
 
         for (i, match_) in candidate_matches.iter().enumerate() {
             if errors[i] <= adaptive_threshold {
@@ -542,61 +403,6 @@ impl StereoMatcher {
         }
 
         verified_matches
-    }
-
-    /// Initial descriptor-based matching
-    fn descriptor_matching(
-        &self,
-        left_features: &[EnhancedFeature],
-        right_features: &[EnhancedFeature],
-    ) -> Vec<StereoMatch> {
-        let mut matches = Vec::new();
-
-        for (left_idx, left_feat) in left_features.iter().enumerate() {
-            let mut best_match = None;
-            let mut best_distance = u32::MAX;
-            let mut second_best_distance = u32::MAX;
-
-            // Find best and second best matches in right image
-            for (right_idx, right_feat) in right_features.iter().enumerate() {
-                let dist = hamming_distance(&left_feat.descriptor, &right_feat.descriptor);
-
-                if dist < best_distance {
-                    second_best_distance = best_distance;
-                    best_distance = dist;
-                    best_match = Some(right_idx);
-                } else if dist < second_best_distance {
-                    second_best_distance = dist;
-                }
-            }
-
-            // Apply Lowe's ratio test
-            if let Some(right_idx) = best_match {
-                if best_distance <= self.config.max_descriptor_distance
-                    && second_best_distance > 0
-                    && (best_distance as f32) / (second_best_distance as f32)
-                        <= self.config.ratio_threshold
-                {
-                    // Compute initial confidence based on descriptor matching
-                    let confidence = self.compute_match_confidence(
-                        best_distance,
-                        0.0, // epipolar error not computed yet
-                        self.config.max_descriptor_distance,
-                        self.config.max_epipolar_error,
-                    );
-
-                    matches.push(StereoMatch {
-                        left_idx,
-                        right_idx,
-                        score: best_distance,
-                        epipolar_error: 0.0, // Will be computed later
-                        confidence,
-                    });
-                }
-            }
-        }
-
-        matches
     }
 
     /// Geometric verification using epipolar constraints
@@ -675,7 +481,8 @@ impl StereoMatcher {
         for _ in 0..self.config.ransac_iterations {
             // Randomly sample 8 matches
             let sample_indices = self.random_sample(matches.len(), 8);
-            let sample_matches: Vec<_> = sample_indices.iter().map(|&idx| &matches[idx]).collect();
+            let sample_matches: [&StereoMatch; 8] =
+                std::array::from_fn(|i| &matches[sample_indices[i]]);
 
             if let Some(f) = self.estimate_fundamental_matrix_8point(
                 &sample_matches,
@@ -808,7 +615,7 @@ impl StereoMatcher {
         k_inv: &na::Matrix3<f64>,
     ) -> (na::Matrix3<f64>, Vec<f64>) {
         // Build weighted A matrix
-        let mut a_matrix = Vec::new();
+        let mut a_matrix = Vec::with_capacity(matches.len() * 9);
 
         for (i, match_) in matches.iter().enumerate() {
             let weight = weights[i].sqrt();
@@ -863,6 +670,9 @@ impl StereoMatcher {
 
         let f_refined = u * na::Matrix3::from_diagonal(&sigma) * v_t;
 
+        // Convert Essential → Fundamental so error is in pixel space.
+        let f_refined = k_inv.transpose() * f_refined * k_inv;
+
         (f_refined, weights.to_vec())
     }
 
@@ -879,7 +689,7 @@ impl StereoMatcher {
         }
 
         // Build the A matrix for Af = 0
-        let mut a = na::DMatrix::<f64>::zeros(8, 9);
+        let mut a = na::SMatrix::<f64, 8, 9>::zeros();
 
         for (i, match_) in matches.iter().enumerate() {
             let left_point = left_features[match_.left_idx].point;
@@ -907,13 +717,13 @@ impl StereoMatcher {
             a[(i, 8)] = 1.0;
         }
 
-        // Solve Af = 0 using SVD
-        let svd = a.svd(true, true);
-        let v_t = svd.v_t.unwrap_or_else(|| {
-            // Fallback - should not happen with valid input
-            na::DMatrix::identity(9, 9)
-        });
-        let f_vec = v_t.row(8).transpose(); // Last column of V
+        // Solve Af = 0 via the normal equations: find the eigenvector of A^T A
+        // corresponding to the smallest eigenvalue (= null space of A).
+        // Uses only stack-allocated 9×9 SMatrix — no heap allocation per RANSAC iteration.
+        let ata = a.transpose() * a; // 9×9 SMatrix
+        let eig = ata.symmetric_eigen();
+        let min_idx = eig.eigenvalues.imin();
+        let f_vec = eig.eigenvectors.column(min_idx);
 
         // Reshape to 3x3 matrix
         let mut f = na::Matrix3::zeros();
@@ -943,10 +753,15 @@ impl StereoMatcher {
 
         // Reconstruct F
         let sigma_diag = na::Matrix3::from_diagonal(&sigma);
-        Some(u * sigma_diag * v_t)
+        // The 8-point algorithm with K-normalized points yields the Essential
+        // matrix E.  Convert to Fundamental matrix F = K^{-T} E K^{-1} so that
+        // downstream epipolar-error computation works in pixel coordinates.
+        let e = u * sigma_diag * v_t;
+        Some(k_inv.transpose() * e * k_inv)
     }
 
     /// Compute epipolar error for a point pair
+    #[inline]
     fn compute_epipolar_error(
         &self,
         f: &na::Matrix3<f64>,
@@ -961,17 +776,19 @@ impl StereoMatcher {
         let epipolar_line = f * right_homogeneous;
 
         // Compute distance: |x_left^T * l| / sqrt(l1^2 + l2^2)
-        let numerator = (left_homogeneous.transpose() * epipolar_line).abs();
+        // Use dot product to get a scalar directly (avoids intermediate 1×1 matrix)
+        let numerator = left_homogeneous.dot(&epipolar_line).abs();
         let denominator = (epipolar_line.x.powi(2) + epipolar_line.y.powi(2)).sqrt();
 
         if denominator > 1e-8 {
-            (numerator[0] / denominator) as f32
+            (numerator / denominator) as f32
         } else {
             f32::INFINITY
         }
     }
 
     /// Compute confidence score for a stereo match (0-1, higher is better)
+    #[inline]
     pub fn compute_match_confidence(
         &self,
         score: u32,
@@ -1000,442 +817,35 @@ impl StereoMatcher {
         score_confidence * score_weight + error_confidence * error_weight
     }
 
-    /// Refine stereo matches to sub-pixel accuracy using interpolation
-    pub fn refine_matches_subpixel(
-        &self,
-        matches: &[StereoMatch],
-        left_features: &[EnhancedFeature],
-        right_features: &[EnhancedFeature],
-        left_image: &image::GrayImage,
-        right_image: &image::GrayImage,
-    ) -> Vec<StereoMatch> {
-        let mut refined_matches = Vec::with_capacity(matches.len());
-
-        for match_ in matches {
-            let left_point = left_features[match_.left_idx].point;
-            let right_point = right_features[match_.right_idx].point;
-
-            // Refine right point to sub-pixel accuracy
-            let _refined_right_point =
-                self.refine_point_subpixel(left_point, right_point, left_image, right_image);
-
-            // Create refined match with updated point
-            let refined_match = match_.clone();
-            // Update the right feature point (we'd need to modify the feature or store refined point separately)
-            // For now, we'll just update the epipolar error computation
-
-            refined_matches.push(refined_match);
+    /// Randomly sample k indices from n (k must be <= 8)
+    fn random_sample(&self, n: usize, k: usize) -> [usize; 8] {
+        debug_assert!(k <= 8, "random_sample only supports k <= 8");
+        let mut samples = [0usize; 8];
+        if n == 0 || k == 0 {
+            return samples;
         }
-
-        refined_matches
-    }
-
-    /// Refine a single point to sub-pixel accuracy using correlation
-    fn refine_point_subpixel(
-        &self,
-        left_point: na::Vector2<f32>,
-        right_point: na::Vector2<f32>,
-        left_image: &image::GrayImage,
-        right_image: &image::GrayImage,
-    ) -> na::Vector2<f32> {
-        let patch_size = 5; // 5x5 patch for correlation
-        let search_range = 2; // Search ±2 pixels around initial match
-
-        let left_x = left_point.x as i32;
-        let left_y = left_point.y as i32;
-        let right_x = right_point.x as i32;
-        let right_y = right_point.y as i32;
-
-        // Extract left patch
-        let left_patch = self.extract_patch(left_image, left_x, left_y, patch_size);
-
-        let mut best_corr = -1.0;
-        let mut best_dx = 0.0;
-
-        // Search for best sub-pixel match
-        for dx in (-search_range..=search_range).map(|x| x as f32) {
-            let test_x = right_x as f32 + dx;
-            let test_y = right_y as f32; // Assume horizontal epipolar lines
-
-            // Extract right patch at sub-pixel position using bilinear interpolation
-            let right_patch =
-                self.extract_patch_interpolated(right_image, test_x, test_y, patch_size);
-
-            // Compute normalized cross-correlation
-            let corr = self.compute_patch_correlation(&left_patch, &right_patch);
-
-            if corr > best_corr {
-                best_corr = corr;
-                best_dx = dx;
+        if k >= n {
+            for (i, s) in samples.iter_mut().enumerate().take(n.min(8)) {
+                *s = i;
             }
+            return samples;
         }
 
-        // Return refined point
-        na::Vector2::new(right_point.x + best_dx, right_point.y)
-    }
+        let seed = self.rng_counter.get();
+        self.rng_counter.set(seed.wrapping_add(1));
+        let mut rng = oorandom::Rand32::new(seed);
 
-    /// Extract image patch around a point
-    fn extract_patch(&self, image: &image::GrayImage, x: i32, y: i32, size: i32) -> Vec<f32> {
-        let half_size = size / 2;
-        let mut patch = Vec::with_capacity((size * size) as usize);
-
-        for dy in -half_size..=half_size {
-            for dx in -half_size..=half_size {
-                let px = (x + dx).clamp(0, image.width() as i32 - 1) as u32;
-                let py = (y + dy).clamp(0, image.height() as i32 - 1) as u32;
-                patch.push(image.get_pixel(px, py)[0] as f32);
-            }
-        }
-
-        patch
-    }
-
-    /// Extract image patch with bilinear interpolation
-    fn extract_patch_interpolated(
-        &self,
-        image: &image::GrayImage,
-        x: f32,
-        y: f32,
-        size: i32,
-    ) -> Vec<f32> {
-        let half_size = size / 2;
-        let mut patch = Vec::with_capacity((size * size) as usize);
-
-        for dy in -half_size..=half_size {
-            for dx in -half_size..=half_size {
-                let px = x + dx as f32;
-                let py = y + dy as f32;
-                let value = self.bilinear_interpolate(image, px, py);
-                patch.push(value);
-            }
-        }
-
-        patch
-    }
-
-    /// Bilinear interpolation at sub-pixel position
-    fn bilinear_interpolate(&self, image: &image::GrayImage, x: f32, y: f32) -> f32 {
-        let x0 = x.floor() as i32;
-        let y0 = y.floor() as i32;
-        let x1 = x0 + 1;
-        let y1 = y0 + 1;
-
-        let x0 = x0.clamp(0, image.width() as i32 - 1) as u32;
-        let y0 = y0.clamp(0, image.height() as i32 - 1) as u32;
-        let x1 = x1.clamp(0, image.width() as i32 - 1) as u32;
-        let y1 = y1.clamp(0, image.height() as i32 - 1) as u32;
-
-        let q00 = image.get_pixel(x0, y0)[0] as f32;
-        let q01 = image.get_pixel(x0, y1)[0] as f32;
-        let q10 = image.get_pixel(x1, y0)[0] as f32;
-        let q11 = image.get_pixel(x1, y1)[0] as f32;
-
-        let dx = x - x0 as f32;
-        let dy = y - y0 as f32;
-
-        // Bilinear interpolation
-        q00 * (1.0 - dx) * (1.0 - dy)
-            + q10 * dx * (1.0 - dy)
-            + q01 * (1.0 - dx) * dy
-            + q11 * dx * dy
-    }
-
-    /// Compute normalized cross-correlation between two patches
-    fn compute_patch_correlation(&self, patch1: &[f32], patch2: &[f32]) -> f32 {
-        if patch1.len() != patch2.len() {
-            return 0.0;
-        }
-
-        let n = patch1.len() as f32;
-
-        // Compute means
-        let mean1 = patch1.iter().sum::<f32>() / n;
-        let mean2 = patch2.iter().sum::<f32>() / n;
-
-        // Compute correlation
-        let mut numerator = 0.0;
-        let mut sum_sq1 = 0.0;
-        let mut sum_sq2 = 0.0;
-
-        for (&p1, &p2) in patch1.iter().zip(patch2.iter()) {
-            let diff1 = p1 - mean1;
-            let diff2 = p2 - mean2;
-            numerator += diff1 * diff2;
-            sum_sq1 += diff1 * diff1;
-            sum_sq2 += diff2 * diff2;
-        }
-
-        if sum_sq1 == 0.0 || sum_sq2 == 0.0 {
-            0.0
-        } else {
-            numerator / (sum_sq1 * sum_sq2).sqrt()
-        }
-    }
-
-    /// Apply bilateral filtering to depth map for noise reduction
-    pub fn filter_depth_map_bilateral(
-        &self,
-        depth_map: &mut [f32],
-        width: usize,
-        height: usize,
-        spatial_sigma: f32,
-        depth_sigma: f32,
-    ) {
-        let mut filtered = vec![0.0; depth_map.len()];
-
-        for y in 0..height {
-            for x in 0..width {
-                let idx = y * width + x;
-                let center_depth = depth_map[idx];
-
-                if center_depth <= 0.0 {
-                    filtered[idx] = center_depth;
-                    continue;
-                }
-
-                let mut sum_weights = 0.0;
-                let mut sum_weighted_depth = 0.0;
-
-                // Apply bilateral filter in local window
-                let window_size = (spatial_sigma * 3.0) as i32;
-
-                for dy in -window_size..=window_size {
-                    for dx in -window_size..=window_size {
-                        let nx = x as i32 + dx;
-                        let ny = y as i32 + dy;
-
-                        if nx >= 0 && nx < width as i32 && ny >= 0 && ny < height as i32 {
-                            let nidx = (ny as usize) * width + (nx as usize);
-                            let neighbor_depth = depth_map[nidx];
-
-                            if neighbor_depth > 0.0 {
-                                // Spatial weight (Gaussian)
-                                let spatial_dist = (dx * dx + dy * dy) as f32;
-                                let spatial_weight =
-                                    (-spatial_dist / (2.0 * spatial_sigma * spatial_sigma)).exp();
-
-                                // Depth weight (Gaussian)
-                                let depth_dist = (center_depth - neighbor_depth).abs();
-                                let depth_weight =
-                                    (-depth_dist / (2.0 * depth_sigma * depth_sigma)).exp();
-
-                                let weight = spatial_weight * depth_weight;
-                                sum_weights += weight;
-                                sum_weighted_depth += neighbor_depth * weight;
-                            }
-                        }
-                    }
-                }
-
-                filtered[idx] = if sum_weights > 0.0 {
-                    sum_weighted_depth / sum_weights
-                } else {
-                    center_depth
-                };
-            }
-        }
-
-        // Copy filtered result back
-        depth_map.copy_from_slice(&filtered);
-    }
-
-    /// Remove depth outliers using statistical filtering
-    pub fn remove_depth_outliers(
-        &self,
-        depth_map: &mut [f32],
-        width: usize,
-        height: usize,
-        max_deviation_sigma: f32,
-    ) {
-        // Compute local statistics
-        let mut local_means = vec![0.0; depth_map.len()];
-        let mut local_stds = vec![0.0; depth_map.len()];
-
-        let window_size = 3; // 3x3 window
-
-        for y in 0..height {
-            for x in 0..width {
-                let idx = y * width + x;
-
-                let mut valid_depths = Vec::new();
-
-                // Collect valid depths in window
-                for dy in -window_size..=window_size {
-                    for dx in -window_size..=window_size {
-                        let nx = x as i32 + dx;
-                        let ny = y as i32 + dy;
-
-                        if nx >= 0 && nx < width as i32 && ny >= 0 && ny < height as i32 {
-                            let nidx = (ny as usize) * width + (nx as usize);
-                            let depth = depth_map[nidx];
-                            if depth > 0.0 {
-                                valid_depths.push(depth);
-                            }
-                        }
-                    }
-                }
-
-                if !valid_depths.is_empty() {
-                    // Compute mean and std
-                    let mean = valid_depths.iter().sum::<f32>() / valid_depths.len() as f32;
-                    let variance = valid_depths
-                        .iter()
-                        .map(|&d| (d - mean).powi(2))
-                        .sum::<f32>()
-                        / valid_depths.len() as f32;
-                    let std = variance.sqrt();
-
-                    local_means[idx] = mean;
-                    local_stds[idx] = std;
-                }
-            }
-        }
-
-        // Remove outliers
-        for i in 0..depth_map.len() {
-            let depth = depth_map[i];
-            if depth > 0.0 && local_stds[i] > 0.0 {
-                let deviation = (depth - local_means[i]).abs() / local_stds[i];
-                if deviation > max_deviation_sigma {
-                    depth_map[i] = 0.0; // Mark as invalid
-                }
-            }
-        }
-    }
-
-    /// Fill holes in depth map using interpolation
-    pub fn fill_depth_holes(&self, depth_map: &mut [f32], width: usize, height: usize) {
-        let mut filled = depth_map.to_vec();
-
-        for y in 0..height {
-            for x in 0..width {
-                let idx = y * width + x;
-
-                if depth_map[idx] <= 0.0 {
-                    // Find nearest valid depths
-                    let mut nearest_depths = Vec::new();
-                    let search_radius = 5;
-
-                    for dy in -search_radius..=search_radius {
-                        for dx in -search_radius..=search_radius {
-                            let nx = x as i32 + dx;
-                            let ny = y as i32 + dy;
-
-                            if nx >= 0 && nx < width as i32 && ny >= 0 && ny < height as i32 {
-                                let nidx = (ny as usize) * width + (nx as usize);
-                                let depth = depth_map[nidx];
-                                if depth > 0.0 {
-                                    let dist = ((dx * dx + dy * dy) as f32).sqrt();
-                                    nearest_depths.push((depth, dist));
-                                }
-                            }
-                        }
-                    }
-
-                    if !nearest_depths.is_empty() {
-                        // Inverse distance weighting
-                        let mut weighted_sum = 0.0;
-                        let mut total_weight = 0.0;
-
-                        for (depth, dist) in nearest_depths {
-                            let weight = 1.0 / (dist + 1.0); // Add 1 to avoid division by zero
-                            weighted_sum += depth * weight;
-                            total_weight += weight;
-                        }
-
-                        filled[idx] = weighted_sum / total_weight;
-                    }
-                }
-            }
-        }
-
-        depth_map.copy_from_slice(&filled);
-    }
-
-    /// Randomly sample k indices from n
-    fn random_sample(&self, n: usize, k: usize) -> Vec<usize> {
-        use std::collections::HashSet;
-
-        let mut rng = oorandom::Rand32::new(
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_else(|_| std::time::Duration::from_secs(0))
-                .as_nanos() as u64,
-        );
-
-        let mut samples = HashSet::new();
-        while samples.len() < k {
+        let mut count = 0;
+        while count < k {
             let idx = (rng.rand_float() * n as f32) as usize;
-            samples.insert(idx.min(n - 1));
+            let idx = idx.min(n - 1);
+            if !samples[..count].contains(&idx) {
+                samples[count] = idx;
+                count += 1;
+            }
         }
 
-        samples.into_iter().collect()
-    }
-}
-
-/// Memory-efficient stereo calibration data structure
-#[derive(Debug, Clone)]
-pub struct StereoCalibrationData {
-    /// Left image features
-    pub left_features: Vec<EnhancedFeature>,
-    /// Right image features
-    pub right_features: Vec<EnhancedFeature>,
-    /// Stereo matches
-    pub matches: Vec<StereoMatch>,
-    /// Camera intrinsics used for matching
-    pub intrinsics: na::Matrix3<f64>,
-    /// Timestamp of this stereo pair
-    pub timestamp: f64,
-}
-
-impl StereoCalibrationData {
-    /// Create new stereo calibration data
-    pub const fn new(
-        left_features: Vec<EnhancedFeature>,
-        right_features: Vec<EnhancedFeature>,
-        matches: Vec<StereoMatch>,
-        intrinsics: na::Matrix3<f64>,
-        timestamp: f64,
-    ) -> Self {
-        Self {
-            left_features,
-            right_features,
-            matches,
-            intrinsics,
-            timestamp,
-        }
-    }
-
-    /// Get number of valid matches
-    pub const fn num_matches(&self) -> usize {
-        self.matches.len()
-    }
-
-    /// Get average epipolar error
-    pub fn average_epipolar_error(&self) -> f32 {
-        if self.matches.is_empty() {
-            return 0.0;
-        }
-
-        self.matches.iter().map(|m| m.epipolar_error).sum::<f32>() / self.matches.len() as f32
-    }
-
-    /// Get match quality statistics
-    pub fn match_quality_stats(&self) -> (f32, f32, f32) {
-        if self.matches.is_empty() {
-            return (0.0, 0.0, 0.0);
-        }
-
-        let scores: Vec<f32> = self.matches.iter().map(|m| m.score as f32).collect();
-        let mean = scores.iter().sum::<f32>() / scores.len() as f32;
-        let variance = scores.iter().map(|s| (s - mean).powi(2)).sum::<f32>() / scores.len() as f32;
-        let std_dev = variance.sqrt();
-
-        (
-            mean,
-            std_dev,
-            scores.iter().fold(f32::INFINITY, |a, &b| a.min(b)),
-        )
+        samples
     }
 }
 
@@ -1461,17 +871,5 @@ mod tests {
 
         let error = matcher.compute_epipolar_error(&f, &left_point, &right_point);
         assert!(error >= 0.0);
-    }
-
-    #[test]
-    fn test_stereo_calibration_data() {
-        let features = vec![];
-        let matches = vec![];
-        let intrinsics = na::Matrix3::identity();
-
-        let data = StereoCalibrationData::new(features.clone(), features, matches, intrinsics, 0.0);
-
-        assert_eq!(data.num_matches(), 0);
-        assert!((data.average_epipolar_error() - 0.0_f32).abs() < f32::EPSILON);
     }
 }

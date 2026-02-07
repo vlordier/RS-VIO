@@ -34,7 +34,7 @@
 //! ```
 
 use crate::datasets::ImuData;
-use crate::imu::preintegration::{exp_map_so3, ImuNoise};
+use crate::imu::preintegration::{exp_map_so3, skew_symmetric, ImuNoise};
 use nalgebra as na;
 
 /// State of the ESKF
@@ -161,7 +161,7 @@ impl Eskf {
     /// - Gyro provides inter-frame orientation estimate when visual updates are sparse
     pub fn predict(&mut self, imu: &ImuData, dt: f64) {
         if dt <= 0.0 || dt > 1.0 {
-            eprintln!("Warning: Invalid dt = {:.6}s for IMU prediction", dt);
+            log::warn!("Invalid dt = {:.6}s for IMU prediction", dt);
             return;
         }
 
@@ -186,39 +186,43 @@ impl Eskf {
         // b_{k+1} = b_k + noise
 
         // Covariance prediction (uncertainty growth)
-        self.predict_covariance(dt);
+        self.predict_covariance(dt, accel_corrected);
 
         // Update timestamp for next iteration
         self.state.timestamp = Some(imu.timestamp);
     }
 
     /// Predict covariance using continuous-time linearization
-    fn predict_covariance(&mut self, dt: f64) {
+    fn predict_covariance(&mut self, dt: f64, accel_corrected: na::Vector3<f64>) {
         let R_rot = self.orientation.to_rotation_matrix();
         let R = R_rot.matrix();
 
-        // State transition matrix F (9x9)
-        // F = [0, 0, -R]
-        //     [0, 0,  0]
-        //     [0, 0,  0]
+        // State transition matrix F (9x9) for state [v, b_g, b_a]
+        // dv/db_a = -R (accel bias error rotated to world frame)
+        // dv/db_g = -R * [a_corrected]_x (gyro bias error causes rotation error
+        //           which misrotates the accelerometer measurement)
         let mut F = na::SMatrix::<f64, 9, 9>::zeros();
-        F.fixed_view_mut::<3, 3>(0, 6).copy_from(&(-R));
+        F.fixed_view_mut::<3, 3>(0, 6).copy_from(&(-R)); // dv/db_a
+        let accel_skew = skew_symmetric(accel_corrected);
+        F.fixed_view_mut::<3, 3>(0, 3).copy_from(&(-R * accel_skew)); // dv/db_g
 
         // Process noise covariance Q (9x9)
         let mut Q = na::SMatrix::<f64, 9, 9>::zeros();
 
-        // Velocity process noise from accelerometer (discretized)
-        let accel_noise_var = self.noise.accel_noise_density.powi(2) * dt;
-        let vel_noise_var = (R * R.transpose()) * accel_noise_var;
-        Q.fixed_view_mut::<3, 3>(0, 0).copy_from(&vel_noise_var);
+        // Continuous-time process noise spectral density Q_c.
+        // The outer discretization `P += P_dot * dt` provides the single dt factor,
+        // so Q_c must NOT contain dt (otherwise noise is double-scaled).
+        let accel_noise_var = self.noise.accel_noise_density.powi(2);
+        Q.fixed_view_mut::<3, 3>(0, 0)
+            .fill_diagonal(accel_noise_var);
 
         // Gyro bias random walk
         Q.fixed_view_mut::<3, 3>(3, 3)
-            .fill_diagonal(self.noise.gyro_bias_random_walk.powi(2) * dt);
+            .fill_diagonal(self.noise.gyro_bias_random_walk.powi(2));
 
         // Accel bias random walk
         Q.fixed_view_mut::<3, 3>(6, 6)
-            .fill_diagonal(self.noise.accel_bias_random_walk.powi(2) * dt);
+            .fill_diagonal(self.noise.accel_bias_random_walk.powi(2));
 
         // Discretized covariance update (first-order)
         // P_{k+1} = P_k + (F * P_k + P_k * F^T + Q) * dt
@@ -290,7 +294,7 @@ impl Eskf {
     /// * `measurement_uncertainty` - Estimated measurement uncertainty [m/s]
     pub fn update_zero_velocity(&mut self, measurement_uncertainty: f64) {
         let measurement_cov =
-            na::SMatrix::<f64, 3, 3>::from_element(measurement_uncertainty.powi(2));
+            na::SMatrix::<f64, 3, 3>::from_diagonal_element(measurement_uncertainty.powi(2));
         self.update_velocity(na::Vector3::zeros(), measurement_cov);
     }
 
@@ -336,7 +340,11 @@ impl Eskf {
     /// Get velocity uncertainty (standard deviation)
     pub fn get_velocity_std(&self) -> na::Vector3<f64> {
         let var = self.state.covariance.fixed_view::<3, 3>(0, 0).diagonal();
-        na::Vector3::new(var[0].sqrt(), var[1].sqrt(), var[2].sqrt())
+        na::Vector3::new(
+            var[0].max(0.0).sqrt(),
+            var[1].max(0.0).sqrt(),
+            var[2].max(0.0).sqrt(),
+        )
     }
 
     /// Get bias uncertainties
@@ -344,11 +352,15 @@ impl Eskf {
         let gyro_var = self.state.covariance.fixed_view::<3, 3>(3, 3).diagonal();
         let accel_var = self.state.covariance.fixed_view::<3, 3>(6, 6).diagonal();
 
-        let gyro_std = na::Vector3::new(gyro_var[0].sqrt(), gyro_var[1].sqrt(), gyro_var[2].sqrt());
+        let gyro_std = na::Vector3::new(
+            gyro_var[0].max(0.0).sqrt(),
+            gyro_var[1].max(0.0).sqrt(),
+            gyro_var[2].max(0.0).sqrt(),
+        );
         let accel_std = na::Vector3::new(
-            accel_var[0].sqrt(),
-            accel_var[1].sqrt(),
-            accel_var[2].sqrt(),
+            accel_var[0].max(0.0).sqrt(),
+            accel_var[1].max(0.0).sqrt(),
+            accel_var[2].max(0.0).sqrt(),
         );
 
         (gyro_std, accel_std)

@@ -43,6 +43,25 @@ pub struct CalibrationQualityMetrics {
 impl CalibrationQualityMetrics {
     /// Create metrics from reprojection errors
     pub fn from_reprojection_errors(errors: Vec<f64>) -> Self {
+        if errors.is_empty() {
+            return Self {
+                mean_reprojection_error: 0.0,
+                median_reprojection_error: 0.0,
+                max_reprojection_error: 0.0,
+                reprojection_error_std: 0.0,
+                accuracy_percentage_1px: 0.0,
+                accuracy_percentage_2px: 0.0,
+                epipolar_consistency_score: 0.0,
+                triangulation_quality_score: 0.0,
+                rolling_shutter_correction_score: None,
+                mean_feature_quality: 0.0,
+                feature_quality_std: 0.0,
+                temporal_stability_score: None,
+                per_point_errors: Vec::new(),
+                outlier_count: 0,
+                total_points: 0,
+            };
+        }
         let total_points = errors.len();
         let mean_error = errors.iter().sum::<f64>() / total_points as f64;
 
@@ -127,7 +146,11 @@ Overall Assessment: {}
             self.accuracy_percentage_2px,
             self.total_points,
             self.outlier_count,
-            self.outlier_count as f64 / self.total_points as f64 * 100.0,
+            if self.total_points > 0 {
+                self.outlier_count as f64 / self.total_points as f64 * 100.0
+            } else {
+                0.0
+            },
             self.epipolar_consistency_score,
             self.triangulation_quality_score,
             self.rolling_shutter_correction_score.unwrap_or(0.0),
@@ -197,16 +220,14 @@ impl CalibrationLogger {
             .collect();
 
         let improvement_rate = if mean_errors.len() >= 2 {
-            (mean_errors[0] - mean_errors[mean_errors.len() - 1]) / mean_errors.len() as f64
+            (mean_errors[mean_errors.len() - 1] - mean_errors[0]) / (mean_errors.len() - 1) as f64
         } else {
             0.0
         };
 
         let stability = if mean_errors.len() >= 2 {
-            let variance = mean_errors
-                .iter()
-                .map(|e| (e - mean_errors.iter().sum::<f64>() / mean_errors.len() as f64).powi(2))
-                .sum::<f64>()
+            let mean = mean_errors.iter().sum::<f64>() / mean_errors.len() as f64;
+            let variance = mean_errors.iter().map(|e| (e - mean).powi(2)).sum::<f64>()
                 / mean_errors.len() as f64;
             1.0 / (1.0 + variance.sqrt()) // Higher stability = lower variance
         } else {

@@ -19,17 +19,14 @@ pub struct GroundTruthPose {
     /// Position in world frame (meters)
     pub position: Vector3,
     /// Orientation as unit quaternion (x, y, z, w)
-    pub quaternion: na::UnitQuaternion<f32>,
+    pub quaternion: na::UnitQuaternion<f64>,
 }
 
 impl GroundTruthPose {
     /// Convert to SE(3) matrix (world to body)
     pub fn to_matrix(&self) -> Matrix4x4 {
-        na::Isometry3::from_parts(
-            na::Translation3::from(self.position),
-            self.quaternion.cast::<f64>(),
-        )
-        .to_homogeneous()
+        na::Isometry3::from_parts(na::Translation3::from(self.position), self.quaternion)
+            .to_homogeneous()
     }
 }
 
@@ -81,33 +78,33 @@ impl GroundTruthTrajectory {
             let timestamp_ns = (timestamp_s * 1e9) as i64;
 
             // Parse position
-            let tx: f32 = parts[1]
+            let tx: f64 = parts[1]
                 .parse()
                 .map_err(|_| format!("Invalid tx: {}", parts[1]))?;
-            let ty: f32 = parts[2]
+            let ty: f64 = parts[2]
                 .parse()
                 .map_err(|_| format!("Invalid ty: {}", parts[2]))?;
-            let tz: f32 = parts[3]
+            let tz: f64 = parts[3]
                 .parse()
                 .map_err(|_| format!("Invalid tz: {}", parts[3]))?;
 
             // Parse quaternion
-            let qx: f32 = parts[4]
+            let qx: f64 = parts[4]
                 .parse()
                 .map_err(|_| format!("Invalid qx: {}", parts[4]))?;
-            let qy: f32 = parts[5]
+            let qy: f64 = parts[5]
                 .parse()
                 .map_err(|_| format!("Invalid qy: {}", parts[5]))?;
-            let qz: f32 = parts[6]
+            let qz: f64 = parts[6]
                 .parse()
                 .map_err(|_| format!("Invalid qz: {}", parts[6]))?;
-            let qw: f32 = parts[7]
+            let qw: f64 = parts[7]
                 .parse()
                 .map_err(|_| format!("Invalid qw: {}", parts[7]))?;
 
             let pose = GroundTruthPose {
                 timestamp_ns,
-                position: Vector3::new(tx as f64, ty as f64, tz as f64),
+                position: Vector3::new(tx, ty, tz),
                 quaternion: na::UnitQuaternion::new_normalize(na::Quaternion::new(qw, qx, qy, qz)),
             };
 
@@ -286,23 +283,23 @@ pub struct TrajectoryEvaluation {
 impl TrajectoryEvaluation {
     /// Print formatted evaluation results
     pub fn print_summary(&self) {
-        println!("\n📊 Trajectory Evaluation: {}", self.algorithm);
-        println!("  ├─ ATE (Absolute Trajectory Error)");
-        println!("  │  ├─ RMSE:  {:.6} m", self.ate_rmse);
-        println!("  │  ├─ Mean:  {:.6} m", self.ate_mean);
-        println!("  │  ├─ Median: {:.6} m", self.ate_median);
-        println!("  │  ├─ Min:   {:.6} m", self.ate_min);
-        println!("  │  ├─ Max:   {:.6} m", self.ate_max);
-        println!("  │  └─ Std:   {:.6} m", self.ate_std);
-        println!("  ├─ RPE (Relative Pose Error)");
-        println!("  │  ├─ Translation: {:.6} m", self.rpe_translation_rmse);
-        println!(
-            "  │  └─ Rotation:    {:.4}°",
+        log::info!("Trajectory Evaluation: {}", self.algorithm);
+        log::info!("  ATE (Absolute Trajectory Error)");
+        log::info!("    RMSE:   {:.6} m", self.ate_rmse);
+        log::info!("    Mean:   {:.6} m", self.ate_mean);
+        log::info!("    Median: {:.6} m", self.ate_median);
+        log::info!("    Min:    {:.6} m", self.ate_min);
+        log::info!("    Max:    {:.6} m", self.ate_max);
+        log::info!("    Std:    {:.6} m", self.ate_std);
+        log::info!("  RPE (Relative Pose Error)");
+        log::info!("    Translation: {:.6} m", self.rpe_translation_rmse);
+        log::info!(
+            "    Rotation:    {:.4} deg",
             self.rpe_rotation_rmse.to_degrees()
         );
-        println!("  └─ Statistics");
-        println!("     ├─ Poses:      {}", self.num_poses);
-        println!("     └─ Failed:     {}", self.num_failed_matches);
+        log::info!("  Statistics");
+        log::info!("    Poses:  {}", self.num_poses);
+        log::info!("    Failed: {}", self.num_failed_matches);
     }
 }
 
@@ -314,7 +311,7 @@ pub fn calculate_ate(
     // Collect estimated poses into a vector for parallel iteration
     let estimated_poses: Vec<_> = estimated.poses().collect();
 
-    let (errors, failed_matches) = estimated_poses
+    let (mut errors, failed_matches) = estimated_poses
         .par_iter()
         .fold(
             || (Vec::new(), 0),
@@ -353,9 +350,8 @@ pub fn calculate_ate(
         let mean = sum / n;
         let rmse = (errors.par_iter().map(|e| e * e).sum::<f64>() / n).sqrt();
 
-        let mut sorted = errors.clone();
-        #[allow(clippy::unwrap_used)]
-        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
+        errors.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
+        let sorted = &errors;
         let median = if sorted.len() % 2 == 0 {
             (sorted[sorted.len() / 2 - 1] + sorted[sorted.len() / 2]) / 2.0
         } else {
@@ -539,6 +535,14 @@ mod tests {
         // Both trajectories should have same poses
         assert_eq!(gt.len(), est.len());
         assert_eq!(gt.len(), 5);
+
+        // Identical trajectories should have zero ATE
+        let eval = super::calculate_ate(&gt, &est);
+        assert!(
+            eval.ate_rmse < 1e-9,
+            "Identical trajectories should have zero ATE, got {}",
+            eval.ate_rmse
+        );
     }
 
     #[test]
@@ -568,6 +572,14 @@ mod tests {
         // Both trajectories should have same number of poses
         assert_eq!(gt.len(), est.len());
         assert_eq!(est.len(), 5);
+
+        // Constant 1.0m offset in X should produce ATE RMSE of 1.0
+        let eval = super::calculate_ate(&gt, &est);
+        assert!(
+            (eval.ate_rmse - 1.0).abs() < 0.01,
+            "ATE RMSE should be ~1.0, got {}",
+            eval.ate_rmse
+        );
     }
 
     #[test]
@@ -594,6 +606,14 @@ mod tests {
         // Just verify that both trajectories have the right number of poses
         assert_eq!(gt.len(), 10);
         assert_eq!(est.len(), 10);
+
+        // Constant 0.5m offset should have zero RPE (relative motion is correct)
+        let (trans_rmse, _rot_rmse) = super::calculate_rpe(&gt, &est, 1000);
+        assert!(
+            trans_rmse < 1e-9,
+            "Constant offset should give zero RPE, got {}",
+            trans_rmse
+        );
     }
 
     #[test]
@@ -752,6 +772,7 @@ mod benchmarks {
     use std::time::Instant;
 
     #[test]
+    #[ignore] // Ad-hoc benchmark — run with `cargo test -- --ignored`
     fn benchmark_ate_calculation() {
         let num_poses = 20_000;
         let mut gt = GroundTruthTrajectory::new("bench_gt");
@@ -785,6 +806,7 @@ mod benchmarks {
     }
 
     #[test]
+    #[ignore] // Ad-hoc benchmark — run with `cargo test -- --ignored`
     fn benchmark_rpe_calculation() {
         let num_poses = 50_000; // Increase to 50k
         let mut gt = GroundTruthTrajectory::new("bench_gt");
@@ -797,7 +819,7 @@ mod benchmarks {
             let gt_pose = GroundTruthPose {
                 timestamp_ns: ts,
                 position: Vector3::new(t, 0.0, 0.0),
-                quaternion: na::UnitQuaternion::from_euler_angles(0.0, 0.0, (0.01 * t) as f32),
+                quaternion: na::UnitQuaternion::from_euler_angles(0.0, 0.0, 0.01 * t),
             };
             gt.poses.insert(ts, gt_pose);
 

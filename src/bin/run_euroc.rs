@@ -1,20 +1,14 @@
 use clap::Parser;
 use env_logger::{Builder, Env};
 use log::{error, info, LevelFilter};
-use rand::rngs::StdRng;
-use rand::SeedableRng;
-use rs_vio::{EurocPlayer, PlayerConfig};
-use std::process;
+use rs_vio::{DatasetPlayer, EurocPlayer, PlayerConfig};
+use std::process::ExitCode;
 
-fn main() {
-    // Set random seed for reproducibility
-    let _rng = StdRng::seed_from_u64(42);
-
+fn main() -> ExitCode {
     // Initialize logger for immediate colored output
     Builder::from_env(Env::default().default_filter_or("debug"))
         // Silence rerun noise unless it's a warning or worse
         .filter_module("rerun", LevelFilter::Warn)
-        .format_timestamp_millis()
         .format(|buf, record| {
             use std::io::Write;
             let level = match record.level() {
@@ -51,10 +45,10 @@ fn main() {
 
     if result.success {
         info!("[Main] processing completed successfully!");
-        process::exit(0);
+        ExitCode::SUCCESS
     } else {
         error!("[Main] processing failed: {}", result.error_message);
-        process::exit(-1);
+        ExitCode::FAILURE
     }
 }
 

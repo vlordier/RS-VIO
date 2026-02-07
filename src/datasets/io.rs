@@ -196,8 +196,8 @@ pub(crate) fn load_grayscale_image(full_path: &Path) -> Result<Vec<u8>> {
         .decode()
         .with_context(|| format!("Failed to decode image: {}", full_path.display()))?;
 
-    let gray_img = img.to_luma8();
-    Ok(gray_img.as_raw().clone())
+    let gray_img = img.into_luma8();
+    Ok(gray_img.into_raw())
 }
 
 // ============================================================================

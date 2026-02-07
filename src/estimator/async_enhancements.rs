@@ -240,7 +240,7 @@ impl StreamingPatternAnalyzer {
                 sum_intervals += interval;
             }
 
-            let avg: i64 = sum_intervals / interval_count as i64;
+            let avg: i64 = (sum_intervals / interval_count as i64).max(0);
             self.avg_interval_ns = avg as u64;
 
             // Calculate jitter without per-update allocations.

@@ -26,11 +26,11 @@ ls /tmp/rs-vio-samples/euroc/MH_01_easy/mav0/
 # Option A: Auto-download (if mirror available)
 just download-datasets
 
-# Option B: Manual download
-# 1. Download rgbd-dataset_freiburg3_walking_xyz.tgz
+# Option B: Manual download from https://cvg.cit.tum.de/data/datasets/visual-inertial-dataset
+# 1. Download dataset-room1_512_16.tar (512x512, EuRoC format)
 # 2. Extract it:
-mkdir -p /tmp/rs-vio-samples/tum_vi
-tar -xzf rgbd-dataset_freiburg3_walking_xyz.tgz -C /tmp/rs-vio-samples/tum_vi/ --strip-components=1
+mkdir -p /tmp/rs-vio-samples/tum_vi/room1
+tar -xf dataset-room1_512_16.tar -C /tmp/rs-vio-samples/tum_vi/room1
 ```
 
 ### 4Seasons Dataset
@@ -54,8 +54,8 @@ cargo build --release
 # Run EuRoC (stereo VIO with IMU)
 cargo run --release --bin run_euroc config/euroc_vio.yaml /tmp/rs-vio-samples/euroc/MH_01_easy
 
-# Run TUM-VI (RGB-D with IMU)
-cargo run --release --bin run_tum config/tum_vi.yaml /tmp/rs-vio-samples/tum_vi
+# Run TUM-VI (stereo with IMU)
+cargo run --release --bin run_tum config/tum_vi.yaml /tmp/rs-vio-samples/tum_vi/room1
 
 # Run 4Seasons (stereo VIO, no IMU)
 cargo run --release --bin run_4seasons config/4seasons.yaml /tmp/rs-vio-samples/4seasons/recording_2021-01-07_13-03-56

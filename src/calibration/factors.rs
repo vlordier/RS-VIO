@@ -4,6 +4,46 @@ use crate::calibration::camera_models::CameraModel;
 use apex_solver::factors::Factor;
 use nalgebra as na;
 
+/// Compute the Jacobian of a factor numerically via central differences.
+///
+/// Given a factor whose `linearize(params, false)` returns a residual vector,
+/// this function perturbs each element of every parameter block by `±eps` and
+/// builds the full `residual_dim × total_params` Jacobian.
+fn numerical_jacobian(
+    factor: &dyn Factor,
+    params: &[na::DVector<f64>],
+    eps: f64,
+) -> na::DMatrix<f64> {
+    let (r0, _) = factor.linearize(params, false);
+    let residual_dim = r0.len();
+    let total_cols: usize = params.iter().map(|p| p.len()).sum();
+    let mut jacobian = na::DMatrix::zeros(residual_dim, total_cols);
+
+    let mut col = 0;
+    let mut perturbed = params.to_vec();
+    for blk in 0..params.len() {
+        for j in 0..params[blk].len() {
+            // +eps
+            perturbed[blk][j] = params[blk][j] + eps;
+            let (r_plus, _) = factor.linearize(&perturbed, false);
+
+            // -eps
+            perturbed[blk][j] = params[blk][j] - eps;
+            let (r_minus, _) = factor.linearize(&perturbed, false);
+
+            // restore
+            perturbed[blk][j] = params[blk][j];
+
+            for i in 0..residual_dim {
+                jacobian[(i, col)] = (r_plus[i] - r_minus[i]) / (2.0 * eps);
+            }
+            col += 1;
+        }
+    }
+
+    jacobian
+}
+
 /// Reprojection factor for stereo calibration
 ///
 /// This factor enforces that a 3D point projects correctly into both left and right cameras.
@@ -131,9 +171,7 @@ impl Factor for StereoReprojectionFactor {
 
         // For now, skip analytical Jacobians (numerical differentiation will be used)
         let jacobian = if compute_jacobian {
-            // TODO: Implement analytical Jacobians
-            // This would be a 4x(9+9+6+3) = 4x27 matrix
-            Some(na::DMatrix::zeros(4, 27))
+            Some(numerical_jacobian(self, params, 1e-8))
         } else {
             None
         };
@@ -393,7 +431,7 @@ impl Factor for EpipolarFactor {
 
         // Compute distance from right point to epipolar line
         let p_right_homogeneous = na::Vector3::new(self.right_point.x, self.right_point.y, 1.0);
-        let numerator = epipolar_line.dot(&p_right_homogeneous).abs();
+        let numerator = epipolar_line.dot(&p_right_homogeneous);
         let denominator = (epipolar_line.x.powi(2) + epipolar_line.y.powi(2)).sqrt();
         let distance = if denominator > 1e-12 {
             numerator / denominator
@@ -406,8 +444,7 @@ impl Factor for EpipolarFactor {
 
         // For now, skip analytical Jacobians
         let jacobian = if compute_jacobian {
-            // TODO: Implement analytical Jacobians (1x24 matrix)
-            Some(na::DMatrix::zeros(1, 24))
+            Some(numerical_jacobian(self, params, 1e-8))
         } else {
             None
         };
@@ -588,8 +625,7 @@ impl Factor for TemporalSuperResolutionFactor {
         // Compute residuals for each temporal observation
         let mut residuals = na::DVector::zeros(self.temporal_observations.len() * 4);
         let jacobian = if compute_jacobian {
-            // Hardcoded parameter dimensions: [9, 9, 6, 6, 3] = 33 total
-            Some(na::DMatrix::zeros(self.temporal_observations.len() * 4, 33))
+            None // Return None to trigger solver's numerical differentiation fallback
         } else {
             None
         };
@@ -702,7 +738,7 @@ impl Factor for TemporalConsistencyFactor {
         let linear_magnitude = linear_vel.norm();
 
         // Residuals penalize unrealistic motion
-        let mut residuals = na::DVector::zeros(6);
+        let mut residuals = na::DVector::zeros(8);
 
         // Angular velocity smoothness (penalize very fast rotations)
         let angular_smoothness_residual =
@@ -716,12 +752,12 @@ impl Factor for TemporalConsistencyFactor {
         // Individual velocity component smoothness
         for i in 0..3 {
             residuals[2 + i] = self.smoothness_weight * angular_vel[i].abs().min(1.0);
-            residuals[5 + i - 3] = self.smoothness_weight * linear_vel[i].abs().min(1.0);
+            residuals[5 + i] = self.smoothness_weight * linear_vel[i].abs().min(1.0);
         }
 
         // TODO: Add proper Jacobians for optimization
         let jacobian = if compute_jacobian {
-            Some(na::DMatrix::zeros(6, 6))
+            None // Return None to trigger solver's numerical differentiation fallback
         } else {
             None
         };
@@ -730,7 +766,7 @@ impl Factor for TemporalConsistencyFactor {
     }
 
     fn get_dimension(&self) -> usize {
-        6 // smoothness constraints
+        8 // smoothness constraints (2 magnitude + 3 angular + 3 linear)
     }
 }
 
@@ -908,7 +944,7 @@ impl Factor for CameraGraphFactor {
 
         // TODO: Compute Jacobians for pose graph optimization
         let jacobian = if compute_jacobian {
-            Some(na::DMatrix::zeros(6, 12)) // 6 residuals, 12 parameters (6D + 6D)
+            None // Return None to trigger solver's numerical differentiation fallback
         } else {
             None
         };

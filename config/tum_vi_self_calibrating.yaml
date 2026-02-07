@@ -37,11 +37,6 @@ feature_detection:
   optical_flow_max_iterations: 15
   optical_flow_convergence_threshold: 0.01
 
-# Global Depth Parameters
-depth:
-  min_depth: 0.1
-  max_depth: 100.0
-
 # Optimization Parameters
 optimization:
   pnp_max_iterations: 10

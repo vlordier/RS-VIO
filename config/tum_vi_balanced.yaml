@@ -1,13 +1,5 @@
 # Balanced TUM-VI config: good accuracy with solid throughput
 
-debug:
-  use_imu: true
-  use_feature_tracking: true
-  use_triangulation: true
-  use_fallback_depth: false
-  min_stereo_matches: 2
-  log_stereo_undistorted: false
-
 camera:
   image_width: 512
   image_height: 512
@@ -26,7 +18,6 @@ keyframe_management:
   keyframe_window_size: 15
   translation_threshold: 0.06
   rotation_threshold: 0.06
-  processing_timeout_ms: 10000
 
 feature_detection:
   grid_size: 20
@@ -34,28 +25,6 @@ feature_detection:
   optical_flow_max_iterations: 12
   optical_flow_convergence_threshold: 0.015
 
-depth:
-  min_depth: 0.1
-  max_depth: 60.0
-
 optimization:
   pnp_max_iterations: 8
   bundle_adjustment_max_iterations: 10
-  imu_prior_enable: true
-  imu_prior_weight_pos: 0.7
-  imu_prior_weight_rot: 1.2
-  imu_prior_huber_delta: 1.0
-
-marginalization:
-  enabled: true
-  max_keyframes: 15
-  num_marginalize_per_step: 1
-  min_landmark_observations: 3
-  landmark_age_limit: 50
-  use_fej: true
-  damping: 1e-7
-  prior_weight: 1.0
-  prior_info_scale: 1.0
-  hessian_approximator: "Diagonal"
-  gradient_computer: "Standard"
-  prior_constructor: "Standard"
