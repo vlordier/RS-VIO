@@ -20,8 +20,6 @@ pub struct Pattern52 {
     pub data: [f32; PATTERN52_SIZE], // negative if the point is not valid
     pub h_se2_inv_j_se2_t: na::SMatrix<f32, 3, PATTERN52_SIZE>,
     pub pattern_scale_down: f32,
-    // Pre-computed pattern matrix to avoid recomputation
-    pub pattern_matrix: na::SMatrix<f32, 2, PATTERN52_SIZE>,
 }
 impl Pattern52 {
     pub const PATTERN_RAW: [[f32; 2]; PATTERN52_SIZE] = [
@@ -144,7 +142,6 @@ impl Pattern52 {
             data: [0.0; PATTERN52_SIZE], // negative if the point is not valid
             h_se2_inv_j_se2_t: na::SMatrix::<f32, 3, 52>::zeros(),
             pattern_scale_down,
-            pattern_matrix: *PATTERN52_MATRIX,
         };
         p.set_data_jac_se2(greyscale_image, &mut j_se2);
         let h_se2 = j_se2 * j_se2.transpose();
@@ -191,8 +188,8 @@ impl Pattern52 {
         let ty = m.m23;
 
         for i in 0..PATTERN52_SIZE {
-            let px_raw = self.pattern_matrix[(0, i)];
-            let py_raw = self.pattern_matrix[(1, i)];
+            let px_raw = PATTERN52_MATRIX[(0, i)];
+            let py_raw = PATTERN52_MATRIX[(1, i)];
 
             let x = r11 * px_raw + r12 * py_raw + tx;
             let y = r21 * px_raw + r22 * py_raw + ty;

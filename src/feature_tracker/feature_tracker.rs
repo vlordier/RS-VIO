@@ -195,15 +195,14 @@ impl<const LEVELS: u32> StereoPatchTracker<LEVELS> {
         );
         self.has_previous = true;
 
-        // Populate the frame's feature lists from the stereo tracks
-        let [tracked_left, tracked_right] = self.get_track_points();
-        for (id, (x, y)) in tracked_left {
-            let f = Feature::new(id, [x, y]);
+        // Populate the frame's feature lists directly from tracked_points_maps
+        // (avoids allocating 2 temporary HashMaps per frame)
+        for (&id, v) in &self.tracked_points_map_cam0 {
+            let f = Feature::new(id, [v.matrix().m13, v.matrix().m23]);
             frame.add_left_feature(f);
         }
-
-        for (id, (x, y)) in tracked_right {
-            let f = Feature::new(id, [x, y]);
+        for (&id, v) in &self.tracked_points_map_cam1 {
+            let f = Feature::new(id, [v.matrix().m13, v.matrix().m23]);
             frame.add_right_feature(f);
         }
     }
@@ -400,6 +399,7 @@ fn track_points<const LEVELS: u32>(
 
     transform_maps1
 }
+#[inline]
 fn track_one_point<const LEVELS: u32>(
     image_pyramid0: &[GrayImage],
     image_pyramid1: &[GrayImage],

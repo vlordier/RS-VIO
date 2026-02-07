@@ -254,9 +254,10 @@ impl PreintegratedImu {
 
         // Rotation block: Jr^{-T} for error-state formulation (left Jacobian inverse transpose)
         // Left Jacobian: Jl(ω) = Jr(-ω), and we use Jl^{-T} for error propagation
-        let Jr_inv_t = Jr.transpose().try_inverse().expect(
-            "Jr^T should always be invertible for SO(3); if this fails, check numerical stability",
-        );
+        let Jr_inv_t = Jr.transpose().try_inverse().unwrap_or_else(|| {
+            log::warn!("[IMU Preintegration] Jr^T near-singular (|omega*dt| near 2*pi*n), using identity fallback");
+            na::Matrix3::identity()
+        });
         A.fixed_view_mut::<3, 3>(0, 0).copy_from(&Jr_inv_t);
 
         // Velocity-rotation coupling (reuses cached R_k * acc_skew)
@@ -368,7 +369,9 @@ pub fn right_jacobian_so3(omega: na::Vector3<f64>) -> na::Matrix3<f64> {
     let theta3 = theta2 * theta;
 
     let W = skew_symmetric(omega);
-    let W2 = W * W;
+    // Analytical identity: [omega]_x^2 = omega * omega^T - theta^2 * I
+    // Avoids a full 3x3 matrix multiply (27 muls) in favor of outer product (9 muls + 3 subs)
+    let W2 = omega * omega.transpose() - theta2 * na::Matrix3::identity();
 
     let (sin_theta, cos_theta) = theta.sin_cos();
 

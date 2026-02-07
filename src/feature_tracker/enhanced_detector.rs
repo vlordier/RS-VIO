@@ -480,14 +480,24 @@ impl EnhancedFeatureDetector {
 
 /// Hamming distance for ORB descriptor matching
 /// Compute Hamming distance between two 128-bit ORB descriptors
-/// Uses the compiler's auto-vectorized popcount which is optimized
-/// for each target architecture.
+/// Widened to two u64 popcnt operations for maximum throughput
+/// (2 XOR + 2 popcnt vs 16 XOR + 16 byte-level count_ones).
+#[inline]
 pub fn hamming_distance(desc1: &[u8; 16], desc2: &[u8; 16]) -> u32 {
-    desc1
-        .iter()
-        .zip(desc2.iter())
-        .map(|(&a, &b)| (a ^ b).count_ones())
-        .sum()
+    // SAFETY: [u8; 16] has alignment 1, u64 accepts any alignment via from_ne_bytes
+    let a0 = u64::from_ne_bytes([
+        desc1[0], desc1[1], desc1[2], desc1[3], desc1[4], desc1[5], desc1[6], desc1[7],
+    ]);
+    let a1 = u64::from_ne_bytes([
+        desc1[8], desc1[9], desc1[10], desc1[11], desc1[12], desc1[13], desc1[14], desc1[15],
+    ]);
+    let b0 = u64::from_ne_bytes([
+        desc2[0], desc2[1], desc2[2], desc2[3], desc2[4], desc2[5], desc2[6], desc2[7],
+    ]);
+    let b1 = u64::from_ne_bytes([
+        desc2[8], desc2[9], desc2[10], desc2[11], desc2[12], desc2[13], desc2[14], desc2[15],
+    ]);
+    (a0 ^ b0).count_ones() + (a1 ^ b1).count_ones()
 }
 
 #[cfg(test)]

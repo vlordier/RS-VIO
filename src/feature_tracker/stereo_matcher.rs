@@ -196,15 +196,13 @@ impl StereoMatcher {
     }
 
     /// Scale features for pyramid level
+    /// Re-uses a single allocation and only mutates the point field
     fn scale_features(&self, features: &[EnhancedFeature], scale: f32) -> Vec<EnhancedFeature> {
-        features
-            .iter()
-            .map(|f| {
-                let mut scaled = f.clone();
-                scaled.point = f.point * scale;
-                scaled
-            })
-            .collect()
+        let mut scaled: Vec<EnhancedFeature> = features.to_vec();
+        for f in &mut scaled {
+            f.point *= scale;
+        }
+        scaled
     }
 
     /// Propagate matches from coarse to fine level (identity — indices don't change)
@@ -352,7 +350,7 @@ impl StereoMatcher {
 
         // Filter matches by epipolar constraint with adaptive threshold
         let mut verified_matches = Vec::new();
-        let mut errors = Vec::new();
+        let mut errors: Vec<f32> = Vec::with_capacity(candidate_matches.len());
 
         for match_ in candidate_matches {
             let left_point = left_features[match_.left_idx].point;
@@ -368,14 +366,16 @@ impl StereoMatcher {
         }
 
         // Adaptive threshold based on median error
-        // Clone before sorting: sorted order must not decouple errors[i] from candidate_matches[i]
+        // Use an index-based partial sort to avoid cloning the errors vec
         let median_error = {
-            let mut buf = errors.clone();
-            let mid = buf.len() / 2;
-            buf.select_nth_unstable_by(mid, |a, b| {
-                a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+            let mut indices: Vec<usize> = (0..errors.len()).collect();
+            let mid = indices.len() / 2;
+            indices.select_nth_unstable_by(mid, |&a, &b| {
+                errors[a]
+                    .partial_cmp(&errors[b])
+                    .unwrap_or(std::cmp::Ordering::Equal)
             });
-            buf[mid]
+            errors[indices[mid]]
         };
         let adaptive_threshold = (median_error * 2.0).min(self.config.max_epipolar_error);
 
@@ -685,7 +685,7 @@ impl StereoMatcher {
         }
 
         // Build the A matrix for Af = 0
-        let mut a = na::DMatrix::<f64>::zeros(8, 9);
+        let mut a = na::SMatrix::<f64, 8, 9>::zeros();
 
         for (i, match_) in matches.iter().enumerate() {
             let left_point = left_features[match_.left_idx].point;
@@ -713,13 +713,13 @@ impl StereoMatcher {
             a[(i, 8)] = 1.0;
         }
 
-        // Solve Af = 0 using SVD
-        let svd = a.svd(true, true);
-        let v_t = svd.v_t.unwrap_or_else(|| {
-            // Fallback - should not happen with valid input
-            na::DMatrix::identity(9, 9)
-        });
-        let f_vec = v_t.row(8).transpose(); // Last column of V
+        // Solve Af = 0 via the normal equations: find the eigenvector of A^T A
+        // corresponding to the smallest eigenvalue (= null space of A).
+        // Uses only stack-allocated 9×9 SMatrix — no heap allocation per RANSAC iteration.
+        let ata = a.transpose() * a; // 9×9 SMatrix
+        let eig = ata.symmetric_eigen();
+        let min_idx = eig.eigenvalues.imin();
+        let f_vec = eig.eigenvectors.column(min_idx);
 
         // Reshape to 3x3 matrix
         let mut f = na::Matrix3::zeros();
@@ -757,6 +757,7 @@ impl StereoMatcher {
     }
 
     /// Compute epipolar error for a point pair
+    #[inline]
     fn compute_epipolar_error(
         &self,
         f: &na::Matrix3<f64>,
@@ -771,17 +772,19 @@ impl StereoMatcher {
         let epipolar_line = f * right_homogeneous;
 
         // Compute distance: |x_left^T * l| / sqrt(l1^2 + l2^2)
-        let numerator = (left_homogeneous.transpose() * epipolar_line).abs();
+        // Use dot product to get a scalar directly (avoids intermediate 1×1 matrix)
+        let numerator = left_homogeneous.dot(&epipolar_line).abs();
         let denominator = (epipolar_line.x.powi(2) + epipolar_line.y.powi(2)).sqrt();
 
         if denominator > 1e-8 {
-            (numerator[0] / denominator) as f32
+            (numerator / denominator) as f32
         } else {
             f32::INFINITY
         }
     }
 
     /// Compute confidence score for a stereo match (0-1, higher is better)
+    #[inline]
     pub fn compute_match_confidence(
         &self,
         score: u32,

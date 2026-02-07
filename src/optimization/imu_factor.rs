@@ -135,20 +135,24 @@ impl ImuFactor {
             self.correct_for_bias(&bias_g, &bias_a);
 
         let dt = self.preintegration.delta_t;
+        let dt2 = dt * dt;
+
+        // Cache R_i inverse — used by rotation, velocity, and position residuals
+        let R_i_inv = R_i.inverse();
 
         // ==================== Rotation Residual ====================
-        let predicted_R_ij = R_i.inverse() * R_j;
+        let predicted_R_ij = R_i_inv * R_j;
         let rotation_error_quat = corrected_delta_R.inverse() * predicted_R_ij;
         let r_R = Self::quat_to_rotation_vector(&rotation_error_quat);
 
         // ==================== Velocity Residual ====================
         let predicted_dv_world = v_j - v_i - self.gravity * dt;
-        let predicted_dv_i = R_i.inverse() * predicted_dv_world;
+        let predicted_dv_i = R_i_inv * predicted_dv_world;
         let r_v = predicted_dv_i - corrected_delta_v;
 
         // ==================== Position Residual ====================
-        let predicted_dp_world = p_j - p_i - v_i * dt - 0.5 * self.gravity * dt.powi(2);
-        let predicted_dp_i = R_i.inverse() * predicted_dp_world;
+        let predicted_dp_world = p_j - p_i - v_i * dt - 0.5 * self.gravity * dt2;
+        let predicted_dp_i = R_i_inv * predicted_dp_world;
         let r_p = predicted_dp_i - corrected_delta_p;
 
         let mut residual = na::SVector::<f64, 9>::zeros();
@@ -157,24 +161,6 @@ impl ImuFactor {
         residual.rows_mut(6, 3).copy_from(&r_p);
 
         self.sqrt_information * residual
-    }
-
-    /// Compute weighted residual (heap-allocated, for trait interface)
-    #[allow(clippy::too_many_arguments)]
-    fn compute_weighted_residual(
-        &self,
-        R_i: UnitQuaternion<f64>,
-        v_i: Vector3<f64>,
-        p_i: Vector3<f64>,
-        R_j: UnitQuaternion<f64>,
-        v_j: Vector3<f64>,
-        p_j: Vector3<f64>,
-        bias_g: Vector3<f64>,
-        bias_a: Vector3<f64>,
-    ) -> DVector<f64> {
-        let weighted =
-            self.compute_weighted_residual_svec(R_i, v_i, p_i, R_j, v_j, p_j, bias_g, bias_a);
-        DVector::from_column_slice(weighted.as_slice())
     }
 
     /// Convert unit quaternion to rotation vector (Log map)
@@ -365,16 +351,32 @@ impl Factor for ImuFactorSe3 {
         let bias_g = Vector3::new(params[4][0], params[4][1], params[4][2]);
         let bias_a = Vector3::new(params[5][0], params[5][1], params[5][2]);
 
-        let weighted_residual = self
+        // Use stack-allocated SVector for base residual, convert to DVector only at return
+        let weighted_svec = self
             .inner
-            .compute_weighted_residual(R_i, v_i, p_i, R_j, v_j, p_j, bias_g, bias_a);
+            .compute_weighted_residual_svec(R_i, v_i, p_i, R_j, v_j, p_j, bias_g, bias_a);
+        let weighted_residual = DVector::from_column_slice(weighted_svec.as_slice());
 
         let jacobian = if compute_jacobian {
             let eps = 1e-7;
+            let inv_eps = 1.0 / eps;
             let mut jac = DMatrix::zeros(9, 26);
 
             // Clone once and perturb/restore in-place
             let mut params_pert = params.to_vec();
+
+            // Inline extraction+eval closure: avoids recursive self.linearize() call
+            // which would heap-allocate 3 DVectors per column (78 total for 26 columns)
+            let eval_svec = |p: &[DVector<f64>]| -> na::SVector<f64, 9> {
+                let (r_i, pos_i) = Self::pose_from_se3(&p[0]);
+                let vi = Vector3::new(p[1][0], p[1][1], p[1][2]);
+                let (r_j, pos_j) = Self::pose_from_se3(&p[2]);
+                let vj = Vector3::new(p[3][0], p[3][1], p[3][2]);
+                let bg = Vector3::new(p[4][0], p[4][1], p[4][2]);
+                let ba = Vector3::new(p[5][0], p[5][1], p[5][2]);
+                self.inner
+                    .compute_weighted_residual_svec(r_i, vi, pos_i, r_j, vj, pos_j, bg, ba)
+            };
 
             let block_sizes: [(usize, usize); 6] = [
                 (0, 7), // T_B_W_i → col offset 0
@@ -388,8 +390,9 @@ impl Factor for ImuFactorSe3 {
             for &(block_idx, block_size) in &block_sizes {
                 for i in 0..block_size {
                     params_pert[block_idx][i] += eps;
-                    let (r_pert, _) = self.linearize(&params_pert, false);
-                    let col = (r_pert - &weighted_residual) / eps;
+                    // SVector path: zero heap allocs for residual computation and diff
+                    let r_pert = eval_svec(&params_pert);
+                    let col = (r_pert - weighted_svec) * inv_eps;
                     jac.column_mut(col_offset + i).copy_from(&col);
                     params_pert[block_idx][i] -= eps; // restore
                 }

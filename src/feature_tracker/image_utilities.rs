@@ -3,6 +3,7 @@ use imageproc::corners::{corners_fast9, Corner};
 use nalgebra as na;
 use rayon::prelude::*;
 
+#[inline]
 pub fn image_grad(grayscale_image: &GrayImage, x: f32, y: f32) -> na::SVector<f32, 3> {
     let ix = x.floor() as u32;
     let iy = y.floor() as u32;
@@ -77,6 +78,7 @@ pub const fn point_in_bound(keypoint: &Corner, height: u32, width: u32, radius: 
         && keypoint.y + radius < height
 }
 
+#[inline]
 pub fn inbound(image: &GrayImage, x: f32, y: f32, radius: u32) -> bool {
     let r = radius as f32;
     x.round() >= r
@@ -85,6 +87,7 @@ pub fn inbound(image: &GrayImage, x: f32, y: f32, radius: u32) -> bool {
         && y.round() < image.height() as f32 - r
 }
 
+#[inline]
 pub fn se2_exp_matrix(a: &na::SVector<f32, 3>) -> na::SMatrix<f32, 3, 3> {
     let theta = a[2];
     let so2 = na::Rotation2::new(theta);
@@ -118,7 +121,10 @@ pub fn detect_key_points(
     current_corners: &[Corner],
     num_points_in_cell: u32,
 ) -> Vec<Corner> {
-    const EDGE_THRESHOLD: u32 = 19;
+    // Margin must accommodate Pattern52 at coarsest pyramid level:
+    // Pattern radius ~7px / pattern_scale_down=2 = 3.5px + 2px interpolation border = ~6px
+    // At 3 pyramid levels (scale factor 2): 6 * 2^(3-1) = 24px at full resolution
+    const EDGE_THRESHOLD: u32 = 24;
     let h = image.height();
     let w = image.width();
 

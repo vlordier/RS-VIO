@@ -178,41 +178,28 @@ impl SlidingWindow {
 
         // PART 1: Count observations and find first observation frame (Parallel)
         // Map: feature_id -> (left_count, right_count, first_frame_idx)
-        let landmark_stats = self
-            .keyframes
-            .par_iter()
-            .enumerate()
-            .fold(
-                HashMap::new,
-                |mut acc: HashMap<usize, (usize, usize, usize)>, (frame_idx, frame)| {
-                    for feat in &frame.left_features {
-                        let entry = acc.entry(feat.feature_id).or_insert((0, 0, usize::MAX));
-                        entry.0 += 1;
-                        if frame_idx < entry.2 {
-                            entry.2 = frame_idx;
-                        }
-                    }
-                    for feat in &frame.right_features {
-                        let entry = acc.entry(feat.feature_id).or_insert((0, 0, usize::MAX));
-                        entry.1 += 1;
-                        if frame_idx < entry.2 {
-                            entry.2 = frame_idx;
-                        }
-                    }
-                    acc
-                },
-            )
-            .reduce(HashMap::new, |mut map1, map2| {
-                for (k, (l, r, f)) in map2 {
-                    let entry = map1.entry(k).or_insert((0, 0, usize::MAX));
-                    entry.0 += l;
-                    entry.1 += r;
-                    if f < entry.2 {
-                        entry.2 = f;
-                    }
+        // Sequential scan — with only 8-16 keyframes, rayon overhead exceeds benefit
+        let mut landmark_stats: HashMap<usize, (usize, usize, usize)> = HashMap::new();
+        for (frame_idx, frame) in self.keyframes.iter().enumerate() {
+            for feat in &frame.left_features {
+                let entry = landmark_stats
+                    .entry(feat.feature_id)
+                    .or_insert((0, 0, usize::MAX));
+                entry.0 += 1;
+                if frame_idx < entry.2 {
+                    entry.2 = frame_idx;
                 }
-                map1
-            });
+            }
+            for feat in &frame.right_features {
+                let entry = landmark_stats
+                    .entry(feat.feature_id)
+                    .or_insert((0, 0, usize::MAX));
+                entry.1 += 1;
+                if frame_idx < entry.2 {
+                    entry.2 = frame_idx;
+                }
+            }
+        }
 
         // Pre-generate feature variable strings
         // This avoids calling format!("LM_{}") thousands of times during building
@@ -242,6 +229,10 @@ impl SlidingWindow {
                 .try_inverse()
                 .expect("T_B_Cr should be invertible"),
         );
+
+        // Pre-compute body-from-camera transforms once (these are the originals, no double-inversion)
+        let T_B_Cl = first_frame.state.T_B_Cl;
+        let T_B_Cr = first_frame.state.T_B_Cr;
 
         // PART 2: Build Factors (Parallel)
         let results: Vec<_> = self
@@ -283,12 +274,14 @@ impl SlidingWindow {
                     None
                 };
 
+                // Use pre-computed body-from-camera transforms (hoisted before par_iter,
+                // avoids double-inversion of T_C_B→T_B_C per frame)
                 let camera_features = [
-                    (&frame.left_features, T_Cl_B.clone()),
-                    (&frame.right_features, T_Cr_B.clone()),
+                    (&frame.left_features, T_Cl_B.clone(), &T_B_Cl),
+                    (&frame.right_features, T_Cr_B.clone(), &T_B_Cr),
                 ];
 
-                for (features, T_C_B) in camera_features.iter() {
+                for (features, T_C_B, T_B_C) in camera_features.iter() {
                     for feat in features.iter() {
                         let feature_id = feat.feature_id;
 
@@ -315,8 +308,6 @@ impl SlidingWindow {
                                         frame.state.T_W_B.fixed_view::<3, 3>(0, 0).into_owned(),
                                         frame.state.T_W_B.fixed_view::<3, 1>(0, 3).into_owned(),
                                     );
-                                    let T_B_C =
-                                        T_C_B.try_inverse().expect("T_C_B should be invertible");
                                     let (R_B_C, t_B_C) = (
                                         T_B_C.fixed_view::<3, 3>(0, 0).into_owned(),
                                         T_B_C.fixed_view::<3, 1>(0, 3).into_owned(),
@@ -564,10 +555,8 @@ impl SlidingWindow {
             }
         }
 
-        // Restore map points
-        self.map_points.clear();
-        self.map_points
-            .extend(saved_map_points.iter().map(|(k, v)| (*k, *v)));
+        // Restore map points (clone_from reuses existing allocation)
+        self.map_points.clone_from(saved_map_points);
 
         log::debug!(
             "[SlidingWindow] Reverted {} keyframe poses and {} map points",
@@ -631,7 +620,11 @@ impl SlidingWindow {
             if let Some(feature_id_str) = var_name.strip_prefix("LM_") {
                 if let Ok(feature_id) = feature_id_str.parse::<usize>() {
                     let vec = value.to_vector();
-                    // TODO check if points are estimated at obviously wrong locations (negative depths, etc.)
+                    // NaN/Inf guard: skip corrupted landmarks to prevent cascading failures
+                    if !vec.iter().all(|v| v.is_finite()) {
+                        log::warn!("[SlidingWindow] Skipping NaN/Inf landmark LM_{feature_id}");
+                        return;
+                    }
                     self.map_points
                         .insert(feature_id, [vec[0] as f32, vec[1] as f32, vec[2] as f32]);
                 }
@@ -640,6 +633,11 @@ impl SlidingWindow {
             else if let Some(frame_id_str) = var_name.strip_prefix("KF_") {
                 if let Ok(frame_id) = frame_id_str.parse::<usize>() {
                     let mat = apex_solver::manifold::se3::SE3::from(value.to_vector()).matrix();
+                    // NaN/Inf guard: skip corrupted poses
+                    if !mat.iter().all(|v| v.is_finite()) {
+                        log::warn!("[SlidingWindow] Skipping NaN/Inf keyframe KF_{frame_id}");
+                        return;
+                    }
                     let Some(kf) = self.keyframes.get_mut(frame_id) else {
                         log::warn!("Optimizer returned unknown keyframe index {frame_id}");
                         return;

@@ -1,6 +1,8 @@
 // Build script to enforce mutual exclusivity of matching strategies
 
 fn main() {
+    // Only re-run when the build script itself changes (not on every build)
+    println!("cargo::rerun-if-changed=build.rs");
     let strategies = [
         "matching-basic-ransac",
         "matching-imu-guided",
