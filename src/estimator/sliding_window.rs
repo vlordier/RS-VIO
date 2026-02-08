@@ -794,3 +794,128 @@ impl SlidingWindow {
         }
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    /// Helper: create a keyframe with the given frame_id.
+    fn make_keyframe(frame_id: i32) -> Frame {
+        let mut f = Frame::new(frame_id as i64 * 1_000_000_000, frame_id);
+        f.is_keyframe = true;
+        f
+    }
+
+    #[test]
+    fn new_creates_empty_window() {
+        let sw = SlidingWindow::new(4);
+        assert!(sw.is_empty());
+        assert!(!sw.is_full());
+        assert_eq!(sw.len(), 0);
+    }
+
+    #[test]
+    fn with_default_size_creates_size_8() {
+        let mut sw = SlidingWindow::with_default_size();
+        for i in 0..8 {
+            sw.add_frame(make_keyframe(i));
+        }
+        assert!(sw.is_full());
+        assert_eq!(sw.len(), 8);
+    }
+
+    #[test]
+    fn add_keyframe_accepted() {
+        let mut sw = SlidingWindow::new(4);
+        let accepted = sw.add_frame(make_keyframe(1));
+        assert!(accepted);
+        assert_eq!(sw.len(), 1);
+    }
+
+    #[test]
+    fn add_non_keyframe_rejected() {
+        let mut sw = SlidingWindow::new(4);
+        let f = Frame::new(1_000_000_000, 1); // is_keyframe defaults to false
+        let accepted = sw.add_frame(f);
+        assert!(!accepted);
+        assert_eq!(sw.len(), 0);
+    }
+
+    #[test]
+    fn add_frame_fifo_eviction() {
+        let mut sw = SlidingWindow::new(2);
+        sw.add_frame(make_keyframe(1));
+        sw.add_frame(make_keyframe(2));
+        sw.add_frame(make_keyframe(3));
+        // Oldest (frame_id=1) was evicted; window has frame_id=2 and 3
+        assert_eq!(sw.len(), 2);
+    }
+
+    #[test]
+    fn is_full_when_at_capacity() {
+        let mut sw = SlidingWindow::new(2);
+        assert!(!sw.is_full());
+        sw.add_frame(make_keyframe(1));
+        assert!(!sw.is_full());
+        sw.add_frame(make_keyframe(2));
+        assert!(sw.is_full());
+    }
+
+    #[test]
+    fn get_keyframe_poses_returns_correct_count() {
+        let mut sw = SlidingWindow::new(8);
+        for i in 0..3 {
+            sw.add_frame(make_keyframe(i));
+        }
+        assert_eq!(sw.get_keyframe_poses().len(), 3);
+    }
+
+    #[test]
+    fn last_keyframe_pose_none_when_empty() {
+        let sw = SlidingWindow::new(4);
+        assert!(sw.last_keyframe_pose().is_none());
+    }
+
+    #[test]
+    fn last_keyframe_pose_returns_latest() {
+        let mut sw = SlidingWindow::new(4);
+
+        sw.add_frame(make_keyframe(1));
+
+        let mut f2 = make_keyframe(2);
+        // Set a distinguishable translation in the second frame's pose
+        f2.state.T_W_B[(0, 3)] = 5.0;
+        f2.state.T_W_B[(1, 3)] = 10.0;
+        f2.state.T_W_B[(2, 3)] = 15.0;
+        sw.add_frame(f2);
+
+        let pose = sw.last_keyframe_pose().unwrap();
+        assert!((pose[(0, 3)] - 5.0).abs() < 1e-12);
+        assert!((pose[(1, 3)] - 10.0).abs() < 1e-12);
+        assert!((pose[(2, 3)] - 15.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn clear_empties_window() {
+        let mut sw = SlidingWindow::new(4);
+        sw.add_frame(make_keyframe(1));
+        sw.add_frame(make_keyframe(2));
+        assert_eq!(sw.len(), 2);
+        sw.clear();
+        assert!(sw.is_empty());
+        assert_eq!(sw.len(), 0);
+    }
+
+    #[test]
+    fn map_points_initially_empty() {
+        let sw = SlidingWindow::new(4);
+        assert!(sw.map_points.is_empty());
+    }
+
+    #[test]
+    fn get_keyframe_poses_empty_window() {
+        let sw = SlidingWindow::new(4);
+        assert!(sw.get_keyframe_poses().is_empty());
+    }
+}

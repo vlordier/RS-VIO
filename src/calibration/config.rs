@@ -136,3 +136,65 @@ impl Default for CalibrationConfig {
         }
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::field_reassign_with_default)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_has_sensible_values() {
+        let cfg = CalibrationConfig::default();
+        assert_eq!(cfg.max_stereo_pairs, 50);
+        assert_eq!(cfg.min_feature_matches, 20);
+        assert!((cfg.max_reprojection_error - 2.0).abs() < f64::EPSILON);
+        assert!((cfg.initial_focal_length - 500.0).abs() < f64::EPSILON);
+        assert_eq!(cfg.image_width, 640);
+        assert_eq!(cfg.image_height, 480);
+        assert!(cfg.auto_calibration_enabled);
+        assert!(cfg.optimize_distortion);
+    }
+
+    #[test]
+    fn default_rolling_shutter_is_autodetect() {
+        let cfg = CalibrationConfig::default();
+        assert!(cfg.rolling_shutter_enabled.is_none());
+    }
+
+    #[test]
+    fn serde_round_trip() {
+        let cfg = CalibrationConfig::default();
+        let yaml = serde_yaml::to_string(&cfg).expect("serialize");
+        let deserialized: CalibrationConfig =
+            serde_yaml::from_str(&yaml).expect("deserialize");
+        assert_eq!(deserialized.max_stereo_pairs, cfg.max_stereo_pairs);
+        assert_eq!(deserialized.min_feature_matches, cfg.min_feature_matches);
+        assert!((deserialized.initial_focal_length - cfg.initial_focal_length).abs() < f64::EPSILON);
+        assert_eq!(deserialized.rolling_shutter_enabled, cfg.rolling_shutter_enabled);
+    }
+
+    #[test]
+    fn clone_preserves_values() {
+        let mut cfg = CalibrationConfig::default();
+        cfg.max_stereo_pairs = 99;
+        cfg.rolling_shutter_enabled = Some(true);
+        let cloned = cfg.clone();
+        assert_eq!(cloned.max_stereo_pairs, 99);
+        assert_eq!(cloned.rolling_shutter_enabled, Some(true));
+    }
+
+    #[test]
+    fn fields_are_independently_modifiable() {
+        let mut cfg = CalibrationConfig::default();
+        cfg.auto_calibration_enabled = false;
+        cfg.adaptive_guidance_enabled = false;
+        cfg.rolling_shutter_enabled = Some(false);
+        cfg.max_iterations = 42;
+        assert!(!cfg.auto_calibration_enabled);
+        assert!(!cfg.adaptive_guidance_enabled);
+        assert_eq!(cfg.rolling_shutter_enabled, Some(false));
+        assert_eq!(cfg.max_iterations, 42);
+        // Other fields unchanged
+        assert_eq!(cfg.max_stereo_pairs, 50);
+    }
+}
