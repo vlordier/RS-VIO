@@ -538,10 +538,14 @@ mod tests {
     }
 
     #[test]
-    fn get_track_points_fresh_tracker_returns_empty() {
-        let tracker = StereoPatchTracker::<4>::new(8, 50, 0.001);
-        let [cam0, cam1] = tracker.get_track_points();
-        assert_eq!(cam0.len(), 0);
-        assert_eq!(cam1.len(), 0);
+    fn stereo_patch_tracker_generic_n_compiles() {
+        // Verify that different pyramid levels N work correctly:
+        // N=2 (fewer levels) vs N=5 (more levels) should both initialize.
+        let t2 = StereoPatchTracker::<2>::new(8, 50, 0.001);
+        let t5 = StereoPatchTracker::<5>::new(8, 50, 0.001);
+        assert!(!t2.has_previous);
+        assert!(!t5.has_previous);
+        assert!(t2.get_track_points()[0].is_empty());
+        assert!(t5.get_track_points()[0].is_empty());
     }
 }

@@ -1335,10 +1335,13 @@ mod tests {
     }
 
     #[test]
-    fn new_guidance_available() {
+    fn new_guidance_has_sensible_defaults() {
         let cal = StereoCalibrator::new(CalibrationConfig::default());
-        // guidance object is accessible (returns a string, possibly empty before data)
-        let _guidance = cal.get_guidance();
+        // Fresh calibrator: not ready, zero progress, guidance accessible
+        assert!(!cal.is_calibration_ready());
+        assert!((cal.progress_percentage() - 0.0).abs() < f64::EPSILON);
+        let guidance = cal.get_guidance();
+        assert!(!guidance.calibration_ready);
         let _display = cal.get_status_display();
     }
 

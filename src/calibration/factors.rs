@@ -1119,4 +1119,66 @@ mod tests {
             );
         }
     }
+
+    // ── Non-zero residual tests ─────────────────────────────────────
+
+    #[test]
+    fn stereo_reprojection_nonzero_residual() {
+        // Point at (0,0,5) with fx=fy=500, cx=320, cy=240 projects to
+        // (320,240) in both cameras. Observe (325,245) instead →
+        // residual ≈ (325-320, 245-240, 325-320, 245-240) = (5, 5, 5, 5).
+        let left_obs = na::Vector2::new(325.0, 245.0);
+        let right_obs = na::Vector2::new(325.0, 245.0);
+        let factor = StereoReprojectionFactor::new(left_obs, right_obs);
+
+        let intr = make_intrinsics(500.0, 500.0, 320.0, 240.0);
+        let extr = identity_extrinsics();
+        let point = na::DVector::from_vec(vec![0.0, 0.0, 5.0]);
+
+        let params: Vec<na::DVector<f64>> = vec![intr.clone(), intr, extr, point];
+        let (residual, _) = factor.linearize(&params, false);
+
+        assert_eq!(residual.len(), 4);
+        // Each component should be nonzero (magnitude ~5)
+        for i in 0..4 {
+            assert!(
+                residual[i].abs() > 1.0,
+                "residual[{i}] = {} (expected nonzero)",
+                residual[i]
+            );
+        }
+    }
+
+    #[test]
+    fn camera_graph_inconsistent_poses_nonzero_residual() {
+        // Expected relative pose = identity, but pose2 is translated 1m along x.
+        // actual_relative = pose1^{-1} * pose2 = identity^{-1} * (tx=1) = (tx=1)
+        // error = expected^{-1} * actual = identity^{-1} * (tx=1) = (tx=1)
+        // → translation_error = (1, 0, 0), rotation_error = (0, 0, 0)
+        let factor = CameraGraphFactor::new(na::Isometry3::identity());
+
+        let pose1 = na::DVector::from_vec(vec![0.0; 6]);
+        let pose2 = na::DVector::from_vec(vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0]);
+        let params: Vec<na::DVector<f64>> = vec![pose1, pose2];
+        let (residual, _) = factor.linearize(&params, false);
+
+        assert_eq!(residual.len(), 6);
+        // Rotation part should be zero
+        for i in 0..3 {
+            assert!(
+                residual[i].abs() < 1e-12,
+                "rotation residual[{i}] = {} (expected 0)",
+                residual[i]
+            );
+        }
+        // Translation x should be ~1.0
+        assert!(
+            (residual[3] - 1.0).abs() < 1e-10,
+            "translation_x = {} (expected 1.0)",
+            residual[3]
+        );
+        // Translation y,z should be zero
+        assert!(residual[4].abs() < 1e-12);
+        assert!(residual[5].abs() < 1e-12);
+    }
 }
