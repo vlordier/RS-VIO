@@ -1,6 +1,7 @@
 //! Optimization factors for stereo camera calibration
 
 use crate::calibration::camera_models::CameraModel;
+use crate::calibration::triangulation::vector_to_isometry;
 use apex_solver::factors::Factor;
 use nalgebra as na;
 
@@ -44,6 +45,12 @@ fn numerical_jacobian(
     jacobian
 }
 
+/// Extract stereo camera intrinsics (fx, fy, cx, cy) from a parameter slice.
+#[inline]
+fn extract_stereo_intrinsics(intrinsics: &[f64]) -> (f64, f64, f64, f64) {
+    (intrinsics[0], intrinsics[1], intrinsics[2], intrinsics[3])
+}
+
 /// Reprojection factor for stereo calibration
 ///
 /// This factor enforces that a 3D point projects correctly into both left and right cameras.
@@ -71,33 +78,6 @@ impl StereoReprojectionFactor {
         }
     }
 
-    /// Extract camera intrinsics from parameter vector
-    #[allow(dead_code)]
-    fn extract_intrinsics(params: &[f64]) -> Vec<f64> {
-        params.iter().take(9).cloned().collect()
-    }
-
-    /// Extract relative pose from parameter vector (6D -> SE(3))
-    #[allow(dead_code)]
-    fn extract_relative_pose(params: &[f64]) -> na::Isometry3<f64> {
-        let rx = params[0];
-        let ry = params[1];
-        let rz = params[2];
-        let tx = params[3];
-        let ty = params[4];
-        let tz = params[5];
-
-        let rotation = na::UnitQuaternion::from_euler_angles(rx, ry, rz);
-        let translation = na::Vector3::new(tx, ty, tz);
-
-        na::Isometry3::from_parts(translation.into(), rotation)
-    }
-
-    /// Extract 3D point from parameter vector
-    #[allow(dead_code)]
-    fn extract_point(params: &[f64]) -> na::Vector3<f64> {
-        na::Vector3::new(params[0], params[1], params[2])
-    }
 }
 
 impl Factor for StereoReprojectionFactor {
@@ -131,27 +111,11 @@ impl Factor for StereoReprojectionFactor {
         let point_3d = na::Vector3::new(params[3][0], params[3][1], params[3][2]);
 
         // Extract camera parameters (simplified pinhole model)
-        let fx_l = left_intrinsics[0];
-        let fy_l = left_intrinsics[1];
-        let cx_l = left_intrinsics[2];
-        let cy_l = left_intrinsics[3];
-
-        let fx_r = right_intrinsics[0];
-        let fy_r = right_intrinsics[1];
-        let cx_r = right_intrinsics[2];
-        let cy_r = right_intrinsics[3];
+        let (fx_l, fy_l, cx_l, cy_l) = extract_stereo_intrinsics(left_intrinsics);
+        let (fx_r, fy_r, cx_r, cy_r) = extract_stereo_intrinsics(right_intrinsics);
 
         // Extract relative pose
-        let rx = extrinsics[0];
-        let ry = extrinsics[1];
-        let rz = extrinsics[2];
-        let tx = extrinsics[3];
-        let ty = extrinsics[4];
-        let tz = extrinsics[5];
-
-        let rotation = na::UnitQuaternion::from_euler_angles(rx, ry, rz);
-        let translation = na::Vector3::new(tx, ty, tz);
-        let relative_pose = na::Isometry3::from_parts(translation.into(), rotation);
+        let relative_pose = vector_to_isometry(extrinsics);
 
         // Project point into left camera
         let left_proj_x = fx_l * point_3d.x / point_3d.z + cx_l;
@@ -250,27 +214,11 @@ impl Factor for RollingShutterFactor {
         let linear_vel = na::Vector3::new(params[4][0], params[4][1], params[4][2]);
 
         // Extract camera parameters
-        let fx_l = left_intrinsics[0];
-        let fy_l = left_intrinsics[1];
-        let cx_l = left_intrinsics[2];
-        let cy_l = left_intrinsics[3];
-
-        let fx_r = right_intrinsics[0];
-        let fy_r = right_intrinsics[1];
-        let cx_r = right_intrinsics[2];
-        let cy_r = right_intrinsics[3];
+        let (fx_l, fy_l, cx_l, cy_l) = extract_stereo_intrinsics(left_intrinsics);
+        let (fx_r, fy_r, cx_r, cy_r) = extract_stereo_intrinsics(right_intrinsics);
 
         // Extract relative pose
-        let rx = extrinsics[0];
-        let ry = extrinsics[1];
-        let rz = extrinsics[2];
-        let tx = extrinsics[3];
-        let ty = extrinsics[4];
-        let tz = extrinsics[5];
-
-        let rotation = na::UnitQuaternion::from_euler_angles(rx, ry, rz);
-        let translation = na::Vector3::new(tx, ty, tz);
-        let relative_pose = na::Isometry3::from_parts(translation.into(), rotation);
+        let relative_pose = vector_to_isometry(extrinsics);
 
         // Calculate rolling shutter correction
         // The feature was captured at time = row_position * readout_time
@@ -398,16 +346,7 @@ impl Factor for EpipolarFactor {
         );
 
         // Extract relative pose
-        let rx = extrinsics[0];
-        let ry = extrinsics[1];
-        let rz = extrinsics[2];
-        let tx = extrinsics[3];
-        let ty = extrinsics[4];
-        let tz = extrinsics[5];
-
-        let rotation = na::UnitQuaternion::from_euler_angles(rx, ry, rz);
-        let translation = na::Vector3::new(tx, ty, tz);
-        let relative_pose = na::Isometry3::from_parts(translation.into(), rotation);
+        let relative_pose = vector_to_isometry(extrinsics);
 
         let rotation_matrix = relative_pose.rotation.to_rotation_matrix();
         let r = rotation_matrix.matrix();
@@ -592,27 +531,11 @@ impl Factor for TemporalSuperResolutionFactor {
         let point_3d = na::Vector3::new(params[4][0], params[4][1], params[4][2]);
 
         // Extract camera intrinsics (simplified pinhole)
-        let fx_l = left_intrinsics[0];
-        let fy_l = left_intrinsics[1];
-        let cx_l = left_intrinsics[2];
-        let cy_l = left_intrinsics[3];
-
-        let fx_r = right_intrinsics[0];
-        let fy_r = right_intrinsics[1];
-        let cx_r = right_intrinsics[2];
-        let cy_r = right_intrinsics[3];
+        let (fx_l, fy_l, cx_l, cy_l) = extract_stereo_intrinsics(left_intrinsics);
+        let (fx_r, fy_r, cx_r, cy_r) = extract_stereo_intrinsics(right_intrinsics);
 
         // Extract base stereo extrinsics
-        let rx = extrinsics[0];
-        let ry = extrinsics[1];
-        let rz = extrinsics[2];
-        let tx = extrinsics[3];
-        let ty = extrinsics[4];
-        let tz = extrinsics[5];
-
-        let base_rotation = na::UnitQuaternion::from_euler_angles(rx, ry, rz);
-        let base_translation = na::Vector3::new(tx, ty, tz);
-        let base_extrinsics = na::Isometry3::from_parts(base_translation.into(), base_rotation);
+        let base_extrinsics = vector_to_isometry(extrinsics);
 
         // Find sequence start time for motion interpolation
         let sequence_start_time = self
