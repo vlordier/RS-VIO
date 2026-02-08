@@ -6,6 +6,7 @@ use crate::calibration::guidance::CalibrationGuidance;
 use crate::calibration::quality::{
     CalibrationLogger, CalibrationQualityMetrics, QualityThresholds,
 };
+use crate::calibration::{rolling_shutter, triangulation};
 use crate::feature_tracker::{
     EnhancedDetectorConfig, EnhancedFeatureDetector, StereoMatcher, StereoMatcherConfig,
 };
@@ -884,7 +885,7 @@ impl StereoCalibrator {
         );
 
         // Initialize parameters
-        let initial_params = self.initialize_parameters();
+        let initial_params = triangulation::initialize_parameters(&self.config);
 
         // Create optimization problem and initial values
         let mut problem = Problem::new();
@@ -923,7 +924,7 @@ impl StereoCalibrator {
             for (corr_idx, &(left_idx, right_idx)) in stereo_pair.correspondences.iter().enumerate()
             {
                 let point_var = format!("point_{}_{}", pair_idx, corr_idx);
-                let initial_point = self.triangulate_initial_point(
+                let initial_point = triangulation::triangulate_initial_point(
                     &stereo_pair.left_features[left_idx],
                     &stereo_pair.right_features[right_idx],
                     &initial_params,
@@ -1027,17 +1028,19 @@ impl StereoCalibrator {
             .to_vector();
 
         // Convert extrinsics back to SE(3)
-        let final_extrinsics_se3 = Self::vector_to_isometry(final_extrinsics.as_slice());
+        let final_extrinsics_se3 = triangulation::vector_to_isometry(final_extrinsics.as_slice());
 
         // Compute final reprojection error and quality metrics
-        let final_error = self.compute_reprojection_error(
+        let final_error = triangulation::compute_reprojection_error(
+            &self.stereo_pairs,
             final_left_intrinsics.as_slice(),
             final_right_intrinsics.as_slice(),
             &final_extrinsics_se3,
         );
 
         // Compute detailed quality metrics
-        let per_point_errors = self.compute_per_point_errors(
+        let per_point_errors = triangulation::compute_per_point_errors(
+            &self.stereo_pairs,
             final_left_intrinsics.as_slice(),
             final_right_intrinsics.as_slice(),
             &final_extrinsics_se3,
@@ -1137,202 +1140,30 @@ impl StereoCalibrator {
 
     /// Get detailed rolling shutter detection information
     pub fn rolling_shutter_detection_info(&self) -> Option<RollingShutterDetectionInfo> {
-        if self.stereo_pairs.len() < 3 {
-            return None;
-        }
-
-        let position_score = self.analyze_position_distortion();
-        let temporal_score = self.analyze_temporal_consistency();
-        let geometric_score = self.analyze_geometric_distortions();
-
-        let combined_score = 0.4 * position_score + 0.4 * temporal_score + 0.2 * geometric_score;
-        let detected = combined_score > 0.6;
-
-        Some(RollingShutterDetectionInfo {
-            position_distortion_score: position_score,
-            temporal_consistency_score: temporal_score,
-            geometric_distortion_score: geometric_score,
-            combined_score,
-            rolling_shutter_detected: detected,
-            confidence: (combined_score * 100.0).round() as u8,
-        })
+        rolling_shutter::rolling_shutter_detection_info(
+            &self.stereo_pairs,
+            self.config.image_height,
+        )
     }
 
     /// Automatically detect if rolling shutter compensation is needed
     pub fn detect_rolling_shutter(&self) -> bool {
-        if self.stereo_pairs.len() < 3 {
-            // Need multiple frames for reliable detection
-            return false;
-        }
-
-        // Method 1: Analyze feature position correlation with distortion
-        let position_distortion_score = self.analyze_position_distortion();
-
-        // Method 2: Check temporal consistency across frames
-        let temporal_consistency_score = self.analyze_temporal_consistency();
-
-        // Method 3: Geometric constraint violations that suggest rolling shutter
-        let geometric_distortion_score = self.analyze_geometric_distortions();
-
-        // Combine scores with weights
-        let combined_score = 0.4 * position_distortion_score
-            + 0.4 * temporal_consistency_score
-            + 0.2 * geometric_distortion_score;
-
-        // Threshold for rolling shutter detection
-        let rolling_shutter_threshold = 0.6;
-
-        self.log_progress(&format!(
-            "🔍 Rolling shutter detection: {:.2} (threshold: {:.2})",
-            combined_score, rolling_shutter_threshold
-        ));
-
-        combined_score > rolling_shutter_threshold
-    }
-
-    /// Analyze correlation between vertical position and distortion patterns
-    fn analyze_position_distortion(&self) -> f64 {
-        let mut position_errors = Vec::new();
-
-        for stereo_pair in &self.stereo_pairs {
-            for &(left_idx, right_idx) in &stereo_pair.correspondences {
-                let left_pt = stereo_pair.left_features[left_idx];
-                let right_pt = stereo_pair.right_features[right_idx];
-
-                // Calculate vertical position (normalized 0-1)
-                let v_pos = left_pt.y / self.config.image_height as f64;
-
-                // Simple distortion metric: horizontal disparity variation
-                let disparity = (left_pt.x - right_pt.x).abs();
-
-                // Expected disparity for pinhole model (rough approximation)
-                let expected_disparity = 50.0; // pixels, typical for stereo
-                let distortion = (disparity - expected_disparity).abs() / expected_disparity;
-
-                position_errors.push((v_pos, distortion));
-            }
-        }
-
-        if position_errors.is_empty() {
-            return 0.0;
-        }
-
-        // Calculate correlation between vertical position and distortion
-        // Rolling shutter causes systematic distortion that correlates with position
-        let mean_v =
-            position_errors.iter().map(|(v, _)| v).sum::<f64>() / position_errors.len() as f64;
-        let mean_d =
-            position_errors.iter().map(|(_, d)| d).sum::<f64>() / position_errors.len() as f64;
-
-        let covariance = position_errors
-            .iter()
-            .map(|(v, d)| (v - mean_v) * (d - mean_d))
-            .sum::<f64>()
-            / position_errors.len() as f64;
-
-        let var_v = position_errors
-            .iter()
-            .map(|(v, _)| (v - mean_v).powi(2))
-            .sum::<f64>()
-            / position_errors.len() as f64;
-
-        let var_d = position_errors
-            .iter()
-            .map(|(_, d)| (d - mean_d).powi(2))
-            .sum::<f64>()
-            / position_errors.len() as f64;
-
-        let correlation = if var_v > 1e-10 && var_d > 1e-10 {
-            covariance / (var_v.sqrt() * var_d.sqrt())
+        let log_fn = if self.config.log_calibration_metrics {
+            let start_time = self.start_time;
+            Some(move |msg: &str| {
+                let elapsed = start_time
+                    .map(|start| start.elapsed())
+                    .unwrap_or(std::time::Duration::ZERO);
+                println!("[CALIBRATION {:.2}s] {}", elapsed.as_secs_f64(), msg);
+            })
         } else {
-            0.0
+            None
         };
-
-        // Strong correlation suggests rolling shutter
-        correlation.abs().min(1.0)
-    }
-
-    /// Analyze temporal consistency across multiple frames
-    fn analyze_temporal_consistency(&self) -> f64 {
-        if self.stereo_pairs.len() < 2 {
-            return 0.0;
-        }
-
-        let mut consistency_scores = Vec::new();
-
-        // Compare consecutive pairs for temporal consistency
-        for i in 0..self.stereo_pairs.len() - 1 {
-            let pair1 = &self.stereo_pairs[i];
-            let pair2 = &self.stereo_pairs[i + 1];
-
-            // Calculate average feature movement between frames
-            let mut movements = Vec::new();
-
-            // Simple temporal analysis: check if features move consistently
-            // In rolling shutter, features at different heights move differently
-            for &(left_idx, _) in &pair1.correspondences {
-                if left_idx < pair1.left_features.len() && left_idx < pair2.left_features.len() {
-                    let pt1 = pair1.left_features[left_idx];
-                    let pt2 = pair2.left_features[left_idx];
-                    let movement = (pt1 - pt2).norm();
-                    movements.push(movement);
-                }
-            }
-
-            if !movements.is_empty() {
-                let mean_movement = movements.iter().sum::<f64>() / movements.len() as f64;
-                let variance = movements
-                    .iter()
-                    .map(|m| (m - mean_movement).powi(2))
-                    .sum::<f64>()
-                    / movements.len() as f64;
-                let consistency = 1.0 / (1.0 + variance.sqrt()); // Higher consistency = lower variance
-                consistency_scores.push(consistency);
-            }
-        }
-
-        if consistency_scores.is_empty() {
-            0.0
-        } else {
-            consistency_scores.iter().sum::<f64>() / consistency_scores.len() as f64
-        }
-    }
-
-    /// Analyze geometric distortions that suggest rolling shutter
-    fn analyze_geometric_distortions(&self) -> f64 {
-        let mut distortion_indicators = Vec::new();
-
-        for stereo_pair in &self.stereo_pairs {
-            // Check for systematic distortions in epipolar geometry
-            // Rolling shutter often violates simple epipolar constraints
-
-            let mut epipolar_errors = Vec::new();
-
-            for &(left_idx, right_idx) in &stereo_pair.correspondences {
-                let left_pt = stereo_pair.left_features[left_idx];
-                let right_pt = stereo_pair.right_features[right_idx];
-
-                // Simple epipolar check: points should be at similar vertical positions
-                // Rolling shutter can cause vertical misalignment
-                let vertical_diff = (left_pt.y - right_pt.y).abs();
-
-                // Normalize by image height
-                let normalized_error = vertical_diff / self.config.image_height as f64;
-                epipolar_errors.push(normalized_error);
-            }
-
-            if !epipolar_errors.is_empty() {
-                let mean_error = epipolar_errors.iter().sum::<f64>() / epipolar_errors.len() as f64;
-                // Higher mean error suggests rolling shutter effects
-                distortion_indicators.push(mean_error.min(1.0));
-            }
-        }
-
-        if distortion_indicators.is_empty() {
-            0.0
-        } else {
-            distortion_indicators.iter().sum::<f64>() / distortion_indicators.len() as f64
-        }
+        rolling_shutter::detect_rolling_shutter(
+            &self.stereo_pairs,
+            self.config.image_height,
+            log_fn.as_ref().map(|f| f as &dyn Fn(&str)),
+        )
     }
 
     /// Get the effective rolling shutter setting (auto-detected or manual)
@@ -1469,215 +1300,4 @@ impl StereoCalibrator {
         }
     }
 
-    /// Initialize optimization parameters
-    fn initialize_parameters(&self) -> InitialParameters {
-        // Use config defaults or estimate from data
-        let left_intrinsics = vec![
-            self.config.initial_focal_length,      // fx
-            self.config.initial_focal_length,      // fy
-            self.config.initial_principal_point.0, // cx
-            self.config.initial_principal_point.1, // cy
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0, // distortion (k1, k2, p1, p2, k3)
-        ];
-
-        let right_intrinsics = left_intrinsics.clone();
-
-        // Initialize extrinsics with small baseline
-        let extrinsics = vec![0.0, 0.0, 0.0, 0.1, 0.0, 0.0]; // rx, ry, rz, tx, ty, tz
-
-        InitialParameters {
-            left_intrinsics,
-            right_intrinsics,
-            extrinsics,
-        }
-    }
-
-    /// Triangulate initial 3D point for optimization
-    fn triangulate_initial_point(
-        &self,
-        left_point: &na::Vector2<f64>,
-        right_point: &na::Vector2<f64>,
-        params: &InitialParameters,
-    ) -> Vec<f64> {
-        // Simple triangulation assuming known intrinsics and small baseline
-        // This is a rough initialization - optimization will refine it
-
-        let fx = params.left_intrinsics[0];
-        let fy = params.left_intrinsics[1];
-        let cx = params.left_intrinsics[2];
-        let cy = params.left_intrinsics[3];
-
-        let baseline = params.extrinsics[3]; // tx
-
-        // Convert to normalized coordinates
-        let xl = (left_point.x - cx) / fx;
-        let yl = (left_point.y - cy) / fy;
-        let xr = (right_point.x - cx) / fx;
-        let _yr = (right_point.y - cy) / fy;
-
-        // Disparity
-        let disparity = xl - xr;
-        if disparity.abs() < 1e-6 {
-            // Points too close, use default depth
-            return vec![0.0, 0.0, 1.0];
-        }
-
-        // Triangulate
-        let z = baseline / disparity;
-        let x = xl * z;
-        let y = yl * z;
-
-        vec![x, y, z]
-    }
-
-    /// Convert parameter vector to SE(3) isometry
-    fn vector_to_isometry(params: &[f64]) -> na::Isometry3<f64> {
-        let rx = params[0];
-        let ry = params[1];
-        let rz = params[2];
-        let tx = params[3];
-        let ty = params[4];
-        let tz = params[5];
-
-        let rotation = na::UnitQuaternion::from_euler_angles(rx, ry, rz);
-        let translation = na::Vector3::new(tx, ty, tz);
-
-        na::Isometry3::from_parts(translation.into(), rotation)
-    }
-
-    /// Compute final reprojection error
-    fn compute_reprojection_error(
-        &self,
-        left_intrinsics: &[f64],
-        right_intrinsics: &[f64],
-        extrinsics: &na::Isometry3<f64>,
-    ) -> f64 {
-        let mut total_error = 0.0;
-        let mut total_points = 0;
-
-        for stereo_pair in &self.stereo_pairs {
-            for &(left_idx, right_idx) in &stereo_pair.correspondences {
-                let left_obs = stereo_pair.left_features[left_idx];
-                let right_obs = stereo_pair.right_features[right_idx];
-
-                // Triangulate point
-                let point_3d =
-                    self.triangulate_point(&left_obs, &right_obs, left_intrinsics, extrinsics);
-
-                // Project back to cameras
-                let left_proj = self.project_point(&point_3d, left_intrinsics);
-                let right_proj =
-                    self.project_point(&(extrinsics.inverse() * point_3d), right_intrinsics);
-
-                // Compute errors
-                let left_error = (left_proj - left_obs).norm();
-                let right_error = (right_proj - right_obs).norm();
-
-                total_error += left_error + right_error;
-                total_points += 2;
-            }
-        }
-
-        if total_points > 0 {
-            total_error / total_points as f64
-        } else {
-            0.0
-        }
-    }
-
-    /// Triangulate 3D point from stereo observations
-    fn triangulate_point(
-        &self,
-        left_point: &na::Vector2<f64>,
-        right_point: &na::Vector2<f64>,
-        left_intrinsics: &[f64],
-        extrinsics: &na::Isometry3<f64>,
-    ) -> na::Vector3<f64> {
-        // Simplified triangulation - in practice, you'd use proper stereo triangulation
-        let fx = left_intrinsics[0];
-        let fy = left_intrinsics[1];
-        let cx = left_intrinsics[2];
-        let cy = left_intrinsics[3];
-
-        let baseline = extrinsics.translation.x; // Assume horizontal baseline
-
-        let xl = (left_point.x - cx) / fx;
-        let yl = (left_point.y - cy) / fy;
-        let xr = (right_point.x - cx) / fx;
-        let _yr = (right_point.y - cy) / fy;
-
-        let disparity = xl - xr;
-        if disparity.abs() < 1e-6 {
-            return na::Vector3::new(0.0, 0.0, 1.0);
-        }
-
-        let z = baseline / disparity;
-        let x = xl * z;
-        let y = yl * z;
-
-        na::Vector3::new(x, y, z)
-    }
-
-    /// Project 3D point to camera
-    fn project_point(&self, point: &na::Vector3<f64>, intrinsics: &[f64]) -> na::Vector2<f64> {
-        let fx = intrinsics[0];
-        let fy = intrinsics[1];
-        let cx = intrinsics[2];
-        let cy = intrinsics[3];
-
-        let u = fx * point.x / point.z + cx;
-        let v = fy * point.y / point.z + cy;
-
-        na::Vector2::new(u, v)
-    }
-
-    /// Compute per-point reprojection errors for quality assessment
-    fn compute_per_point_errors(
-        &self,
-        left_intrinsics: &[f64],
-        right_intrinsics: &[f64],
-        extrinsics: &na::Isometry3<f64>,
-    ) -> Vec<f64> {
-        let mut errors = Vec::new();
-
-        for stereo_pair in &self.stereo_pairs {
-            for &(left_idx, right_idx) in &stereo_pair.correspondences {
-                let observed_left = stereo_pair.left_features[left_idx];
-                let observed_right = stereo_pair.right_features[right_idx];
-
-                // Triangulate 3D point
-                let point_3d = self.triangulate_point(
-                    &observed_left,
-                    &observed_right,
-                    left_intrinsics,
-                    extrinsics,
-                );
-
-                // Project back to cameras
-                let projected_left = self.project_point(&point_3d, left_intrinsics);
-                let projected_right =
-                    self.project_point(&(extrinsics.inverse() * point_3d), right_intrinsics);
-
-                // Compute reprojection errors
-                let left_error = (observed_left - projected_left).norm();
-                let right_error = (observed_right - projected_right).norm();
-
-                // Use maximum of left/right errors for this point
-                errors.push(left_error.max(right_error));
-            }
-        }
-
-        errors
-    }
-}
-
-/// Helper struct for initial parameter estimation
-struct InitialParameters {
-    left_intrinsics: Vec<f64>,
-    right_intrinsics: Vec<f64>,
-    extrinsics: Vec<f64>,
 }

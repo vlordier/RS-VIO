@@ -45,7 +45,9 @@ pub mod factors;
 pub mod guidance;
 pub mod multi_camera;
 pub mod quality;
+pub mod rolling_shutter;
 pub mod stereo_calibrator;
+pub mod triangulation;
 
 pub use camera_models::{
     CameraConfig, CameraModel, DistortionModel, FisheyeCamera, FisheyeModel, PinholeCamera,
