@@ -394,26 +394,212 @@ mod tests {
         let gravity = na::Vector3::new(0.0, 0.0, -9.81);
         let mut eskf = Eskf::new(noise, gravity);
 
-        // For static condition: accel = gravity in sensor frame
-        // After removing bias and rotating to world frame, net acceleration should be zero
+        // Static IMU: accel reads [0, 0, 9.81] (gravity), gyro reads zero.
+        // Net acceleration = R * (accel - bias) + gravity = [0,0,9.81] + [0,0,-9.81] = 0
+        // Velocity must remain exactly zero (to floating-point precision).
         let imu = ImuData {
             timestamp: 0,
             gyro: [0.0, 0.0, 0.0],
-            accel: [0.0, 0.0, 9.81], // Gravity measurement
+            accel: [0.0, 0.0, 9.81],
         };
 
         for _ in 0..100 {
             eskf.predict(&imu, 0.01);
         }
 
-        // Velocity should remain near zero for static condition
-        // The acceleration is gravity, bias is initially 0, so after removing bias
-        // we get gravity in sensor frame, which rotates to gravity in world frame
-        // Adding the gravity vector results in net zero acceleration
         assert!(
-            eskf.state.velocity.norm() < 0.1,
-            "Velocity: {}",
+            eskf.state.velocity.norm() < 1e-6,
+            "Static velocity should be ~0, got {}",
             eskf.state.velocity.norm()
         );
+
+        // Covariance must remain positive semi-definite (all eigenvalues >= 0)
+        let eigenvalues = eskf.state.covariance.symmetric_eigenvalues();
+        for i in 0..eigenvalues.len() {
+            assert!(
+                eigenvalues[i] >= -1e-12,
+                "Covariance eigenvalue {} is negative: {}",
+                i,
+                eigenvalues[i]
+            );
+        }
+    }
+
+    #[test]
+    fn test_eskf_constant_acceleration() {
+        let noise = ImuNoise::default();
+        let gravity = na::Vector3::new(0.0, 0.0, -9.81);
+        let mut eskf = Eskf::new(noise, gravity);
+
+        // Apply 1 m/s² along x. Sensor reads [1, 0, 9.81] (includes gravity).
+        let imu = ImuData {
+            timestamp: 0,
+            gyro: [0.0, 0.0, 0.0],
+            accel: [1.0, 0.0, 9.81],
+        };
+
+        let dt = 0.01;
+        let steps = 100;
+        for _ in 0..steps {
+            eskf.predict(&imu, dt);
+        }
+
+        let expected = na::Vector3::new(1.0, 0.0, 0.0); // v = a*t = 1*1 = 1 m/s
+        let error = (eskf.state.velocity - expected).norm();
+        assert!(
+            error < 1e-3,
+            "Expected velocity ~[1,0,0], got {:?} (error {})",
+            eskf.state.velocity,
+            error
+        );
+    }
+
+    #[test]
+    fn test_eskf_covariance_growth_during_prediction() {
+        let noise = ImuNoise::default();
+        let gravity = na::Vector3::new(0.0, 0.0, -9.81);
+        let mut eskf = Eskf::new(noise, gravity);
+
+        let imu = ImuData {
+            timestamp: 0,
+            gyro: [0.0, 0.0, 0.0],
+            accel: [0.0, 0.0, 9.81],
+        };
+
+        // Velocity covariance block is rows/cols 3..6 of the 15×15 covariance.
+        let vel_cov_trace = |eskf: &Eskf| {
+            eskf.state.covariance[(3, 3)] + eskf.state.covariance[(4, 4)] + eskf.state.covariance[(5, 5)]
+        };
+
+        let mut prev_trace = vel_cov_trace(&eskf);
+        for step in 1..=50 {
+            eskf.predict(&imu, 0.01);
+            let cur_trace = vel_cov_trace(&eskf);
+            assert!(
+                cur_trace > prev_trace,
+                "Velocity covariance trace must grow monotonically (step {}: {} <= {})",
+                step,
+                cur_trace,
+                prev_trace
+            );
+            prev_trace = cur_trace;
+        }
+    }
+
+    #[test]
+    fn test_eskf_zero_velocity_update_corrects_drift() {
+        let noise = ImuNoise::default();
+        let gravity = na::Vector3::new(0.0, 0.0, -9.81);
+        let mut eskf = Eskf::new(noise, gravity);
+
+        // Use a slightly biased accelerometer reading to induce drift.
+        let imu = ImuData {
+            timestamp: 0,
+            gyro: [0.0, 0.0, 0.0],
+            accel: [0.05, -0.03, 9.81],
+        };
+
+        for _ in 0..50 {
+            eskf.predict(&imu, 0.01);
+        }
+
+        let vel_before = eskf.state.velocity.norm();
+        assert!(
+            vel_before > 1e-6,
+            "Drift should have caused nonzero velocity, got {}",
+            vel_before
+        );
+
+        // Apply zero-velocity update with reasonable uncertainty
+        eskf.update_zero_velocity(0.01);
+
+        let vel_after = eskf.state.velocity.norm();
+        assert!(
+            vel_after < vel_before,
+            "Zero-velocity update should reduce velocity ({} -> {})",
+            vel_before,
+            vel_after
+        );
+    }
+
+    #[test]
+    fn test_eskf_velocity_update_reduces_uncertainty() {
+        let noise = ImuNoise::default();
+        let gravity = na::Vector3::new(0.0, 0.0, -9.81);
+        let mut eskf = Eskf::new(noise, gravity);
+
+        let imu = ImuData {
+            timestamp: 0,
+            gyro: [0.0, 0.0, 0.0],
+            accel: [0.0, 0.0, 9.81],
+        };
+
+        // Grow covariance via prediction
+        for _ in 0..50 {
+            eskf.predict(&imu, 0.01);
+        }
+
+        let vel_cov_trace = |eskf: &Eskf| {
+            eskf.state.covariance[(3, 3)] + eskf.state.covariance[(4, 4)] + eskf.state.covariance[(5, 5)]
+        };
+        let trace_before = vel_cov_trace(&eskf);
+
+        // Apply velocity measurement with tight uncertainty
+        let measured_velocity = na::Vector3::zeros();
+        let measurement_cov = na::Matrix3::identity() * 0.001;
+        eskf.update_velocity(measured_velocity, measurement_cov);
+
+        let trace_after = vel_cov_trace(&eskf);
+        assert!(
+            trace_after < trace_before,
+            "Velocity update should reduce uncertainty ({} -> {})",
+            trace_before,
+            trace_after
+        );
+    }
+
+    #[test]
+    fn test_eskf_bias_correction_sets_values() {
+        let noise = ImuNoise::default();
+        let gravity = na::Vector3::new(0.0, 0.0, -9.81);
+        let mut eskf = Eskf::new(noise, gravity);
+
+        let gyro_bias = na::Vector3::new(0.01, -0.02, 0.005);
+        let accel_bias = na::Vector3::new(0.1, -0.05, 0.03);
+        let bias_uncertainty = 0.001;
+
+        eskf.apply_bias_correction(gyro_bias, accel_bias, bias_uncertainty);
+
+        let gyro_err = (eskf.state.gyro_bias - gyro_bias).norm();
+        let accel_err = (eskf.state.accel_bias - accel_bias).norm();
+        assert!(
+            gyro_err < 1e-12,
+            "Gyro bias should be exactly set, error {}",
+            gyro_err
+        );
+        assert!(
+            accel_err < 1e-12,
+            "Accel bias should be exactly set, error {}",
+            accel_err
+        );
+
+        // Bias uncertainty should be reflected in covariance diagonal
+        let (gyro_std, accel_std) = eskf.get_bias_std();
+        for i in 0..3 {
+            assert!(
+                (gyro_std[i] - bias_uncertainty).abs() < 1e-6,
+                "Gyro bias std[{}] = {}, expected {}",
+                i,
+                gyro_std[i],
+                bias_uncertainty
+            );
+            assert!(
+                (accel_std[i] - bias_uncertainty).abs() < 1e-6,
+                "Accel bias std[{}] = {}, expected {}",
+                i,
+                accel_std[i],
+                bias_uncertainty
+            );
+        }
     }
 }

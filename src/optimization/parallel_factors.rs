@@ -84,25 +84,12 @@ impl ParallelFactorBatch {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::cloned_ref_to_slice_refs)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_parallel_batch_creation() {
-        let batch = ParallelFactorBatch::new(ParallelFactorConfig::default());
-
-        let observations = (0..100)
-            .map(|i| {
-                (
-                    Vector2::new(i as f64 / 100.0, i as f64 / 100.0),
-                    Matrix4::identity(),
-                )
-            })
-            .collect::<Vec<_>>();
-
-        let factors = batch.create_pinhole_factors_parallel(observations);
-        assert_eq!(factors.len(), 100);
-    }
+    use apex_solver::factors::Factor;
+    use na::DVector;
 
     #[test]
     fn test_empty_batch() {
@@ -113,67 +100,112 @@ mod tests {
         assert!(factors.is_empty());
     }
 
+    /// Verify parallel and serial paths produce numerically identical factors.
+    ///
+    /// Creates 200 pinhole factors via both the serial path (threshold=10000)
+    /// and the parallel path (threshold=1), then compares every factor's
+    /// linearization output (residual + Jacobian) at the same evaluation point.
     #[test]
-    fn test_small_batch_serial() {
-        let batch = ParallelFactorBatch::new(ParallelFactorConfig {
-            parallelization_threshold: 1000,
+    fn test_serial_parallel_pinhole_factors_numerically_identical() {
+        let observations: Vec<(Vector2<f64>, Matrix4<f64>)> = (0..200)
+            .map(|i| {
+                let u = (i as f64) * 0.005 - 0.5;
+                let v = (i as f64) * 0.003 - 0.3;
+                (Vector2::new(u, v), Matrix4::identity())
+            })
+            .collect();
+
+        let serial_batch = ParallelFactorBatch::new(ParallelFactorConfig {
+            parallelization_threshold: 10_000,
+        });
+        let parallel_batch = ParallelFactorBatch::new(ParallelFactorConfig {
+            parallelization_threshold: 1,
         });
 
-        let observations = vec![
-            (Vector2::new(0.5, 0.5), Matrix4::identity()),
-            (Vector2::new(0.6, 0.6), Matrix4::identity()),
-        ];
+        let serial_factors = serial_batch.create_pinhole_factors_parallel(observations.clone());
+        let parallel_factors = parallel_batch.create_pinhole_factors_parallel(observations);
 
-        let factors = batch.create_pinhole_factors_parallel(observations);
-        assert_eq!(factors.len(), 2);
+        assert_eq!(serial_factors.len(), parallel_factors.len());
+
+        // Evaluate each factor at the same 3D point and compare residual + Jacobian
+        let test_point = DVector::from_vec(vec![0.3, -0.2, 2.0]);
+        for (i, (sf, pf)) in serial_factors.iter().zip(parallel_factors.iter()).enumerate() {
+            let (r_s, j_s) = sf.linearize(&[test_point.clone()], true);
+            let (r_p, j_p) = pf.linearize(&[test_point.clone()], true);
+
+            assert_eq!(
+                r_s.as_slice(),
+                r_p.as_slice(),
+                "Residual mismatch at factor {i}"
+            );
+            let j_s = j_s.expect("serial Jacobian");
+            let j_p = j_p.expect("parallel Jacobian");
+            assert_eq!(
+                j_s.as_slice(),
+                j_p.as_slice(),
+                "Jacobian mismatch at factor {i}"
+            );
+        }
     }
 
+    /// Same equivalence check for BundleAdjustmentFactors.
     #[test]
-    fn test_threshold_boundary_parallelization() {
-        let batch = ParallelFactorBatch::new(ParallelFactorConfig {
-            parallelization_threshold: 4,
+    fn test_serial_parallel_ba_factors_numerically_identical() {
+        let observations: Vec<(Vector2<f64>, Matrix4<f64>)> = (0..200)
+            .map(|i| {
+                let u = (i as f64) * 0.004 - 0.4;
+                let v = (i as f64) * 0.002 - 0.2;
+                (Vector2::new(u, v), Matrix4::identity())
+            })
+            .collect();
+
+        let serial_batch = ParallelFactorBatch::new(ParallelFactorConfig {
+            parallelization_threshold: 10_000,
+        });
+        let parallel_batch = ParallelFactorBatch::new(ParallelFactorConfig {
+            parallelization_threshold: 1,
         });
 
-        let observations = (0..4)
-            .map(|i| {
-                (
-                    Vector2::new(i as f64 / 10.0, i as f64 / 10.0),
-                    Matrix4::identity(),
-                )
-            })
-            .collect::<Vec<_>>();
+        let serial_factors = serial_batch.create_ba_factors_parallel(observations.clone());
+        let parallel_factors = parallel_batch.create_ba_factors_parallel(observations);
 
-        let factors = batch.create_pinhole_factors_parallel(observations);
-        assert_eq!(factors.len(), 4);
+        assert_eq!(serial_factors.len(), parallel_factors.len());
+
+        // Evaluate at a known 3D landmark + camera pose
+        let test_landmark = DVector::from_vec(vec![0.5, -0.1, 3.0]);
+        let test_pose = DVector::from_vec(vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]);
+        for (i, (sf, pf)) in serial_factors.iter().zip(parallel_factors.iter()).enumerate() {
+            let (r_s, j_s) = sf.linearize(&[test_landmark.clone(), test_pose.clone()], true);
+            let (r_p, j_p) = pf.linearize(&[test_landmark.clone(), test_pose.clone()], true);
+
+            assert_eq!(
+                r_s.as_slice(),
+                r_p.as_slice(),
+                "BA residual mismatch at factor {i}"
+            );
+            let j_s = j_s.expect("serial Jacobian");
+            let j_p = j_p.expect("parallel Jacobian");
+            assert_eq!(
+                j_s.as_slice(),
+                j_p.as_slice(),
+                "BA Jacobian mismatch at factor {i}"
+            );
+        }
     }
 
     #[test]
-    fn test_ba_factors_parallel() {
-        let batch = ParallelFactorBatch::new(ParallelFactorConfig::default());
+    fn test_generic_batch_processing_values() {
+        let batch = ParallelFactorBatch::new(ParallelFactorConfig {
+            parallelization_threshold: 1,
+        });
 
-        let observations = (0..50)
-            .map(|i| {
-                (
-                    Vector2::new(0.5 + i as f64 * 0.01, 0.5),
-                    Matrix4::identity(),
-                )
-            })
-            .collect::<Vec<_>>();
-
-        let factors = batch.create_ba_factors_parallel(observations);
-        assert_eq!(factors.len(), 50);
-    }
-
-    #[test]
-    fn test_generic_batch_processing() {
-        let batch = ParallelFactorBatch::new(ParallelFactorConfig::default());
-
-        let numbers: Vec<i32> = (0..100).collect();
+        let numbers: Vec<i32> = (0..200).collect();
         let doubled = batch.process_batch_parallel(numbers, |x| x * 2);
 
-        assert_eq!(doubled.len(), 100);
-        assert_eq!(doubled[0], 0);
-        assert_eq!(doubled[50], 100);
+        assert_eq!(doubled.len(), 200);
+        for (i, &val) in doubled.iter().enumerate() {
+            assert_eq!(val, (i as i32) * 2, "Mismatch at index {i}");
+        }
     }
 
     #[cfg(feature = "benchmarks")]

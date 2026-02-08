@@ -225,74 +225,188 @@ mod tests {
     use super::*;
     use nalgebra as na;
 
-    fn make_stereo_pair(n_features: usize) -> StereoPair {
+    /// Helper: build a stereo pair with uniform disparity of 50px and no vertical misalignment.
+    fn make_uniform_pair(n_features: usize, timestamp: f64) -> StereoPair {
         let mut left = Vec::new();
         let mut right = Vec::new();
         let mut correspondences = Vec::new();
         for i in 0..n_features {
-            left.push(na::Vector2::new(100.0 + i as f64 * 10.0, 50.0 + i as f64 * 5.0));
-            right.push(na::Vector2::new(80.0 + i as f64 * 10.0, 50.0 + i as f64 * 5.0));
+            let y = (i as f64 / (n_features - 1).max(1) as f64) * 480.0;
+            let lx = 200.0 + (i as f64 * 3.7); // spread x a bit
+            left.push(na::Vector2::new(lx, y));
+            right.push(na::Vector2::new(lx - 50.0, y)); // constant 50px disparity, same y
             correspondences.push((i, i));
         }
         StereoPair {
             left_features: left,
             right_features: right,
             correspondences,
-            timestamp: 0.0,
+            timestamp,
             angular_velocity: None,
             linear_velocity: None,
             feature_qualities: vec![1.0; n_features],
         }
     }
 
+    /// Helper: build a stereo pair where disparity varies linearly with y.
+    /// At y=0 disparity=50, at y=480 disparity=90 (all above the expected 50px baseline).
+    /// This ensures `(disparity - 50).abs() / 50` increases monotonically with y.
+    fn make_y_correlated_pair(n_features: usize, timestamp: f64) -> StereoPair {
+        let mut left = Vec::new();
+        let mut right = Vec::new();
+        let mut correspondences = Vec::new();
+        for i in 0..n_features {
+            let y = (i as f64 / (n_features - 1).max(1) as f64) * 480.0;
+            let disparity = 50.0 + (y / 480.0) * 40.0; // 50 at top, 90 at bottom
+            left.push(na::Vector2::new(200.0, y));
+            right.push(na::Vector2::new(200.0 - disparity, y)); // same y (no geometric distortion)
+            correspondences.push((i, i));
+        }
+        StereoPair {
+            left_features: left,
+            right_features: right,
+            correspondences,
+            timestamp,
+            angular_velocity: None,
+            linear_velocity: None,
+            feature_qualities: vec![1.0; n_features],
+        }
+    }
+
+    /// Helper: build a stereo pair with a fixed vertical misalignment in right features.
+    fn make_vertical_misaligned_pair(
+        n_features: usize,
+        y_offset: f64,
+        timestamp: f64,
+    ) -> StereoPair {
+        let mut left = Vec::new();
+        let mut right = Vec::new();
+        let mut correspondences = Vec::new();
+        for i in 0..n_features {
+            let y = (i as f64 / (n_features - 1).max(1) as f64) * 480.0;
+            let lx = 200.0 + (i as f64 * 3.7);
+            left.push(na::Vector2::new(lx, y));
+            right.push(na::Vector2::new(lx - 50.0, y + y_offset));
+            correspondences.push((i, i));
+        }
+        StereoPair {
+            left_features: left,
+            right_features: right,
+            correspondences,
+            timestamp,
+            angular_velocity: None,
+            linear_velocity: None,
+            feature_qualities: vec![1.0; n_features],
+        }
+    }
+
+    /// Helper: build a stereo pair with BOTH y-correlated disparity AND vertical misalignment.
+    fn make_rs_evidence_pair(
+        n_features: usize,
+        y_offset: f64,
+        timestamp: f64,
+    ) -> StereoPair {
+        let mut left = Vec::new();
+        let mut right = Vec::new();
+        let mut correspondences = Vec::new();
+        for i in 0..n_features {
+            let y = (i as f64 / (n_features - 1).max(1) as f64) * 480.0;
+            let disparity = 50.0 + (y / 480.0) * 40.0;
+            left.push(na::Vector2::new(200.0, y));
+            right.push(na::Vector2::new(200.0 - disparity, y + y_offset));
+            correspondences.push((i, i));
+        }
+        StereoPair {
+            left_features: left,
+            right_features: right,
+            correspondences,
+            timestamp,
+            angular_velocity: None,
+            linear_velocity: None,
+            feature_qualities: vec![1.0; n_features],
+        }
+    }
+
+    // ── Boundary tests ──────────────────────────────────────────────────
+
     #[test]
     fn test_detection_info_returns_none_with_fewer_than_3_pairs() {
-        let pairs: Vec<StereoPair> = vec![make_stereo_pair(5), make_stereo_pair(5)];
+        let pairs: Vec<StereoPair> = vec![make_uniform_pair(5, 0.0), make_uniform_pair(5, 1.0)];
         assert!(rolling_shutter_detection_info(&pairs, 480).is_none());
     }
 
     #[test]
-    fn test_detection_info_returns_some_with_3_pairs() {
-        let pairs: Vec<StereoPair> = (0..3).map(|_| make_stereo_pair(10)).collect();
-        let info = rolling_shutter_detection_info(&pairs, 480);
-        assert!(info.is_some());
-    }
-
-    #[test]
     fn test_detect_rolling_shutter_returns_false_with_fewer_than_3_pairs() {
-        let pairs: Vec<StereoPair> = vec![make_stereo_pair(5)];
+        let pairs: Vec<StereoPair> = vec![make_uniform_pair(5, 0.0)];
         assert!(!detect_rolling_shutter(&pairs, 480, None));
     }
 
+    // ── Meaningful detection logic tests ─────────────────────────────────
+
     #[test]
-    fn test_analyze_position_distortion_empty_pairs() {
-        let pairs: Vec<StereoPair> = Vec::new();
-        assert_eq!(analyze_position_distortion(&pairs, 480), 0.0);
+    fn test_uniform_disparity_no_rs_detection() {
+        // Constant 50px disparity, same y on both sides → no RS evidence.
+        let pairs: Vec<StereoPair> = (0..4)
+            .map(|i| make_uniform_pair(20, i as f64))
+            .collect();
+
+        let pos_score = analyze_position_distortion(&pairs, 480);
+        assert!(
+            pos_score < 0.1,
+            "position distortion should be ~0 for uniform disparity, got {pos_score}"
+        );
+
+        let geo_score = analyze_geometric_distortions(&pairs, 480);
+        assert!(
+            geo_score < 1e-9,
+            "geometric distortion should be 0 for aligned y, got {geo_score}"
+        );
+
+        assert!(
+            !detect_rolling_shutter(&pairs, 480, None),
+            "should NOT detect rolling shutter with uniform disparity"
+        );
     }
 
     #[test]
-    fn test_analyze_position_distortion_no_correspondences() {
-        let pair = StereoPair {
-            left_features: vec![na::Vector2::new(100.0, 200.0)],
-            right_features: vec![na::Vector2::new(80.0, 200.0)],
-            correspondences: vec![],
-            timestamp: 0.0,
-            angular_velocity: None,
-            linear_velocity: None,
-            feature_qualities: vec![],
-        };
-        assert_eq!(analyze_position_distortion(&[pair], 480), 0.0);
+    fn test_y_correlated_disparity_triggers_position_score() {
+        // Disparity linearly varies with y → strong Pearson correlation.
+        let pairs: Vec<StereoPair> = (0..4)
+            .map(|i| make_y_correlated_pair(20, i as f64))
+            .collect();
+
+        let pos_score = analyze_position_distortion(&pairs, 480);
+        assert!(
+            pos_score > 0.7,
+            "position distortion should be > 0.7 for linearly y-correlated disparity, got {pos_score}"
+        );
     }
 
     #[test]
-    fn test_analyze_temporal_consistency_single_pair() {
-        let pairs = vec![make_stereo_pair(5)];
-        assert_eq!(analyze_temporal_consistency(&pairs), 0.0);
+    fn test_vertical_misalignment_triggers_geometric_score() {
+        // Right features offset by 10px vertically → geometric distortion.
+        let pairs: Vec<StereoPair> = (0..4)
+            .map(|i| make_vertical_misaligned_pair(20, 10.0, i as f64))
+            .collect();
+
+        let geo_score = analyze_geometric_distortions(&pairs, 480);
+        // 10 / 480 ≈ 0.0208
+        assert!(
+            geo_score > 0.01,
+            "geometric distortion should be > 0.01 for 10px vertical offset, got {geo_score}"
+        );
     }
 
     #[test]
-    fn test_analyze_geometric_distortions_empty_pairs() {
-        let pairs: Vec<StereoPair> = Vec::new();
-        assert_eq!(analyze_geometric_distortions(&pairs, 480), 0.0);
+    fn test_combined_rs_evidence_triggers_detection() {
+        // Both y-correlated disparity AND vertical misalignment → detection.
+        let pairs: Vec<StereoPair> = (0..4)
+            .map(|i| make_rs_evidence_pair(20, 10.0, i as f64))
+            .collect();
+
+        assert!(
+            detect_rolling_shutter(&pairs, 480, None),
+            "should detect rolling shutter with combined y-correlated disparity and vertical misalignment"
+        );
     }
 }

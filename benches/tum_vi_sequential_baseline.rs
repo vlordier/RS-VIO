@@ -1,4 +1,4 @@
-#![allow(clippy::expect_used, clippy::cast_precision_loss)]
+#![allow(clippy::expect_used, clippy::unwrap_used, clippy::cast_precision_loss)]
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use image::GrayImage;
@@ -92,6 +92,7 @@ fn bench_tumvi_sequential_baseline(c: &mut Criterion) {
         return;
     };
 
+    let n_frames = frames.len();
     let detector_config = EnhancedDetectorConfig {
         max_features: (vio_cfg.feature_detection.max_features_per_grid as usize)
             .saturating_mul(vio_cfg.feature_detection.grid_cols as usize)
@@ -101,7 +102,9 @@ fn bench_tumvi_sequential_baseline(c: &mut Criterion) {
         ..Default::default()
     };
 
-    c.bench_function("tumvi_sequential_baseline_1000_frames", |b| {
+    let mut group = c.benchmark_group("sequential_baseline");
+    group.throughput(criterion::Throughput::Elements(n_frames as u64));
+    group.bench_function("tumvi_1000_frames", |b| {
         b.iter(|| {
             // Fresh detector and sliding window each iteration to avoid state carryover
             let detector = EnhancedFeatureDetector::new(detector_config.clone());
@@ -123,7 +126,69 @@ fn bench_tumvi_sequential_baseline(c: &mut Criterion) {
             }
         })
     });
+    group.finish();
 }
 
-criterion_group!(benches, bench_tumvi_sequential_baseline);
+/// Synthetic benchmark that runs without TUM-VI dataset.
+///
+/// Uses checkerboard + gradient images with realistic feature density to
+/// measure detection + optimization throughput without external data deps.
+fn bench_synthetic_sequential(c: &mut Criterion) {
+    let vio_cfg = Config::load("config/tum_vi.yaml").expect("Config should load");
+    let (w, h) = (vio_cfg.camera.image_width, vio_cfg.camera.image_height);
+
+    // Generate 200 textured synthetic frames
+    let n_frames = 200usize;
+    let frames: Vec<StereoFrame> = (0..n_frames)
+        .map(|i| {
+            let phase = i as f64 * 0.05;
+            let mut buf = vec![0u8; (w * h) as usize];
+            for y in 0..h {
+                for x in 0..w {
+                    let grad = ((x as f64 / w as f64 + phase).sin() * 127.0 + 128.0) as u8;
+                    let checker = if ((x / 32) + (y / 32)) % 2 == 0 { 40u8 } else { 0 };
+                    let noise = ((x.wrapping_mul(7).wrapping_add(y.wrapping_mul(13))) % 17) as u8;
+                    buf[(y * w + x) as usize] = grad.saturating_add(checker).saturating_add(noise);
+                }
+            }
+            let img = GrayImage::from_vec(w, h, buf.clone()).unwrap();
+            let img2 = GrayImage::from_vec(w, h, buf).unwrap();
+            StereoFrame {
+                left: img,
+                right: img2,
+                timestamp: (i as i64) * 33_333,
+            }
+        })
+        .collect();
+
+    let detector_config = EnhancedDetectorConfig {
+        max_features: 200,
+        fast_threshold: 20,
+        min_distance: 8.0,
+        ..Default::default()
+    };
+
+    let mut group = c.benchmark_group("synthetic_sequential");
+    group.throughput(criterion::Throughput::Elements(n_frames as u64));
+    group.bench_function("200_frames", |b| {
+        b.iter(|| {
+            let detector = EnhancedFeatureDetector::new(detector_config.clone());
+            let mut sliding_window = SlidingWindow::with_default_size();
+
+            for (idx, f) in frames.iter().enumerate() {
+                let mut frame = Frame::new(f.timestamp, idx as i32);
+                frame.is_keyframe = idx % 5 == 0;
+                let _left = detector.detect(&f.left);
+                let _right = detector.detect(&f.right);
+                if frame.is_keyframe {
+                    sliding_window.add_frame(frame.clone());
+                    let _ = sliding_window.optimize();
+                }
+            }
+        })
+    });
+    group.finish();
+}
+
+criterion_group!(benches, bench_tumvi_sequential_baseline, bench_synthetic_sequential);
 criterion_main!(benches);

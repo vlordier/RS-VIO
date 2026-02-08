@@ -1,4 +1,4 @@
-#![allow(clippy::expect_used, clippy::cast_precision_loss)]
+#![allow(clippy::expect_used, clippy::unwrap_used, clippy::cast_precision_loss)]
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use image::GrayImage;
@@ -94,6 +94,7 @@ fn bench_tumvi_async_pipeline(c: &mut Criterion) {
         return;
     };
 
+    let n_frames = frames.len();
     let grid_cell_size = (vio_cfg.camera.image_width as usize)
         .saturating_div(vio_cfg.feature_detection.grid_cols.max(1) as usize)
         .max(8);
@@ -113,7 +114,9 @@ fn bench_tumvi_async_pipeline(c: &mut Criterion) {
         .build()
         .expect("tokio runtime");
 
-    c.bench_function("tumvi_async_pipeline_1000_frames", |b| {
+    let mut group = c.benchmark_group("async_pipeline");
+    group.throughput(criterion::Throughput::Elements(n_frames as u64));
+    group.bench_function("tumvi_1000_frames", |b| {
         b.iter(|| {
             // Fresh detector and optimizer each iteration to avoid state carryover
             let detector = AsyncFeatureDetector::new(detector_config.clone());
@@ -150,7 +153,79 @@ fn bench_tumvi_async_pipeline(c: &mut Criterion) {
             });
         })
     });
+    group.finish();
 }
 
-criterion_group!(benches, bench_tumvi_async_pipeline);
+/// Synthetic benchmark that runs without TUM-VI dataset.
+///
+/// Measures async detection + optimization throughput using
+/// checkerboard-textured images. Always runnable in CI.
+fn bench_synthetic_async(c: &mut Criterion) {
+    let vio_cfg = Config::load("config/tum_vi.yaml").expect("Config should load");
+    let (w, h) = (vio_cfg.camera.image_width, vio_cfg.camera.image_height);
+
+    let n_frames = 200usize;
+    let frames: Vec<StereoFrame> = (0..n_frames)
+        .map(|i| {
+            let phase = i as f64 * 0.05;
+            let mut buf = vec![0u8; (w * h) as usize];
+            for y in 0..h {
+                for x in 0..w {
+                    let grad = ((x as f64 / w as f64 + phase).sin() * 127.0 + 128.0) as u8;
+                    let checker = if ((x / 32) + (y / 32)) % 2 == 0 { 40u8 } else { 0 };
+                    let noise = ((x.wrapping_mul(7).wrapping_add(y.wrapping_mul(13))) % 17) as u8;
+                    buf[(y * w + x) as usize] = grad.saturating_add(checker).saturating_add(noise);
+                }
+            }
+            let img = GrayImage::from_vec(w, h, buf.clone()).unwrap();
+            let img2 = GrayImage::from_vec(w, h, buf).unwrap();
+            StereoFrame {
+                left: img,
+                right: img2,
+                timestamp: (i as i64) * 33_333,
+            }
+        })
+        .collect();
+
+    let grid_cell_size = (w as usize)
+        .saturating_div(vio_cfg.feature_detection.grid_cols.max(1) as usize)
+        .max(8);
+
+    let detector_config = AsyncDetectorConfig {
+        num_parallel_tasks: 4,
+        grid_cell_size,
+        max_features: 200,
+        threshold: 20.0,
+    };
+
+    let rt = Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("tokio runtime");
+
+    let mut group = c.benchmark_group("synthetic_async");
+    group.throughput(criterion::Throughput::Elements(n_frames as u64));
+    group.bench_function("200_frames", |b| {
+        b.iter(|| {
+            let detector = AsyncFeatureDetector::new(detector_config.clone());
+            let optimizer = AsyncOptimizer::new();
+            rt.block_on(async {
+                for (idx, f) in frames.iter().enumerate() {
+                    let mut frame = Frame::new(f.timestamp, idx as i32);
+                    frame.is_keyframe = idx % 5 == 0;
+                    let left_bytes = Arc::new(f.left.clone().into_vec());
+                    let right_bytes = Arc::new(f.right.clone().into_vec());
+                    let _left = detector.detect_async(left_bytes, w, h).await;
+                    let _right = detector.detect_async(right_bytes, w, h).await;
+                    if frame.is_keyframe {
+                        let _ = optimizer.optimize().await;
+                    }
+                }
+            });
+        })
+    });
+    group.finish();
+}
+
+criterion_group!(benches, bench_tumvi_async_pipeline, bench_synthetic_async);
 criterion_main!(benches);
