@@ -139,11 +139,7 @@ impl Estimator {
             self.frame_id_counter
         );
 
-        // Timing placeholders (warning: assigned before read in log::debug below)
-        #[allow(unused_assignments)]
-        let mut frame_creation_time_ms = 0.0f64;
-        #[allow(unused_assignments)]
-        let mut patch_tracking_time_ms = 0.0f64;
+        // Timing
         let motion_tracking_time_ms;
         let mut optimization_time_ms = 0.0f64;
 
@@ -242,13 +238,13 @@ impl Estimator {
                 std::mem::replace(&mut self.imu_buffer, Vec::with_capacity(100));
         }
 
-        frame_creation_time_ms = frame_creation_start.elapsed().as_secs_f64() * 1000.0;
+        let frame_creation_time_ms = frame_creation_start.elapsed().as_secs_f64() * 1000.0;
 
         // Patch tracking
         let tracking_start = Instant::now();
         self.stereo_patch_tracker
             .process_frame(&left_img, &right_img, &mut current_frame);
-        patch_tracking_time_ms = tracking_start.elapsed().as_secs_f64() * 1000.0;
+        let patch_tracking_time_ms = tracking_start.elapsed().as_secs_f64() * 1000.0;
         self.view_patch_tracking_results(&current_frame, &left_img, &right_img, img_w, img_h);
 
         // Motion tracking - only if the sliding window is full (has initialized keyframes)

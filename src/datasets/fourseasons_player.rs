@@ -1,3 +1,5 @@
+//! 4Seasons dataset player implementation.
+
 use crate::datasets::io::load_grayscale_image;
 use crate::datasets::player::DatasetPlayer;
 use crate::datasets::{ImageData, ImuData};

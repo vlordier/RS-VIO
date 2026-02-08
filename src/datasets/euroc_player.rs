@@ -1,3 +1,5 @@
+//! EuRoC MAV dataset player implementation.
+
 use crate::datasets::io::{
     load_csv_image_timestamps, load_grayscale_image, load_imu_data, ImuFormat,
 };

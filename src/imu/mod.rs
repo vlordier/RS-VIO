@@ -125,7 +125,7 @@
 //! - **Initialization**: Static period bias estimation
 
 #[cfg(test)]
-pub mod bias_feedback_tests;
+mod bias_feedback_tests;
 pub mod buffer;
 pub mod eskf;
 pub mod initialization;

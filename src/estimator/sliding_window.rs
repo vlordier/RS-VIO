@@ -682,7 +682,13 @@ impl SlidingWindow {
         // Use predicted pose if available, otherwise fall back to last keyframe
         let kf_var = "F".to_string();
         let T_W_B_init =
-            predicted_pose.unwrap_or_else(|| self.keyframes.back().unwrap().state.T_W_B);
+            predicted_pose.unwrap_or_else(|| {
+                self.keyframes
+                    .back()
+                    .expect("keyframes must not be empty during optimization")
+                    .state
+                    .T_W_B
+            });
         let T_B_W = T_W_B_init
             .try_inverse()
             .expect("T_W_B should be invertible");
@@ -696,18 +702,16 @@ impl SlidingWindow {
 
         // Add factors: for both the left and right cameras, each point that was already in the map is used to optimize the new frame
         // Fetch transforms between cameras and body
-        let T_Cl_B = self
+        let front_kf = self
             .keyframes
             .front()
-            .unwrap()
+            .expect("keyframes must not be empty during optimization");
+        let T_Cl_B = front_kf
             .state
             .T_B_Cl
             .try_inverse()
             .expect("T_B_Cl should be invertible");
-        let T_Cr_B = self
-            .keyframes
-            .front()
-            .unwrap()
+        let T_Cr_B = front_kf
             .state
             .T_B_Cr
             .try_inverse()

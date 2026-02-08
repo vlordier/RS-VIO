@@ -369,6 +369,9 @@ pub fn calculate_ate(
         (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
     };
 
+    // Calculate RPE at 1-second intervals (standard benchmark delta)
+    let (rpe_trans, rpe_rot) = calculate_rpe(ground_truth, estimated, 1_000_000_000);
+
     TrajectoryEvaluation {
         algorithm: estimated.algorithm_name.clone(),
         ate_rmse: rmse,
@@ -377,8 +380,8 @@ pub fn calculate_ate(
         ate_min: min,
         ate_max: max,
         ate_std: std,
-        rpe_translation_rmse: 0.0, // TODO: Implement RPE
-        rpe_rotation_rmse: 0.0,
+        rpe_translation_rmse: rpe_trans,
+        rpe_rotation_rmse: rpe_rot,
         num_poses: errors.len(),
         num_failed_matches: failed_matches,
     }
