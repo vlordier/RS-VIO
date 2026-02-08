@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::needless_update)]
+
 use super::*;
 use crate::datasets::config::{
     CameraConfig, Config, FeatureDetectionConfig, KeyframeManagementConfig, OptimizationConfig,

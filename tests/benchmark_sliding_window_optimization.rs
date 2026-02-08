@@ -1,3 +1,5 @@
+#![cfg(feature = "benchmarks")]
+
 use rs_vio::estimator::{Frame, SlidingWindow};
 use rs_vio::feature_tracker::Feature;
 use std::time::Instant;
@@ -8,7 +10,7 @@ fn bench_optimization_build() {
 
     // Add 8 frames
     for i in 0..8 {
-        let mut frame = Frame::new((i * 100) as i64, i);
+        let mut frame = Frame::new((i * 100) as i64, i as i32);
         frame.is_keyframe = true;
 
         // Add 2000 features per frame to stress test

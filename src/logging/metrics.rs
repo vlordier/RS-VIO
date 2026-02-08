@@ -234,6 +234,7 @@ impl std::fmt::Display for PerformanceReport {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::float_cmp)]
 mod tests {
     use super::*;
 

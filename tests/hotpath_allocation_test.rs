@@ -3,7 +3,7 @@
 //! These tests verify that the critical frame processing path has zero allocations.
 //! Run with: cargo test --test hotpath_allocation_test --features dhat-heap
 
-#![allow(clippy::unwrap_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use rs_vio::datasets::config::Config;
 use rs_vio::estimator::AsyncEstimator;

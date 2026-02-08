@@ -1,3 +1,5 @@
+#![cfg(feature = "benchmarks")]
+
 use image::{GrayImage, Luma};
 use rs_vio::estimator::Frame;
 use rs_vio::feature_tracker::StereoPatchTracker;

@@ -15,6 +15,8 @@ rerun-viewer = ["rerun"]
 lightglue = ["ort", "ndarray"]
 # Feature flag for neural network position refinement (ONNX Runtime)
 onnx-refinement = ["ort", "ndarray"]
+# Feature flag for dhat heap profiling in tests
+dhat-heap = []
 
 # Stereo matching strategies - only one should be enabled per build
 # Basic RANSAC: 1000 iterations, standard 8-point algorithm (baseline, default)
@@ -112,7 +114,9 @@ debug = true            # Keep debug symbols for profiling
 [[bench]]
 name = "tum_vi_async_pipeline"
 harness = false
+required-features = ["benchmarks"]
 
 [[bench]]
 name = "tum_vi_sequential_baseline"
 harness = false
+required-features = ["benchmarks"]

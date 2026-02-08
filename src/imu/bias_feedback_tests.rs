@@ -6,7 +6,8 @@
 /// 3. Refined biases feed back to ESKF
 /// 4. Future predictions improve with refined biases
 #[cfg(test)]
-mod bias_feedback_tests {
+#[allow(clippy::expect_used)]
+mod tests {
     use crate::datasets::ImuData;
     use crate::imu::preintegration::PreintegratedImu;
     use crate::imu::ImuNoise;

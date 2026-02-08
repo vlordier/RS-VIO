@@ -2,7 +2,7 @@
 //!
 //! These tests verify deterministic execution suitable for embedded real-time systems.
 
-#![allow(clippy::unwrap_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use rs_vio::datasets::config::Config;
 use rs_vio::estimator::AsyncEstimator;
