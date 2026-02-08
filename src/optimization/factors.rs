@@ -34,6 +34,41 @@ fn jacobian_proj_wrt_p_C(p_C: Vector3<f64>) -> na::Matrix2x3<f64> {
     )
 }
 
+/// Sentinel residual for a point behind the camera (cheirality violation).
+///
+/// Returns a large residual that, combined with `cheirality_jacobian`, gives
+/// the Gauss-Newton solver a descent direction that pushes the point/pose
+/// in front of the camera.
+const CHEIRALITY_PENALTY: f64 = 1e6;
+
+/// Large 2D residual for a cheirality violation.
+#[inline]
+fn cheirality_residual() -> DVector<f64> {
+    DVector::from_column_slice(&[CHEIRALITY_PENALTY, CHEIRALITY_PENALTY])
+}
+
+/// Write a 2×3 cheirality Jacobian block at column offset `col`.
+///
+/// Fills `jac[(0..2, col..col+3)]` with `−R_row2 × 1e3`, where `R_row2` is
+/// row 2 of the rotation from world/body to camera.  This creates a gradient
+/// that pushes the 3D point toward positive camera-z during GN descent.
+#[inline]
+fn fill_cheirality_jacobian(
+    jac: &mut DMatrix<f64>,
+    r20: f64,
+    r21: f64,
+    r22: f64,
+    col: usize,
+) {
+    const SCALE: f64 = 1e3;
+    jac[(0, col)] = -r20 * SCALE;
+    jac[(1, col)] = -r20 * SCALE;
+    jac[(0, col + 1)] = -r21 * SCALE;
+    jac[(1, col + 1)] = -r21 * SCALE;
+    jac[(0, col + 2)] = -r22 * SCALE;
+    jac[(1, col + 2)] = -r22 * SCALE;
+}
+
 /// Pinhole projection factor for optimizing 3D point positions from camera observations.
 ///
 /// This factor computes the reprojection error for a 3D point observed in a camera.
@@ -97,16 +132,10 @@ impl Factor for PinholeProjectionFactor {
 
         // Cheirality check: point must be in front of camera
         if point_camera.z <= 1e-6 {
-            let residuals = DVector::from_column_slice(&[1e6, 1e6]);
+            let residuals = cheirality_residual();
             if compute_jacobian {
-                // Gradient pushes the 3D point toward positive camera z in world frame
                 let mut jac = DMatrix::zeros(2, 3);
-                // Direction that increases p_C.z w.r.t. p_W is R_C_W[2, :]
-                // Negate so GN descent moves point *in front of* camera
-                for c in 0..3 {
-                    jac[(0, c)] = -R_C_W[(2, c)] * 1e3;
-                    jac[(1, c)] = -R_C_W[(2, c)] * 1e3;
-                }
+                fill_cheirality_jacobian(&mut jac, R_C_W[(2, 0)], R_C_W[(2, 1)], R_C_W[(2, 2)], 0);
                 return (residuals, Some(jac));
             }
             return (residuals, None);
@@ -206,21 +235,13 @@ impl Factor for BundleAdjustmentFactorTranslationOnly {
 
         // Cheirality check: point must be in front of camera
         if p_C.z <= 1e-6 {
-            let residuals = DVector::from_column_slice(&[1e6, 1e6]);
+            let residuals = cheirality_residual();
             if compute_jacobian {
-                // Gradient pushes the 3D point toward positive camera z
                 let ncols = if self.fixed_position.is_some() { 3 } else { 6 };
                 let mut jac = DMatrix::zeros(2, ncols);
-                for c in 0..3 {
-                    jac[(0, c)] = -R_C_B[(2, c)] * 1e3;
-                    jac[(1, c)] = -R_C_B[(2, c)] * 1e3;
-                }
+                fill_cheirality_jacobian(&mut jac, R_C_B[(2, 0)], R_C_B[(2, 1)], R_C_B[(2, 2)], 0);
                 if ncols == 6 {
-                    // Translation Jacobian: same direction since ∂p_C/∂t_B_W = R_C_B
-                    for c in 0..3 {
-                        jac[(0, 3 + c)] = -R_C_B[(2, c)] * 1e3;
-                        jac[(1, 3 + c)] = -R_C_B[(2, c)] * 1e3;
-                    }
+                    fill_cheirality_jacobian(&mut jac, R_C_B[(2, 0)], R_C_B[(2, 1)], R_C_B[(2, 2)], 3);
                 }
                 return (residuals, Some(jac));
             }
@@ -351,40 +372,23 @@ impl Factor for BundleAdjustmentFactor {
         let p_B = R_B_W * p_W + t_B_W;
         let p_C = R_C_B * p_B + t_C_B;
 
-        // Check cheirality: point behind camera gets a large residual with
-        // a finite Jacobian so the optimizer can recover (zero Jacobian
-        // would stall the solver).  Threshold 1e-6 (not 0.0) to prevent
-        // Inf from project_normalized dividing by ~0.
+        // Cheirality check: behind-camera points get a large residual with
+        // a finite Jacobian so the optimizer can recover.
         if p_C.z <= 1e-6 {
-            let residuals = DVector::from_column_slice(&[1e6, 1e6]);
+            let residuals = cheirality_residual();
             if !compute_jacobian {
                 return (residuals, None);
             }
-            // R_total = R_C_B * R_B_W.  Row 2 of R_total is the direction in
-            // world coords that increases p_C.z.  We NEGATE so that GN descent
-            // (δ = -(J^T J + λI)^{-1} J^T r) moves in the +camera-z direction
-            // when r = [+1e6, +1e6].
             let R_total = R_C_B * R_B_W;
+            let (r20, r21, r22) = (R_total[(2, 0)], R_total[(2, 1)], R_total[(2, 2)]);
             if self.fixed_pose.is_some() {
                 let mut jac = DMatrix::zeros(2, 3);
-                for c in 0..3 {
-                    jac[(0, c)] = -R_total[(2, c)] * 1e3;
-                    jac[(1, c)] = -R_total[(2, c)] * 1e3;
-                }
+                fill_cheirality_jacobian(&mut jac, r20, r21, r22, 0);
                 return (residuals, Some(jac));
             } else {
                 let mut jac = DMatrix::zeros(2, 9);
-                // Point Jacobian (columns 0-2)
-                for c in 0..3 {
-                    jac[(0, c)] = -R_total[(2, c)] * 1e3;
-                    jac[(1, c)] = -R_total[(2, c)] * 1e3;
-                }
-                // Pose translation Jacobian (columns 3-5): same direction under
-                // right-perturbation since ∂p_C/∂δρ = R_C_B * R_B_W = R_total
-                for c in 0..3 {
-                    jac[(0, 3 + c)] = -R_total[(2, c)] * 1e3;
-                    jac[(1, 3 + c)] = -R_total[(2, c)] * 1e3;
-                }
+                fill_cheirality_jacobian(&mut jac, r20, r21, r22, 0);
+                fill_cheirality_jacobian(&mut jac, r20, r21, r22, 3);
                 // Rotation Jacobian (columns 6-8): leave zero (under-determined)
                 return (residuals, Some(jac));
             }
@@ -538,20 +542,14 @@ impl Factor for PnPFactor {
         let p_B = R_B_W * self.p_W + t_B_W;
         let p_C = R_C_B * p_B + t_C_B;
 
-        // Cheirality check: point behind camera gets large residual with
-        // gradient signal so the optimizer can recover.  Threshold 1e-6
-        // (not 0.0) to prevent Inf from project_normalized dividing by ~0.
+        // Cheirality check: behind-camera points get a large residual with
+        // a finite Jacobian so the optimizer can recover.
         if p_C.z <= 1e-6 {
-            let residuals = DVector::from_column_slice(&[1e6, 1e6]);
+            let residuals = cheirality_residual();
             if compute_jacobian {
-                // Negate so GN descent (δ = -(J^TJ+λI)^{-1} J^T r) pushes
-                // the pose to move the point in front of the camera.
                 let R_total = R_C_B * R_B_W.matrix();
                 let mut jac = DMatrix::zeros(2, 6);
-                for c in 0..3 {
-                    jac[(0, c)] = -R_total[(2, c)] * 1e3;
-                    jac[(1, c)] = -R_total[(2, c)] * 1e3;
-                }
+                fill_cheirality_jacobian(&mut jac, R_total[(2, 0)], R_total[(2, 1)], R_total[(2, 2)], 0);
                 // Rotation Jacobian (columns 3-5): leave zero
                 return (residuals, Some(jac));
             }
