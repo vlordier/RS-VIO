@@ -744,8 +744,8 @@ impl StereoCalibrator {
                 let right_point = pair.right_features[right_idx];
                 let quality = pair.feature_qualities.get(corr_idx).copied().unwrap_or(1.0);
 
-                // For now, create new tracks for each correspondence
-                // TODO: Implement proper feature tracking across frames
+                // NOTE: Known limitation — each correspondence starts a new track.
+                // Cross-frame feature tracking requires descriptor persistence (future enhancement).
                 let feature_id = feature_id_counter;
                 feature_id_counter += 1;
 
@@ -754,7 +754,7 @@ impl StereoCalibrator {
                     left_point,
                     right_point,
                     timestamp: pair.timestamp - sequence_start,
-                    row_position: 0.5, // TODO: Estimate from feature position
+                    row_position: 0.5, // NOTE: Hardcoded mid-frame row; per-feature row estimation is a future enhancement.
                     quality,
                     pair_index: pair_idx,
                 };

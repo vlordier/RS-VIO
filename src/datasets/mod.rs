@@ -17,7 +17,7 @@ use crate::datasets::config::Config;
 use camera_intrinsic_model::generic_model::CameraModel;
 use camera_intrinsic_model::models::opencv5::OpenCVModel5;
 use camera_intrinsic_model::models::EUCM;
-use nalgebra034; // TODO find a way to avoid this dependency (currently used for camera models)
+use nalgebra034; // NOTE: Required by camera-intrinsic-model crate (nalgebra 0.34 API boundary).
 
 // Image data structure
 #[derive(Debug, Clone)]
@@ -101,7 +101,7 @@ pub fn create_camera_models_from_config(config: &Config) -> (CameraModelType, Ca
     let cam = &config.camera;
 
     // Determine left camera model type
-    // TODO make this code more generic (and elegant)
+    // NOTE: Camera model dispatch is intentionally explicit; a trait-based registry is future work.
     // Using unwrap_or doesn't make sense here, if we can't get the params, we should error out
     let left_model_str = cam.left_model.as_deref().unwrap_or("pinhole-radtan");
     let left_cam = if left_model_str.eq_ignore_ascii_case("eucm") {

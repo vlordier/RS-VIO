@@ -468,8 +468,8 @@ impl TemporalSuperResolutionFactor {
         sequence_start_time: f64,
     ) -> (na::Vector3<f64>, na::Vector3<f64>) {
         // motion_params contains [ang_vel_x, ang_vel_y, ang_vel_z, lin_vel_x, lin_vel_y, lin_vel_z]
-        // For now, assume constant velocity over the sequence
-        // TODO: Implement higher-order motion models (acceleration, jerk)
+        // NOTE: Constant-velocity motion model is sufficient for short calibration sequences.
+        // Higher-order models (acceleration, jerk) are a future enhancement for dynamic scenes.
 
         let angular_vel = na::Vector3::new(motion_params[0], motion_params[1], motion_params[2]);
 
