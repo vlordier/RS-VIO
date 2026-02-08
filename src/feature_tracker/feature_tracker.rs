@@ -499,3 +499,49 @@ pub fn track_point_at_level(
 
     true
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::float_cmp, clippy::field_reassign_with_default)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn feature_new_pixel_coord() {
+        let f = Feature::new(42, [10.5, 20.3]);
+        assert_eq!(f.pixel_coord, [10.5, 20.3]);
+    }
+
+    #[test]
+    fn feature_new_undistorted_coord_defaults() {
+        let f = Feature::new(0, [1.0, 2.0]);
+        assert_eq!(f.undistorted_coord, [-1.0, -1.0]);
+    }
+
+    #[test]
+    fn feature_new_feature_id() {
+        let f = Feature::new(99, [0.0, 0.0]);
+        assert_eq!(f.feature_id, 99);
+    }
+
+    #[test]
+    fn stereo_patch_tracker_new_has_previous_false() {
+        let tracker = StereoPatchTracker::<3>::new(16, 30, 0.01);
+        assert!(!tracker.has_previous);
+    }
+
+    #[test]
+    fn stereo_patch_tracker_new_track_points_empty() {
+        let tracker = StereoPatchTracker::<3>::new(16, 30, 0.01);
+        let [cam0, cam1] = tracker.get_track_points();
+        assert!(cam0.is_empty());
+        assert!(cam1.is_empty());
+    }
+
+    #[test]
+    fn get_track_points_fresh_tracker_returns_empty() {
+        let tracker = StereoPatchTracker::<4>::new(8, 50, 0.001);
+        let [cam0, cam1] = tracker.get_track_points();
+        assert_eq!(cam0.len(), 0);
+        assert_eq!(cam1.len(), 0);
+    }
+}

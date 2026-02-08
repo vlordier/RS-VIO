@@ -810,6 +810,7 @@ impl StereoMatcher {
 }
 
 #[cfg(test)]
+#[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
 
@@ -831,5 +832,181 @@ mod tests {
 
         let error = matcher.compute_epipolar_error(&f, &left_point, &right_point);
         assert!(error >= 0.0);
+    }
+
+    // ---- random_sample tests ----
+
+    #[test]
+    fn test_random_sample_unique_indices() {
+        let matcher = StereoMatcher::new(StereoMatcherConfig::default());
+        let samples = matcher.random_sample(100, 8);
+        let slice = &samples[..8];
+        for i in 0..8 {
+            for j in (i + 1)..8 {
+                assert_ne!(slice[i], slice[j], "indices {i} and {j} are duplicates");
+            }
+        }
+    }
+
+    #[test]
+    fn test_random_sample_indices_in_range() {
+        let matcher = StereoMatcher::new(StereoMatcherConfig::default());
+        let n = 50;
+        let k = 6;
+        let samples = matcher.random_sample(n, k);
+        for &idx in &samples[..k] {
+            assert!(idx < n, "index {idx} out of range [0, {n})");
+        }
+    }
+
+    #[test]
+    fn test_random_sample_determinism_and_counter_increment() {
+        // Two matchers with the same initial state should produce the same first sample
+        let m1 = StereoMatcher::new(StereoMatcherConfig::default());
+        let m2 = StereoMatcher::new(StereoMatcherConfig::default());
+
+        let s1 = m1.random_sample(100, 5);
+        let s2 = m2.random_sample(100, 5);
+        assert_eq!(s1, s2, "same seed should give same output");
+
+        // Second call on m1 should differ because the counter incremented
+        let s1_second = m1.random_sample(100, 5);
+        assert_ne!(
+            s1[..5], s1_second[..5],
+            "counter should increment, giving different output"
+        );
+    }
+
+    #[test]
+    fn test_random_sample_k_ge_n() {
+        let matcher = StereoMatcher::new(StereoMatcherConfig::default());
+        // k >= n: should return 0..n sequentially
+        let samples = matcher.random_sample(5, 8);
+        for (i, s) in samples.iter().enumerate().take(5) {
+            assert_eq!(*s, i);
+        }
+        // k == n
+        let samples2 = matcher.random_sample(3, 3);
+        for (i, s) in samples2.iter().enumerate().take(3) {
+            assert_eq!(*s, i);
+        }
+    }
+
+    // ---- compute_match_confidence tests ----
+
+    #[test]
+    fn test_confidence_perfect_score() {
+        let matcher = StereoMatcher::new(StereoMatcherConfig::default());
+        let conf = matcher.compute_match_confidence(0, 0.0, 100, 10.0);
+        // score_confidence = 1.0, error_confidence = 1.0 => 1.0
+        assert!((conf - 1.0).abs() < 1e-6, "expected ~1.0, got {conf}");
+    }
+
+    #[test]
+    fn test_confidence_worst_score() {
+        let matcher = StereoMatcher::new(StereoMatcherConfig::default());
+        let conf = matcher.compute_match_confidence(100, 10.0, 100, 10.0);
+        // score_confidence = 0.0, error_confidence = 0.0 => 0.0
+        assert!((conf).abs() < 1e-6, "expected ~0.0, got {conf}");
+    }
+
+    #[test]
+    fn test_confidence_max_score_zero() {
+        let matcher = StereoMatcher::new(StereoMatcherConfig::default());
+        // max_score=0 → score_confidence defaults to 1.0
+        let conf = matcher.compute_match_confidence(50, 5.0, 0, 10.0);
+        // score_confidence = 1.0, error_confidence = 0.5
+        // result = 1.0 * 0.6 + 0.5 * 0.4 = 0.8
+        assert!((conf - 0.8).abs() < 1e-6, "expected 0.8, got {conf}");
+    }
+
+    // ---- compute_epipolar_error extended tests ----
+
+    #[test]
+    fn test_epipolar_error_point_on_line() {
+        let matcher = StereoMatcher::new(StereoMatcherConfig::default());
+        // F = [[0,0,0],[0,0,-1],[0,1,0]]  =>  epipolar line for right=(x,y,1) is (0, -1, y)
+        // i.e. the line Y = y. Any left point with left_y == right_y should have 0 error.
+        let f = na::Matrix3::new(0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0);
+        let left = na::Vector2::new(50.0, 30.0);
+        let right = na::Vector2::new(70.0, 30.0);
+        let error = matcher.compute_epipolar_error(&f, &left, &right);
+        assert!(error < 1e-4, "point on epipolar line should have ~0 error, got {error}");
+    }
+
+    #[test]
+    fn test_epipolar_error_point_far_from_line() {
+        let matcher = StereoMatcher::new(StereoMatcherConfig::default());
+        // Same F as above; left_y != right_y → large error
+        let f = na::Matrix3::new(0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0);
+        let left = na::Vector2::new(50.0, 100.0);
+        let right = na::Vector2::new(70.0, 30.0);
+        let error = matcher.compute_epipolar_error(&f, &left, &right);
+        assert!(error > 50.0, "expected large error, got {error}");
+    }
+
+    // ---- match_features tests ----
+
+    fn make_feature(x: f32, y: f32, descriptor: [u8; 16]) -> EnhancedFeature {
+        EnhancedFeature {
+            point: na::Vector2::new(x, y),
+            orientation: 0.0,
+            descriptor,
+            score: 100.0,
+            scale: 1.0,
+            quality: 1.0,
+        }
+    }
+
+    #[test]
+    fn test_match_features_identical_descriptors() {
+        let mut config = StereoMatcherConfig::default();
+        config.enable_geometric_check = false; // avoid RANSAC with too few points
+        let matcher = StereoMatcher::new(config);
+
+        let desc = [0xAA; 16];
+        // Two left features with different descriptors, two right with matching ones
+        // Need at least 2 right features so Lowe's ratio test can distinguish
+        let left = vec![make_feature(100.0, 200.0, desc)];
+        let right = vec![
+            make_feature(90.0, 200.0, desc),          // identical → distance 0
+            make_feature(110.0, 200.0, [0xFF; 16]),    // very different
+        ];
+
+        let intrinsics = na::Matrix3::<f64>::identity();
+        let matches = matcher.match_features(&left, &right, &intrinsics);
+        assert_eq!(matches.len(), 1, "should match the identical descriptor");
+        assert_eq!(matches[0].left_idx, 0);
+        assert_eq!(matches[0].right_idx, 0);
+    }
+
+    #[test]
+    fn test_match_features_different_descriptors() {
+        let mut config = StereoMatcherConfig::default();
+        config.enable_geometric_check = false;
+        let matcher = StereoMatcher::new(config);
+
+        let left = vec![make_feature(100.0, 200.0, [0x00; 16])];
+        let right = vec![
+            make_feature(90.0, 200.0, [0xFF; 16]),  // max Hamming distance = 128
+            make_feature(110.0, 200.0, [0xFE; 16]), // also very far
+        ];
+
+        let intrinsics = na::Matrix3::<f64>::identity();
+        let matches = matcher.match_features(&left, &right, &intrinsics);
+        assert!(matches.is_empty(), "very different descriptors should not match");
+    }
+
+    #[test]
+    fn test_match_features_empty_input() {
+        let matcher = StereoMatcher::new(StereoMatcherConfig::default());
+        let intrinsics = na::Matrix3::<f64>::identity();
+
+        let empty: Vec<EnhancedFeature> = Vec::new();
+        let feat = vec![make_feature(10.0, 20.0, [0; 16])];
+
+        assert!(matcher.match_features(&empty, &feat, &intrinsics).is_empty());
+        assert!(matcher.match_features(&feat, &empty, &intrinsics).is_empty());
+        assert!(matcher.match_features(&empty, &empty, &intrinsics).is_empty());
     }
 }

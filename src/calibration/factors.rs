@@ -867,3 +867,256 @@ impl Factor for CameraGraphFactor {
         6 // 6D pose error
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::float_cmp)]
+mod tests {
+    use super::*;
+    use apex_solver::factors::Factor;
+    use nalgebra as na;
+
+    /// Helper: build a 9D intrinsics vector (fx, fy, cx, cy, k1, k2, p1, p2, k3).
+    fn make_intrinsics(fx: f64, fy: f64, cx: f64, cy: f64) -> na::DVector<f64> {
+        na::DVector::from_vec(vec![fx, fy, cx, cy, 0.0, 0.0, 0.0, 0.0, 0.0])
+    }
+
+    /// Helper: identity extrinsics (6D zeros → identity pose).
+    fn identity_extrinsics() -> na::DVector<f64> {
+        na::DVector::from_vec(vec![0.0; 6])
+    }
+
+    // ── StereoReprojectionFactor ────────────────────────────────────
+
+    #[test]
+    fn stereo_reprojection_get_dimension() {
+        let f = StereoReprojectionFactor::new(
+            na::Vector2::new(0.0, 0.0),
+            na::Vector2::new(0.0, 0.0),
+        );
+        assert_eq!(f.get_dimension(), 4);
+    }
+
+    #[test]
+    fn stereo_reprojection_known_projection() {
+        // Camera: fx=fy=500, cx=320, cy=240, no distortion.
+        // Point at (0,0,5) projects to (320,240) in both cameras when
+        // extrinsics are identity.
+        let left_obs = na::Vector2::new(320.0, 240.0);
+        let right_obs = na::Vector2::new(320.0, 240.0);
+        let factor = StereoReprojectionFactor::new(left_obs, right_obs);
+
+        let intr = make_intrinsics(500.0, 500.0, 320.0, 240.0);
+        let extr = identity_extrinsics();
+        let point = na::DVector::from_vec(vec![0.0, 0.0, 5.0]);
+
+        let params: Vec<na::DVector<f64>> = vec![intr.clone(), intr, extr, point];
+        let (residual, _) = factor.linearize(&params, false);
+
+        assert_eq!(residual.len(), 4);
+        for i in 0..4 {
+            assert!(
+                residual[i].abs() < 1e-10,
+                "residual[{i}] = {} (expected ~0)",
+                residual[i]
+            );
+        }
+    }
+
+    #[test]
+    fn stereo_reprojection_jacobian_shape() {
+        let factor = StereoReprojectionFactor::new(
+            na::Vector2::new(320.0, 240.0),
+            na::Vector2::new(320.0, 240.0),
+        );
+        let intr = make_intrinsics(500.0, 500.0, 320.0, 240.0);
+        let extr = identity_extrinsics();
+        let point = na::DVector::from_vec(vec![0.0, 0.0, 5.0]);
+
+        let params: Vec<na::DVector<f64>> = vec![intr.clone(), intr, extr, point];
+        let (_, jacobian) = factor.linearize(&params, true);
+
+        let jac = jacobian.unwrap();
+        assert_eq!(jac.nrows(), 4);
+        assert_eq!(jac.ncols(), 27); // 9+9+6+3
+    }
+
+    // ── RollingShutterFactor ────────────────────────────────────────
+
+    #[test]
+    fn rolling_shutter_get_dimension() {
+        let f = RollingShutterFactor::new(
+            na::Vector2::new(0.0, 0.0),
+            na::Vector2::new(0.0, 0.0),
+            0.5,
+            0.03,
+        );
+        assert_eq!(f.get_dimension(), 4);
+    }
+
+    #[test]
+    fn rolling_shutter_zero_velocity_equals_standard() {
+        // With zero angular and linear velocity the rolling-shutter
+        // correction collapses to the uncorrected stereo case.
+        let intr = make_intrinsics(500.0, 500.0, 320.0, 240.0);
+        let extr = identity_extrinsics();
+
+        // The rolling shutter factor internally uses a unit-depth point
+        // (0,0,1) and projects it. With identity extrinsics and zero
+        // velocities the projected point in both cameras is (cx, cy).
+        let left_obs = na::Vector2::new(320.0, 240.0);
+        let right_obs = na::Vector2::new(320.0, 240.0);
+
+        let factor = RollingShutterFactor::new(left_obs, right_obs, 0.5, 0.03);
+
+        let ang_vel = na::DVector::from_vec(vec![0.0, 0.0, 0.0]);
+        let lin_vel = na::DVector::from_vec(vec![0.0, 0.0, 0.0]);
+
+        let params: Vec<na::DVector<f64>> =
+            vec![intr.clone(), intr, extr, ang_vel, lin_vel];
+        let (residual, _) = factor.linearize(&params, false);
+
+        assert_eq!(residual.len(), 4);
+        for i in 0..4 {
+            assert!(
+                residual[i].abs() < 1e-10,
+                "residual[{i}] = {} (expected ~0)",
+                residual[i]
+            );
+        }
+    }
+
+    // ── EpipolarFactor ──────────────────────────────────────────────
+
+    #[test]
+    fn epipolar_get_dimension() {
+        let f = EpipolarFactor::new(
+            na::Vector2::new(0.0, 0.0),
+            na::Vector2::new(0.0, 0.0),
+        );
+        assert_eq!(f.get_dimension(), 1);
+    }
+
+    #[test]
+    fn epipolar_consistent_pair_near_zero() {
+        // Place a pure horizontal baseline (tx = 0.1). A point at
+        // (0,0,5) projects to the principal point in the left camera
+        // and to (cx + fx*tx/5, cy) in the right camera.
+        let fx = 500.0;
+        let fy = 500.0;
+        let cx = 320.0;
+        let cy = 240.0;
+        let tx = 0.1;
+
+        let left_pt = na::Vector2::new(cx, cy);
+        let right_pt = na::Vector2::new(cx + fx * tx / 5.0, cy);
+
+        let factor = EpipolarFactor::new(left_pt, right_pt);
+
+        let intr = make_intrinsics(fx, fy, cx, cy);
+        // Extrinsics: pure translation along x → rotation zeros, tx=0.1
+        let extr = na::DVector::from_vec(vec![0.0, 0.0, 0.0, tx, 0.0, 0.0]);
+
+        let params: Vec<na::DVector<f64>> = vec![intr.clone(), intr, extr];
+        let (residual, _) = factor.linearize(&params, false);
+
+        assert_eq!(residual.len(), 1);
+        assert!(
+            residual[0].abs() < 1e-6,
+            "epipolar residual = {} (expected ~0)",
+            residual[0]
+        );
+    }
+
+    #[test]
+    fn epipolar_jacobian_shape() {
+        let factor = EpipolarFactor::new(
+            na::Vector2::new(320.0, 240.0),
+            na::Vector2::new(330.0, 240.0),
+        );
+        let intr = make_intrinsics(500.0, 500.0, 320.0, 240.0);
+        let extr = na::DVector::from_vec(vec![0.0, 0.0, 0.0, 0.1, 0.0, 0.0]);
+
+        let params: Vec<na::DVector<f64>> = vec![intr.clone(), intr, extr];
+        let (_, jacobian) = factor.linearize(&params, true);
+
+        let jac = jacobian.unwrap();
+        assert_eq!(jac.nrows(), 1);
+        assert_eq!(jac.ncols(), 24); // 9+9+6
+    }
+
+    // ── TemporalConsistencyFactor ───────────────────────────────────
+
+    #[test]
+    fn temporal_consistency_get_dimension() {
+        let f = TemporalConsistencyFactor::new(1.0, 1.0);
+        assert_eq!(f.get_dimension(), 8);
+    }
+
+    #[test]
+    fn temporal_consistency_zero_velocity() {
+        let factor = TemporalConsistencyFactor::new(1.0, 1.0);
+        let motion = na::DVector::from_vec(vec![0.0; 6]);
+
+        let params: Vec<na::DVector<f64>> = vec![motion];
+        let (residual, _) = factor.linearize(&params, false);
+
+        assert_eq!(residual.len(), 8);
+        for i in 0..residual.len() {
+            assert!(
+                residual[i].abs() < 1e-12,
+                "residual[{i}] = {} (expected 0)",
+                residual[i]
+            );
+        }
+    }
+
+    #[test]
+    fn temporal_consistency_large_velocity_penalty() {
+        let factor = TemporalConsistencyFactor::new(1.0, 1.0);
+        // Angular velocity 20 rad/s, linear velocity 10 m/s → exceeds thresholds.
+        let motion = na::DVector::from_vec(vec![20.0, 0.0, 0.0, 10.0, 0.0, 0.0]);
+
+        let params: Vec<na::DVector<f64>> = vec![motion];
+        let (residual, _) = factor.linearize(&params, false);
+
+        // The magnitude penalties (indices 0 and 1) must be positive.
+        assert!(
+            residual[0] > 0.0,
+            "angular penalty should be > 0, got {}",
+            residual[0]
+        );
+        assert!(
+            residual[1] > 0.0,
+            "linear penalty should be > 0, got {}",
+            residual[1]
+        );
+    }
+
+    // ── CameraGraphFactor ───────────────────────────────────────────
+
+    #[test]
+    fn camera_graph_get_dimension() {
+        let f = CameraGraphFactor::new(na::Isometry3::identity());
+        assert_eq!(f.get_dimension(), 6);
+    }
+
+    #[test]
+    fn camera_graph_consistent_poses_zero_residual() {
+        // Expected relative pose = identity.
+        // Both camera poses identical → residual should be zero.
+        let factor = CameraGraphFactor::new(na::Isometry3::identity());
+
+        let pose = na::DVector::from_vec(vec![0.0; 6]);
+        let params: Vec<na::DVector<f64>> = vec![pose.clone(), pose];
+        let (residual, _) = factor.linearize(&params, false);
+
+        assert_eq!(residual.len(), 6);
+        for i in 0..6 {
+            assert!(
+                residual[i].abs() < 1e-12,
+                "residual[{i}] = {} (expected 0)",
+                residual[i]
+            );
+        }
+    }
+}
