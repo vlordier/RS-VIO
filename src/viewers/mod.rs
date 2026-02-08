@@ -1,3 +1,5 @@
+//! Visualization module: viewer trait and backend implementations.
+
 #[cfg(feature = "rerun-viewer")]
 pub mod rerun;
 pub mod viewer;

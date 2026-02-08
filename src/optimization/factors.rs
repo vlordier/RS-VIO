@@ -1,3 +1,5 @@
+//! Bundle adjustment factors for VIO optimization.
+
 use apex_solver::factors::Factor;
 use na::{DMatrix, DVector, Matrix4, Quaternion, UnitQuaternion, Vector2, Vector3};
 use nalgebra as na;

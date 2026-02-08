@@ -1,3 +1,5 @@
+//! VIO estimator module: async wrapper, sliding window, and motion models.
+
 pub mod async_enhancements;
 pub mod async_optimization;
 pub mod async_wrapper;

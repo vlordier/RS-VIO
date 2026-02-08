@@ -1,3 +1,5 @@
+//! Optimization result types for bundle adjustment output.
+
 /// Optimization result containing refined parameters
 ///
 /// This structure holds the results from bundle adjustment optimization,

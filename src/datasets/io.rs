@@ -1,3 +1,5 @@
+//! Dataset I/O: image loading, IMU parsing, and ground truth readers.
+
 use crate::datasets::{ImageData, ImuData};
 use anyhow::{bail, Context, Result};
 use image::ImageReader;

@@ -1,3 +1,5 @@
+//! Feature tracking module: detection, matching, and optical flow.
+
 pub mod async_detector;
 #[allow(clippy::module_inception)] // Re-exported as crate::feature_tracker::*
 pub mod enhanced_detector;

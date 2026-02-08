@@ -1,3 +1,5 @@
+//! Viewer trait for VIO visualization backends.
+
 use anyhow::Result;
 
 use crate::types::Matrix4x4;

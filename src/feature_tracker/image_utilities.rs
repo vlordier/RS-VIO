@@ -1,3 +1,5 @@
+//! Image processing utilities: FAST detection, pyramid building, and grid-based NMS.
+
 use image::{GenericImageView, GrayImage};
 use imageproc::corners::{corners_fast9, Corner};
 use nalgebra as na;

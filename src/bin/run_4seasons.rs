@@ -1,3 +1,5 @@
+//! 4Seasons dataset runner binary.
+
 use clap::Parser;
 use env_logger::{Builder, Env};
 use log::{error, info, LevelFilter};

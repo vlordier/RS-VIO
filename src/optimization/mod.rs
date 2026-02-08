@@ -1,3 +1,5 @@
+//! Optimization module: bundle adjustment, IMU factors, and solver integration.
+
 pub mod factors;
 pub mod imu_factor;
 pub mod observer;

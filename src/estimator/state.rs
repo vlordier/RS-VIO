@@ -1,3 +1,5 @@
+//! VIO state representation: pose, velocity, biases, and covariance.
+
 use crate::types::Matrix4x4;
 
 #[derive(Debug, Clone)]

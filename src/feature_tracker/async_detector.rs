@@ -1,3 +1,5 @@
+//! Async feature detection for concurrent VIO pipeline.
+
 use std::sync::Arc;
 /// Async feature detection for concurrent VIO pipeline
 ///

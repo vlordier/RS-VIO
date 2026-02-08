@@ -1,3 +1,5 @@
+//! VIO pipeline configuration: camera, feature detection, optimization, and keyframe parameters.
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

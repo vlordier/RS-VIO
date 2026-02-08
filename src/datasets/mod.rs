@@ -1,3 +1,5 @@
+//! Dataset loading and playback module.
+
 pub mod config;
 pub mod euroc_player;
 pub mod fourseasons_player;

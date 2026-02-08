@@ -1,3 +1,5 @@
+//! Optimization observer for convergence monitoring.
+
 use apex_solver::core::problem::VariableEnum;
 use apex_solver::observers::OptObserver;
 use std::cell::RefCell;

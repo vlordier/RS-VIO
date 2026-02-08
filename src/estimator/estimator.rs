@@ -1,3 +1,5 @@
+//! Core sequential VIO estimator pipeline.
+
 use crate::datasets::config::Config;
 use crate::datasets::CameraModelType;
 use crate::datasets::ImuData;

@@ -1,3 +1,5 @@
+//! Trajectory evaluation: ATE and RPE metrics for VIO accuracy assessment.
+
 /// Phase 3A: Ground Truth Evaluation Module
 ///
 /// This module loads TUM VI ground truth trajectories and provides

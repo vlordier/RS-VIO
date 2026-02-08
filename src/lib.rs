@@ -1,3 +1,5 @@
+//! RS-VIO: Real-time stereo visual-inertial odometry for embedded platforms.
+
 pub mod calibration;
 pub mod datasets;
 pub mod estimator;

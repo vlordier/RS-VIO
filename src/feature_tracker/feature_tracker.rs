@@ -1,3 +1,5 @@
+//! Stereo patch tracker: KLT optical flow with stereo matching.
+
 use image::{imageops, GrayImage};
 use imageproc::corners::Corner;
 use nalgebra as na;

@@ -1,3 +1,5 @@
+//! Frame data structure for stereo VIO processing.
+
 use crate::datasets::CameraModelType;
 use crate::datasets::ImuData;
 use crate::estimator::state::State;

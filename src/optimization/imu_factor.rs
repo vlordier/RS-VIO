@@ -1,3 +1,5 @@
+//! IMU preintegration factor for SE(3) pose graph optimization.
+
 use apex_solver::factors::Factor;
 use na::{DMatrix, DVector, UnitQuaternion, Vector3};
 use nalgebra as na;
