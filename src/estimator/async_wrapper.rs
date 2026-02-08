@@ -229,10 +229,7 @@ impl AsyncEstimator {
                                 match result {
                                     Ok(frame_result) => {
                                         if frame_result.is_ok() {
-                                            let mut m = match metrics_thread.lock() {
-                                                Ok(guard) => guard,
-                                                Err(err) => err.into_inner(),
-                                            };
+                                            let mut m = poison_guard(&metrics_thread);
                                             m.frames_processed += 1;
                                             m.total_processing_time_ns += latency_ns;
                                             if m.frames_processed == 1 {
@@ -265,29 +262,16 @@ impl AsyncEstimator {
                                             }
                                             drop(m);
 
-                                            match latency_thread.lock() {
-                                                Ok(mut histogram) => histogram.record(latency_ns),
-                                                Err(err) => err.into_inner().record(latency_ns),
-                                            }
+                                            poison_guard(&latency_thread).record(latency_ns);
 
-                                            match failure_thread.lock() {
-                                                Ok(mut tracker) => tracker.mark_worker_healthy(),
-                                                Err(err) => err.into_inner().mark_worker_healthy(),
-                                            }
+                                            poison_guard(&failure_thread).mark_worker_healthy();
                                         }
 
                                         let _ = respond_to.send(frame_result);
                                     },
                                     Err(_) => {
                                         let now_ns = timestamp_ns;
-                                        match failure_thread.lock() {
-                                            Ok(mut tracker) => {
-                                                tracker.record_panic_recovery(now_ns)
-                                            },
-                                            Err(err) => {
-                                                err.into_inner().record_panic_recovery(now_ns)
-                                            },
-                                        }
+                                        poison_guard(&failure_thread).record_panic_recovery(now_ns);
                                         let _ = respond_to
                                             .send(Err(anyhow::anyhow!(ESTIMATOR_PANIC_ERROR)));
                                         // Keep worker alive: estimator state may be inconsistent,
@@ -314,10 +298,7 @@ impl AsyncEstimator {
                                         let _ = respond_to.send(Ok(()));
                                     },
                                     Err(_) => {
-                                        match failure_thread.lock() {
-                                            Ok(mut tracker) => tracker.record_panic_recovery(0),
-                                            Err(err) => err.into_inner().record_panic_recovery(0),
-                                        }
+                                        poison_guard(&failure_thread).record_panic_recovery(0);
                                         let _ =
                                             respond_to.send(Err(anyhow::anyhow!(TEST_PANIC_ERROR)));
                                         return;
@@ -514,34 +495,22 @@ impl AsyncEstimator {
 
     /// Get current processing metrics
     pub fn metrics(&self) -> ProcessingMetrics {
-        match self.metrics.lock() {
-            Ok(guard) => guard.clone(),
-            Err(err) => err.into_inner().clone(),
-        }
+        poison_guard(&self.metrics).clone()
     }
 
     /// Get current latency histogram
     pub fn latency_histogram(&self) -> LatencyHistogram {
-        match self.latency_histogram.lock() {
-            Ok(guard) => guard.clone(),
-            Err(err) => err.into_inner().clone(),
-        }
+        poison_guard(&self.latency_histogram).clone()
     }
 
     /// Get current streaming pattern description
     pub fn streaming_status(&self) -> String {
-        match self.streaming_analyzer.lock() {
-            Ok(guard) => guard.description(),
-            Err(err) => err.into_inner().description(),
-        }
+        poison_guard(&self.streaming_analyzer).description()
     }
 
     /// Get failure recovery status
     pub fn failure_status(&self) -> String {
-        match self.failure_tracker.lock() {
-            Ok(guard) => guard.status(),
-            Err(err) => err.into_inner().status(),
-        }
+        poison_guard(&self.failure_tracker).status()
     }
 
     /// Shutdown the async estimator gracefully
@@ -570,6 +539,17 @@ impl AsyncEstimator {
     }
 }
 
+/// Lock a mutex, recovering from poison if the previous holder panicked.
+///
+/// In a real-time VIO pipeline the worker thread must survive panics,
+/// so we always recover the inner data rather than propagating the poison.
+fn poison_guard<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    match mutex.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    }
+}
+
 fn enqueue_command(
     command: Command,
     queue: &mut BinaryHeap<PrioritizedCommand>,
@@ -589,19 +569,13 @@ fn enqueue_command(
             is_keyframe,
             respond_to,
         } => {
-            match streaming.lock() {
-                Ok(mut analyzer) => analyzer.update(timestamp_ns),
-                Err(err) => err.into_inner().update(timestamp_ns),
-            }
+            poison_guard(streaming).update(timestamp_ns);
 
             let backlog = queue.len();
             let over_limit = config.max_pending_frames > 0 && backlog >= config.max_pending_frames;
 
             if over_limit {
-                match metrics.lock() {
-                    Ok(mut metrics) => metrics.frames_skipped += 1,
-                    Err(err) => err.into_inner().frames_skipped += 1,
-                }
+                poison_guard(metrics).frames_skipped += 1;
                 // Use static error to avoid allocation in hot path
                 let _ = respond_to.send(Err(anyhow::anyhow!(BACKLOG_ERROR)));
                 return;
