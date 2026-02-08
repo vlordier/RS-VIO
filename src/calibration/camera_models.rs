@@ -507,3 +507,175 @@ impl CameraConfig {
         self
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    fn pinhole_intrinsics() -> Vec<f64> {
+        // fx, fy, cx, cy
+        vec![500.0, 500.0, 320.0, 240.0]
+    }
+
+    fn pinhole_intrinsics_with_distortion() -> Vec<f64> {
+        // fx, fy, cx, cy, k1, k2, p1, p2, k3
+        vec![500.0, 500.0, 320.0, 240.0, 0.1, -0.05, 0.001, -0.001, 0.0]
+    }
+
+    #[test]
+    fn test_pinhole_project_on_axis() {
+        let cam = PinholeCamera::default();
+        let intrinsics = pinhole_intrinsics();
+        let pt = na::Vector3::new(0.0, 0.0, 1.0);
+        let px = cam.project(&pt, &intrinsics);
+        // On optical axis → projects to principal point
+        assert!((px.x - 320.0).abs() < 1e-10);
+        assert!((px.y - 240.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_pinhole_project_off_axis() {
+        let cam = PinholeCamera::default();
+        let intrinsics = pinhole_intrinsics();
+        let pt = na::Vector3::new(0.1, -0.2, 1.0);
+        let px = cam.project(&pt, &intrinsics);
+        assert!((px.x - (500.0 * 0.1 + 320.0)).abs() < 1e-10);
+        assert!((px.y - (500.0 * -0.2 + 240.0)).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_pinhole_behind_camera_returns_nan() {
+        let cam = PinholeCamera::default();
+        let intrinsics = pinhole_intrinsics();
+        let behind = na::Vector3::new(0.0, 0.0, -1.0);
+        let px = cam.project(&behind, &intrinsics);
+        assert!(px.x.is_nan());
+        assert!(px.y.is_nan());
+    }
+
+    #[test]
+    fn test_pinhole_project_unproject_roundtrip() {
+        let cam = PinholeCamera::default();
+        let intrinsics = pinhole_intrinsics();
+        let pt3d = na::Vector3::new(0.3, -0.4, 2.0);
+        let px = cam.project(&pt3d, &intrinsics);
+        let ray = cam.unproject(&px, &intrinsics);
+        // Unproject gives unit-depth bearing; compare direction
+        let expected_dir = pt3d.normalize();
+        assert!((ray.normalize() - expected_dir).norm() < 1e-8);
+    }
+
+    #[test]
+    fn test_pinhole_with_distortion_roundtrip() {
+        let cam = PinholeCamera { has_distortion: true, ..PinholeCamera::default() };
+        let intrinsics = pinhole_intrinsics_with_distortion();
+        let pt3d = na::Vector3::new(0.05, -0.05, 1.0);  // small angle for mild distortion
+        let px = cam.project(&pt3d, &intrinsics);
+        // The projected pixel should differ from undistorted
+        let cam_no_dist = PinholeCamera::default();
+        let px_no_dist = cam_no_dist.project(&pt3d, &pinhole_intrinsics());
+        // Distortion should alter the projection
+        let diff = (px - px_no_dist).norm();
+        assert!(diff > 0.001, "Distortion should have an effect, but diff={diff}");
+    }
+
+    #[test]
+    fn test_pinhole_validate_intrinsics() {
+        let cam = PinholeCamera::default();
+        assert!(cam.validate_intrinsics(&pinhole_intrinsics_with_distortion()).is_ok());
+        // Too few parameters
+        assert!(cam.validate_intrinsics(&[500.0, 500.0]).is_err());
+    }
+
+    #[test]
+    fn test_pinhole_default_intrinsics() {
+        let cam = PinholeCamera::default();
+        let intr = cam.default_intrinsics(640, 480);
+        assert_eq!(intr.len(), cam.num_intrinsics());
+        // Focal length should be reasonable
+        assert!(intr[0] > 100.0);
+    }
+
+    #[test]
+    fn test_fisheye_equidistant_project_on_axis() {
+        let cam = FisheyeCamera { model: FisheyeModel::Equidistant };
+        let intrinsics = vec![500.0, 500.0, 320.0, 240.0];
+        let pt = na::Vector3::new(0.0, 0.0, 1.0);
+        let px = cam.project(&pt, &intrinsics);
+        assert!((px.x - 320.0).abs() < 1e-10);
+        assert!((px.y - 240.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_fisheye_behind_camera_returns_nan() {
+        let cam = FisheyeCamera { model: FisheyeModel::Equidistant };
+        let intrinsics = vec![500.0, 500.0, 320.0, 240.0];
+        let behind = na::Vector3::new(0.0, 0.0, -1.0);
+        let px = cam.project(&behind, &intrinsics);
+        assert!(px.x.is_nan());
+        assert!(px.y.is_nan());
+    }
+
+    #[test]
+    fn test_fisheye_equidistant_roundtrip() {
+        let cam = FisheyeCamera { model: FisheyeModel::Equidistant };
+        let intrinsics = vec![500.0, 500.0, 320.0, 240.0];
+        let pt3d = na::Vector3::new(0.2, -0.3, 1.0);
+        let px = cam.project(&pt3d, &intrinsics);
+        let ray = cam.unproject(&px, &intrinsics);
+        let expected_dir = pt3d.normalize();
+        assert!((ray.normalize() - expected_dir).norm() < 1e-6,
+            "roundtrip error: {}", (ray.normalize() - expected_dir).norm());
+    }
+
+    #[test]
+    fn test_fisheye_equisolid_roundtrip() {
+        let cam = FisheyeCamera { model: FisheyeModel::Equisolid };
+        let intrinsics = vec![500.0, 500.0, 320.0, 240.0];
+        let pt3d = na::Vector3::new(0.1, 0.2, 1.0);
+        let px = cam.project(&pt3d, &intrinsics);
+        let ray = cam.unproject(&px, &intrinsics);
+        let expected_dir = pt3d.normalize();
+        assert!((ray.normalize() - expected_dir).norm() < 1e-6);
+    }
+
+    #[test]
+    fn test_fisheye_stereographic_roundtrip() {
+        let cam = FisheyeCamera { model: FisheyeModel::Stereographic };
+        let intrinsics = vec![500.0, 500.0, 320.0, 240.0];
+        let pt3d = na::Vector3::new(-0.15, 0.1, 1.0);
+        let px = cam.project(&pt3d, &intrinsics);
+        let ray = cam.unproject(&px, &intrinsics);
+        let expected_dir = pt3d.normalize();
+        assert!((ray.normalize() - expected_dir).norm() < 1e-6);
+    }
+
+    #[test]
+    fn test_fisheye_validate_intrinsics() {
+        let cam = FisheyeCamera::default();
+        assert!(cam.validate_intrinsics(&[500.0, 500.0, 320.0, 240.0]).is_ok());
+        assert!(cam.validate_intrinsics(&[500.0]).is_err());
+    }
+
+    #[test]
+    fn test_camera_model_enum_delegates() {
+        let pinhole = CameraModelEnum::Pinhole(PinholeCamera::default());
+        let intrinsics = pinhole_intrinsics();
+        let pt = na::Vector3::new(0.0, 0.0, 1.0);
+        let px = pinhole.project(&pt, &intrinsics);
+        assert!((px.x - 320.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_camera_config_builder() {
+        let config = CameraConfig::new(
+            "cam0".to_string(),
+            CameraModelEnum::Pinhole(PinholeCamera::default()),
+            640,
+            480,
+        )
+        .with_initial_intrinsics(pinhole_intrinsics());
+        assert_eq!(config.initial_intrinsics.as_ref().unwrap().len(), 4);
+    }
+}

@@ -214,3 +214,91 @@ pub(crate) fn compute_per_point_errors(
 
     errors
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    fn default_params() -> InitialParameters {
+        InitialParameters {
+            left_intrinsics: vec![500.0, 500.0, 320.0, 240.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            right_intrinsics: vec![500.0, 500.0, 320.0, 240.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            extrinsics: vec![0.0, 0.0, 0.0, 0.1, 0.0, 0.0],
+        }
+    }
+
+    #[test]
+    fn test_triangulate_initial_point_known_depth() {
+        let params = default_params();
+        // Left point at principal point, right point shifted by disparity
+        // disparity = baseline * fx / Z  =>  for Z=1.0, disparity = 0.1 * 500 / 1.0 = 50 pixels
+        // In normalised coords: xl=0, xr = -baseline/Z = -0.1
+        let left = na::Vector2::new(320.0, 240.0);
+        let right = na::Vector2::new(320.0 - 50.0, 240.0); // 50 px disparity
+        let pt = triangulate_initial_point(&left, &right, &params);
+        // Expected: x=0, y=0, z = baseline / (xl - xr) in normalised coords
+        // xl = 0.0, xr = (270-320)/500 = -0.1, disparity = 0.1, z = 0.1/0.1 = 1.0
+        assert!((pt[2] - 1.0).abs() < 1e-8, "depth should be ~1.0, got {}", pt[2]);
+        assert!(pt[0].abs() < 1e-8, "x should be ~0, got {}", pt[0]);
+        assert!(pt[1].abs() < 1e-8, "y should be ~0, got {}", pt[1]);
+    }
+
+    #[test]
+    fn test_triangulate_initial_point_zero_disparity() {
+        let params = default_params();
+        let left = na::Vector2::new(320.0, 240.0);
+        let right = na::Vector2::new(320.0, 240.0); // zero disparity
+        let pt = triangulate_initial_point(&left, &right, &params);
+        // Should return default depth
+        assert_eq!(pt, vec![0.0, 0.0, 1.0]);
+    }
+
+    #[test]
+    fn test_vector_to_isometry_identity() {
+        let params = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let iso = vector_to_isometry(&params);
+        let identity = na::Isometry3::identity();
+        assert!((iso.translation.vector - identity.translation.vector).norm() < 1e-12);
+        assert!((iso.rotation.angle()) < 1e-12);
+    }
+
+    #[test]
+    fn test_vector_to_isometry_translation() {
+        let params = vec![0.0, 0.0, 0.0, 1.0, 2.0, 3.0];
+        let iso = vector_to_isometry(&params);
+        assert!((iso.translation.x - 1.0).abs() < 1e-12);
+        assert!((iso.translation.y - 2.0).abs() < 1e-12);
+        assert!((iso.translation.z - 3.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_project_point_on_axis() {
+        let intrinsics = [500.0, 500.0, 320.0, 240.0];
+        let pt = na::Vector3::new(0.0, 0.0, 1.0);
+        let px = project_point(&pt, &intrinsics);
+        assert!((px.x - 320.0).abs() < 1e-10);
+        assert!((px.y - 240.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_project_point_off_axis() {
+        let intrinsics = [500.0, 500.0, 320.0, 240.0];
+        let pt = na::Vector3::new(0.1, -0.2, 1.0);
+        let px = project_point(&pt, &intrinsics);
+        assert!((px.x - 370.0).abs() < 1e-10);
+        assert!((px.y - 140.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_triangulate_and_project_roundtrip() {
+        let intrinsics = vec![500.0, 500.0, 320.0, 240.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let extrinsics = vector_to_isometry(&[0.0, 0.0, 0.0, 0.1, 0.0, 0.0]);
+
+        let left = na::Vector2::new(370.0, 190.0);
+        // Compute expected right pixel for consistency
+        let pt3d = triangulate_point(&left, &na::Vector2::new(345.0, 190.0), &intrinsics, &extrinsics);
+        let reprojected = project_point(&pt3d, &intrinsics);
+        assert!((reprojected - left).norm() < 1e-6, "left reprojection error too large");
+    }
+}

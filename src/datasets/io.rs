@@ -368,3 +368,120 @@ pub(crate) fn load_imu_data(
 
     Ok((imu_data, stats))
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::float_cmp)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    #[test]
+    fn test_load_stats_total_skipped() {
+        let stats = LoadStats {
+            total_lines: 10,
+            valid_samples: 5,
+            skipped_header: 1,
+            skipped_empty_or_comment: 1,
+            skipped_invalid_timestamp: 1,
+            skipped_invalid_values: 1,
+            skipped_insufficient_fields: 0,
+            skipped_out_of_range: 1,
+        };
+        assert_eq!(stats.total_skipped(), 5);
+    }
+
+    #[test]
+    fn test_load_stats_success_rate() {
+        let stats = LoadStats {
+            total_lines: 10,
+            valid_samples: 8,
+            ..LoadStats::default()
+        };
+        assert!((stats.success_rate() - 80.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_load_stats_success_rate_zero_lines() {
+        let stats = LoadStats::default();
+        assert_eq!(stats.success_rate(), 0.0);
+    }
+
+    #[test]
+    fn test_load_csv_image_timestamps() {
+        let dir = tempfile::tempdir().unwrap();
+        let csv_path = dir.path().join("images.csv");
+        let mut f = File::create(&csv_path).unwrap();
+        writeln!(f, "timestamp,filename").unwrap();
+        writeln!(f, "1000000000,image_0000.png").unwrap();
+        writeln!(f, "2000000000,image_0001.png").unwrap();
+        writeln!(f, "# comment line").unwrap();
+        writeln!(f).unwrap();
+        writeln!(f, "bad_ts,image_0002.png").unwrap();
+        f.flush().unwrap();
+
+        let (data, stats) = load_csv_image_timestamps_with_stats(&csv_path).unwrap();
+        assert_eq!(data.len(), 2);
+        assert_eq!(data[0].timestamp, 1_000_000_000);
+        assert_eq!(data[0].filename, "image_0000.png");
+        assert_eq!(data[1].timestamp, 2_000_000_000);
+        assert_eq!(stats.skipped_header, 1);
+        assert_eq!(stats.skipped_invalid_timestamp, 1);
+        assert!(stats.skipped_empty_or_comment >= 2);
+    }
+
+    #[test]
+    fn test_load_imu_data_tum_vi_format() {
+        let dir = tempfile::tempdir().unwrap();
+        let imu_path = dir.path().join("imu.txt");
+        let mut f = File::create(&imu_path).unwrap();
+        // header
+        writeln!(f, "timestamp gx gy gz ax ay az").unwrap();
+        // valid line
+        writeln!(f, "1000000000 0.01 -0.02 0.03 0.1 0.2 9.81").unwrap();
+        // another valid line
+        writeln!(f, "2000000000 0.0 0.0 0.0 0.0 0.0 9.81").unwrap();
+        // insufficient fields
+        writeln!(f, "3000000000 0.1 0.2").unwrap();
+        // bad timestamp
+        writeln!(f, "bad 0.0 0.0 0.0 0.0 0.0 9.81").unwrap();
+        f.flush().unwrap();
+
+        let (data, stats) =
+            load_imu_data(&imu_path, ImuFormat::WhitespaceDelimited, "test").unwrap();
+        assert_eq!(data.len(), 2);
+        assert_eq!(data[0].timestamp, 1_000_000_000);
+        assert!((data[0].accel[2] - 9.81).abs() < 1e-10);
+        assert_eq!(stats.skipped_insufficient_fields, 1);
+        assert_eq!(stats.skipped_invalid_timestamp, 1);
+    }
+
+    #[test]
+    fn test_load_imu_data_missing_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("nonexistent.csv");
+        let (data, _stats) =
+            load_imu_data(&missing, ImuFormat::CsvComma, "test").unwrap();
+        assert!(data.is_empty());
+    }
+
+    #[test]
+    fn test_load_grayscale_image() {
+        let dir = tempfile::tempdir().unwrap();
+        let img_path = dir.path().join("test.png");
+        // Create a 4x4 gray PNG
+        let img = image::GrayImage::from_fn(4, 4, |x, y| {
+            image::Luma([(x * 60 + y * 30) as u8])
+        });
+        img.save(&img_path).unwrap();
+
+        let pixels = load_grayscale_image(&img_path).unwrap();
+        assert_eq!(pixels.len(), 16); // 4*4
+    }
+
+    #[test]
+    fn test_load_grayscale_image_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("no_such.png");
+        assert!(load_grayscale_image(&missing).is_err());
+    }
+}

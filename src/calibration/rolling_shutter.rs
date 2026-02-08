@@ -218,3 +218,81 @@ pub fn analyze_geometric_distortions(stereo_pairs: &[StereoPair], image_height: 
         distortion_indicators.iter().sum::<f64>() / distortion_indicators.len() as f64
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::float_cmp)]
+mod tests {
+    use super::*;
+    use nalgebra as na;
+
+    fn make_stereo_pair(n_features: usize) -> StereoPair {
+        let mut left = Vec::new();
+        let mut right = Vec::new();
+        let mut correspondences = Vec::new();
+        for i in 0..n_features {
+            left.push(na::Vector2::new(100.0 + i as f64 * 10.0, 50.0 + i as f64 * 5.0));
+            right.push(na::Vector2::new(80.0 + i as f64 * 10.0, 50.0 + i as f64 * 5.0));
+            correspondences.push((i, i));
+        }
+        StereoPair {
+            left_features: left,
+            right_features: right,
+            correspondences,
+            timestamp: 0.0,
+            angular_velocity: None,
+            linear_velocity: None,
+            feature_qualities: vec![1.0; n_features],
+        }
+    }
+
+    #[test]
+    fn test_detection_info_returns_none_with_fewer_than_3_pairs() {
+        let pairs: Vec<StereoPair> = vec![make_stereo_pair(5), make_stereo_pair(5)];
+        assert!(rolling_shutter_detection_info(&pairs, 480).is_none());
+    }
+
+    #[test]
+    fn test_detection_info_returns_some_with_3_pairs() {
+        let pairs: Vec<StereoPair> = (0..3).map(|_| make_stereo_pair(10)).collect();
+        let info = rolling_shutter_detection_info(&pairs, 480);
+        assert!(info.is_some());
+    }
+
+    #[test]
+    fn test_detect_rolling_shutter_returns_false_with_fewer_than_3_pairs() {
+        let pairs: Vec<StereoPair> = vec![make_stereo_pair(5)];
+        assert!(!detect_rolling_shutter(&pairs, 480, None));
+    }
+
+    #[test]
+    fn test_analyze_position_distortion_empty_pairs() {
+        let pairs: Vec<StereoPair> = Vec::new();
+        assert_eq!(analyze_position_distortion(&pairs, 480), 0.0);
+    }
+
+    #[test]
+    fn test_analyze_position_distortion_no_correspondences() {
+        let pair = StereoPair {
+            left_features: vec![na::Vector2::new(100.0, 200.0)],
+            right_features: vec![na::Vector2::new(80.0, 200.0)],
+            correspondences: vec![],
+            timestamp: 0.0,
+            angular_velocity: None,
+            linear_velocity: None,
+            feature_qualities: vec![],
+        };
+        assert_eq!(analyze_position_distortion(&[pair], 480), 0.0);
+    }
+
+    #[test]
+    fn test_analyze_temporal_consistency_single_pair() {
+        let pairs = vec![make_stereo_pair(5)];
+        assert_eq!(analyze_temporal_consistency(&pairs), 0.0);
+    }
+
+    #[test]
+    fn test_analyze_geometric_distortions_empty_pairs() {
+        let pairs: Vec<StereoPair> = Vec::new();
+        assert_eq!(analyze_geometric_distortions(&pairs, 480), 0.0);
+    }
+}
