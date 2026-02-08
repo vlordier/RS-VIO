@@ -49,6 +49,23 @@ pub trait CameraModel: std::fmt::Debug + Send + Sync {
     fn clone_box(&self) -> Box<dyn CameraModel>;
 }
 
+/// Validate that an intrinsics slice has the expected length and positive focal lengths.
+fn validate_intrinsics_common(intrinsics: &[f64], expected_len: usize) -> Result<(), String> {
+    if intrinsics.len() != expected_len {
+        return Err(format!(
+            "Expected {} intrinsics, got {}",
+            expected_len,
+            intrinsics.len()
+        ));
+    }
+    let fx = intrinsics[0];
+    let fy = intrinsics[1];
+    if fx <= 0.0 || fy <= 0.0 {
+        return Err("Focal lengths must be positive".to_string());
+    }
+    Ok(())
+}
+
 /// Pinhole camera model with optional distortion
 #[derive(Debug, Clone)]
 pub struct PinholeCamera {
@@ -209,22 +226,7 @@ impl CameraModel for PinholeCamera {
     }
 
     fn validate_intrinsics(&self, intrinsics: &[f64]) -> Result<(), String> {
-        if intrinsics.len() != self.num_intrinsics() {
-            return Err(format!(
-                "Expected {} intrinsics, got {}",
-                self.num_intrinsics(),
-                intrinsics.len()
-            ));
-        }
-
-        let fx = intrinsics[0];
-        let fy = intrinsics[1];
-
-        if fx <= 0.0 || fy <= 0.0 {
-            return Err("Focal lengths must be positive".to_string());
-        }
-
-        Ok(())
+        validate_intrinsics_common(intrinsics, self.num_intrinsics())
     }
 
     fn name(&self) -> &str {
@@ -393,22 +395,7 @@ impl CameraModel for FisheyeCamera {
     }
 
     fn validate_intrinsics(&self, intrinsics: &[f64]) -> Result<(), String> {
-        if intrinsics.len() != self.num_intrinsics() {
-            return Err(format!(
-                "Expected {} intrinsics, got {}",
-                self.num_intrinsics(),
-                intrinsics.len()
-            ));
-        }
-
-        let fx = intrinsics[0];
-        let fy = intrinsics[1];
-
-        if fx <= 0.0 || fy <= 0.0 {
-            return Err("Focal lengths must be positive".to_string());
-        }
-
-        Ok(())
+        validate_intrinsics_common(intrinsics, self.num_intrinsics())
     }
 
     fn name(&self) -> &str {

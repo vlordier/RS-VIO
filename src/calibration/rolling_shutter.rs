@@ -37,41 +37,25 @@ pub(crate) fn rolling_shutter_detection_info(
 /// Automatically detect if rolling shutter compensation is needed.
 ///
 /// Uses the provided `log_fn` callback (if any) for diagnostic output.
+/// Delegates to [`rolling_shutter_detection_info`] for the actual analysis.
 pub(crate) fn detect_rolling_shutter(
     stereo_pairs: &[StereoPair],
     image_height: u32,
     log_fn: Option<&dyn Fn(&str)>,
 ) -> bool {
-    if stereo_pairs.len() < 3 {
-        // Need multiple frames for reliable detection
-        return false;
-    }
-
-    // Method 1: Analyze feature position correlation with distortion
-    let position_distortion_score = analyze_position_distortion(stereo_pairs, image_height);
-
-    // Method 2: Check temporal consistency across frames
-    let temporal_consistency_score = analyze_temporal_consistency(stereo_pairs);
-
-    // Method 3: Geometric constraint violations that suggest rolling shutter
-    let geometric_distortion_score = analyze_geometric_distortions(stereo_pairs, image_height);
-
-    // Combine scores with weights
-    let combined_score = 0.4 * position_distortion_score
-        + 0.4 * temporal_consistency_score
-        + 0.2 * geometric_distortion_score;
-
-    // Threshold for rolling shutter detection
-    let rolling_shutter_threshold = 0.6;
+    let info = match rolling_shutter_detection_info(stereo_pairs, image_height) {
+        Some(info) => info,
+        None => return false,
+    };
 
     if let Some(log) = log_fn {
         log(&format!(
-            "🔍 Rolling shutter detection: {:.2} (threshold: {:.2})",
-            combined_score, rolling_shutter_threshold
+            "🔍 Rolling shutter detection: {:.2} (threshold: 0.60)",
+            info.combined_score
         ));
     }
 
-    combined_score > rolling_shutter_threshold
+    info.rolling_shutter_detected
 }
 
 /// Analyze correlation between vertical position and distortion patterns.

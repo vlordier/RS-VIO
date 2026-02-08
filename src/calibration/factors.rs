@@ -1,7 +1,7 @@
 //! Optimization factors for stereo camera calibration
 
 use crate::calibration::camera_models::CameraModel;
-use crate::calibration::triangulation::vector_to_isometry;
+use crate::calibration::triangulation::{pinhole_project, vector_to_isometry};
 use apex_solver::factors::Factor;
 use nalgebra as na;
 
@@ -51,17 +51,7 @@ fn extract_stereo_intrinsics(intrinsics: &[f64]) -> (f64, f64, f64, f64) {
     (intrinsics[0], intrinsics[1], intrinsics[2], intrinsics[3])
 }
 
-/// Pinhole projection: projects a 3D point using (fx, fy, cx, cy).
-#[inline]
-fn pinhole_project(
-    fx: f64,
-    fy: f64,
-    cx: f64,
-    cy: f64,
-    p: &na::Vector3<f64>,
-) -> na::Vector2<f64> {
-    na::Vector2::new(fx * p.x / p.z + cx, fy * p.y / p.z + cy)
-}
+// pinhole_project is imported from crate::calibration::triangulation
 
 /// Reprojection factor for stereo calibration
 ///

@@ -88,16 +88,14 @@ pub(crate) fn triangulate_initial_point(
 }
 
 /// Convert a parameter vector `[rx, ry, rz, tx, ty, tz]` to an SE(3) isometry.
+///
+/// The rotation part `[rx, ry, rz]` is interpreted as a **scaled-axis** (axis-angle)
+/// vector, consistent with the convention used throughout the calibration factors.
 pub(crate) fn vector_to_isometry(params: &[f64]) -> na::Isometry3<f64> {
-    let rx = params[0];
-    let ry = params[1];
-    let rz = params[2];
-    let tx = params[3];
-    let ty = params[4];
-    let tz = params[5];
-
-    let rotation = na::UnitQuaternion::from_euler_angles(rx, ry, rz);
-    let translation = na::Vector3::new(tx, ty, tz);
+    let rotation = na::UnitQuaternion::from_scaled_axis(na::Vector3::new(
+        params[0], params[1], params[2],
+    ));
+    let translation = na::Vector3::new(params[3], params[4], params[5]);
 
     na::Isometry3::from_parts(translation.into(), rotation)
 }
@@ -119,17 +117,21 @@ pub(crate) fn triangulate_point(
         .unwrap_or_else(|| na::Vector3::new(0.0, 0.0, 1.0))
 }
 
+/// Pinhole projection: projects a 3D point using (fx, fy, cx, cy).
+#[inline]
+pub(crate) fn pinhole_project(
+    fx: f64,
+    fy: f64,
+    cx: f64,
+    cy: f64,
+    p: &na::Vector3<f64>,
+) -> na::Vector2<f64> {
+    na::Vector2::new(fx * p.x / p.z + cx, fy * p.y / p.z + cy)
+}
+
 /// Project a 3D point into a camera using the given intrinsics.
 pub(crate) fn project_point(point: &na::Vector3<f64>, intrinsics: &[f64]) -> na::Vector2<f64> {
-    let fx = intrinsics[0];
-    let fy = intrinsics[1];
-    let cx = intrinsics[2];
-    let cy = intrinsics[3];
-
-    let u = fx * point.x / point.z + cx;
-    let v = fy * point.y / point.z + cy;
-
-    na::Vector2::new(u, v)
+    pinhole_project(intrinsics[0], intrinsics[1], intrinsics[2], intrinsics[3], point)
 }
 
 /// Compute the mean reprojection error across all stereo pairs.

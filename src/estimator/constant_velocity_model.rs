@@ -280,6 +280,16 @@ impl ConstantVelocityModel {
         &self.last_pose
     }
 
+    /// Get timestamp of last update [ns]
+    pub const fn last_timestamp(&self) -> i64 {
+        self.last_timestamp
+    }
+
+    /// Get number of updates since initialization
+    pub const fn update_count(&self) -> u32 {
+        self.update_count
+    }
+
     /// Get configuration
     pub const fn config(&self) -> &ConstantVelocityConfig {
         &self.config

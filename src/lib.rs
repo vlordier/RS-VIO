@@ -42,3 +42,61 @@ pub use evaluation::{
     TrajectoryEvaluation,
 };
 pub use logging::PerformanceMetrics;
+
+/// Initialize the standard colored logger used by all dataset-runner binaries.
+///
+/// Sets the default log level to `debug`, silences the `rerun` crate to `Warn`,
+/// and produces timestamped, ANSI-colored output.
+pub fn init_logger() {
+    use env_logger::{Builder, Env};
+    use log::LevelFilter;
+
+    Builder::from_env(Env::default().default_filter_or("debug"))
+        .filter_module("rerun", LevelFilter::Warn)
+        .format(|buf, record| {
+            use std::io::Write;
+            let level = match record.level() {
+                log::Level::Error => "\x1b[31mERROR\x1b[0m",
+                log::Level::Warn => "\x1b[33mWARN\x1b[0m",
+                log::Level::Info => "\x1b[32mINFO\x1b[0m",
+                log::Level::Debug => "\x1b[34mDEBUG\x1b[0m",
+                log::Level::Trace => "\x1b[36mTRACE\x1b[0m",
+            };
+            writeln!(
+                buf,
+                "[{}] [{}] {}",
+                buf.timestamp_millis(),
+                level,
+                record.args()
+            )
+        })
+        .init();
+}
+
+/// Shared entry point for all dataset-runner binaries.
+///
+/// Creates a [`PlayerConfig`] from the given paths, runs the player,
+/// and returns the appropriate [`std::process::ExitCode`].
+pub fn run_dataset<P: DatasetPlayer + Default>(
+    config_path: &str,
+    dataset_path: &str,
+) -> std::process::ExitCode {
+    let player_config = PlayerConfig {
+        config_path: config_path.to_owned(),
+        dataset_path: dataset_path.to_owned(),
+        enable_statistics: true,
+        enable_console_statistics: true,
+        step_mode: false,
+    };
+
+    let player = P::default();
+    let result = player.run(player_config);
+
+    if result.success {
+        log::info!("[Main] processing completed successfully!");
+        std::process::ExitCode::SUCCESS
+    } else {
+        log::error!("[Main] processing failed: {}", result.error_message);
+        std::process::ExitCode::FAILURE
+    }
+}

@@ -3,6 +3,7 @@
 use crate::datasets::config::Config;
 use crate::datasets::CameraModelType;
 use crate::datasets::ImuData;
+use crate::estimator::constant_velocity_model::{ConstantVelocityConfig, ConstantVelocityModel};
 use crate::estimator::sliding_window::SlidingWindow;
 use crate::estimator::Frame;
 use crate::feature_tracker::StereoPatchTracker;
@@ -46,9 +47,9 @@ pub struct Estimator {
     right_image_buffer: Vec<u8>,
     /// Pre-allocated IMU buffer (reused each frame - zero allocation)
     imu_buffer: Vec<ImuData>,
-    /// Last two successfully tracked poses for constant-velocity prediction.
-    /// (previous, current) — used to extrapolate initial guess for track_motion.
-    last_two_poses: (Option<Matrix4x4>, Option<Matrix4x4>),
+    /// Constant-velocity motion model for frame-to-frame prediction.
+    /// Provides smoothed velocity estimation and pose extrapolation.
+    velocity_model: ConstantVelocityModel,
     /// Counter for consecutive motion tracking failures.
     /// When this exceeds a threshold, we force a keyframe to prevent map staleness.
     consecutive_tracking_failures: u32,
@@ -113,7 +114,7 @@ impl Estimator {
             left_image_buffer,
             right_image_buffer,
             imu_buffer,
-            last_two_poses: (None, None),
+            velocity_model: ConstantVelocityModel::new(ConstantVelocityConfig::default()),
             consecutive_tracking_failures: 0,
         }
     }
@@ -254,18 +255,14 @@ impl Estimator {
         // second blocking lock() after the guard is dropped.
         let mut last_kf_pose: Option<Matrix4x4> = None;
 
-        // Constant-velocity prediction: extrapolate from last two successful poses
-        let predicted_pose = match self.last_two_poses {
-            (Some(prev), Some(curr)) => {
-                // delta = curr * prev^{-1}, predicted = delta * curr
-                prev.try_inverse().map(|prev_inv| {
-                    let delta = curr * prev_inv;
-                    delta * curr
-                })
-            },
-            (_, Some(curr)) => Some(curr), // Only one pose: use it directly
-            _ => None,
-        };
+        // Constant-velocity prediction: extrapolate from the velocity model
+        let predicted_pose = self
+            .velocity_model
+            .predict_pose(
+                (timestamp_ns - self.velocity_model.last_timestamp()) as f64 / 1e9,
+            )
+            .ok()
+            .map(|iso| iso.to_homogeneous());
 
         let motion_tracking_result = match self.sliding_window.try_lock() {
             Ok(mut sliding_window) => {
@@ -295,8 +292,16 @@ impl Estimator {
 
         match motion_tracking_result.0 {
             Ok(Some(T_W_B)) => {
-                // Tracking succeeded: update pose history and reset failure counter
-                self.last_two_poses = (self.last_two_poses.1, Some(T_W_B));
+                // Tracking succeeded: update velocity model and reset failure counter
+                let iso = na::Isometry3::from_parts(
+                    na::Translation3::from(T_W_B.fixed_view::<3, 1>(0, 3).into_owned()),
+                    UnitQuaternion::from_matrix(&T_W_B.fixed_view::<3, 3>(0, 0).into_owned()),
+                );
+                if self.velocity_model.update_count() == 0 {
+                    let _ = self.velocity_model.initialize(iso, timestamp_ns);
+                } else {
+                    let _ = self.velocity_model.update(iso, timestamp_ns);
+                }
                 self.consecutive_tracking_failures = 0;
 
                 // Apply the optimized pose to the current frame
@@ -369,7 +374,7 @@ impl Estimator {
                             self.consecutive_tracking_failures
                         );
                         // Use the predicted pose (or last known pose) for the forced keyframe
-                        if let Some(pose) = predicted_pose.or(self.last_two_poses.1) {
+                        if let Some(pose) = predicted_pose {
                             current_frame.state.T_W_B = pose;
                         }
                         current_frame.is_keyframe = true;

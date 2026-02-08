@@ -7,6 +7,7 @@
 
 use crate::estimator::Frame;
 use crate::optimization::factors::{BundleAdjustmentFactor, PnPFactor};
+use crate::optimization::observer::TerminalObserver;
 use crate::optimization::optimization_converged;
 use crate::types::{Matrix3x3, Matrix4x4, Vector3};
 use apex_solver::core::loss_functions::HuberLoss;
@@ -432,7 +433,7 @@ impl SlidingWindow {
         let mut solver = LevenbergMarquardt::with_config(Self::build_solver_config(
             LinearSolverType::SparseCholesky,
         ));
-        // solver.add_observer(TerminalObserver::new());
+        solver.add_observer(TerminalObserver::new());
 
         let (problem, initial_values) = self.build_optimization_problem();
 
