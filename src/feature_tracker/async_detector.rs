@@ -1,11 +1,9 @@
+//! Async feature detection for concurrent VIO pipeline.
+//!
+//! Implements parallel feature extraction using tokio tasks for
+//! FAST corner detection with non-maximum suppression.
+
 use std::sync::Arc;
-/// Async feature detection for concurrent VIO pipeline
-///
-/// Implements parallel feature extraction using tokio tasks for:
-/// - FAST corner detection
-/// - Feature grid distribution
-///
-/// Designed to work with the concurrent pipeline in estimator::concurrent
 use tokio::task;
 
 /// Detected feature with spatial and quality information

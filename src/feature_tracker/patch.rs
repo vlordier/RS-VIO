@@ -1,3 +1,5 @@
+//! Fixed-size image patch for template-based optical flow tracking.
+
 use image::GrayImage;
 use nalgebra as na;
 use std::ops::AddAssign;

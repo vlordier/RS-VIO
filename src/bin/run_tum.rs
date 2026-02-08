@@ -1,3 +1,5 @@
+//! TUM-VI dataset runner binary.
+
 use clap::Parser;
 use log::{error, info};
 use rs_vio::{init_logger, DatasetPlayer, PlayerConfig, TUMVIPlayer};

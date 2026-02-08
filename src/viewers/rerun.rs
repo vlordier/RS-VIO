@@ -1,3 +1,5 @@
+//! Rerun.io 3D visualization backend for VIO output.
+
 use super::get_feature_color;
 use super::Viewer;
 use crate::types::{Array3, Float, Matrix3x3, Matrix4x4, ToArray};
