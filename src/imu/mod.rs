@@ -141,33 +141,6 @@ pub use preintegration::{ImuNoise, PreintegratedImu};
 
 use nalgebra as na;
 
-/// Configuration for IMU processing
-#[derive(Debug, Clone)]
-pub struct ImuConfig {
-    /// Gyroscope noise density [rad/s/√Hz]
-    pub gyro_noise_density: f64,
-    /// Accelerometer noise density [m/s²/√Hz]
-    pub accel_noise_density: f64,
-    /// Gyroscope bias random walk [rad/s²/√Hz]
-    pub gyro_bias_random_walk: f64,
-    /// Accelerometer bias random walk [m/s³/√Hz]
-    pub accel_bias_random_walk: f64,
-    /// Gravity vector in world frame [m/s²]
-    pub gravity: [f64; 3],
-}
-
-impl Default for ImuConfig {
-    fn default() -> Self {
-        Self {
-            gyro_noise_density: 1e-4,
-            accel_noise_density: 1e-2,
-            gyro_bias_random_walk: 1e-5,
-            accel_bias_random_walk: 1e-4,
-            gravity: [0.0, 0.0, -9.81],
-        }
-    }
-}
-
 /// IMU motion prior for optimization
 ///
 /// Provides motion constraints from preintegrated IMU measurements

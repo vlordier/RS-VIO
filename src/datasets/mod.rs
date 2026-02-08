@@ -94,85 +94,59 @@ impl CameraModelType {
     }
 }
 
-/// Create camera models from config
-/// This helper function creates camera models from the configuration
-/// for both left and right cameras. Supports OpenCVModel5 and EUCM models.
+/// Create a single camera model from parameters and model type string.
+fn create_camera_model(
+    model_str: &str,
+    intrinsics: &[f64],
+    distortion: &[f64],
+    width: u32,
+    height: u32,
+) -> CameraModelType {
+    if model_str.eq_ignore_ascii_case("eucm") {
+        let params = nalgebra034::DVector::from_vec(vec![
+            intrinsics[0], intrinsics[1], intrinsics[2], intrinsics[3],
+            distortion[0], distortion[1],
+        ]);
+        CameraModelType::EUCM(EUCM::new(
+            &params,
+            width,
+            height,
+        ))
+    } else {
+        let params = nalgebra034::DVector::from_vec(vec![
+            intrinsics[0], intrinsics[1], intrinsics[2], intrinsics[3],
+            distortion.first().copied().unwrap_or(0.0),
+            distortion.get(1).copied().unwrap_or(0.0),
+            distortion.get(2).copied().unwrap_or(0.0),
+            distortion.get(3).copied().unwrap_or(0.0),
+            distortion.get(4).copied().unwrap_or(0.0),
+        ]);
+        CameraModelType::OpenCV5(OpenCVModel5::new(
+            &params,
+            width,
+            height,
+        ))
+    }
+}
+
+/// Create left and right camera models from config.
 pub fn create_camera_models_from_config(config: &Config) -> (CameraModelType, CameraModelType) {
     let cam = &config.camera;
-
-    // Determine left camera model type
-    // NOTE: Camera model dispatch is intentionally explicit; a trait-based registry is future work.
-    // Using unwrap_or doesn't make sense here, if we can't get the params, we should error out
-    let left_model_str = cam.left_model.as_deref().unwrap_or("pinhole-radtan");
-    let left_cam = if left_model_str.eq_ignore_ascii_case("eucm") {
-        // EUCM model: [fx, fy, cx, cy, alpha, beta]
-        let eucm_params_vec: Vec<f64> = vec![
-            cam.left_intrinsics[0], // fx (validated)
-            cam.left_intrinsics[1], // fy
-            cam.left_intrinsics[2], // cx
-            cam.left_intrinsics[3], // cy
-            cam.left_distortion[0], // alpha (validated: EUCM requires >= 2 distortion)
-            cam.left_distortion[1], // beta
-        ];
-        let eucm_params = nalgebra034::DVector::from_vec(eucm_params_vec);
-        CameraModelType::EUCM(EUCM::new(&eucm_params, cam.image_width, cam.image_height))
-    } else {
-        // OpenCVModel5: [fx, fy, cx, cy, k1, k2, p1, p2, k3]
-        let left_params_vec: Vec<f64> = vec![
-            cam.left_intrinsics[0],                              // fx (validated)
-            cam.left_intrinsics[1],                              // fy
-            cam.left_intrinsics[2],                              // cx
-            cam.left_intrinsics[3],                              // cy
-            cam.left_distortion.first().copied().unwrap_or(0.0), // k1
-            cam.left_distortion.get(1).copied().unwrap_or(0.0),  // k2
-            cam.left_distortion.get(2).copied().unwrap_or(0.0),  // p1
-            cam.left_distortion.get(3).copied().unwrap_or(0.0),  // p2
-            cam.left_distortion.get(4).copied().unwrap_or(0.0),  // k3
-        ];
-        let left_params = nalgebra034::DVector::from_vec(left_params_vec);
-        CameraModelType::OpenCV5(OpenCVModel5::new(
-            &left_params,
-            cam.image_width,
-            cam.image_height,
-        ))
-    };
-
-    // Determine right camera model type
-    let right_model_str = cam.right_model.as_deref().unwrap_or("pinhole-radtan");
-    let right_cam = if right_model_str.eq_ignore_ascii_case("eucm") {
-        // EUCM model: [fx, fy, cx, cy, alpha, beta]
-        let eucm_params_vec: Vec<f64> = vec![
-            cam.right_intrinsics[0], // fx (validated)
-            cam.right_intrinsics[1], // fy
-            cam.right_intrinsics[2], // cx
-            cam.right_intrinsics[3], // cy
-            cam.right_distortion[0], // alpha (validated: EUCM requires >= 2 distortion)
-            cam.right_distortion[1], // beta
-        ];
-        let eucm_params = nalgebra034::DVector::from_vec(eucm_params_vec);
-        CameraModelType::EUCM(EUCM::new(&eucm_params, cam.image_width, cam.image_height))
-    } else {
-        // OpenCVModel5: [fx, fy, cx, cy, k1, k2, p1, p2, k3]
-        let right_params_vec: Vec<f64> = vec![
-            cam.right_intrinsics[0],                              // fx (validated)
-            cam.right_intrinsics[1],                              // fy
-            cam.right_intrinsics[2],                              // cx
-            cam.right_intrinsics[3],                              // cy
-            cam.right_distortion.first().copied().unwrap_or(0.0), // k1
-            cam.right_distortion.get(1).copied().unwrap_or(0.0),  // k2
-            cam.right_distortion.get(2).copied().unwrap_or(0.0),  // p1
-            cam.right_distortion.get(3).copied().unwrap_or(0.0),  // p2
-            cam.right_distortion.get(4).copied().unwrap_or(0.0),  // k3
-        ];
-        let right_params = nalgebra034::DVector::from_vec(right_params_vec);
-        CameraModelType::OpenCV5(OpenCVModel5::new(
-            &right_params,
-            cam.image_width,
-            cam.image_height,
-        ))
-    };
-
-    (left_cam, right_cam)
+    let left = create_camera_model(
+        cam.left_model.as_deref().unwrap_or("pinhole-radtan"),
+        &cam.left_intrinsics,
+        &cam.left_distortion,
+        cam.image_width,
+        cam.image_height,
+    );
+    let right = create_camera_model(
+        cam.right_model.as_deref().unwrap_or("pinhole-radtan"),
+        &cam.right_intrinsics,
+        &cam.right_distortion,
+        cam.image_width,
+        cam.image_height,
+    );
+    (left, right)
 }
 
 #[cfg(test)]
