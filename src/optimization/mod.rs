@@ -53,5 +53,11 @@ pub const fn optimization_status_label(status: &OptimizationStatus) -> (&'static
     }
 }
 
+/// Returns `true` if the optimization status is acceptable for calibration:
+/// converged *or* hit the iteration cap (which often still yields a usable result).
+pub const fn optimization_acceptable(status: &OptimizationStatus) -> bool {
+    optimization_converged(status) || matches!(status, OptimizationStatus::MaxIterationsReached)
+}
+
 #[cfg(test)]
 mod tests;

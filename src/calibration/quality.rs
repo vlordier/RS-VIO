@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 /// Calibration quality metrics
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct CalibrationQualityMetrics {
     /// Mean reprojection error (pixels)
     pub mean_reprojection_error: f64,
@@ -44,23 +44,7 @@ impl CalibrationQualityMetrics {
     /// Create metrics from reprojection errors
     pub fn from_reprojection_errors(errors: Vec<f64>) -> Self {
         if errors.is_empty() {
-            return Self {
-                mean_reprojection_error: 0.0,
-                median_reprojection_error: 0.0,
-                max_reprojection_error: 0.0,
-                reprojection_error_std: 0.0,
-                accuracy_percentage_1px: 0.0,
-                accuracy_percentage_2px: 0.0,
-                epipolar_consistency_score: 0.0,
-                triangulation_quality_score: 0.0,
-                rolling_shutter_correction_score: None,
-                mean_feature_quality: 0.0,
-                feature_quality_std: 0.0,
-                temporal_stability_score: None,
-                per_point_errors: Vec::new(),
-                outlier_count: 0,
-                total_points: 0,
-            };
+            return Self::default();
         }
         let total_points = errors.len();
         let mean_error = errors.iter().sum::<f64>() / total_points as f64;

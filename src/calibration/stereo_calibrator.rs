@@ -379,12 +379,12 @@ impl StereoCalibrator {
 
         // Detect features synchronously
         let left_detected = detector.detect(
-            &image::DynamicImage::ImageLuma8(left_image.clone()).to_luma8(),
+            left_image.as_raw(),
             left_image.width(),
             left_image.height(),
         );
         let right_detected = detector.detect(
-            &image::DynamicImage::ImageLuma8(right_image.clone()).to_luma8(),
+            right_image.as_raw(),
             right_image.width(),
             right_image.height(),
         );
@@ -436,9 +436,16 @@ impl StereoCalibrator {
         left_image: &image::GrayImage,
         right_image: &image::GrayImage,
     ) -> Vec<(usize, usize)> {
+        /// Maximum horizontal disparity in pixels for the basic matcher.
+        const BASIC_MAX_DISPARITY_PX: i32 = 64;
+        /// Half-width of the NCC comparison patch.
+        const BASIC_PATCH_SIZE: i32 = 8;
+        /// Maximum vertical distance (pixels) to accept as "same epipolar row".
+        const BASIC_EPIPOLAR_TOLERANCE_PX: i32 = 2;
+        /// Minimum NCC score (inverted: lower is better) to accept a match.
+        const NCC_ACCEPTANCE_THRESHOLD: f32 = 0.8;
+
         let mut matches = Vec::new();
-        let max_disparity = 64; // pixels
-        let patch_size = 8;
 
         for (left_idx, left_feat) in left_features.iter().enumerate() {
             let mut best_match = None;
@@ -453,13 +460,13 @@ impl StereoCalibrator {
                 let right_y = right_feat.y as i32;
 
                 // Check epipolar constraint (same row)
-                if (right_y - y).abs() > 2 {
+                if (right_y - y).abs() > BASIC_EPIPOLAR_TOLERANCE_PX {
                     continue;
                 }
 
                 // Check disparity range
                 let disparity = left_x - right_x;
-                if disparity < 0 || disparity > max_disparity {
+                if !(0..=BASIC_MAX_DISPARITY_PX).contains(&disparity) {
                     continue;
                 }
 
@@ -469,7 +476,7 @@ impl StereoCalibrator {
                     left_y: y,
                     right_x,
                     right_y,
-                    patch_size,
+                    patch_size: BASIC_PATCH_SIZE,
                 };
                 let score = self.compute_ncc_score(left_image, right_image, params);
 
@@ -480,8 +487,7 @@ impl StereoCalibrator {
             }
 
             if let Some(right_idx) = best_match {
-                if best_score < 0.8 {
-                    // NCC threshold
+                if best_score < NCC_ACCEPTANCE_THRESHOLD {
                     matches.push((left_idx, right_idx));
                 }
             }
@@ -992,11 +998,7 @@ impl StereoCalibrator {
         let opt_result = optimizer.optimize(&problem, &initial_values)?;
 
         // Check if optimization was successful
-        let is_successful = crate::optimization::optimization_converged(&opt_result.status)
-            || matches!(
-                &opt_result.status,
-                apex_solver::optimizer::OptimizationStatus::MaxIterationsReached
-            );
+        let is_successful = crate::optimization::optimization_acceptable(&opt_result.status);
 
         if !is_successful {
             return Err(format!(

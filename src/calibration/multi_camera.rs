@@ -413,11 +413,7 @@ impl MultiCameraCalibrator {
         let opt_result = optimizer.optimize(&problem, &initial_values)?;
 
         // Check if optimization was successful
-        let is_successful = crate::optimization::optimization_converged(&opt_result.status)
-            || matches!(
-                &opt_result.status,
-                apex_solver::optimizer::OptimizationStatus::MaxIterationsReached
-            );
+        let is_successful = crate::optimization::optimization_acceptable(&opt_result.status);
 
         if !is_successful {
             return Err(format!(

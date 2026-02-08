@@ -230,30 +230,17 @@ fn ensure_pyramid_buffers(
     levels: u32,
 ) {
     let target_len = levels as usize;
-    if pyramid.len() != target_len {
-        pyramid.clear();
-        pyramid.reserve(target_len);
-        for level in 0..levels {
+
+    // Check whether we can reuse the existing buffers.
+    let reusable = pyramid.len() == target_len
+        && pyramid.iter().enumerate().all(|(level, img)| {
             let scale_down = 1 << level;
             let width = (base_width / scale_down).max(1);
             let height = (base_height / scale_down).max(1);
-            pyramid.push(GrayImage::new(width, height));
-        }
-        return;
-    }
+            img.width() == width && img.height() == height
+        });
 
-    let mut resize_needed = false;
-    for (level, img) in pyramid.iter().enumerate() {
-        let scale_down = 1 << level;
-        let width = (base_width / scale_down).max(1);
-        let height = (base_height / scale_down).max(1);
-        if img.width() != width || img.height() != height {
-            resize_needed = true;
-            break;
-        }
-    }
-
-    if resize_needed {
+    if !reusable {
         pyramid.clear();
         pyramid.reserve(target_len);
         for level in 0..levels {

@@ -65,6 +65,24 @@ pub struct StereoMatcher {
     rng_counter: Cell<u64>,
 }
 
+/// Enforce rank-2 constraint on a 3×3 essential/fundamental matrix via SVD,
+/// then convert from the calibrated (essential) space to pixel (fundamental)
+/// space: `F = K⁻ᵀ · rank2(E) · K⁻¹`.
+fn enforce_rank2_to_fundamental(
+    e: &na::Matrix3<f64>,
+    k_inv: &na::Matrix3<f64>,
+) -> na::Matrix3<f64> {
+    let svd = e.svd(true, true);
+    let mut sigma = svd.singular_values;
+    sigma[2] = 0.0;
+
+    let u = svd.u.unwrap_or_else(na::Matrix3::identity);
+    let v_t = svd.v_t.unwrap_or_else(na::Matrix3::identity);
+
+    let e_rank2 = u * na::Matrix3::from_diagonal(&sigma) * v_t;
+    k_inv.transpose() * e_rank2 * k_inv
+}
+
 impl StereoMatcher {
     /// Create new stereo matcher
     pub const fn new(config: StereoMatcherConfig) -> Self {
@@ -614,24 +632,7 @@ impl StereoMatcher {
             f_vec[8],
         );
 
-        // Enforce rank-2 constraint
-        let svd_f = f_matrix.svd(true, true);
-        let mut sigma = svd_f.singular_values;
-        sigma[2] = 0.0; // Set smallest singular value to zero
-
-        let u = svd_f.u.unwrap_or_else(|| {
-            // Fallback - should not happen with valid matrix
-            na::Matrix3::identity()
-        });
-        let v_t = svd_f.v_t.unwrap_or_else(|| {
-            // Fallback - should not happen with valid matrix
-            na::Matrix3::identity()
-        });
-
-        let f_refined = u * na::Matrix3::from_diagonal(&sigma) * v_t;
-
-        // Convert Essential → Fundamental so error is in pixel space.
-        let f_refined = k_inv.transpose() * f_refined * k_inv;
+        let f_refined = enforce_rank2_to_fundamental(&f_matrix, k_inv);
 
         (f_refined, weights.to_vec())
     }
@@ -697,27 +698,7 @@ impl StereoMatcher {
         f[(2, 1)] = f_vec[7];
         f[(2, 2)] = f_vec[8];
 
-        // Enforce rank 2 constraint
-        let svd_f = f.svd(true, true);
-        let mut sigma = svd_f.singular_values;
-        sigma[2] = 0.0; // Set smallest singular value to 0
-
-        let u = svd_f.u.unwrap_or_else(|| {
-            // Fallback - should not happen with valid matrix
-            na::Matrix3::identity()
-        });
-        let v_t = svd_f.v_t.unwrap_or_else(|| {
-            // Fallback - should not happen with valid matrix
-            na::Matrix3::identity()
-        });
-
-        // Reconstruct F
-        let sigma_diag = na::Matrix3::from_diagonal(&sigma);
-        // The 8-point algorithm with K-normalized points yields the Essential
-        // matrix E.  Convert to Fundamental matrix F = K^{-T} E K^{-1} so that
-        // downstream epipolar-error computation works in pixel coordinates.
-        let e = u * sigma_diag * v_t;
-        Some(k_inv.transpose() * e * k_inv)
+        Some(enforce_rank2_to_fundamental(&f, k_inv))
     }
 
     /// Compute epipolar error for a point pair
