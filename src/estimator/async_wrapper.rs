@@ -6,7 +6,7 @@
 use crate::datasets::config::Config;
 use crate::datasets::{CameraModelType, ImuData};
 use crate::estimator::{
-    Estimator, FailureRecoveryTracker, LatencyHistogram, ProcessingMetrics,
+    Estimator, DeadlineTracker, FailureRecoveryTracker, LatencyHistogram, ProcessingMetrics,
     StreamingPatternAnalyzer,
 };
 use crate::viewers::Viewer;
@@ -224,6 +224,8 @@ impl AsyncEstimator {
                                 ..
                             } => {
                                 let frame_start = Instant::now();
+                                let deadline_ns = async_config_clone.frame_timeout_ms as i64 * 1_000_000;
+                                let mut tracker = DeadlineTracker::new(deadline_ns, frame_id);
                                 let result = panic::catch_unwind(AssertUnwindSafe(|| {
                                     estimator.set_viewer_frame(frame_id);
                                     estimator.process_frame(
@@ -255,12 +257,10 @@ impl AsyncEstimator {
                                             }
                                             m.avg_latency_ns =
                                                 m.total_processing_time_ns / m.frames_processed;
-                                            if processing_time
-                                                > Duration::from_millis(
-                                                    async_config_clone.frame_timeout_ms,
-                                                )
-                                            {
+                                            if tracker.is_missed(latency_ns as i64) {
                                                 m.deadline_misses += 1;
+                                            } else {
+                                                tracker.mark_met();
                                             }
                                             if async_config_clone.frame_budget_ms > 0
                                                 && processing_time

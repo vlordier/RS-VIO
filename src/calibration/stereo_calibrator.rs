@@ -1,7 +1,9 @@
 //! Stereo camera calibrator implementation
 
 use crate::calibration::config::CalibrationConfig;
-use crate::calibration::factors::{EpipolarFactor, StereoReprojectionFactor};
+use crate::calibration::factors::{
+    EpipolarFactor, StereoReprojectionFactor, TemporalSuperResolutionFactor,
+};
 use crate::calibration::guidance::CalibrationGuidance;
 use crate::calibration::quality::{
     CalibrationLogger, CalibrationQualityMetrics, QualityThresholds,
@@ -10,10 +12,12 @@ use crate::calibration::{rolling_shutter, triangulation};
 use crate::feature_tracker::{
     OrbDetectorConfig, OrbFeatureDetector, StereoMatcher, StereoMatcherConfig,
 };
+use crate::optimization::parallel_factors::{ParallelFactorBatch, ParallelFactorConfig};
 use apex_solver::core::loss_functions::HuberLoss;
-use apex_solver::core::problem::Problem;
+use apex_solver::core::problem::{Problem, VariableEnum};
 use apex_solver::manifold::ManifoldType;
 use apex_solver::optimizer::levenberg_marquardt::{LevenbergMarquardt, LevenbergMarquardtConfig};
+use apex_solver::optimizer::SolverResult;
 use nalgebra as na;
 use std::time::{Duration, Instant};
 
@@ -826,10 +830,6 @@ impl StereoCalibrator {
             self.temporal_sequences.len()
         ));
 
-        // NOTE: Temporal super resolution is not yet implemented.
-        // Falls back to standard calibration with temporal metadata logging.
-
-        // For now, fall back to standard calibration but log the temporal info
         let total_tracks: usize = self
             .temporal_sequences
             .iter()
@@ -847,8 +847,142 @@ impl StereoCalibrator {
             total_tracks, avg_duration
         ));
 
-        // Fall back to standard calibration for now
-        self.calibrate()
+        // Check if we have multi-observation tracks (>1 observation per track)
+        let multi_obs_tracks: usize = self
+            .temporal_sequences
+            .iter()
+            .flat_map(|seq| seq.temporal_tracks.values())
+            .filter(|track| track.len() > 1)
+            .count();
+
+        if multi_obs_tracks == 0 {
+            self.log_progress(
+                "⚠️  All temporal tracks have single observations, \
+                 falling back to standard calibration",
+            );
+            return self.calibrate();
+        }
+
+        // Initialize parameters (same as standard calibration)
+        let initial_params = triangulation::initialize_parameters(&self.config);
+
+        let mut problem = Problem::new();
+        let mut initial_values = std::collections::HashMap::new();
+
+        let left_intrinsics_var = "left_intrinsics".to_string();
+        let right_intrinsics_var = "right_intrinsics".to_string();
+        let extrinsics_var = "stereo_extrinsics".to_string();
+
+        initial_values.insert(
+            left_intrinsics_var.clone(),
+            (
+                ManifoldType::RN,
+                na::DVector::from_vec(initial_params.left_intrinsics.clone()),
+            ),
+        );
+        initial_values.insert(
+            right_intrinsics_var.clone(),
+            (
+                ManifoldType::RN,
+                na::DVector::from_vec(initial_params.right_intrinsics.clone()),
+            ),
+        );
+        initial_values.insert(
+            extrinsics_var.clone(),
+            (
+                ManifoldType::RN,
+                na::DVector::from_vec(initial_params.extrinsics.clone()),
+            ),
+        );
+
+        // Readout time from config (for rolling shutter compensation)
+        let readout_time = self.config.rolling_shutter_readout_time;
+
+        // Add temporal super resolution factors per track
+        let mut track_idx = 0;
+        for (seq_idx, sequence) in self.temporal_sequences.iter().enumerate() {
+            for (feature_id, observations) in &sequence.temporal_tracks {
+                if observations.is_empty() {
+                    continue;
+                }
+
+                // Create a 3D point variable for this track
+                let point_var = format!("temporal_point_{}_{}", seq_idx, feature_id);
+                // Triangulate initial point from first observation
+                let first_obs = &observations[0];
+                let initial_point = triangulation::triangulate_initial_point(
+                    &first_obs.left_point,
+                    &first_obs.right_point,
+                    &initial_params,
+                );
+                initial_values.insert(
+                    point_var.clone(),
+                    (ManifoldType::RN, na::DVector::from_vec(initial_point)),
+                );
+
+                // Create motion trajectory variable per track
+                let motion_var = format!("motion_{}_{}", seq_idx, feature_id);
+                initial_values.insert(
+                    motion_var.clone(),
+                    (ManifoldType::RN, na::DVector::zeros(6)),
+                );
+
+                // Build TemporalSuperResolutionFactor from all observations in this track
+                let mut factor = TemporalSuperResolutionFactor::new(readout_time);
+                for obs in observations {
+                    factor.add_observation(
+                        obs.left_point,
+                        obs.right_point,
+                        obs.timestamp,
+                        obs.row_position,
+                        obs.quality,
+                    );
+                }
+
+                let huber_loss = HuberLoss::new(self.config.huber_delta).ok();
+                problem.add_residual_block(
+                    &[
+                        &left_intrinsics_var,
+                        &right_intrinsics_var,
+                        &extrinsics_var,
+                        &motion_var,
+                        &point_var,
+                    ],
+                    Box::new(factor),
+                    huber_loss.map(|l| {
+                        Box::new(l)
+                            as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>
+                    }),
+                );
+
+                track_idx += 1;
+            }
+        }
+
+        self.log_progress(&format!(
+            "🔧 Added {} temporal super resolution factors",
+            track_idx
+        ));
+
+        problem.initialize_variables(&initial_values);
+
+        let optimizer_config = LevenbergMarquardtConfig {
+            max_iterations: self.config.max_iterations,
+            parameter_tolerance: self.config.parameter_tolerance,
+            cost_tolerance: self.config.cost_tolerance,
+            ..Default::default()
+        };
+
+        let mut optimizer = LevenbergMarquardt::with_config(optimizer_config);
+        let opt_result = optimizer.optimize(&problem, &initial_values)?;
+
+        self.log_progress(&format!(
+            "✅ Temporal optimization converged after {} iterations (cost: {:.6})",
+            opt_result.iterations, opt_result.final_cost
+        ));
+
+        // Extract results (same variable naming as standard calibration)
+        self.extract_calibration_result(&opt_result)
     }
 
     /// Run the stereo calibration optimization
@@ -944,41 +1078,58 @@ impl StereoCalibrator {
             }
         }
 
-        // Add factors
-        let mut point_var_idx = 0;
-        for stereo_pair in &self.stereo_pairs {
-            for &(left_idx, right_idx) in &stereo_pair.correspondences {
-                let left_obs = stereo_pair.left_features[left_idx];
-                let right_obs = stereo_pair.right_features[right_idx];
+        // Add factors using parallel batch creation
+        let factor_batch = ParallelFactorBatch::new(ParallelFactorConfig::default());
 
-                let point_var = &point_vars[point_var_idx];
-                point_var_idx += 1;
-
-                // Add reprojection factor
-                let factor = StereoReprojectionFactor::new(left_obs, right_obs);
-                let huber_loss = HuberLoss::new(self.config.huber_delta).ok();
-                problem.add_residual_block(
-                    &[
-                        &left_intrinsics_var,
-                        &right_intrinsics_var,
-                        &extrinsics_var,
-                        point_var,
-                    ],
-                    Box::new(factor),
-                    huber_loss.map(|l| {
-                        Box::new(l)
-                            as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>
-                    }),
-                );
-
-                // Optionally add epipolar constraint
-                let epipolar_factor = EpipolarFactor::new(left_obs, right_obs);
-                problem.add_residual_block(
-                    &[&left_intrinsics_var, &right_intrinsics_var, &extrinsics_var],
-                    Box::new(epipolar_factor),
-                    None,
-                );
+        // Collect all observation pairs for parallel factor creation
+        let mut obs_pairs: Vec<(usize, na::Vector2<f64>, na::Vector2<f64>)> = Vec::new();
+        {
+            let mut idx = 0;
+            for stereo_pair in &self.stereo_pairs {
+                for &(left_idx, right_idx) in &stereo_pair.correspondences {
+                    let left_obs = stereo_pair.left_features[left_idx];
+                    let right_obs = stereo_pair.right_features[right_idx];
+                    obs_pairs.push((idx, left_obs, right_obs));
+                    idx += 1;
+                }
             }
+        }
+
+        // Create reprojection and epipolar factors in parallel
+        let stereo_factors: Vec<StereoReprojectionFactor> = factor_batch
+            .process_batch_parallel(obs_pairs.clone(), |(_, left_obs, right_obs)| {
+                StereoReprojectionFactor::new(left_obs, right_obs)
+            });
+        let epipolar_factors: Vec<EpipolarFactor> = factor_batch
+            .process_batch_parallel(obs_pairs.clone(), |(_, left_obs, right_obs)| {
+                EpipolarFactor::new(left_obs, right_obs)
+            });
+
+        // Add factors to problem sequentially (Problem is not Send)
+        for (i, (stereo_factor, epipolar_factor)) in
+            stereo_factors.into_iter().zip(epipolar_factors).enumerate()
+        {
+            let point_var = &point_vars[obs_pairs[i].0];
+            let huber_loss = HuberLoss::new(self.config.huber_delta).ok();
+            problem.add_residual_block(
+                &[
+                    &left_intrinsics_var,
+                    &right_intrinsics_var,
+                    &extrinsics_var,
+                    point_var,
+                ],
+                Box::new(stereo_factor),
+                huber_loss.map(|l| {
+                    Box::new(l)
+                        as Box<dyn apex_solver::core::loss_functions::LossFunction + Send>
+                }),
+            );
+
+            problem.add_residual_block(
+                &[&left_intrinsics_var, &right_intrinsics_var, &extrinsics_var],
+                Box::new(epipolar_factor),
+                None,
+            );
         }
 
         // Initialize variables in the problem
@@ -1007,6 +1158,18 @@ impl StereoCalibrator {
             )
             .into());
         }
+
+        self.extract_calibration_result(&opt_result)
+    }
+
+    /// Extract calibration results from optimizer output and log quality metrics.
+    fn extract_calibration_result(
+        &mut self,
+        opt_result: &SolverResult<std::collections::HashMap<String, VariableEnum>>,
+    ) -> Result<CalibrationResult, Box<dyn std::error::Error>> {
+        let left_intrinsics_var = "left_intrinsics".to_string();
+        let right_intrinsics_var = "right_intrinsics".to_string();
+        let extrinsics_var = "stereo_extrinsics".to_string();
 
         // Extract results
         let final_left_intrinsics = opt_result

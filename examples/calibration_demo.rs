@@ -4,8 +4,11 @@
 //! the calibration system with logging enabled.
 use nalgebra as na;
 use rs_vio::calibration::stereo_calibrator::StereoPair;
-use rs_vio::calibration::CalibrationConfig;
-use rs_vio::calibration::StereoCalibrator;
+use rs_vio::calibration::{
+    CalibrationConfig, CameraEdge, MultiCameraCalibrationConfig,
+    MultiCameraCalibrator, MultiViewObservation, StereoCalibrator,
+};
+use rs_vio::calibration::camera_models::{CameraConfig, CameraModelEnum};
 fn main() {
     println!("🎯 Stereo Calibration Logging Demo");
     println!("==================================\n");
@@ -164,4 +167,87 @@ fn main() {
     println!("\n🚀 Ready for Raspberry Pi deployment!");
     println!("   The system now automatically detects rolling shutter!");
     println!("   Use this logging to monitor calibration quality in real-time.");
+
+    // ---- Multi-Camera Calibration Demo ----
+    println!("\n📸 Multi-Camera Calibration Demo:");
+    println!("----------------------------------\n");
+
+    // Build a 3-camera rig: left, right, and rear
+    let pinhole = CameraModelEnum::Pinhole(Default::default());
+    let cameras = vec![
+        CameraConfig::new("left".to_string(), pinhole.clone(), 640, 480),
+        CameraConfig::new("right".to_string(), pinhole.clone(), 640, 480),
+        CameraConfig::new("rear".to_string(), pinhole, 640, 480),
+    ];
+
+    let mut camera_graph = rs_vio::calibration::create_camera_graph(cameras, "left".to_string());
+
+    // Add edges representing known baseline relationships
+    camera_graph.edges.insert(
+        ("left".to_string(), "right".to_string()),
+        CameraEdge {
+            relative_pose: na::Isometry3::from_parts(
+                na::Translation3::new(0.12, 0.0, 0.0),
+                na::UnitQuaternion::identity(),
+            ),
+            num_observations: 50,
+            quality_score: 0.95,
+        },
+    );
+    camera_graph.edges.insert(
+        ("left".to_string(), "rear".to_string()),
+        CameraEdge {
+            relative_pose: na::Isometry3::from_parts(
+                na::Translation3::new(-0.05, 0.0, -0.15),
+                na::UnitQuaternion::from_euler_angles(0.0, std::f64::consts::PI, 0.0),
+            ),
+            num_observations: 30,
+            quality_score: 0.85,
+        },
+    );
+
+    let config = MultiCameraCalibrationConfig::default();
+    let mut multi_cal = MultiCameraCalibrator::new(config, camera_graph);
+
+    // Add synthetic multi-view observations
+    for i in 0..15 {
+        let mut camera_observations = std::collections::HashMap::new();
+        let mut quality_scores = std::collections::HashMap::new();
+
+        // Simulate a 3D point observed by at least 2 cameras
+        let base_x = 320.0 + (i as f64 - 7.0) * 15.0;
+        let base_y = 240.0 + (i as f64 - 7.0) * 10.0;
+
+        camera_observations.insert("left".to_string(), na::Vector2::new(base_x, base_y));
+        quality_scores.insert("left".to_string(), 0.9);
+
+        camera_observations.insert(
+            "right".to_string(),
+            na::Vector2::new(base_x - 35.0, base_y + 1.0),
+        );
+        quality_scores.insert("right".to_string(), 0.85);
+
+        if i % 3 == 0 {
+            camera_observations.insert(
+                "rear".to_string(),
+                na::Vector2::new(640.0 - base_x, base_y + 5.0),
+            );
+            quality_scores.insert("rear".to_string(), 0.75);
+        }
+
+        multi_cal.add_multi_view_observation(MultiViewObservation {
+            camera_observations,
+            timestamp: i as f64 * 0.033,
+            quality_scores,
+        });
+    }
+
+    println!(
+        "Multi-camera calibrator status: {:?}",
+        multi_cal.status()
+    );
+    println!(
+        "Progress: {:.1}%",
+        multi_cal.progress_percentage()
+    );
 }

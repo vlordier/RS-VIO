@@ -59,7 +59,7 @@ pub use factors::{
 };
 pub use guidance::{CalibrationCoverage, CalibrationGuidance, CalibrationSuggestion, MovementType};
 pub use multi_camera::{
-    create_camera_graph, CameraGraph, CameraPose, MultiCameraCalibrationConfig,
+    create_camera_graph, CameraEdge, CameraGraph, CameraPose, MultiCameraCalibrationConfig,
     MultiCameraCalibrationResult, MultiCameraCalibrationStatus, MultiCameraCalibrator,
     MultiViewObservation,
 };

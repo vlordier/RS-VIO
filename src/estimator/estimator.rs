@@ -7,6 +7,7 @@ use crate::estimator::constant_velocity_model::{ConstantVelocityConfig, Constant
 use crate::estimator::sliding_window::SlidingWindow;
 use crate::estimator::Frame;
 use crate::feature_tracker::StereoPatchTracker;
+use crate::imu::{ImuMotionPrior, ImuNoise, PreintegratedImu};
 use crate::types::{Matrix4x4, UnitQuaternion};
 use crate::viewers::Viewer;
 use anyhow::Result;
@@ -50,6 +51,14 @@ pub struct Estimator {
     /// Constant-velocity motion model for frame-to-frame prediction.
     /// Provides smoothed velocity estimation and pose extrapolation.
     velocity_model: ConstantVelocityModel,
+    /// IMU preintegration accumulator (reset between keyframes).
+    preintegration: PreintegratedImu,
+    /// Last estimated velocity in world frame (for IMU motion prior).
+    last_velocity: na::Vector3<f64>,
+    /// Gravity vector in world frame [m/s²].
+    gravity: na::Vector3<f64>,
+    /// Timestamp of the last IMU sample processed (nanoseconds).
+    last_imu_timestamp_ns: i64,
     /// Counter for consecutive motion tracking failures.
     /// When this exceeds a threshold, we force a keyframe to prevent map staleness.
     consecutive_tracking_failures: u32,
@@ -115,6 +124,10 @@ impl Estimator {
             right_image_buffer,
             imu_buffer,
             velocity_model: ConstantVelocityModel::new(ConstantVelocityConfig::default()),
+            preintegration: PreintegratedImu::new(ImuNoise::default()),
+            last_velocity: na::Vector3::zeros(),
+            gravity: na::Vector3::new(0.0, 0.0, -9.81),
+            last_imu_timestamp_ns: 0,
             consecutive_tracking_failures: 0,
         }
     }
@@ -236,6 +249,21 @@ impl Estimator {
         if let Some(imu) = imu_data {
             self.imu_buffer.clear();
             self.imu_buffer.extend_from_slice(imu);
+
+            // Preintegrate IMU measurements for motion prior
+            for sample in imu {
+                let dt = if self.last_imu_timestamp_ns > 0 {
+                    (sample.timestamp - self.last_imu_timestamp_ns) as f64 / 1e9
+                } else {
+                    0.0
+                };
+                if dt > 0.0 {
+                    self.preintegration
+                        .integrate(sample.gyro_vec3(), sample.accel_vec3(), dt);
+                }
+                self.last_imu_timestamp_ns = sample.timestamp;
+            }
+
             current_frame.imu_from_last_frame =
                 std::mem::replace(&mut self.imu_buffer, Vec::with_capacity(100));
         }
@@ -255,14 +283,32 @@ impl Estimator {
         // second blocking lock() after the guard is dropped.
         let mut last_kf_pose: Option<Matrix4x4> = None;
 
-        // Constant-velocity prediction: extrapolate from the velocity model
-        let predicted_pose = self
-            .velocity_model
-            .predict_pose(
-                (timestamp_ns - self.velocity_model.last_timestamp()) as f64 / 1e9,
-            )
-            .ok()
-            .map(|iso| iso.to_homogeneous());
+        // Motion prediction: prefer IMU-based prior when preintegration is available,
+        // fall back to constant-velocity model otherwise.
+        let predicted_pose = if self.preintegration.delta_t > 0.0
+            && self.velocity_model.update_count() > 0
+        {
+            let last_pose = self.velocity_model.last_pose().to_homogeneous();
+            let prior = ImuMotionPrior::from_preintegration(
+                &self.preintegration,
+                last_pose,
+                self.last_velocity,
+                self.gravity,
+            );
+            let (pred_pose, _pred_vel) = prior.predict_state();
+            log::debug!(
+                "[Estimator] Using IMU motion prior (dt={:.4}s)",
+                self.preintegration.delta_t
+            );
+            Some(pred_pose)
+        } else {
+            self.velocity_model
+                .predict_pose(
+                    (timestamp_ns - self.velocity_model.last_timestamp()) as f64 / 1e9,
+                )
+                .ok()
+                .map(|iso| iso.to_homogeneous())
+        };
 
         let motion_tracking_result = match self.sliding_window.try_lock() {
             Ok(mut sliding_window) => {
@@ -300,7 +346,15 @@ impl Estimator {
                 if self.velocity_model.update_count() == 0 {
                     let _ = self.velocity_model.initialize(iso, timestamp_ns);
                 } else {
-                    let _ = self.velocity_model.update(iso, timestamp_ns);
+                    // Derive velocity from consecutive pose difference
+                    let dt = (timestamp_ns - self.velocity_model.last_timestamp()) as f64 / 1e9;
+                    if dt > 0.0 {
+                        let prev_t = self.velocity_model.last_pose().translation.vector;
+                        let _ = self.velocity_model.update(iso, timestamp_ns);
+                        self.last_velocity = (iso.translation.vector - prev_t) / dt;
+                    } else {
+                        let _ = self.velocity_model.update(iso, timestamp_ns);
+                    }
                 }
                 self.consecutive_tracking_failures = 0;
 
@@ -409,6 +463,10 @@ impl Estimator {
                 sliding_window.add_frame(current_frame);
             }
             self.schedule_optimization();
+
+            // Reset preintegration for next inter-keyframe interval
+            self.preintegration
+                .reset(na::Vector3::zeros(), na::Vector3::zeros());
 
             optimization_time_ms = optimization_start.elapsed().as_secs_f64() * 1000.0;
         }

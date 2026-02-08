@@ -512,7 +512,7 @@ impl MultiCameraCalibrator {
 
     /// Log a progress message
     fn log_progress(&self, message: &str) {
-        println!("{}", message);
+        log::info!("{}", message);
     }
 }
 
