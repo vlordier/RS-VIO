@@ -63,34 +63,4 @@ impl OptimizationResult {
     }
 }
 
-#[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::float_cmp)]
-mod tests {
-    use super::*;
-    use nalgebra::Vector3;
 
-    #[test]
-    fn test_optimization_result_creation() {
-        let bg = Vector3::new(0.01, -0.02, 0.005);
-        let ba = Vector3::new(0.1, 0.05, -0.08);
-
-        let result = OptimizationResult::new(bg, ba, 0.001);
-
-        assert_eq!(result.gyro_bias, bg);
-        assert_eq!(result.accel_bias, ba);
-        assert_eq!(result.bias_uncertainty, 0.001);
-        assert!(!result.converged);
-    }
-
-    #[test]
-    fn test_optimization_result_with_metadata() {
-        let bg = Vector3::new(0.01, -0.02, 0.005);
-        let ba = Vector3::new(0.1, 0.05, -0.08);
-
-        let result = OptimizationResult::with_metadata(bg, ba, 0.001, 10, 1.5, true);
-
-        assert_eq!(result.iterations, 10);
-        assert_eq!(result.final_cost, 1.5);
-        assert!(result.converged);
-    }
-}

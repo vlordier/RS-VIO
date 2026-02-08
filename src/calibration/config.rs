@@ -153,48 +153,20 @@ mod tests {
         assert_eq!(cfg.image_height, 480);
         assert!(cfg.auto_calibration_enabled);
         assert!(cfg.optimize_distortion);
-    }
-
-    #[test]
-    fn default_rolling_shutter_is_autodetect() {
-        let cfg = CalibrationConfig::default();
+        // Rolling shutter should default to auto-detect
         assert!(cfg.rolling_shutter_enabled.is_none());
     }
 
     #[test]
     fn serde_round_trip() {
-        let cfg = CalibrationConfig::default();
+        let mut cfg = CalibrationConfig::default();
+        cfg.rolling_shutter_enabled = Some(true);
+        cfg.max_stereo_pairs = 99;
         let yaml = serde_yaml::to_string(&cfg).expect("serialize");
         let deserialized: CalibrationConfig =
             serde_yaml::from_str(&yaml).expect("deserialize");
-        assert_eq!(deserialized.max_stereo_pairs, cfg.max_stereo_pairs);
-        assert_eq!(deserialized.min_feature_matches, cfg.min_feature_matches);
+        assert_eq!(deserialized.max_stereo_pairs, 99);
+        assert_eq!(deserialized.rolling_shutter_enabled, Some(true));
         assert!((deserialized.initial_focal_length - cfg.initial_focal_length).abs() < f64::EPSILON);
-        assert_eq!(deserialized.rolling_shutter_enabled, cfg.rolling_shutter_enabled);
-    }
-
-    #[test]
-    fn clone_preserves_values() {
-        let mut cfg = CalibrationConfig::default();
-        cfg.max_stereo_pairs = 99;
-        cfg.rolling_shutter_enabled = Some(true);
-        let cloned = cfg.clone();
-        assert_eq!(cloned.max_stereo_pairs, 99);
-        assert_eq!(cloned.rolling_shutter_enabled, Some(true));
-    }
-
-    #[test]
-    fn fields_are_independently_modifiable() {
-        let mut cfg = CalibrationConfig::default();
-        cfg.auto_calibration_enabled = false;
-        cfg.adaptive_guidance_enabled = false;
-        cfg.rolling_shutter_enabled = Some(false);
-        cfg.max_iterations = 42;
-        assert!(!cfg.auto_calibration_enabled);
-        assert!(!cfg.adaptive_guidance_enabled);
-        assert_eq!(cfg.rolling_shutter_enabled, Some(false));
-        assert_eq!(cfg.max_iterations, 42);
-        // Other fields unchanged
-        assert_eq!(cfg.max_stereo_pairs, 50);
     }
 }

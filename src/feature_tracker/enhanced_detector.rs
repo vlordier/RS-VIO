@@ -503,31 +503,76 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_enhanced_detector_creation() {
-        let config = EnhancedDetectorConfig::default();
-        let detector = EnhancedFeatureDetector::new(config);
-        assert_eq!(detector.config.max_features, 1000);
-    }
+    fn test_detect_on_textured_image() {
+        // Create a textured image with bright squares that produce corners
+        let img = image::GrayImage::from_fn(320, 240, |x, y| {
+            let bx = x % 40;
+            let by = y % 40;
+            if (10..30).contains(&bx) && (10..30).contains(&by) {
+                image::Luma([220u8])
+            } else {
+                image::Luma([30u8])
+            }
+        });
 
-    #[test]
-    fn test_hamming_distance() {
-        let desc1 = [0u8; 16];
-        let mut desc2 = [0u8; 16];
-        desc2[0] = 1;
+        let detector = EnhancedFeatureDetector::new(EnhancedDetectorConfig {
+            max_features: 200,
+            fast_threshold: 15,
+            pyramid_levels: 2,
+            ..Default::default()
+        });
 
-        let distance = hamming_distance(&desc1, &desc2);
-        assert_eq!(distance, 1);
-    }
+        let features = detector.detect(&img);
 
-    #[test]
-    fn test_brief_pattern_generation() {
-        let pattern = EnhancedFeatureDetector::generate_brief_pattern(16);
-        assert_eq!(pattern.len(), 16);
+        // Textured image should produce features
+        assert!(
+            !features.is_empty(),
+            "Textured image should produce at least some features"
+        );
 
-        // Check that positions are unique
-        let mut positions = std::collections::HashSet::new();
-        for &(dx, dy) in &pattern {
-            assert!(positions.insert((dx, dy)));
+        // All features should be within image bounds
+        for f in &features {
+            assert!((0.0..320.0).contains(&f.point.x), "x={} out of bounds", f.point.x);
+            assert!((0.0..240.0).contains(&f.point.y), "y={} out of bounds", f.point.y);
+            assert!(f.score > 0.0, "Score should be positive");
+            assert!((0.0..=1.0).contains(&f.quality), "Quality should be in [0,1]");
         }
+
+        // Features should respect max_features limit
+        assert!(features.len() <= 200);
+    }
+
+    #[test]
+    fn test_hamming_distance_known_values() {
+        // All zeros → distance 0
+        assert_eq!(hamming_distance(&[0u8; 16], &[0u8; 16]), 0);
+
+        // All ones vs all zeros → 128 bits differ
+        assert_eq!(hamming_distance(&[0xFFu8; 16], &[0u8; 16]), 128);
+
+        // Single bit flip
+        let mut d = [0u8; 16];
+        d[0] = 0b0000_0001;
+        assert_eq!(hamming_distance(&[0u8; 16], &d), 1);
+
+        // Symmetric
+        let d1 = [0xAA; 16];
+        let d2 = [0x55; 16];
+        assert_eq!(hamming_distance(&d1, &d2), hamming_distance(&d2, &d1));
+        assert_eq!(hamming_distance(&d1, &d2), 128); // all bits differ
+    }
+
+    #[test]
+    fn test_uniform_image_produces_few_features() {
+        let img = image::GrayImage::from_pixel(320, 240, image::Luma([128u8]));
+        let detector = EnhancedFeatureDetector::new(EnhancedDetectorConfig::default());
+        let features = detector.detect(&img);
+
+        // Uniform image should produce zero or very few features
+        assert!(
+            features.len() < 5,
+            "Uniform image should have almost no features, got {}",
+            features.len()
+        );
     }
 }

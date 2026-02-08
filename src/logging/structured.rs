@@ -157,24 +157,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_structured_logger_creation() {
-        let logger = StructuredLogger::new(None);
-        assert!(logger.is_ok());
-    }
-
-    #[test]
-    fn test_log_context() {
-        let ctx = LogContext::new("estimator", "process_frame", "vio");
-        assert_eq!(ctx.component, "estimator");
-        assert_eq!(ctx.operation, "process_frame");
-        assert_eq!(ctx.module, "vio");
-    }
-
-    #[test]
-    fn test_structured_logger_metadata() {
+    fn test_structured_logger_logs_with_context() {
         let mut logger = StructuredLogger::new(None).unwrap();
+        logger.set_context(LogContext::new("estimator", "process_frame", "vio"));
         logger.add_metadata("frame_id", "42");
         logger.add_metadata("features", "256");
+
+        // Context should be set
+        assert!(logger.context.is_some());
+        assert_eq!(logger.context.as_ref().unwrap().component, "estimator");
+        // Metadata should accumulate
         assert_eq!(logger.metadata.len(), 2);
+
+        // Logging with context should not panic
+        logger.info("Processing frame");
+        logger.warn("High latency detected");
     }
 }

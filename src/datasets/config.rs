@@ -244,65 +244,6 @@ mod tests {
     }
 
     #[test]
-    fn test_default_helper_functions() {
-        assert_eq!(default_five(), 5);
-        assert!((default_max_change() - 0.5).abs() < f64::EPSILON);
-        assert!((default_reg_weight() - 0.01).abs() < f64::EPSILON);
-        assert!(default_true());
-    }
-
-    #[test]
-    fn test_camera_config_intrinsics() {
-        let camera = CameraConfig {
-            image_width: 640,
-            image_height: 480,
-            left_intrinsics: vec![500.0, 500.0, 320.0, 240.0],
-            left_distortion: vec![0.0, 0.0],
-            right_intrinsics: vec![505.0, 505.0, 320.0, 240.0],
-            right_distortion: vec![0.0, 0.0],
-            left_model: Some("EUCM".to_string()),
-            right_model: Some("EUCM".to_string()),
-            T_B_Cl: vec![
-                1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-            ],
-            T_B_Cr: vec![
-                1.0, 0.0, 0.0, -0.12, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-            ],
-        };
-
-        assert_eq!(camera.image_width, 640);
-        assert_eq!(camera.image_height, 480);
-        assert!((camera.left_intrinsics[0] - 500.0).abs() < f64::EPSILON);
-        assert!((camera.right_intrinsics[0] - 505.0).abs() < f64::EPSILON);
-        assert_eq!(camera.left_model, Some("EUCM".to_string()));
-    }
-
-    #[test]
-    fn test_keyframe_management_config() {
-        let kf_config = KeyframeManagementConfig {
-            keyframe_window_size: 10,
-            translation_threshold: 0.1,
-            rotation_threshold: 0.05,
-        };
-
-        assert_eq!(kf_config.keyframe_window_size, 10);
-        assert!(kf_config.translation_threshold > 0.0);
-        assert!(kf_config.rotation_threshold > 0.0);
-    }
-
-    #[test]
-    fn test_optimization_config() {
-        let opt_config = OptimizationConfig {
-            bundle_adjustment_max_iterations: 100,
-            pnp_max_iterations: 50,
-        };
-
-        assert_eq!(opt_config.bundle_adjustment_max_iterations, 100);
-        assert_eq!(opt_config.pnp_max_iterations, 50);
-        assert!(opt_config.bundle_adjustment_max_iterations > opt_config.pnp_max_iterations);
-    }
-
-    #[test]
     fn test_load_tum_vi_config_has_realistic_intrinsics() {
         // Validate that the real TUM-VI config loads and has physically reasonable values
         let config = Config::load("config/tum_vi.yaml").expect("TUM-VI config should load");

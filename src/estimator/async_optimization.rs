@@ -81,14 +81,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_async_optimizer_creation() {
-        let optimizer = AsyncOptimizer::new();
-        let count = optimizer.keyframe_count().await;
-        assert_eq!(count, 0, "New optimizer should have 0 keyframes");
-    }
-
-    #[tokio::test]
-    async fn test_optimizer_cloning() {
+    async fn test_optimizer_cloning_shares_state() {
         let optimizer1 = AsyncOptimizer::new();
         let optimizer2 = optimizer1.clone_optimizer();
 
@@ -96,18 +89,22 @@ mod tests {
             optimizer1.shares_state_with(&optimizer2),
             "Cloned optimizers should share state"
         );
+        assert!(
+            !optimizer1.shares_state_with(&AsyncOptimizer::new()),
+            "Independent optimizers should not share state"
+        );
     }
 
     #[tokio::test]
-    async fn test_optimizer_state_queries() {
+    async fn test_optimize_empty_window() {
         let optimizer = AsyncOptimizer::new();
 
-        let kf_count = optimizer.keyframe_count().await;
-        let mp_count = optimizer.map_point_count().await;
-        let is_full = optimizer.is_full().await;
+        // Optimization on empty window should succeed (no-op)
+        let elapsed_ms = optimizer.optimize().await;
+        assert!(elapsed_ms.is_ok(), "Optimize on empty window should not fail");
 
-        assert_eq!(kf_count, 0);
-        assert_eq!(mp_count, 0);
-        assert!(!is_full);
+        // Window should still be empty
+        assert_eq!(optimizer.keyframe_count().await, 0);
+        assert!(!optimizer.is_full().await);
     }
 }

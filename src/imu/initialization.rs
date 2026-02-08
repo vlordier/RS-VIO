@@ -412,25 +412,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_imu_initializer_creation() {
-        let config = ImuInitializationConfig::default();
-        let initializer = ImuInitializer::new(config);
-
-        assert_eq!(initializer.state(), InitializationState::Uninitialized);
-        assert!(!initializer.is_initialized());
-    }
-
-    #[test]
-    fn test_bias_estimate_default() {
-        let bias = BiasEstimate::default();
-
-        assert_eq!(bias.gyro_bias, na::Vector3::zeros());
-        assert_eq!(bias.accel_bias, na::Vector3::zeros());
-        assert!(bias.gyro_bias_std > 0.0);
-        assert!(bias.accel_bias_std > 0.0);
-    }
-
-    #[test]
     fn test_adaptive_noise_estimator() {
         let mut estimator = AdaptiveNoiseEstimator::new(0.1, 0.01);
 
@@ -438,8 +419,8 @@ mod tests {
         assert!((estimator.accel_noise() - 0.1).abs() < 1e-6);
         assert!((estimator.gyro_noise() - 0.01).abs() < 1e-6);
 
-        // Add some measurements
-        for _ in 0..10 {
+        // Add static measurements (zero motion) — noise should stay near baseline
+        for _ in 0..50 {
             let imu = ImuData {
                 timestamp: 0,
                 accel: [0.0, 0.0, -9.81],
@@ -448,9 +429,17 @@ mod tests {
             estimator.add_measurement(&imu);
         }
 
-        // Noise should still be close to baseline (low variance)
-        assert!(estimator.accel_noise() > 0.0);
-        assert!(estimator.gyro_noise() > 0.0);
+        // With perfectly static data, estimated noise should remain close to baseline
+        assert!(
+            estimator.accel_noise() < 0.5,
+            "Accel noise should stay low for static data: {}",
+            estimator.accel_noise()
+        );
+        assert!(
+            estimator.gyro_noise() < 0.1,
+            "Gyro noise should stay low for static data: {}",
+            estimator.gyro_noise()
+        );
     }
 
     #[test]

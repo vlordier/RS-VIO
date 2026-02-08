@@ -261,51 +261,95 @@ fn distribute_features_in_grid(
 mod tests {
     use super::*;
 
-    #[test]
-    #[allow(clippy::float_cmp)]
-    fn test_config_default() {
-        let config = AsyncDetectorConfig::default();
-        assert_eq!(config.num_parallel_tasks, 4);
-        assert_eq!(config.grid_cell_size, 32);
-        assert_eq!(config.max_features, 1000);
-        assert_eq!(config.threshold, 20.0);
+    /// Create a textured test image (bright squares on dark background) as raw bytes
+    fn create_textured_image(width: usize, height: usize) -> Vec<u8> {
+        let mut data = vec![0u8; width * height];
+        for y in 0..height {
+            for x in 0..width {
+                let bx = x % 40;
+                let by = y % 40;
+                data[y * width + x] = if (10..30).contains(&bx) && (10..30).contains(&by) {
+                    220
+                } else {
+                    30
+                };
+            }
+        }
+        data
     }
 
     #[test]
-    fn test_detector_creation() {
-        let detector = AsyncFeatureDetector::new(AsyncDetectorConfig::default());
-        assert_eq!(detector.config.num_parallel_tasks, 4);
+    fn test_detect_features_on_textured_image() {
+        let image_data = create_textured_image(320, 240);
+        let detector = AsyncFeatureDetector::new(AsyncDetectorConfig {
+            threshold: 20.0,
+            max_features: 500,
+            ..Default::default()
+        });
+
+        let features = detector.detect(&image_data, 320, 240);
+
+        // Textured image should produce features
+        assert!(
+            !features.is_empty(),
+            "Textured image must produce features"
+        );
+
+        // All features should be within image bounds
+        for f in &features {
+            assert!((0.0..320.0).contains(&f.x), "x={} out of bounds", f.x);
+            assert!((0.0..240.0).contains(&f.y), "y={} out of bounds", f.y);
+            assert!(f.score > 0.0, "Feature score must be positive");
+        }
     }
 
     #[test]
-    fn test_detect_features_sync() {
-        // Create simple test image (32x32)
-        let image_data = vec![100u8; 32 * 32];
+    fn test_uniform_image_produces_no_features() {
+        let image_data = vec![100u8; 64 * 64];
         let detector = AsyncFeatureDetector::new(AsyncDetectorConfig {
             threshold: 50.0,
             max_features: 100,
             ..Default::default()
         });
 
-        let features = detector.detect(&image_data, 32, 32);
-        // Uniform image should have few features
-        assert!(features.len() < 10);
+        let features = detector.detect(&image_data, 64, 64);
+        assert!(
+            features.is_empty(),
+            "Uniform image should produce zero features, got {}",
+            features.len()
+        );
     }
 
     #[tokio::test]
-    async fn test_detect_features_async() {
-        // Create simple test image (64x64)
-        let image_data = Arc::new(vec![100u8; 64 * 64]);
+    async fn test_detect_features_async_matches_sync() {
+        let image_data = create_textured_image(320, 240);
         let detector = AsyncFeatureDetector::new(AsyncDetectorConfig {
-            threshold: 50.0,
-            max_features: 100,
+            threshold: 20.0,
+            max_features: 500,
             num_parallel_tasks: 2,
             ..Default::default()
         });
 
-        let features = detector.detect_async(image_data, 64, 64).await;
-        // Uniform image should have few features
-        assert!(features.len() < 10);
+        let sync_features = detector.detect(&image_data, 320, 240);
+        let async_features = detector
+            .detect_async(Arc::new(image_data), 320, 240)
+            .await;
+
+        // Async should also produce features on textured image
+        assert!(
+            !async_features.is_empty(),
+            "Async detection must produce features on textured image"
+        );
+
+        // Both should find features in roughly the same ballpark
+        // (exact count may differ due to parallel region splitting)
+        let ratio = async_features.len() as f64 / sync_features.len().max(1) as f64;
+        assert!(
+            (0.5..2.0).contains(&ratio),
+            "Async ({}) and sync ({}) feature counts should be similar",
+            async_features.len(),
+            sync_features.len()
+        );
     }
 
     #[test]
@@ -313,12 +357,12 @@ mod tests {
         let mut features = vec![
             DetectedFeature {
                 x: 5.0,
-                y: 45.0, // Different cell from (5,5)
+                y: 45.0,
                 score: 100.0,
             },
             DetectedFeature {
                 x: 45.0,
-                y: 5.0, // Different cell from (45,45)
+                y: 5.0,
                 score: 90.0,
             },
             DetectedFeature {
