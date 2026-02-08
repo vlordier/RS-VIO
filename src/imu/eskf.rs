@@ -114,6 +114,18 @@ impl Default for EskfState {
     }
 }
 
+/// Extract 3 diagonal standard deviations from a covariance matrix starting at `offset`.
+///
+/// Clamps negative variances (numerical artifacts) to zero before taking the square root.
+#[inline]
+fn diagonal_std(cov: &na::SMatrix<f64, 9, 9>, offset: usize) -> na::Vector3<f64> {
+    na::Vector3::new(
+        cov[(offset, offset)].max(0.0).sqrt(),
+        cov[(offset + 1, offset + 1)].max(0.0).sqrt(),
+        cov[(offset + 2, offset + 2)].max(0.0).sqrt(),
+    )
+}
+
 /// Error-State Kalman Filter for velocity and bias estimation
 pub struct Eskf {
     /// Current state estimate
@@ -339,31 +351,15 @@ impl Eskf {
 
     /// Get velocity uncertainty (standard deviation)
     pub fn get_velocity_std(&self) -> na::Vector3<f64> {
-        let var = self.state.covariance.fixed_view::<3, 3>(0, 0).diagonal();
-        na::Vector3::new(
-            var[0].max(0.0).sqrt(),
-            var[1].max(0.0).sqrt(),
-            var[2].max(0.0).sqrt(),
-        )
+        diagonal_std(&self.state.covariance, 0)
     }
 
     /// Get bias uncertainties
     pub fn get_bias_std(&self) -> (na::Vector3<f64>, na::Vector3<f64>) {
-        let gyro_var = self.state.covariance.fixed_view::<3, 3>(3, 3).diagonal();
-        let accel_var = self.state.covariance.fixed_view::<3, 3>(6, 6).diagonal();
-
-        let gyro_std = na::Vector3::new(
-            gyro_var[0].max(0.0).sqrt(),
-            gyro_var[1].max(0.0).sqrt(),
-            gyro_var[2].max(0.0).sqrt(),
-        );
-        let accel_std = na::Vector3::new(
-            accel_var[0].max(0.0).sqrt(),
-            accel_var[1].max(0.0).sqrt(),
-            accel_var[2].max(0.0).sqrt(),
-        );
-
-        (gyro_std, accel_std)
+        (
+            diagonal_std(&self.state.covariance, 3),
+            diagonal_std(&self.state.covariance, 6),
+        )
     }
 
     /// Reset filter (e.g., after reinitialization)

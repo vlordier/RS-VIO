@@ -992,16 +992,11 @@ impl StereoCalibrator {
         let opt_result = optimizer.optimize(&problem, &initial_values)?;
 
         // Check if optimization was successful
-        let is_successful = matches!(
-            &opt_result.status,
-            apex_solver::optimizer::OptimizationStatus::Converged
-                | apex_solver::optimizer::OptimizationStatus::CostToleranceReached
-                | apex_solver::optimizer::OptimizationStatus::ParameterToleranceReached
-                | apex_solver::optimizer::OptimizationStatus::GradientToleranceReached
-                | apex_solver::optimizer::OptimizationStatus::TrustRegionRadiusTooSmall
-                | apex_solver::optimizer::OptimizationStatus::MinCostThresholdReached
-                | apex_solver::optimizer::OptimizationStatus::MaxIterationsReached
-        );
+        let is_successful = crate::optimization::optimization_converged(&opt_result.status)
+            || matches!(
+                &opt_result.status,
+                apex_solver::optimizer::OptimizationStatus::MaxIterationsReached
+            );
 
         if !is_successful {
             return Err(format!(

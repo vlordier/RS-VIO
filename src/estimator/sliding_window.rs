@@ -7,6 +7,7 @@
 
 use crate::estimator::Frame;
 use crate::optimization::factors::{BundleAdjustmentFactor, PnPFactor};
+use crate::optimization::optimization_converged;
 use crate::types::{Matrix3x3, Matrix4x4, Vector3};
 use apex_solver::core::loss_functions::HuberLoss;
 use apex_solver::core::problem::{Problem, VariableEnum};
@@ -29,6 +30,15 @@ type ResidualTuple = (
     BundleAdjustmentFactor,
     Option<Box<dyn apex_solver::core::loss_functions::LossFunction + Send>>,
 );
+
+/// Pack a 4×4 homogeneous transform into a 7D SE3 parameter vector
+/// `[tx, ty, tz, qw, qi, qj, qk]` suitable for the optimizer.
+fn pose_to_se3_dvector(t_inv: &Matrix4x4) -> DVector<f64> {
+    let t = t_inv.fixed_view::<3, 1>(0, 3);
+    let r = Matrix3x3::from(t_inv.fixed_view::<3, 3>(0, 0));
+    let q = UnitQuaternion::from_matrix(&r);
+    DVector::from_column_slice(&[t.x, t.y, t.z, q.w, q.i, q.j, q.k])
+}
 
 /// Sliding window of keyframes for bundle adjustment optimization.
 ///
@@ -142,9 +152,9 @@ impl SlidingWindow {
         log::debug!("[SlidingWindow] Cleared all keyframes");
     }
 
-    fn build_solver_config(&self) -> LevenbergMarquardtConfig {
+    fn build_solver_config(solver_type: LinearSolverType) -> LevenbergMarquardtConfig {
         LevenbergMarquardtConfig::new()
-            .with_linear_solver_type(LinearSolverType::SparseCholesky)
+            .with_linear_solver_type(solver_type)
             .with_max_iterations(20)
             .with_cost_tolerance(1e-6)
             .with_parameter_tolerance(1e-9)
@@ -259,12 +269,7 @@ impl SlidingWindow {
                     .T_W_B
                     .try_inverse()
                     .expect("T_W_B should be invertible");
-                let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
-                let R_B_W = Matrix3x3::from(T_B_W.fixed_view::<3, 3>(0, 0));
-                let q_B_W = UnitQuaternion::from_matrix(&R_B_W);
-                let se3_data = DVector::from_column_slice(&[
-                    t_B_W.x, t_B_W.y, t_B_W.z, q_B_W.w, q_B_W.i, q_B_W.j, q_B_W.k,
-                ]);
+                let se3_data = pose_to_se3_dvector(&T_B_W);
                 local_initials.push(((*kf_var).clone(), (ManifoldType::SE3, se3_data)));
 
                 // Pre-compute fixed pose Arc for frame 0 (avoids recomputing inversion per-feature)
@@ -416,7 +421,9 @@ impl SlidingWindow {
         let saved_map_points = self.map_points.clone();
 
         // Initialize problem and solver
-        let mut solver = LevenbergMarquardt::with_config(self.build_solver_config());
+        let mut solver = LevenbergMarquardt::with_config(Self::build_solver_config(
+            LinearSolverType::SparseCholesky,
+        ));
         // solver.add_observer(TerminalObserver::new());
 
         let (problem, initial_values) = self.build_optimization_problem();
@@ -470,12 +477,7 @@ impl SlidingWindow {
 
                     // Create fallback solver with SparseQR (handles rank-deficient systems)
                     let mut fallback_solver = LevenbergMarquardt::with_config(
-                        LevenbergMarquardtConfig::new()
-                            .with_linear_solver_type(LinearSolverType::SparseQR)
-                            .with_max_iterations(20)
-                            .with_cost_tolerance(1e-6)
-                            .with_parameter_tolerance(1e-9)
-                            .with_jacobi_scaling(false),
+                        Self::build_solver_config(LinearSolverType::SparseQR),
                     );
 
                     match fallback_solver.optimize(&problem, &initial_values) {
@@ -529,15 +531,7 @@ impl SlidingWindow {
         &self,
         opt_result: &SolverResult<HashMap<String, VariableEnum>>,
     ) -> bool {
-        matches!(
-            &opt_result.status,
-            apex_solver::optimizer::OptimizationStatus::Converged
-                | apex_solver::optimizer::OptimizationStatus::CostToleranceReached
-                | apex_solver::optimizer::OptimizationStatus::ParameterToleranceReached
-                | apex_solver::optimizer::OptimizationStatus::GradientToleranceReached
-                | apex_solver::optimizer::OptimizationStatus::TrustRegionRadiusTooSmall
-                | apex_solver::optimizer::OptimizationStatus::MinCostThresholdReached
-        )
+        optimization_converged(&opt_result.status)
     }
 
     /// Revert keyframe poses and map points to saved state
@@ -671,14 +665,9 @@ impl SlidingWindow {
 
         // Create a new problem and solver
         let mut problem = Problem::new();
-        let mut solver = LevenbergMarquardt::with_config(
-            LevenbergMarquardtConfig::new()
-                .with_linear_solver_type(LinearSolverType::SparseCholesky)
-                .with_max_iterations(20)
-                .with_cost_tolerance(1e-6)
-                .with_parameter_tolerance(1e-9)
-                .with_jacobi_scaling(false),
-        );
+        let mut solver = LevenbergMarquardt::with_config(Self::build_solver_config(
+            LinearSolverType::SparseCholesky,
+        ));
         let mut initial_values = HashMap::new();
 
         // Add variable for the new frame
@@ -689,12 +678,7 @@ impl SlidingWindow {
         let T_B_W = T_W_B_init
             .try_inverse()
             .expect("T_W_B should be invertible");
-        let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
-        let R_B_W = Matrix3x3::from(T_B_W.fixed_view::<3, 3>(0, 0));
-        let q_B_W = UnitQuaternion::from_matrix(&R_B_W);
-        let se3_data = DVector::from_column_slice(&[
-            t_B_W.x, t_B_W.y, t_B_W.z, q_B_W.w, q_B_W.i, q_B_W.j, q_B_W.k,
-        ]);
+        let se3_data = pose_to_se3_dvector(&T_B_W);
         initial_values.insert(kf_var.clone(), (ManifoldType::SE3, se3_data));
 
         // Add factors: for both the left and right cameras, each point that was already in the map is used to optimize the new frame

@@ -51,6 +51,18 @@ fn extract_stereo_intrinsics(intrinsics: &[f64]) -> (f64, f64, f64, f64) {
     (intrinsics[0], intrinsics[1], intrinsics[2], intrinsics[3])
 }
 
+/// Pinhole projection: projects a 3D point using (fx, fy, cx, cy).
+#[inline]
+fn pinhole_project(
+    fx: f64,
+    fy: f64,
+    cx: f64,
+    cy: f64,
+    p: &na::Vector3<f64>,
+) -> na::Vector2<f64> {
+    na::Vector2::new(fx * p.x / p.z + cx, fy * p.y / p.z + cy)
+}
+
 /// Reprojection factor for stereo calibration
 ///
 /// This factor enforces that a 3D point projects correctly into both left and right cameras.
@@ -118,20 +130,18 @@ impl Factor for StereoReprojectionFactor {
         let relative_pose = vector_to_isometry(extrinsics);
 
         // Project point into left camera
-        let left_proj_x = fx_l * point_3d.x / point_3d.z + cx_l;
-        let left_proj_y = fy_l * point_3d.y / point_3d.z + cy_l;
+        let left_proj = pinhole_project(fx_l, fy_l, cx_l, cy_l, &point_3d);
 
         // Transform point to right camera frame and project
         let point_in_right = relative_pose.inverse() * point_3d;
-        let right_proj_x = fx_r * point_in_right.x / point_in_right.z + cx_r;
-        let right_proj_y = fy_r * point_in_right.y / point_in_right.z + cy_r;
+        let right_proj = pinhole_project(fx_r, fy_r, cx_r, cy_r, &point_in_right);
 
         // Compute residuals (4D)
         let mut residuals = na::DVector::zeros(4);
-        residuals[0] = left_proj_x - self.left_observation.x;
-        residuals[1] = left_proj_y - self.left_observation.y;
-        residuals[2] = right_proj_x - self.right_observation.x;
-        residuals[3] = right_proj_y - self.right_observation.y;
+        residuals[0] = left_proj.x - self.left_observation.x;
+        residuals[1] = left_proj.y - self.left_observation.y;
+        residuals[2] = right_proj.x - self.right_observation.x;
+        residuals[3] = right_proj.y - self.right_observation.y;
 
         // For now, skip analytical Jacobians (numerical differentiation will be used)
         let jacobian = if compute_jacobian {
@@ -236,17 +246,11 @@ impl Factor for RollingShutterFactor {
         let point_3d = na::Vector3::new(0.0, 0.0, 1.0); // Assume unit depth for now
 
         // Project to left camera (observed point)
-        let left_projected = na::Vector2::new(
-            fx_l * (point_3d.x / point_3d.z) + cx_l,
-            fy_l * (point_3d.y / point_3d.z) + cy_l,
-        );
+        let left_projected = pinhole_project(fx_l, fy_l, cx_l, cy_l, &point_3d);
 
         // Transform to right camera with corrected pose
         let point_in_right = corrected_relative_pose * point_3d;
-        let right_projected = na::Vector2::new(
-            fx_r * (point_in_right.x / point_in_right.z) + cx_r,
-            fy_r * (point_in_right.y / point_in_right.z) + cy_r,
-        );
+        let right_projected = pinhole_project(fx_r, fy_r, cx_r, cy_r, &point_in_right);
 
         // Residual is difference between observed and projected points
         let residual = na::DVector::from_vec(vec![
@@ -563,17 +567,11 @@ impl Factor for TemporalSuperResolutionFactor {
             );
 
             // Project point to left camera (observed point)
-            let left_projected = na::Vector2::new(
-                fx_l * (point_3d.x / point_3d.z) + cx_l,
-                fy_l * (point_3d.y / point_3d.z) + cy_l,
-            );
+            let left_projected = pinhole_project(fx_l, fy_l, cx_l, cy_l, &point_3d);
 
             // Transform point to right camera with corrected extrinsics
             let point_in_right = corrected_extrinsics * point_3d;
-            let right_projected = na::Vector2::new(
-                fx_r * (point_in_right.x / point_in_right.z) + cx_r,
-                fy_r * (point_in_right.y / point_in_right.z) + cy_r,
-            );
+            let right_projected = pinhole_project(fx_r, fy_r, cx_r, cy_r, &point_in_right);
 
             // Compute reprojection residuals with quality weighting
             let weight = observation.quality.sqrt(); // Square root for residual weighting
