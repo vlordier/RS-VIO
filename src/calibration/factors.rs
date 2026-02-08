@@ -396,9 +396,9 @@ impl Factor for EpipolarFactor {
     }
 }
 
-/// Temporal Super Resolution Factor for enhanced calibration accuracy
+/// Temporal Super Resolution Factor
 ///
-/// This factor leverages multiple stereo pairs over time to achieve temporal super resolution,
+/// This factor uses multiple stereo pairs over time to achieve temporal super resolution,
 /// providing more accurate calibration by:
 /// - Modeling smooth motion trajectories between frames
 /// - Enforcing temporal consistency constraints

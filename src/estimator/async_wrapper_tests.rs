@@ -263,9 +263,6 @@ async fn test_async_estimator_timeout_behavior() {
     estimator.shutdown().await;
 }
 
-// ============================================================================
-// ENHANCED REAL-TIME TESTS - Comprehensive Coverage for Production Readiness
-// ============================================================================
 
 #[tokio::test]
 async fn test_timeout_exact_duration_respected() {

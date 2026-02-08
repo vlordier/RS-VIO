@@ -5,7 +5,7 @@ use image::GrayImage;
 use rs_vio::datasets::config::Config;
 use rs_vio::datasets::{DatasetPlayer, ImageData, TUMVIPlayer};
 use rs_vio::estimator::{Frame, SlidingWindow};
-use rs_vio::feature_tracker::{EnhancedDetectorConfig, EnhancedFeatureDetector};
+use rs_vio::feature_tracker::{OrbDetectorConfig, OrbFeatureDetector};
 
 struct StereoFrame {
     left: GrayImage,
@@ -93,7 +93,7 @@ fn bench_tumvi_sequential_baseline(c: &mut Criterion) {
     };
 
     let n_frames = frames.len();
-    let detector_config = EnhancedDetectorConfig {
+    let detector_config = OrbDetectorConfig {
         max_features: (vio_cfg.feature_detection.max_features_per_grid as usize)
             .saturating_mul(vio_cfg.feature_detection.grid_cols as usize)
             .max(200),
@@ -107,7 +107,7 @@ fn bench_tumvi_sequential_baseline(c: &mut Criterion) {
     group.bench_function("tumvi_1000_frames", |b| {
         b.iter(|| {
             // Fresh detector and sliding window each iteration to avoid state carryover
-            let detector = EnhancedFeatureDetector::new(detector_config.clone());
+            let detector = OrbFeatureDetector::new(detector_config.clone());
             let mut sliding_window = SlidingWindow::with_default_size();
 
             for (idx, f) in frames.iter().enumerate() {
@@ -161,7 +161,7 @@ fn bench_synthetic_sequential(c: &mut Criterion) {
         })
         .collect();
 
-    let detector_config = EnhancedDetectorConfig {
+    let detector_config = OrbDetectorConfig {
         max_features: 200,
         fast_threshold: 20,
         min_distance: 8.0,
@@ -172,7 +172,7 @@ fn bench_synthetic_sequential(c: &mut Criterion) {
     group.throughput(criterion::Throughput::Elements(n_frames as u64));
     group.bench_function("200_frames", |b| {
         b.iter(|| {
-            let detector = EnhancedFeatureDetector::new(detector_config.clone());
+            let detector = OrbFeatureDetector::new(detector_config.clone());
             let mut sliding_window = SlidingWindow::with_default_size();
 
             for (idx, f) in frames.iter().enumerate() {

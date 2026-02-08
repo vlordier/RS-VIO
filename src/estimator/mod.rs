@@ -1,6 +1,6 @@
 //! VIO estimator module: async wrapper, sliding window, and motion models.
 
-pub mod async_enhancements;
+pub mod async_metrics;
 pub mod async_optimization;
 pub mod async_wrapper;
 pub mod constant_velocity_model;
@@ -10,7 +10,7 @@ pub mod frame;
 pub mod sliding_window;
 pub mod state;
 
-pub use async_enhancements::{
+pub use async_metrics::{
     DeadlineTracker, FailureRecoveryTracker, LatencyHistogram, PriorityFrameEntry,
     ProcessingMetrics, StreamingPatternAnalyzer,
 };

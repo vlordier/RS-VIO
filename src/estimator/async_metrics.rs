@@ -1,11 +1,11 @@
-//! Enhanced AsyncEstimator features for production deployment
+//! Async processing metrics, scheduling, and failure recovery
 //!
-//! This module provides advanced features built on top of AsyncEstimator:
+//! Utilities for AsyncEstimator:
 //! - Priority queue-based frame scheduling
 //! - Processing metrics and performance monitoring
 //! - Latency histograms and deadline tracking
 //! - Worker thread panic recovery
-//! - Advanced streaming pattern support
+//! - Streaming pattern analysis
 //! - Budget violation detection
 
 use std::cmp::Ordering;

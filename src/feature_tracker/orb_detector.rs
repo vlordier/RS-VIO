@@ -1,6 +1,6 @@
-//! Enhanced feature detector with ORB descriptors and subpixel refinement
+//! ORB feature detector with subpixel refinement
 //!
-//! This module provides advanced feature detection capabilities for stereo calibration:
+//! Feature detection for stereo calibration:
 //! - ORB (Oriented FAST and Rotated BRIEF) descriptors for robust matching
 //! - Subpixel corner refinement using quadratic interpolation
 //! - Patch-based super resolution for precise localization
@@ -10,9 +10,9 @@
 use imageproc::corners::Corner;
 use nalgebra as na;
 use rayon::prelude::*;
-/// Enhanced feature with descriptor and subpixel precision
+/// ORB feature with descriptor and subpixel precision
 #[derive(Debug, Clone)]
-pub struct EnhancedFeature {
+pub struct OrbFeature {
     /// Pixel coordinates (subpixel precision)
     pub point: na::Vector2<f32>,
     /// Feature orientation in radians
@@ -27,9 +27,9 @@ pub struct EnhancedFeature {
     pub quality: f32,
 }
 
-/// Configuration for enhanced feature detection
+/// Configuration for ORB feature detection
 #[derive(Debug, Clone)]
-pub struct EnhancedDetectorConfig {
+pub struct OrbDetectorConfig {
     /// Maximum number of features to detect
     pub max_features: usize,
     /// FAST threshold for initial detection
@@ -50,7 +50,7 @@ pub struct EnhancedDetectorConfig {
     pub brief_smoothing_sigma: f32,
 }
 
-impl Default for EnhancedDetectorConfig {
+impl Default for OrbDetectorConfig {
     fn default() -> Self {
         Self {
             max_features: 1000,
@@ -66,15 +66,15 @@ impl Default for EnhancedDetectorConfig {
     }
 }
 
-/// Enhanced feature detector with ORB descriptors
-pub struct EnhancedFeatureDetector {
-    config: EnhancedDetectorConfig,
+/// ORB feature detector with descriptors and subpixel refinement
+pub struct OrbFeatureDetector {
+    config: OrbDetectorConfig,
     brief_pattern: Vec<(i32, i32)>,
 }
 
-impl EnhancedFeatureDetector {
-    /// Create new enhanced feature detector
-    pub fn new(config: EnhancedDetectorConfig) -> Self {
+impl OrbFeatureDetector {
+    /// Create new ORB feature detector
+    pub fn new(config: OrbDetectorConfig) -> Self {
         let brief_pattern = Self::generate_brief_pattern(config.brief_pattern_size);
         Self {
             config,
@@ -83,16 +83,16 @@ impl EnhancedFeatureDetector {
     }
 
     /// Detect features with ORB descriptors
-    pub fn detect(&self, image: &image::GrayImage) -> Vec<EnhancedFeature> {
+    pub fn detect(&self, image: &image::GrayImage) -> Vec<OrbFeature> {
         // Adapt parameters based on image content
         let adaptive_config = self.adapt_parameters(image);
 
         // Parallel multi-scale detection
         // Level 0 uses the original image directly (avoids a full-image clone)
-        let mut features: Vec<EnhancedFeature> = self.detect_at_scale(image, 1.0);
+        let mut features: Vec<OrbFeature> = self.detect_at_scale(image, 1.0);
 
         if adaptive_config.pyramid_levels > 1 {
-            let pyramid_features: Vec<EnhancedFeature> = (1..adaptive_config.pyramid_levels)
+            let pyramid_features: Vec<OrbFeature> = (1..adaptive_config.pyramid_levels)
                 .into_par_iter()
                 .flat_map(|level| {
                     let scale = adaptive_config.scale_factor.powi(level as i32);
@@ -116,7 +116,7 @@ impl EnhancedFeatureDetector {
     }
 
     /// Detect features at a specific scale
-    fn detect_at_scale(&self, image: &image::GrayImage, scale: f32) -> Vec<EnhancedFeature> {
+    fn detect_at_scale(&self, image: &image::GrayImage, scale: f32) -> Vec<OrbFeature> {
         let mut features = Vec::new();
 
         // FAST corner detection
@@ -143,7 +143,7 @@ impl EnhancedFeatureDetector {
             // Compute feature quality based on corner score and descriptor variance
             let quality = self.compute_feature_quality(&descriptor, corner.score);
 
-            features.push(EnhancedFeature {
+            features.push(OrbFeature {
                 point: refined_point,
                 orientation,
                 descriptor,
@@ -160,7 +160,7 @@ impl EnhancedFeatureDetector {
     }
 
     /// Prune features to keep only the best ones
-    fn prune_features(&self, features: &mut Vec<EnhancedFeature>) {
+    fn prune_features(&self, features: &mut Vec<OrbFeature>) {
         if features.len() <= self.config.max_features {
             return;
         }
@@ -180,12 +180,12 @@ impl EnhancedFeatureDetector {
     }
 
     /// Apply minimum distance filter to avoid clustered features
-    fn apply_min_distance_filter(&self, features: &mut Vec<EnhancedFeature>) {
+    fn apply_min_distance_filter(&self, features: &mut Vec<OrbFeature>) {
         let mut filtered = Vec::new();
         let min_dist_sq = self.config.min_distance * self.config.min_distance;
 
         for feature in features.iter() {
-            let too_close = filtered.iter().any(|existing: &EnhancedFeature| {
+            let too_close = filtered.iter().any(|existing: &OrbFeature| {
                 let dx = feature.point.x - existing.point.x;
                 let dy = feature.point.y - existing.point.y;
                 dx * dx + dy * dy < min_dist_sq
@@ -200,7 +200,7 @@ impl EnhancedFeatureDetector {
     }
 
     /// Adapt detection parameters based on image content statistics
-    fn adapt_parameters(&self, image: &image::GrayImage) -> EnhancedDetectorConfig {
+    fn adapt_parameters(&self, image: &image::GrayImage) -> OrbDetectorConfig {
         let mut config = self.config.clone();
 
         // Compute image statistics
@@ -449,7 +449,7 @@ impl EnhancedFeatureDetector {
 
     /// Apply non-maximum suppression
     /// Uses swap_remove for O(1) removal instead of O(n) shift per element
-    fn apply_nms(&self, features: &mut Vec<EnhancedFeature>) {
+    fn apply_nms(&self, features: &mut Vec<OrbFeature>) {
         // Sort by score descending so higher-score features suppress lower-score ones
         features.sort_by(|a, b| {
             b.score
@@ -515,7 +515,7 @@ mod tests {
             }
         });
 
-        let detector = EnhancedFeatureDetector::new(EnhancedDetectorConfig {
+        let detector = OrbFeatureDetector::new(OrbDetectorConfig {
             max_features: 200,
             fast_threshold: 15,
             pyramid_levels: 2,
@@ -565,7 +565,7 @@ mod tests {
     #[test]
     fn test_uniform_image_produces_few_features() {
         let img = image::GrayImage::from_pixel(320, 240, image::Luma([128u8]));
-        let detector = EnhancedFeatureDetector::new(EnhancedDetectorConfig::default());
+        let detector = OrbFeatureDetector::new(OrbDetectorConfig::default());
         let features = detector.detect(&img);
 
         // Uniform image should produce zero or very few features

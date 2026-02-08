@@ -1,9 +1,9 @@
-//! Stereo feature matching with enhanced descriptors
+//! Stereo feature matching with ORB descriptors
 //!
-//! This module provides robust stereo correspondence using ORB descriptors
+//! Stereo correspondence using ORB descriptors
 //! with geometric constraints and outlier rejection for calibration.
 
-use crate::feature_tracker::enhanced_detector::{hamming_distance, EnhancedFeature};
+use crate::feature_tracker::orb_detector::{hamming_distance, OrbFeature};
 use nalgebra as na;
 use std::cell::Cell;
 
@@ -77,8 +77,8 @@ impl StereoMatcher {
     /// Match features between left and right images
     pub fn match_features(
         &self,
-        left_features: &[EnhancedFeature],
-        right_features: &[EnhancedFeature],
+        left_features: &[OrbFeature],
+        right_features: &[OrbFeature],
         camera_intrinsics: &na::Matrix3<f64>,
     ) -> Vec<StereoMatch> {
         if self.config.enable_hierarchical_matching {
@@ -112,8 +112,8 @@ impl StereoMatcher {
     /// Hierarchical coarse-to-fine matching for improved accuracy and speed
     fn hierarchical_matching(
         &self,
-        left_features: &[EnhancedFeature],
-        right_features: &[EnhancedFeature],
+        left_features: &[OrbFeature],
+        right_features: &[OrbFeature],
         camera_intrinsics: &na::Matrix3<f64>,
     ) -> Vec<StereoMatch> {
         let mut all_matches = Vec::new();
@@ -156,8 +156,8 @@ impl StereoMatcher {
     /// Match features at a specific pyramid level
     fn match_at_level(
         &self,
-        left_features: &[EnhancedFeature],
-        right_features: &[EnhancedFeature],
+        left_features: &[OrbFeature],
+        right_features: &[OrbFeature],
         camera_intrinsics: &na::Matrix3<f64>,
         scale: f32,
     ) -> Vec<StereoMatch> {
@@ -197,8 +197,8 @@ impl StereoMatcher {
 
     /// Scale features for pyramid level
     /// Re-uses a single allocation and only mutates the point field
-    fn scale_features(&self, features: &[EnhancedFeature], scale: f32) -> Vec<EnhancedFeature> {
-        let mut scaled: Vec<EnhancedFeature> = features.to_vec();
+    fn scale_features(&self, features: &[OrbFeature], scale: f32) -> Vec<OrbFeature> {
+        let mut scaled: Vec<OrbFeature> = features.to_vec();
         for f in &mut scaled {
             f.point *= scale;
         }
@@ -218,8 +218,8 @@ impl StereoMatcher {
     /// Descriptor matching with custom parameters
     fn descriptor_matching_with_params(
         &self,
-        left_features: &[EnhancedFeature],
-        right_features: &[EnhancedFeature],
+        left_features: &[OrbFeature],
+        right_features: &[OrbFeature],
         max_distance: u32,
     ) -> Vec<StereoMatch> {
         let mut matches = Vec::new();
@@ -280,8 +280,8 @@ impl StereoMatcher {
     fn geometric_verification_with_params(
         &self,
         candidate_matches: &[StereoMatch],
-        left_features: &[EnhancedFeature],
-        right_features: &[EnhancedFeature],
+        left_features: &[OrbFeature],
+        right_features: &[OrbFeature],
         camera_intrinsics: &na::Matrix3<f64>,
         max_epipolar_error: f32,
     ) -> Vec<StereoMatch> {
@@ -337,8 +337,8 @@ impl StereoMatcher {
     fn geometric_verification_robust(
         &self,
         candidate_matches: &[StereoMatch],
-        left_features: &[EnhancedFeature],
-        right_features: &[EnhancedFeature],
+        left_features: &[OrbFeature],
+        right_features: &[OrbFeature],
         camera_intrinsics: &na::Matrix3<f64>,
     ) -> Vec<StereoMatch> {
         if candidate_matches.len() < 8 {
@@ -409,8 +409,8 @@ impl StereoMatcher {
     fn geometric_verification(
         &self,
         candidate_matches: &[StereoMatch],
-        left_features: &[EnhancedFeature],
-        right_features: &[EnhancedFeature],
+        left_features: &[OrbFeature],
+        right_features: &[OrbFeature],
         camera_intrinsics: &na::Matrix3<f64>,
     ) -> Vec<StereoMatch> {
         self.geometric_verification_with_params(
@@ -426,8 +426,8 @@ impl StereoMatcher {
     fn estimate_fundamental_matrix_ransac(
         &self,
         matches: &[StereoMatch],
-        left_features: &[EnhancedFeature],
-        right_features: &[EnhancedFeature],
+        left_features: &[OrbFeature],
+        right_features: &[OrbFeature],
         camera_intrinsics: &na::Matrix3<f64>,
     ) -> na::Matrix3<f64> {
         let mut best_f = na::Matrix3::zeros();
@@ -481,8 +481,8 @@ impl StereoMatcher {
     fn robust_fundamental_matrix_estimation(
         &self,
         matches: &[StereoMatch],
-        left_features: &[EnhancedFeature],
-        right_features: &[EnhancedFeature],
+        left_features: &[OrbFeature],
+        right_features: &[OrbFeature],
         camera_intrinsics: &na::Matrix3<f64>,
     ) -> na::Matrix3<f64> {
         let k_inv = camera_intrinsics.try_inverse().unwrap_or_else(|| {
@@ -527,8 +527,8 @@ impl StereoMatcher {
         &self,
         initial_f: &na::Matrix3<f64>,
         matches: &[StereoMatch],
-        left_features: &[EnhancedFeature],
-        right_features: &[EnhancedFeature],
+        left_features: &[OrbFeature],
+        right_features: &[OrbFeature],
         k_inv: &na::Matrix3<f64>,
     ) -> (na::Matrix3<f64>, Vec<f64>) {
         let mut weights = Vec::with_capacity(matches.len());
@@ -569,8 +569,8 @@ impl StereoMatcher {
     fn weighted_fundamental_matrix_estimation(
         &self,
         matches: &[StereoMatch],
-        left_features: &[EnhancedFeature],
-        right_features: &[EnhancedFeature],
+        left_features: &[OrbFeature],
+        right_features: &[OrbFeature],
         weights: &[f64],
         k_inv: &na::Matrix3<f64>,
     ) -> (na::Matrix3<f64>, Vec<f64>) {
@@ -640,8 +640,8 @@ impl StereoMatcher {
     fn estimate_fundamental_matrix_8point(
         &self,
         matches: &[&StereoMatch],
-        left_features: &[EnhancedFeature],
-        right_features: &[EnhancedFeature],
+        left_features: &[OrbFeature],
+        right_features: &[OrbFeature],
         k_inv: &na::Matrix3<f64>,
     ) -> Option<na::Matrix3<f64>> {
         if matches.len() != 8 {
@@ -947,8 +947,8 @@ mod tests {
 
     // ---- match_features tests ----
 
-    fn make_feature(x: f32, y: f32, descriptor: [u8; 16]) -> EnhancedFeature {
-        EnhancedFeature {
+    fn make_feature(x: f32, y: f32, descriptor: [u8; 16]) -> OrbFeature {
+        OrbFeature {
             point: na::Vector2::new(x, y),
             orientation: 0.0,
             descriptor,
@@ -1002,7 +1002,7 @@ mod tests {
         let matcher = StereoMatcher::new(StereoMatcherConfig::default());
         let intrinsics = na::Matrix3::<f64>::identity();
 
-        let empty: Vec<EnhancedFeature> = Vec::new();
+        let empty: Vec<OrbFeature> = Vec::new();
         let feat = vec![make_feature(10.0, 20.0, [0; 16])];
 
         assert!(matcher.match_features(&empty, &feat, &intrinsics).is_empty());

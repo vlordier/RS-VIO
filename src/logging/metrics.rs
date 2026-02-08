@@ -77,7 +77,7 @@ impl PerformanceMetrics {
         self._stats(&self.throughput_samples)
     }
 
-    /// Get comprehensive performance report
+    /// Get performance report
     pub fn report(&self) -> PerformanceReport {
         PerformanceReport {
             fps_avg: self.avg_fps(),

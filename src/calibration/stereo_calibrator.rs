@@ -8,7 +8,7 @@ use crate::calibration::quality::{
 };
 use crate::calibration::{rolling_shutter, triangulation};
 use crate::feature_tracker::{
-    EnhancedDetectorConfig, EnhancedFeatureDetector, StereoMatcher, StereoMatcherConfig,
+    OrbDetectorConfig, OrbFeatureDetector, StereoMatcher, StereoMatcherConfig,
 };
 use apex_solver::core::loss_functions::HuberLoss;
 use apex_solver::core::problem::Problem;
@@ -246,12 +246,12 @@ impl StereoCalibrator {
 
     /// Process raw stereo images with automatic feature detection and matching
     ///
-    /// This method provides enhanced auto-calibration by:
+    /// This method performs auto-calibration by:
     /// - Detecting features with ORB descriptors and subpixel refinement (if enabled)
     /// - Matching features using descriptor distance and geometric constraints
-    /// - Applying robust outlier rejection
+    /// - Applying outlier rejection
     ///
-    /// Falls back to basic feature detection if enhanced features are disabled.
+    /// Falls back to FAST feature detection if ORB features are disabled.
     ///
     /// # Arguments
     /// * `left_image` - Left camera image
@@ -266,22 +266,22 @@ impl StereoCalibrator {
         right_image: &image::GrayImage,
         timestamp: Option<f64>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        if self.config.enhanced_features_enabled {
-            self.process_stereo_images_enhanced(left_image, right_image, timestamp)
+        if self.config.orb_features_enabled {
+            self.process_stereo_images_orb(left_image, right_image, timestamp)
         } else {
             self.process_stereo_images_basic(left_image, right_image, timestamp)
         }
     }
 
-    /// Process stereo images with enhanced ORB features
-    fn process_stereo_images_enhanced(
+    /// Process stereo images with ORB features
+    fn process_stereo_images_orb(
         &mut self,
         left_image: &image::GrayImage,
         right_image: &image::GrayImage,
         timestamp: Option<f64>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        // Initialize enhanced feature detector
-        let detector_config = EnhancedDetectorConfig {
+        // Initialize ORB feature detector
+        let detector_config = OrbDetectorConfig {
             max_features: self.config.orb_max_features,
             fast_threshold: self.config.orb_fast_threshold,
             min_distance: 10.0,
@@ -292,7 +292,7 @@ impl StereoCalibrator {
             brief_pattern_size: 128,
             brief_smoothing_sigma: 2.0,
         };
-        let detector = EnhancedFeatureDetector::new(detector_config);
+        let detector = OrbFeatureDetector::new(detector_config);
 
         // Detect features in both images
         let left_features = detector.detect(left_image);
@@ -577,15 +577,15 @@ impl StereoCalibrator {
         }
     }
 
-    /// Create StereoPair from enhanced features and matches
+    /// Create StereoPair from ORB features and matches
     fn create_stereo_pair_from_matches(
         &self,
-        left_features: Vec<crate::feature_tracker::EnhancedFeature>,
-        right_features: Vec<crate::feature_tracker::EnhancedFeature>,
+        left_features: Vec<crate::feature_tracker::OrbFeature>,
+        right_features: Vec<crate::feature_tracker::OrbFeature>,
         matches: Vec<crate::feature_tracker::StereoMatch>,
         timestamp: f64,
     ) -> StereoPair {
-        // Convert enhanced features to basic feature format
+        // Convert ORB features to basic feature format
         let left_basic_features: Vec<na::Vector2<f64>> = left_features
             .iter()
             .map(|f| na::Vector2::new(f.point.x as f64, f.point.y as f64))

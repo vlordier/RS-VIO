@@ -83,7 +83,7 @@ fn main() -> anyhow::Result<()> {
     println!();
 
     // Example 4: Full performance report
-    println!("▶ Example 4: Comprehensive Performance Report");
+    println!("▶ Example 4: Performance Report");
     println!("──────────────────────────────────────────────\n");
 
     let report = metrics.report();

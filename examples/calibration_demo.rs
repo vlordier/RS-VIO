@@ -1,7 +1,7 @@
 //! Example output from stereo calibration logging system
 //!
 //! This shows the type of logging output you can expect when using
-//! the enhanced calibration system with logging enabled.
+//! the calibration system with logging enabled.
 use nalgebra as na;
 use rs_vio::calibration::stereo_calibrator::StereoPair;
 use rs_vio::calibration::CalibrationConfig;
@@ -64,7 +64,7 @@ fn main() {
     println!("✅ Outlier detection and counting");
     println!("✅ Stereo pair validation and progress tracking");
     println!("✅ Optimization convergence monitoring");
-    println!("✅ Final comprehensive quality report");
+    println!("✅ Final quality report");
     println!("✅ Stability analysis over time");
     println!();
 

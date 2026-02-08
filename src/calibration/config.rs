@@ -72,8 +72,8 @@ pub struct CalibrationConfig {
     pub log_calibration_metrics: bool,
     pub reprojection_error_threshold: f64,
 
-    /// Enhanced feature detection (ORB descriptors)
-    pub enhanced_features_enabled: bool,
+    /// ORB feature detection (descriptors + subpixel refinement)
+    pub orb_features_enabled: bool,
     pub orb_max_features: usize,
     pub orb_fast_threshold: u8,
     pub orb_scale_factor: f32,
@@ -84,7 +84,7 @@ pub struct CalibrationConfig {
     pub stereo_matcher_ratio_threshold: f32,
     pub stereo_matcher_ransac_iterations: usize,
 
-    /// Advanced optimization features
+    /// Optimization features
     pub enable_bundle_adjustment: bool,
     pub enable_temporal_tracking: bool,
 }
@@ -123,7 +123,7 @@ impl Default for CalibrationConfig {
             min_quality_for_auto_calibration: 0.8,
             log_calibration_metrics: true,
             reprojection_error_threshold: 1.0,
-            enhanced_features_enabled: true,
+            orb_features_enabled: true,
             orb_max_features: 1000,
             orb_fast_threshold: 20,
             orb_scale_factor: 1.2,

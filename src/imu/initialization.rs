@@ -1,12 +1,12 @@
 //! # IMU Initialization and Processing
 //!
-//! Enhanced IMU processing with robust initialization, bias estimation, and adaptive noise handling.
+//! IMU initialization, bias estimation, and adaptive noise handling.
 //!
 //! ## Features
 //!
 //! - **IMU Initialization**: Estimates initial biases and aligns to gravity
 //! - **Gravity Alignment**: Uses accelerometer measurements to determine local gravity direction
-//! - **Bias Estimation**: Robust bias estimation during initialization phase
+//! - **Bias Estimation**: Bias estimation during static initialization
 //! - **Adaptive Noise**: Adjusts measurement noise based on sensor quality metrics
 //! - **Covariance Propagation**: Proper uncertainty tracking through preintegration
 //!

@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-/// Comprehensive calibration quality metrics
+/// Calibration quality metrics
 #[derive(Debug, Clone)]
 pub struct CalibrationQualityMetrics {
     /// Mean reprojection error (pixels)
@@ -245,7 +245,7 @@ impl CalibrationLogger {
         trends
     }
 
-    /// Generate comprehensive logging report
+    /// Generate full logging report
     pub fn generate_full_report(&self) -> String {
         let trends = self.analyze_trends();
 

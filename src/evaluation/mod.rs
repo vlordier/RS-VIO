@@ -1,6 +1,6 @@
 //! VIO evaluation metrics and benchmarking tools
 //!
-//! Provides comprehensive evaluation of:
+//! Evaluation tools for:
 //! - Trajectory accuracy (ATE, RPE)
 //! - Ground truth trajectory loading and analysis
 //! - Visual-inertial odometry evaluation infrastructure
