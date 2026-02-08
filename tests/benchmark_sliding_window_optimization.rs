@@ -35,4 +35,14 @@ fn bench_optimization_build() {
         initials.len(),
         problem.num_residual_blocks()
     );
+
+    // Correctness: 8 frames should produce variables and residuals
+    assert!(
+        !initials.is_empty(),
+        "Optimization problem should have variables"
+    );
+    assert!(
+        problem.num_residual_blocks() > 0,
+        "Optimization problem should have residual blocks"
+    );
 }

@@ -553,4 +553,143 @@ mod tests {
         assert_eq!(jac.ncols(), 26);
         assert!(jac.iter().all(|x| x.is_finite()));
     }
+
+    /// Finite-difference Jacobian check for ImuFactor (SO3 variant).
+    /// Tests velocity, position, and bias parameters (Euclidean, no manifold retraction needed).
+    #[test]
+    fn test_imu_factor_jacobian_fd_euclidean_params() {
+        use crate::imu::preintegration::PreintegratedImu;
+
+        let noise = ImuNoise::default();
+        let mut preint = PreintegratedImu::new(noise);
+
+        // Integrate 10 IMU measurements at 200 Hz so biases actually affect the result
+        let gyro = Vector3::new(0.1, -0.05, 0.02);
+        let accel = Vector3::new(0.0, 0.0, 9.81);
+        for _ in 0..10 {
+            preint.integrate(gyro, accel, 0.005);
+        }
+
+        let gravity = Vector3::new(0.0, 0.0, -9.81);
+        let factor = ImuFactor::new(preint, gravity);
+
+        let params = vec![
+            DVector::from_vec(vec![1.0, 0.0, 0.0, 0.0]),     // R_i (quat: w,x,y,z)
+            DVector::from_vec(vec![0.1, 0.2, 0.3]),           // v_i
+            DVector::from_vec(vec![1.0, 2.0, 3.0]),           // p_i
+            DVector::from_vec(vec![1.0, 0.0, 0.0, 0.0]),     // R_j
+            DVector::from_vec(vec![0.15, 0.25, 0.25]),        // v_j
+            DVector::from_vec(vec![1.1, 2.1, 3.0]),           // p_j
+            DVector::from_vec(vec![0.01, -0.01, 0.005]),      // bias_g
+            DVector::from_vec(vec![0.05, 0.02, -0.03]),       // bias_a
+        ];
+
+        let (_residual_0, jacobian) = factor.linearize(&params, true);
+        let jac = jacobian.expect("Jacobian");
+
+        let eps = 1e-6;
+        // Check Euclidean params: v_i (block 1), p_i (block 2), v_j (block 4), p_j (block 5),
+        // bias_g (block 6), bias_a (block 7)
+        // Block column offsets: R_i=0..4, v_i=4..7, p_i=7..10, R_j=10..14, v_j=14..17, p_j=17..20, bg=20..23, ba=23..26
+        let block_specs: Vec<(usize, usize, usize)> = vec![
+            // (param_index, col_start, dim)
+            (1, 4, 3),   // v_i
+            (2, 7, 3),   // p_i
+            (4, 14, 3),  // v_j
+            (5, 17, 3),  // p_j
+            (6, 20, 3),  // bias_g
+            (7, 23, 3),  // bias_a
+        ];
+
+        for (param_idx, col_start, dim) in &block_specs {
+            for k in 0..*dim {
+                let mut params_plus = params.clone();
+                let mut params_minus = params.clone();
+                params_plus[*param_idx][k] += eps;
+                params_minus[*param_idx][k] -= eps;
+
+                let (r_plus, _) = factor.linearize(&params_plus, false);
+                let (r_minus, _) = factor.linearize(&params_minus, false);
+
+                let fd_col = (&r_plus - &r_minus) / (2.0 * eps);
+                let analytic_col = jac.column(col_start + k);
+
+                let diff = (fd_col.clone() - analytic_col).norm();
+                let denom = fd_col.norm().max(analytic_col.norm()).max(1e-8);
+                let relative_error = diff / denom;
+
+                assert!(
+                    relative_error < 1e-3,
+                    "FD Jacobian mismatch for param block {} col {}: rel_err={:.6e} (analytic={:.4e}, fd={:.4e})",
+                    param_idx, k, relative_error, analytic_col.norm(), fd_col.norm()
+                );
+            }
+        }
+    }
+
+    /// Finite-difference Jacobian check for ImuFactorSe3.
+    /// Tests velocity and bias parameters (Euclidean blocks).
+    #[test]
+    fn test_imu_factor_se3_jacobian_fd_euclidean_params() {
+        use crate::imu::preintegration::PreintegratedImu;
+
+        let noise = ImuNoise::default();
+        let mut preint = PreintegratedImu::new(noise);
+
+        // Integrate 10 IMU measurements so biases actually affect the result
+        let gyro = Vector3::new(0.1, -0.05, 0.02);
+        let accel = Vector3::new(0.0, 0.0, 9.81);
+        for _ in 0..10 {
+            preint.integrate(gyro, accel, 0.005);
+        }
+
+        let gravity = Vector3::new(0.0, 0.0, -9.81);
+        let factor = ImuFactorSe3::new(preint, gravity);
+
+        let params = vec![
+            DVector::from_vec(vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]),  // T_i (t,q)
+            DVector::from_vec(vec![0.1, 0.2, 0.3]),                        // v_i
+            DVector::from_vec(vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]),  // T_j
+            DVector::from_vec(vec![0.15, 0.25, 0.25]),                     // v_j
+            DVector::from_vec(vec![0.01, -0.01, 0.005]),                   // bias_g
+            DVector::from_vec(vec![0.05, 0.02, -0.03]),                    // bias_a
+        ];
+
+        let (_residual_0, jacobian) = factor.linearize(&params, true);
+        let jac = jacobian.expect("Jacobian");
+
+        let eps = 1e-6;
+        // SE3 block layout: T_i=0..7, v_i=7..10, T_j=10..17, v_j=17..20, bg=20..23, ba=23..26
+        let block_specs: Vec<(usize, usize, usize)> = vec![
+            (1, 7, 3),   // v_i
+            (3, 17, 3),  // v_j
+            (4, 20, 3),  // bias_g
+            (5, 23, 3),  // bias_a
+        ];
+
+        for (param_idx, col_start, dim) in &block_specs {
+            for k in 0..*dim {
+                let mut params_plus = params.clone();
+                let mut params_minus = params.clone();
+                params_plus[*param_idx][k] += eps;
+                params_minus[*param_idx][k] -= eps;
+
+                let (r_plus, _) = factor.linearize(&params_plus, false);
+                let (r_minus, _) = factor.linearize(&params_minus, false);
+
+                let fd_col = (&r_plus - &r_minus) / (2.0 * eps);
+                let analytic_col = jac.column(col_start + k);
+
+                let diff = (fd_col.clone() - analytic_col).norm();
+                let denom = fd_col.norm().max(analytic_col.norm()).max(1e-8);
+                let relative_error = diff / denom;
+
+                assert!(
+                    relative_error < 1e-3,
+                    "SE3 FD Jacobian mismatch for param block {} col {}: rel_err={:.6e}",
+                    param_idx, k, relative_error
+                );
+            }
+        }
+    }
 }

@@ -918,4 +918,62 @@ mod tests {
         let sw = SlidingWindow::new(4);
         assert!(sw.get_keyframe_poses().is_empty());
     }
+
+    #[test]
+    fn build_optimization_problem_produces_residuals_and_variables() {
+        use crate::feature_tracker::Feature;
+
+        let mut sw = SlidingWindow::new(4);
+
+        // Create 4 keyframes with shared features (visible in both left and right cameras)
+        for i in 0..4 {
+            let mut frame = make_keyframe(i);
+            // Give each frame a slightly different pose (translation along x)
+            frame.state.T_W_B[(0, 3)] = i as f64 * 0.5;
+
+            // Add 50 features visible in both left + right, with valid undistorted coords
+            for fid in 0..50 {
+                let mut lf = Feature::new(fid, [100.0 + fid as f32, 200.0]);
+                lf.undistorted_coord = [0.1 + fid as f32 * 0.01, 0.2];
+                frame.left_features.push(lf);
+
+                let mut rf = Feature::new(fid, [90.0 + fid as f32, 200.0]);
+                rf.undistorted_coord = [0.09 + fid as f32 * 0.01, 0.2];
+                frame.right_features.push(rf);
+            }
+
+            sw.add_frame(frame);
+        }
+
+        let (problem, initials) = sw.build_optimization_problem();
+
+        // Should have residual blocks from the feature observations
+        assert!(
+            problem.num_residual_blocks() > 0,
+            "Problem should have residual blocks from feature observations"
+        );
+
+        // Should have initial values for landmarks and keyframe poses
+        assert!(
+            !initials.is_empty(),
+            "Problem should have initial values for landmarks and poses"
+        );
+
+        // Should have landmark variables (LM_*) and pose variables (KF_*)
+        let lm_count = initials.keys().filter(|k| k.starts_with("LM_")).count();
+        let kf_count = initials.keys().filter(|k| k.starts_with("KF_")).count();
+        assert!(lm_count > 0, "Should have landmark variables");
+        assert!(kf_count > 0, "Should have keyframe pose variables");
+    }
+
+    #[test]
+    fn optimize_requires_full_window() {
+        let mut sw = SlidingWindow::new(4);
+        // Only add 2 frames (window needs 4)
+        sw.add_frame(make_keyframe(1));
+        sw.add_frame(make_keyframe(2));
+
+        let result = sw.optimize();
+        assert!(result.is_err(), "Optimize should fail with incomplete window");
+    }
 }

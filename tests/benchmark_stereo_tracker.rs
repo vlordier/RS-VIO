@@ -65,4 +65,10 @@ fn bench_stereo_tracker_process_frame() {
         "Average features per frame: {}",
         total_features / iterations as usize
     );
+
+    // Correctness: textured images should produce features
+    assert!(
+        total_features > 0,
+        "Stereo tracker should detect features on textured images"
+    );
 }

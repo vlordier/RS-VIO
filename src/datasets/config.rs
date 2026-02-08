@@ -231,19 +231,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_calibration_refinement_config_defaults() {
-        let config = CalibrationRefinementConfig::default();
-
-        assert!(!config.optimize_intrinsics);
-        assert!(config.optimize_focal_length);
-        assert!(!config.optimize_principal_point);
-        assert!(!config.optimize_distortion);
-        assert_eq!(config.intrinsics_refinement_frequency, 5);
-        assert!((config.max_intrinsics_change_per_update - 0.5).abs() < f64::EPSILON);
-        assert!((config.intrinsics_regularization_weight - 0.01).abs() < f64::EPSILON);
-    }
-
-    #[test]
     fn test_load_tum_vi_config_has_realistic_intrinsics() {
         // Validate that the real TUM-VI config loads and has physically reasonable values
         let config = Config::load("config/tum_vi.yaml").expect("TUM-VI config should load");

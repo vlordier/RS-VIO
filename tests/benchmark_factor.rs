@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used)]
+
 use apex_solver::factors::Factor;
 use na::{DVector, Matrix4, Vector2, Vector3};
 use nalgebra as na;
@@ -33,6 +35,15 @@ fn bench_factor_linearize() {
         duration, iterations
     );
     println!("  Avg: {:?}", duration / iterations as u32);
+
+    // Correctness: residual should be finite, Jacobian should have correct dimensions
+    let (residual, jacobian) = factor.linearize(&params, true);
+    assert!(residual.iter().all(|v| v.is_finite()), "Residual must be finite");
+    assert_eq!(residual.len(), 2, "Reprojection residual must be 2D");
+    let jac = jacobian.unwrap();
+    assert_eq!(jac.nrows(), 2, "Jacobian rows = residual dim");
+    assert_eq!(jac.ncols(), 9, "Jacobian cols = 3 (point) + 6 (pose)");
+    assert!(jac.iter().all(|v| v.is_finite()), "Jacobian must be finite");
 }
 
 #[test]
@@ -66,4 +77,13 @@ fn bench_pnp_factor_linearize() {
         duration, iterations
     );
     println!("  Avg: {:?}", duration / iterations as u32);
+
+    // Correctness: residual should be finite, Jacobian should have correct dimensions
+    let (residual, jacobian) = factor.linearize(&params, true);
+    assert!(residual.iter().all(|v| v.is_finite()), "Residual must be finite");
+    assert_eq!(residual.len(), 2, "Reprojection residual must be 2D");
+    let jac = jacobian.unwrap();
+    assert_eq!(jac.nrows(), 2, "Jacobian rows = residual dim");
+    assert_eq!(jac.ncols(), 6, "Jacobian cols = 6 (pose)");
+    assert!(jac.iter().all(|v| v.is_finite()), "Jacobian must be finite");
 }

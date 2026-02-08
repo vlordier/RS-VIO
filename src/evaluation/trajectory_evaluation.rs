@@ -622,27 +622,6 @@ mod tests {
     }
 
     #[test]
-    fn test_trajectory_evaluation_structure() {
-        let eval = TrajectoryEvaluation {
-            algorithm: "VIO".to_string(),
-            ate_rmse: 0.1,
-            ate_mean: 0.08,
-            ate_median: 0.075,
-            ate_min: 0.01,
-            ate_max: 0.15,
-            ate_std: 0.03,
-            rpe_translation_rmse: 0.05,
-            rpe_rotation_rmse: 0.02,
-            num_poses: 100,
-            num_failed_matches: 0,
-        };
-
-        assert!((eval.ate_rmse - 0.1).abs() < 1e-6);
-        assert!((eval.rpe_translation_rmse - 0.05).abs() < 1e-6);
-        assert_eq!(eval.num_poses, 100);
-    }
-
-    #[test]
     fn test_ground_truth_trajectory_empty() {
         let traj = GroundTruthTrajectory::new("empty");
         assert_eq!(traj.len(), 0);

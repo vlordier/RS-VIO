@@ -56,4 +56,12 @@ fn benchmark_track_point_at_level_loop() {
         duration / iterations as u32
     );
     println!("Success count: {}", success_count);
+
+    // Correctness: tracking same patch against same image should mostly converge
+    assert!(
+        success_count > iterations / 2,
+        "Tracker should converge >50% of the time on identical patch, got {}/{}",
+        success_count,
+        iterations
+    );
 }
