@@ -8,7 +8,7 @@
 use crate::estimator::Frame;
 use crate::optimization::factors::{BundleAdjustmentFactor, PnPFactor};
 use crate::optimization::observer::TerminalObserver;
-use crate::optimization::optimization_converged;
+use crate::optimization::{optimization_converged, OptimizationResult};
 use crate::types::{Matrix3x3, Matrix4x4, Vector3};
 use apex_solver::core::loss_functions::HuberLoss;
 use apex_solver::core::problem::{Problem, VariableEnum};
@@ -421,7 +421,7 @@ impl SlidingWindow {
         (problem, initial_values)
     }
 
-    pub fn optimize(&mut self) -> Result<bool, std::io::Error> {
+    pub fn optimize(&mut self) -> Result<Option<OptimizationResult>, std::io::Error> {
         self.check_sliding_window_size_for_optimization()?;
 
         // Save current state before optimization for potential rollback
@@ -452,14 +452,14 @@ impl SlidingWindow {
                 "[SlidingWindow] Too few residuals ({}), skipping optimization",
                 num_residuals
             );
-            return Ok(false);
+            return Ok(None);
         }
 
         // Check if we have enough constraints (roughly: need at least 2 residuals per variable for well-posed problem)
         if num_residuals < num_variables {
             log::warn!("[SlidingWindow] Underconstrained problem: {} residuals < {} variables, skipping optimization",
                       num_residuals, num_variables);
-            return Ok(false);
+            return Ok(None);
         }
 
         // Initialize variables in the problem
@@ -471,7 +471,7 @@ impl SlidingWindow {
             .count();
         if landmark_variables == 0 {
             log::warn!("[SlidingWindow] No landmark variables found; skipping optimization");
-            return Ok(false);
+            return Ok(None);
         }
 
         // Try optimization with Schur complement (fallback to SparseCholesky on singular matrix)
@@ -497,7 +497,7 @@ impl SlidingWindow {
                         Err(e2) => {
                             log::error!("[SlidingWindow] Both Schur complement and fallback solver failed: {:?} - reverting to previous state", e2);
                             self.revert_to_saved_state(&saved_keyframe_poses, &saved_map_points);
-                            return Ok(false);
+                            return Ok(None);
                         },
                     }
                 } else {
@@ -507,13 +507,15 @@ impl SlidingWindow {
                         e
                     );
                     self.revert_to_saved_state(&saved_keyframe_poses, &saved_map_points);
-                    return Ok(false);
+                    return Ok(None);
                 }
             },
         };
 
         // Check if optimization was successful based on status
         let is_successful = self.is_optimization_successful(&opt_result);
+
+        let converged = is_successful;
 
         if is_successful {
             // Process successful optimization result
@@ -523,7 +525,6 @@ impl SlidingWindow {
                 opt_result.initial_cost,
                 opt_result.final_cost
             );
-            Ok(true)
         } else {
             // Optimization failed - revert to saved state
             log::warn!(
@@ -531,8 +532,16 @@ impl SlidingWindow {
                 opt_result.status
             );
             self.revert_to_saved_state(&saved_keyframe_poses, &saved_map_points);
-            Ok(false)
         }
+
+        Ok(Some(OptimizationResult {
+            gyro_bias: nalgebra::Vector3::zeros(),
+            accel_bias: nalgebra::Vector3::zeros(),
+            bias_uncertainty: 0.0,
+            iterations: opt_result.iterations,
+            final_cost: opt_result.final_cost,
+            converged,
+        }))
     }
 
     /// Check if optimization result indicates success
