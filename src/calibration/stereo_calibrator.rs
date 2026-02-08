@@ -322,7 +322,8 @@ impl StereoCalibrator {
         let matcher = StereoMatcher::new(matcher_config);
 
         // Use approximate intrinsics based on image size
-        // TODO: Use actual calibrated intrinsics when available
+        // NOTE: Uses approximate intrinsics from image dimensions; once calibrated,
+        // these could be refined in a second pass.
         let fx = left_image.width() as f64 * 0.8;
         let fy = left_image.height() as f64 * 0.8;
         let cx = left_image.width() as f64 * 0.5;
@@ -819,8 +820,8 @@ impl StereoCalibrator {
             self.temporal_sequences.len()
         ));
 
-        // TODO: Implement temporal super resolution optimization
-        // This would use TemporalSuperResolutionFactor and TemporalConsistencyFactor
+        // NOTE: Temporal super resolution is not yet implemented.
+        // Falls back to standard calibration with temporal metadata logging.
 
         // For now, fall back to standard calibration but log the temporal info
         let total_tracks: usize = self
