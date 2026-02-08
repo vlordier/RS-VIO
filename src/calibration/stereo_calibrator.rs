@@ -1503,35 +1503,58 @@ impl StereoCalibrator {
         right_point: &na::Vector2<f64>,
         params: &InitialParameters,
     ) -> Vec<f64> {
-        // Simple triangulation assuming known intrinsics and small baseline
-        // This is a rough initialization - optimization will refine it
+        let p = Self::triangulate_stereo(
+            left_point,
+            right_point,
+            params.left_intrinsics[0],
+            params.left_intrinsics[1],
+            params.left_intrinsics[2],
+            params.left_intrinsics[3],
+            params.extrinsics[3], // tx = baseline
+        );
+        vec![p.x, p.y, p.z]
+    }
 
-        let fx = params.left_intrinsics[0];
-        let fy = params.left_intrinsics[1];
-        let cx = params.left_intrinsics[2];
-        let cy = params.left_intrinsics[3];
+    /// Triangulate 3D point from stereo observations
+    fn triangulate_point(
+        &self,
+        left_point: &na::Vector2<f64>,
+        right_point: &na::Vector2<f64>,
+        left_intrinsics: &[f64],
+        extrinsics: &na::Isometry3<f64>,
+    ) -> na::Vector3<f64> {
+        Self::triangulate_stereo(
+            left_point,
+            right_point,
+            left_intrinsics[0],
+            left_intrinsics[1],
+            left_intrinsics[2],
+            left_intrinsics[3],
+            extrinsics.translation.x, // Assume horizontal baseline
+        )
+    }
 
-        let baseline = params.extrinsics[3]; // tx
-
-        // Convert to normalized coordinates
+    /// Core stereo triangulation: normalized coords → 3D point.
+    fn triangulate_stereo(
+        left_point: &na::Vector2<f64>,
+        right_point: &na::Vector2<f64>,
+        fx: f64,
+        fy: f64,
+        cx: f64,
+        cy: f64,
+        baseline: f64,
+    ) -> na::Vector3<f64> {
         let xl = (left_point.x - cx) / fx;
         let yl = (left_point.y - cy) / fy;
         let xr = (right_point.x - cx) / fx;
-        let _yr = (right_point.y - cy) / fy;
 
-        // Disparity
         let disparity = xl - xr;
         if disparity.abs() < 1e-6 {
-            // Points too close, use default depth
-            return vec![0.0, 0.0, 1.0];
+            return na::Vector3::new(0.0, 0.0, 1.0);
         }
 
-        // Triangulate
         let z = baseline / disparity;
-        let x = xl * z;
-        let y = yl * z;
-
-        vec![x, y, z]
+        na::Vector3::new(xl * z, yl * z, z)
     }
 
     /// Convert parameter vector to SE(3) isometry
@@ -1587,39 +1610,6 @@ impl StereoCalibrator {
         } else {
             0.0
         }
-    }
-
-    /// Triangulate 3D point from stereo observations
-    fn triangulate_point(
-        &self,
-        left_point: &na::Vector2<f64>,
-        right_point: &na::Vector2<f64>,
-        left_intrinsics: &[f64],
-        extrinsics: &na::Isometry3<f64>,
-    ) -> na::Vector3<f64> {
-        // Simplified triangulation - in practice, you'd use proper stereo triangulation
-        let fx = left_intrinsics[0];
-        let fy = left_intrinsics[1];
-        let cx = left_intrinsics[2];
-        let cy = left_intrinsics[3];
-
-        let baseline = extrinsics.translation.x; // Assume horizontal baseline
-
-        let xl = (left_point.x - cx) / fx;
-        let yl = (left_point.y - cy) / fy;
-        let xr = (right_point.x - cx) / fx;
-        let _yr = (right_point.y - cy) / fy;
-
-        let disparity = xl - xr;
-        if disparity.abs() < 1e-6 {
-            return na::Vector3::new(0.0, 0.0, 1.0);
-        }
-
-        let z = baseline / disparity;
-        let x = xl * z;
-        let y = yl * z;
-
-        na::Vector3::new(x, y, z)
     }
 
     /// Project 3D point to camera

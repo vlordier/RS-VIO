@@ -70,34 +70,6 @@ impl StereoReprojectionFactor {
             right_observation: right_obs,
         }
     }
-
-    /// Extract camera intrinsics from parameter vector
-    #[allow(dead_code)]
-    fn extract_intrinsics(params: &[f64]) -> Vec<f64> {
-        params.iter().take(9).cloned().collect()
-    }
-
-    /// Extract relative pose from parameter vector (6D -> SE(3))
-    #[allow(dead_code)]
-    fn extract_relative_pose(params: &[f64]) -> na::Isometry3<f64> {
-        let rx = params[0];
-        let ry = params[1];
-        let rz = params[2];
-        let tx = params[3];
-        let ty = params[4];
-        let tz = params[5];
-
-        let rotation = na::UnitQuaternion::from_euler_angles(rx, ry, rz);
-        let translation = na::Vector3::new(tx, ty, tz);
-
-        na::Isometry3::from_parts(translation.into(), rotation)
-    }
-
-    /// Extract 3D point from parameter vector
-    #[allow(dead_code)]
-    fn extract_point(params: &[f64]) -> na::Vector3<f64> {
-        na::Vector3::new(params[0], params[1], params[2])
-    }
 }
 
 impl Factor for StereoReprojectionFactor {

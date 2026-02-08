@@ -1,7 +1,7 @@
-/// Phase 3A: Ground Truth Evaluation Module
-///
-/// This module loads TUM VI ground truth trajectories and provides
-/// trajectory evaluation metrics (ATE, RPE) for comparing VIO vs SLAM.
+//! Ground truth trajectory evaluation for VIO accuracy assessment.
+//!
+//! Loads TUM VI ground truth trajectories and provides trajectory
+//! evaluation metrics (ATE, RPE) for comparing VIO vs SLAM.
 use crate::types::{Matrix4x4, Vector3};
 use nalgebra as na;
 use rayon::prelude::*;

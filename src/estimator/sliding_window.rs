@@ -216,7 +216,6 @@ impl SlidingWindow {
             .keyframes
             .front()
             .expect("Keyframes should not be empty");
-        #[allow(clippy::unwrap_used, clippy::expect_used)]
         let T_Cl_B = Arc::new(
             first_frame
                 .state
@@ -224,7 +223,6 @@ impl SlidingWindow {
                 .try_inverse()
                 .expect("T_B_Cl should be invertible"),
         );
-        #[allow(clippy::unwrap_used, clippy::expect_used)]
         let T_Cr_B = Arc::new(
             first_frame
                 .state
@@ -253,7 +251,6 @@ impl SlidingWindow {
 
                 // Add KF pose
                 let kf_var = Arc::new(format!("KF_{}", id_frame));
-                #[allow(clippy::expect_used)]
                 let T_B_W = frame
                     .state
                     .T_W_B

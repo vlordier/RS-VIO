@@ -1,8 +1,6 @@
 #[cfg(test)]
 #[allow(clippy::module_inception)]
 #[allow(clippy::unwrap_used)]
-#[allow(clippy::clone_on_copy)]
-#[allow(clippy::needless_borrow)]
 mod tests {
     use crate::optimization::factors::BundleAdjustmentFactor;
     use crate::optimization::factors::BundleAdjustmentFactorTranslationOnly;
@@ -17,6 +15,23 @@ mod tests {
     use na::DVector;
     use nalgebra as na;
     use std::collections::HashMap;
+
+    // ── Shared test helpers ──
+
+    /// Extract landmark index from variable name like "LM_3"
+    fn get_landmark_idx(lm_var: &str) -> usize {
+        lm_var.strip_prefix("LM_").unwrap().parse().unwrap()
+    }
+
+    /// Project 3D point to normalized camera coordinates
+    fn project_to_normalized(p_cam: na::Vector3<f64>) -> na::Vector2<f64> {
+        na::Vector2::new(p_cam[0] / p_cam[2], p_cam[1] / p_cam[2])
+    }
+
+    /// Check if point is visible (in front of camera with sufficient depth)
+    fn is_visible(p_cam: &na::Vector3<f64>, min_depth: f64) -> bool {
+        p_cam[2] > min_depth && p_cam.iter().all(|&x| x.is_finite())
+    }
 
     #[test]
     fn test_pinhole_projection_factor() {
@@ -130,21 +145,6 @@ mod tests {
         const NOISE_RANGE: f64 = 0.05;
         const MIN_DEPTH: f64 = 0.1; // Minimum depth for point to be visible
         const TRANSLATION_RANGE: f64 = 3.0; // Range for random translations
-
-        // Helper: Extract landmark index from variable name
-        fn get_landmark_idx(lm_var: &str) -> usize {
-            lm_var.strip_prefix("LM_").unwrap().parse().unwrap()
-        }
-
-        // Helper: Project 3D point to normalized camera coordinates
-        fn project_to_normalized(p_cam: na::Vector3<f64>) -> na::Vector2<f64> {
-            na::Vector2::new(p_cam[0] / p_cam[2], p_cam[1] / p_cam[2])
-        }
-
-        // Helper: Check if point is visible (in front of camera)
-        fn is_visible(p_cam: &na::Vector3<f64>, min_depth: f64) -> bool {
-            p_cam[2] > min_depth && p_cam.iter().all(|&x| x.is_finite())
-        }
 
         // Helper: Transform point from world to camera frame
         fn world_to_camera(
@@ -397,21 +397,6 @@ mod tests {
         const TRANSLATION_RANGE: f64 = 3.0; // Range for random translations
         const MAX_ROTATION_ANGLE: f64 = 0.5; // Maximum rotation angle in radians (~5.7 degrees)
 
-        // Helper: Extract landmark index from variable name
-        fn get_landmark_idx(lm_var: &str) -> usize {
-            lm_var.strip_prefix("LM_").unwrap().parse().unwrap()
-        }
-
-        // Helper: Project 3D point to normalized camera coordinates
-        fn project_to_normalized(p_C: na::Vector3<f64>) -> na::Vector2<f64> {
-            na::Vector2::new(p_C[0] / p_C[2], p_C[1] / p_C[2])
-        }
-
-        // Helper: Check if point is visible (in front of camera)
-        fn is_visible(p_C: &na::Vector3<f64>, min_depth: f64) -> bool {
-            p_C[2] > min_depth && p_C.iter().all(|&x| x.is_finite())
-        }
-
         // Helper: Generate a small random rotation (axis-angle representation)
         fn generate_small_rotation(
             rng: &mut impl rand::Rng,
@@ -565,10 +550,10 @@ mod tests {
                     noisy_translation.x,
                     noisy_translation.y,
                     noisy_translation.z, // then wijk
-                    noisy_rotation.w.clone(),
-                    noisy_rotation.i.clone(),
-                    noisy_rotation.j.clone(),
-                    noisy_rotation.k.clone(),
+                    noisy_rotation.w,
+                    noisy_rotation.i,
+                    noisy_rotation.j,
+                    noisy_rotation.k,
                 ]);
                 initial_values.insert(cam_var.clone(), (ManifoldType::SE3, cam_data));
                 pose_vars.push((pose_id, cam_var));
@@ -587,7 +572,7 @@ mod tests {
             let mut T_B_W = na::Matrix4::identity();
             T_B_W
                 .fixed_view_mut::<3, 3>(0, 0)
-                .copy_from(&R_B_W.to_rotation_matrix().matrix());
+                .copy_from(R_B_W.to_rotation_matrix().matrix());
             T_B_W
                 .fixed_view_mut::<3, 1>(0, 3)
                 .copy_from(&t_B_W.to_owned());
