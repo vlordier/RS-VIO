@@ -175,13 +175,13 @@ impl ConstantVelocityModel {
         let innovation = (actual_position - predicted_position).norm();
 
         // Update velocity with exponential moving average
-        let alpha = self.config.velocity_alpha.max(0.0).min(1.0);
+        let alpha = self.config.velocity_alpha.clamp(0.0, 1.0);
         self.velocity = alpha * measured_velocity + (1.0 - alpha) * self.velocity;
 
         // Clip velocity magnitude for safety
         let velocity_magnitude = self.velocity.norm();
         if velocity_magnitude > self.config.max_velocity {
-            self.velocity = self.velocity * (self.config.max_velocity / velocity_magnitude);
+            self.velocity *= self.config.max_velocity / velocity_magnitude;
         }
 
         // Update variance (decrease with more observations)
@@ -229,7 +229,7 @@ impl ConstantVelocityModel {
     }
 
     /// Get current velocity estimate (world frame)
-    pub fn velocity(&self) -> na::Vector3<f64> {
+    pub const fn velocity(&self) -> na::Vector3<f64> {
         self.velocity
     }
 
@@ -253,7 +253,7 @@ impl ConstantVelocityModel {
     }
 
     /// Check if model is initialized and ready for predictions
-    pub fn is_initialized(&self) -> bool {
+    pub const fn is_initialized(&self) -> bool {
         matches!(self.state, ModelState::Initialized)
     }
 
@@ -276,17 +276,18 @@ impl ConstantVelocityModel {
     }
 
     /// Get last observed pose
-    pub fn last_pose(&self) -> &na::Isometry3<f64> {
+    pub const fn last_pose(&self) -> &na::Isometry3<f64> {
         &self.last_pose
     }
 
     /// Get configuration
-    pub fn config(&self) -> &ConstantVelocityConfig {
+    pub const fn config(&self) -> &ConstantVelocityConfig {
         &self.config
     }
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 

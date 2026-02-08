@@ -568,7 +568,7 @@ impl Factor for TemporalSuperResolutionFactor {
     fn linearize(
         &self,
         params: &[na::DVector<f64>],
-        compute_jacobian: bool,
+        _compute_jacobian: bool,
     ) -> (na::DVector<f64>, Option<na::DMatrix<f64>>) {
         // params[0] = left intrinsics (9D)
         // params[1] = right intrinsics (9D)
@@ -624,11 +624,7 @@ impl Factor for TemporalSuperResolutionFactor {
 
         // Compute residuals for each temporal observation
         let mut residuals = na::DVector::zeros(self.temporal_observations.len() * 4);
-        let jacobian = if compute_jacobian {
-            None // Return None to trigger solver's numerical differentiation fallback
-        } else {
-            None
-        };
+        let jacobian = None; // Trigger solver's numerical differentiation fallback
 
         for (i, observation) in self.temporal_observations.iter().enumerate() {
             // Interpolate motion at this timestamp
@@ -713,7 +709,7 @@ impl Factor for TemporalConsistencyFactor {
     fn linearize(
         &self,
         params: &[na::DVector<f64>],
-        compute_jacobian: bool,
+        _compute_jacobian: bool,
     ) -> (na::DVector<f64>, Option<na::DMatrix<f64>>) {
         // params[0] = motion trajectory (6D: angular + linear velocity)
 
@@ -756,11 +752,7 @@ impl Factor for TemporalConsistencyFactor {
         }
 
         // TODO: Add proper Jacobians for optimization
-        let jacobian = if compute_jacobian {
-            None // Return None to trigger solver's numerical differentiation fallback
-        } else {
-            None
-        };
+        let jacobian = None; // Trigger solver's numerical differentiation fallback
 
         (residuals, jacobian)
     }
@@ -892,7 +884,7 @@ impl Factor for CameraGraphFactor {
     fn linearize(
         &self,
         params: &[na::DVector<f64>],
-        compute_jacobian: bool,
+        _compute_jacobian: bool,
     ) -> (na::DVector<f64>, Option<na::DMatrix<f64>>) {
         // params[0] = first camera pose (6D)
         // params[1] = second camera pose (6D)
@@ -943,11 +935,7 @@ impl Factor for CameraGraphFactor {
         ]);
 
         // TODO: Compute Jacobians for pose graph optimization
-        let jacobian = if compute_jacobian {
-            None // Return None to trigger solver's numerical differentiation fallback
-        } else {
-            None
-        };
+        let jacobian = None; // Trigger solver's numerical differentiation fallback
 
         (residuals, jacobian)
     }

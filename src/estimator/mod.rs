@@ -1,8 +1,8 @@
 pub mod async_enhancements;
 pub mod async_optimization;
 pub mod async_wrapper;
-#[allow(clippy::module_inception)] // Re-exported as crate::estimator::Estimator
 pub mod constant_velocity_model;
+#[allow(clippy::module_inception)] // Re-exported as crate::estimator::Estimator
 pub mod estimator;
 pub mod frame;
 pub mod sliding_window;

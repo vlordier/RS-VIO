@@ -2,7 +2,7 @@
 //!
 //! These tests verify deterministic execution suitable for embedded real-time systems.
 
-#![allow(clippy::unwrap_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use rs_vio::datasets::config::Config;
 use rs_vio::estimator::AsyncEstimator;
@@ -34,7 +34,7 @@ async fn test_deterministic_latency_30fps() {
                 i,
                 left.clone(),
                 right.clone(),
-                i64::from(i) * 1_000_000,
+                i * 1_000_000,
                 None,
             )
             .await;
@@ -48,7 +48,7 @@ async fn test_deterministic_latency_30fps() {
                 i,
                 left.clone(),
                 right.clone(),
-                i64::from(i) * 1_000_000,
+                i * 1_000_000,
                 None,
             )
             .await;
@@ -115,7 +115,7 @@ async fn test_latency_jitter_analysis() {
                 i,
                 left.clone(),
                 right.clone(),
-                i64::from(i) * 1_000_000,
+                i * 1_000_000,
                 None,
             )
             .await;
@@ -129,7 +129,7 @@ async fn test_latency_jitter_analysis() {
                 i,
                 left.clone(),
                 right.clone(),
-                i64::from(i) * 1_000_000,
+                i * 1_000_000,
                 None,
             )
             .await;
@@ -198,7 +198,7 @@ async fn test_no_gc_pauses() {
                 i,
                 left.clone(),
                 right.clone(),
-                i64::from(i) * 1_000_000,
+                i * 1_000_000,
                 None,
             )
             .await;
@@ -212,7 +212,7 @@ async fn test_no_gc_pauses() {
                 i,
                 left.clone(),
                 right.clone(),
-                i64::from(i) * 1_000_000,
+                i * 1_000_000,
                 None,
             )
             .await;

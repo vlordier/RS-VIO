@@ -492,7 +492,7 @@ pub struct CameraConfig {
 }
 
 impl CameraConfig {
-    pub fn new(id: String, model: CameraModelEnum, image_width: u32, image_height: u32) -> Self {
+    pub const fn new(id: String, model: CameraModelEnum, image_width: u32, image_height: u32) -> Self {
         Self {
             id,
             model,

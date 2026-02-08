@@ -52,7 +52,7 @@ fn create_checkerboard_image(width: usize, height: usize, square_size: usize) ->
         for x in 0..width {
             let square_x = x / square_size;
             let square_y = y / square_size;
-            if (square_x + square_y) % 2 == 0 {
+            if (square_x + square_y).is_multiple_of(2) {
                 image[y * width + x] = 200; // Light squares
             } else {
                 image[y * width + x] = 50; // Dark squares

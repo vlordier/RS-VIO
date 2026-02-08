@@ -481,7 +481,7 @@ impl EnhancedFeatureDetector {
 /// Widened to two u64 popcnt operations for maximum throughput
 /// (2 XOR + 2 popcnt vs 16 XOR + 16 byte-level count_ones).
 #[inline]
-pub fn hamming_distance(desc1: &[u8; 16], desc2: &[u8; 16]) -> u32 {
+pub const fn hamming_distance(desc1: &[u8; 16], desc2: &[u8; 16]) -> u32 {
     // SAFETY: [u8; 16] has alignment 1, u64 accepts any alignment via from_ne_bytes
     let a0 = u64::from_ne_bytes([
         desc1[0], desc1[1], desc1[2], desc1[3], desc1[4], desc1[5], desc1[6], desc1[7],

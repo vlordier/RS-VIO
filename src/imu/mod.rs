@@ -199,7 +199,7 @@ pub struct ImuMotionPrior {
 
 impl ImuMotionPrior {
     /// Create from preintegrated measurements
-    pub fn from_preintegration(
+    pub const fn from_preintegration(
         preint: &PreintegratedImu,
         initial_pose: na::Matrix4<f64>,
         initial_velocity: na::Vector3<f64>,

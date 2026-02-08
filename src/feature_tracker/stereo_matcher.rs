@@ -67,7 +67,7 @@ pub struct StereoMatcher {
 
 impl StereoMatcher {
     /// Create new stereo matcher
-    pub fn new(config: StereoMatcherConfig) -> Self {
+    pub const fn new(config: StereoMatcherConfig) -> Self {
         Self {
             config,
             rng_counter: Cell::new(42),
@@ -207,7 +207,7 @@ impl StereoMatcher {
 
     /// Propagate matches from coarse to fine level (identity — indices don't change)
     #[inline]
-    fn propagate_matches_to_next_level(
+    const fn propagate_matches_to_next_level(
         &self,
         coarse_matches: Vec<StereoMatch>,
         _scale: f32,

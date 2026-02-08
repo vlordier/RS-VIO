@@ -163,6 +163,8 @@ impl AsyncEstimator {
         let failure_thread = Arc::clone(&failure_tracker);
         let async_config_clone = async_config.clone();
 
+        // Thread spawn failure is unrecoverable — no worker means no VIO pipeline
+        #[allow(clippy::expect_used)]
         let join_handle = std::thread::Builder::new()
             .name("vio-estimator".into())
             .spawn(move || {
@@ -508,7 +510,7 @@ impl AsyncEstimator {
     }
 
     /// Get current async configuration
-    pub fn config(&self) -> &AsyncConfig {
+    pub const fn config(&self) -> &AsyncConfig {
         &self.config
     }
 
@@ -644,6 +646,7 @@ fn enqueue_command(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use crate::datasets::config::{
@@ -697,7 +700,7 @@ mod tests {
             for x in 0..width {
                 let square_x = x / square_size;
                 let square_y = y / square_size;
-                if (square_x + square_y) % 2 == 0 {
+                if (square_x + square_y).is_multiple_of(2) {
                     image[y * width + x] = 200; // Light square
                 } else {
                     image[y * width + x] = 50; // Dark square
@@ -1037,7 +1040,7 @@ mod tests {
 
         // Test that frame skipping is enabled in config
         assert_eq!(estimator.config().channel_capacity, 1);
-        assert_eq!(estimator.config().enable_frame_skipping, true);
+        assert!(estimator.config().enable_frame_skipping);
 
         // Process a single frame successfully
         let result = estimator
@@ -1072,7 +1075,7 @@ mod tests {
         // Test config access
         assert_eq!(estimator.config().frame_timeout_ms, 500);
         assert_eq!(estimator.config().channel_capacity, 16);
-        assert_eq!(estimator.config().enable_frame_skipping, false);
+        assert!(!estimator.config().enable_frame_skipping);
 
         // Test can_accept_frame
         assert!(
@@ -1337,7 +1340,7 @@ mod tests {
                     i,
                     left,
                     right,
-                    i64::from(i) * 1_000_000,
+                    i * 1_000_000,
                     None,
                     is_keyframe,
                 )
@@ -1507,7 +1510,6 @@ mod tests {
             frame_budget_ms: 200, // Slow budget to keep frames in queue (buffer pool made processing faster)
             keyframe_priority: 100,
             regular_frame_priority: 1,
-            ..Default::default()
         };
         let estimator = Arc::new(AsyncEstimator::new_with_cameras_and_async_config(
             config,
@@ -1746,7 +1748,7 @@ mod tests {
             async_config_no_skip,
         );
 
-        assert_eq!(est_no_skip.config().enable_frame_skipping, false);
+        assert!(!est_no_skip.config().enable_frame_skipping);
 
         // With skipping enabled
         let async_config_skip = AsyncConfig {
@@ -1762,7 +1764,7 @@ mod tests {
             async_config_skip,
         );
 
-        assert_eq!(est_skip.config().enable_frame_skipping, true);
+        assert!(est_skip.config().enable_frame_skipping);
 
         // Both should process at least one frame successfully
         let left = create_checkerboard_image(640, 480, 20);

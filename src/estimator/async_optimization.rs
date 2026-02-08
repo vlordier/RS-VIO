@@ -70,6 +70,12 @@ impl AsyncOptimizer {
     }
 }
 
+impl Default for AsyncOptimizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

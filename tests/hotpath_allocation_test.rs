@@ -3,7 +3,7 @@
 //! These tests verify that the critical frame processing path has zero allocations.
 //! Run with: cargo test --test hotpath_allocation_test --features dhat-heap
 
-#![allow(clippy::unwrap_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use rs_vio::datasets::config::Config;
 use rs_vio::estimator::AsyncEstimator;
@@ -95,7 +95,7 @@ async fn test_sustained_zero_allocation_processing() {
                 i,
                 left.clone(),
                 right.clone(),
-                i64::from(i) * 1_000_000,
+                i * 1_000_000,
                 None,
             )
             .await;
@@ -111,7 +111,7 @@ async fn test_sustained_zero_allocation_processing() {
                 i,
                 left.clone(),
                 right.clone(),
-                i64::from(i) * 1_000_000,
+                i * 1_000_000,
                 None,
             )
             .await;
@@ -161,7 +161,7 @@ async fn test_concurrent_processing_no_allocation_growth() {
         let l = left.clone();
         let r = right.clone();
         handles.push(tokio::spawn(async move {
-            est.process_frame_async(i, l, r, i64::from(i) * 1_000_000, None)
+            est.process_frame_async(i, l, r, i * 1_000_000, None)
                 .await
         }));
     }

@@ -283,7 +283,7 @@ impl ImuInitializer {
     }
 
     /// Get current initialization state
-    pub fn state(&self) -> InitializationState {
+    pub const fn state(&self) -> InitializationState {
         self.state
     }
 
@@ -293,17 +293,17 @@ impl ImuInitializer {
     }
 
     /// Get bias estimates
-    pub fn bias_estimate(&self) -> BiasEstimate {
+    pub const fn bias_estimate(&self) -> BiasEstimate {
         self.bias_estimate
     }
 
     /// Get estimated gravity vector (world frame)
-    pub fn gravity_vector(&self) -> na::Vector3<f64> {
+    pub const fn gravity_vector(&self) -> na::Vector3<f64> {
         self.gravity_vector
     }
 
     /// Get number of samples collected
-    pub fn sample_count(&self) -> usize {
+    pub const fn sample_count(&self) -> usize {
         self.measurements.len()
     }
 
@@ -332,7 +332,7 @@ pub struct AdaptiveNoiseEstimator {
 
 impl AdaptiveNoiseEstimator {
     /// Create new adaptive noise estimator
-    pub fn new(base_accel_noise: f64, base_gyro_noise: f64) -> Self {
+    pub const fn new(base_accel_noise: f64, base_gyro_noise: f64) -> Self {
         Self {
             base_accel_noise,
             base_gyro_noise,

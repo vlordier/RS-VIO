@@ -207,7 +207,7 @@ impl ImuBuffer {
     }
 
     /// Get time span covered by buffer [oldest, newest]
-    pub fn time_span(&self) -> Option<(i64, i64)> {
+    pub const fn time_span(&self) -> Option<(i64, i64)> {
         if let (Some(oldest), Some(newest)) = (self.oldest_time, self.newest_time) {
             Some((oldest, newest))
         } else {
@@ -236,6 +236,7 @@ impl ImuBuffer {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 
