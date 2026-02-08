@@ -28,5 +28,30 @@ pub const fn optimization_converged(status: &OptimizationStatus) -> bool {
     )
 }
 
+/// Return a `("CONVERGED"|"NOT_CONVERGED", reason)` pair for logging.
+pub const fn optimization_status_label(status: &OptimizationStatus) -> (&'static str, &'static str) {
+    match status {
+        OptimizationStatus::Converged => ("CONVERGED", "Converged"),
+        OptimizationStatus::CostToleranceReached => ("CONVERGED", "CostTolerance"),
+        OptimizationStatus::ParameterToleranceReached => ("CONVERGED", "ParameterTolerance"),
+        OptimizationStatus::GradientToleranceReached => ("CONVERGED", "GradientTolerance"),
+        OptimizationStatus::TrustRegionRadiusTooSmall => {
+            ("CONVERGED", "TrustRegionRadiusTooSmall")
+        },
+        OptimizationStatus::MinCostThresholdReached => ("CONVERGED", "MinCostThresholdReached"),
+        OptimizationStatus::MaxIterationsReached => ("NOT_CONVERGED", "MaxIterations"),
+        OptimizationStatus::Timeout => ("NOT_CONVERGED", "Timeout"),
+        OptimizationStatus::NumericalFailure => ("NOT_CONVERGED", "NumericalFailure"),
+        OptimizationStatus::IllConditionedJacobian => {
+            ("NOT_CONVERGED", "IllConditionedJacobian")
+        },
+        OptimizationStatus::InvalidNumericalValues => {
+            ("NOT_CONVERGED", "InvalidNumericalValues")
+        },
+        OptimizationStatus::UserTerminated => ("NOT_CONVERGED", "UserTerminated"),
+        OptimizationStatus::Failed(_) => ("NOT_CONVERGED", "Failed"),
+    }
+}
+
 #[cfg(test)]
 mod tests;

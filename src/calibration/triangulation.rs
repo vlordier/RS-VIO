@@ -41,41 +41,50 @@ pub(crate) fn initialize_parameters(config: &CalibrationConfig) -> InitialParame
     }
 }
 
+/// Minimum disparity (pixels, normalized) below which triangulation is degenerate.
+const MIN_DISPARITY: f64 = 1e-6;
+
+/// Core disparity-based triangulation from pixel coordinates and intrinsics.
+///
+/// Returns `None` if the disparity is too small (near-parallel rays).
+fn triangulate_from_disparity(
+    left_point: &na::Vector2<f64>,
+    right_point: &na::Vector2<f64>,
+    fx: f64,
+    fy: f64,
+    cx: f64,
+    cy: f64,
+    baseline: f64,
+) -> Option<na::Vector3<f64>> {
+    let xl = (left_point.x - cx) / fx;
+    let yl = (left_point.y - cy) / fy;
+    let xr = (right_point.x - cx) / fx;
+
+    let disparity = xl - xr;
+    if disparity.abs() < MIN_DISPARITY {
+        return None;
+    }
+
+    let z = baseline / disparity;
+    Some(na::Vector3::new(xl * z, yl * z, z))
+}
+
 /// Triangulate an initial 3D point for optimization (rough initialization).
 pub(crate) fn triangulate_initial_point(
     left_point: &na::Vector2<f64>,
     right_point: &na::Vector2<f64>,
     params: &InitialParameters,
 ) -> Vec<f64> {
-    // Simple triangulation assuming known intrinsics and small baseline
-    // This is a rough initialization - optimization will refine it
-
     let fx = params.left_intrinsics[0];
     let fy = params.left_intrinsics[1];
     let cx = params.left_intrinsics[2];
     let cy = params.left_intrinsics[3];
-
     let baseline = params.extrinsics[3]; // tx
 
-    // Convert to normalized coordinates
-    let xl = (left_point.x - cx) / fx;
-    let yl = (left_point.y - cy) / fy;
-    let xr = (right_point.x - cx) / fx;
-    let _yr = (right_point.y - cy) / fy;
-
-    // Disparity
-    let disparity = xl - xr;
-    if disparity.abs() < 1e-6 {
-        // Points too close, use default depth
-        return vec![0.0, 0.0, 1.0];
+    match triangulate_from_disparity(left_point, right_point, fx, fy, cx, cy, baseline) {
+        Some(p) => vec![p.x, p.y, p.z],
+        None => vec![0.0, 0.0, 1.0],
     }
-
-    // Triangulate
-    let z = baseline / disparity;
-    let x = xl * z;
-    let y = yl * z;
-
-    vec![x, y, z]
 }
 
 /// Convert a parameter vector `[rx, ry, rz, tx, ty, tz]` to an SE(3) isometry.
@@ -100,29 +109,14 @@ pub(crate) fn triangulate_point(
     left_intrinsics: &[f64],
     extrinsics: &na::Isometry3<f64>,
 ) -> na::Vector3<f64> {
-    // Simplified triangulation - in practice, you'd use proper stereo triangulation
     let fx = left_intrinsics[0];
     let fy = left_intrinsics[1];
     let cx = left_intrinsics[2];
     let cy = left_intrinsics[3];
-
     let baseline = extrinsics.translation.x; // Assume horizontal baseline
 
-    let xl = (left_point.x - cx) / fx;
-    let yl = (left_point.y - cy) / fy;
-    let xr = (right_point.x - cx) / fx;
-    let _yr = (right_point.y - cy) / fy;
-
-    let disparity = xl - xr;
-    if disparity.abs() < 1e-6 {
-        return na::Vector3::new(0.0, 0.0, 1.0);
-    }
-
-    let z = baseline / disparity;
-    let x = xl * z;
-    let y = yl * z;
-
-    na::Vector3::new(x, y, z)
+    triangulate_from_disparity(left_point, right_point, fx, fy, cx, cy, baseline)
+        .unwrap_or_else(|| na::Vector3::new(0.0, 0.0, 1.0))
 }
 
 /// Project a 3D point into a camera using the given intrinsics.

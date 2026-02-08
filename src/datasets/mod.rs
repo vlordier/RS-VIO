@@ -34,6 +34,18 @@ pub struct ImuData {
     pub accel: [f64; 3],
 }
 
+impl ImuData {
+    /// Gyroscope reading as a `nalgebra::Vector3`.
+    pub fn gyro_vec3(&self) -> nalgebra::Vector3<f64> {
+        nalgebra::Vector3::from(self.gyro)
+    }
+
+    /// Accelerometer reading as a `nalgebra::Vector3`.
+    pub fn accel_vec3(&self) -> nalgebra::Vector3<f64> {
+        nalgebra::Vector3::from(self.accel)
+    }
+}
+
 // Frame context for tracking processing state
 #[derive(Debug)]
 pub struct FrameContext {

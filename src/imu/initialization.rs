@@ -194,8 +194,8 @@ impl ImuInitializer {
         let mut accel_sum = na::Vector3::zeros();
 
         for imu in &self.measurements {
-            gyro_sum += na::Vector3::from(imu.gyro);
-            accel_sum += na::Vector3::from(imu.accel);
+            gyro_sum += imu.gyro_vec3();
+            accel_sum += imu.accel_vec3();
         }
 
         let n = self.measurements.len() as f64;
@@ -207,8 +207,8 @@ impl ImuInitializer {
         let mut accel_var_sum = 0.0;
 
         for imu in &self.measurements {
-            let gyro_dev = na::Vector3::from(imu.gyro) - gyro_mean;
-            let accel_dev = na::Vector3::from(imu.accel) - accel_mean;
+            let gyro_dev = imu.gyro_vec3() - gyro_mean;
+            let accel_dev = imu.accel_vec3() - accel_mean;
 
             gyro_var_sum += gyro_dev.norm_squared();
             accel_var_sum += accel_dev.norm_squared();
@@ -243,7 +243,7 @@ impl ImuInitializer {
         // Average accelerometer reading
         let mut accel_sum = na::Vector3::zeros();
         for imu in &self.measurements {
-            accel_sum += na::Vector3::from(imu.accel);
+            accel_sum += imu.accel_vec3();
         }
 
         let accel_mean = accel_sum / self.measurements.len() as f64;
@@ -359,14 +359,14 @@ impl AdaptiveNoiseEstimator {
 
         let mut accel_sum = na::Vector3::zeros();
         for imu in &self.recent_measurements {
-            accel_sum += na::Vector3::from(imu.accel);
+            accel_sum += imu.accel_vec3();
         }
         let accel_mean = accel_sum / self.recent_measurements.len() as f64;
 
         // Estimate variance
         let mut variance = 0.0;
         for imu in &self.recent_measurements {
-            let dev = na::Vector3::from(imu.accel) - accel_mean;
+            let dev = imu.accel_vec3() - accel_mean;
             variance += dev.norm_squared();
         }
         variance /= (self.recent_measurements.len() - 1).max(1) as f64;
@@ -384,14 +384,14 @@ impl AdaptiveNoiseEstimator {
 
         let mut gyro_sum = na::Vector3::zeros();
         for imu in &self.recent_measurements {
-            gyro_sum += na::Vector3::from(imu.gyro);
+            gyro_sum += imu.gyro_vec3();
         }
         let gyro_mean = gyro_sum / self.recent_measurements.len() as f64;
 
         // Estimate variance
         let mut variance = 0.0;
         for imu in &self.recent_measurements {
-            let dev = na::Vector3::from(imu.gyro) - gyro_mean;
+            let dev = imu.gyro_vec3() - gyro_mean;
             variance += dev.norm_squared();
         }
         variance /= (self.recent_measurements.len() - 1).max(1) as f64;

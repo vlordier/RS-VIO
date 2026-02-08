@@ -106,6 +106,11 @@ impl EskfState {
             .fixed_view_mut::<3, 3>(6, 6)
             .fill_diagonal(accel_std.powi(2));
     }
+
+    /// Force the covariance matrix to be symmetric (numerical drift correction).
+    fn ensure_symmetric(&mut self) {
+        self.covariance = 0.5 * (self.covariance + self.covariance.transpose());
+    }
 }
 
 impl Default for EskfState {
@@ -177,8 +182,8 @@ impl Eskf {
             return;
         }
 
-        let gyro = na::Vector3::new(imu.gyro[0], imu.gyro[1], imu.gyro[2]);
-        let accel = na::Vector3::new(imu.accel[0], imu.accel[1], imu.accel[2]);
+        let gyro = imu.gyro_vec3();
+        let accel = imu.accel_vec3();
 
         // Gyro integration: Update orientation for continuous tracking
         // This is essential even with visual odometry for high-rate IMU fusion
@@ -242,7 +247,7 @@ impl Eskf {
         self.state.covariance += P_dot * dt;
 
         // Ensure symmetry and positive definiteness
-        self.state.covariance = 0.5 * (self.state.covariance + self.state.covariance.transpose());
+        self.state.ensure_symmetric();
     }
 
     /// Update step: correct state with visual velocity measurement
@@ -294,7 +299,7 @@ impl Eskf {
             I_KH * self.state.covariance * I_KH.transpose() + K * measurement_cov * K.transpose();
 
         // Ensure symmetry
-        self.state.covariance = 0.5 * (self.state.covariance + self.state.covariance.transpose());
+        self.state.ensure_symmetric();
     }
 
     /// Update step: correct state with zero-velocity constraint

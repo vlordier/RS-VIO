@@ -59,8 +59,8 @@ mod tests {
 
         // Integrate IMU measurements
         for imu in &imu_data {
-            let gyro = na::Vector3::new(imu.gyro[0], imu.gyro[1], imu.gyro[2]);
-            let accel = na::Vector3::new(imu.accel[0], imu.accel[1], imu.accel[2]);
+            let gyro = imu.gyro_vec3();
+            let accel = imu.accel_vec3();
             preint.integrate(gyro, accel, 0.01);
         }
 
@@ -125,8 +125,8 @@ mod tests {
         let imu_data = create_synthetic_imu_with_bias(50, 0.01, gyro_bias, accel_bias);
 
         for imu in &imu_data {
-            let gyro = na::Vector3::new(imu.gyro[0], imu.gyro[1], imu.gyro[2]);
-            let accel = na::Vector3::new(imu.accel[0], imu.accel[1], imu.accel[2]);
+            let gyro = imu.gyro_vec3();
+            let accel = imu.accel_vec3();
             preint.integrate(gyro, accel, 0.01);
         }
 
@@ -198,8 +198,8 @@ mod tests {
         );
 
         for imu in &imu_data {
-            let gyro = na::Vector3::new(imu.gyro[0], imu.gyro[1], imu.gyro[2]);
-            let accel = na::Vector3::new(imu.accel[0], imu.accel[1], imu.accel[2]);
+            let gyro = imu.gyro_vec3();
+            let accel = imu.accel_vec3();
             preint.integrate(gyro, accel, 0.01);
         }
 

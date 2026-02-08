@@ -31,6 +31,15 @@ type ResidualTuple = (
     Option<Box<dyn apex_solver::core::loss_functions::LossFunction + Send>>,
 );
 
+/// Huber loss threshold (pixels) for robust down-weighting of outlier residuals.
+const HUBER_THRESHOLD: f64 = 2.0;
+
+/// Default depth (meters) for initializing landmarks before stereo triangulation.
+const DEFAULT_LANDMARK_DEPTH: f64 = 2.0;
+
+/// Minimum residual count for a well-posed optimization (PnP and BA).
+const MIN_RESIDUALS: usize = 6;
+
 /// Pack a 4×4 homogeneous transform into a 7D SE3 parameter vector
 /// `[tx, ty, tz, qw, qi, qj, qk]` suitable for the optimizer.
 fn pose_to_se3_dvector(t_inv: &Matrix4x4) -> DVector<f64> {
@@ -303,11 +312,10 @@ impl SlidingWindow {
                                 if !self.map_points.contains_key(&feature_id)
                                     && id_frame == *first_frame_idx
                                 {
-                                    let default_depth = 2.0_f64;
                                     let p_C = Vector3::new(
-                                        feat.undistorted_coord[0] as f64 * default_depth,
-                                        feat.undistorted_coord[1] as f64 * default_depth,
-                                        default_depth,
+                                        feat.undistorted_coord[0] as f64 * DEFAULT_LANDMARK_DEPTH,
+                                        feat.undistorted_coord[1] as f64 * DEFAULT_LANDMARK_DEPTH,
+                                        DEFAULT_LANDMARK_DEPTH,
                                     );
                                     let (R_W_B, t_W_B) = (
                                         frame.state.T_W_B.fixed_view::<3, 3>(0, 0).into_owned(),
@@ -343,7 +351,7 @@ impl SlidingWindow {
                                     Some(kf_var.clone())
                                 };
 
-                                let huber_loss = HuberLoss::new(2.0).ok();
+                                let huber_loss = HuberLoss::new(HUBER_THRESHOLD).ok();
                                 // Store Arc<String>
                                 local_residuals.push((
                                     lm_var_arc.clone(),
@@ -438,7 +446,7 @@ impl SlidingWindow {
         );
 
         // Validate problem before optimization
-        if num_residuals < 6 {
+        if num_residuals < MIN_RESIDUALS {
             log::warn!(
                 "[SlidingWindow] Too few residuals ({}), skipping optimization",
                 num_residuals
@@ -565,41 +573,8 @@ impl SlidingWindow {
         // non-converged results are already handled by is_optimization_successful().
 
         // Determine convergence status accurately
-        let (status, convergence_reason): (&str, &str) = match &opt_result.status {
-            apex_solver::optimizer::OptimizationStatus::Converged => ("CONVERGED", "Converged"),
-            apex_solver::optimizer::OptimizationStatus::CostToleranceReached => {
-                ("CONVERGED", "CostTolerance")
-            },
-            apex_solver::optimizer::OptimizationStatus::ParameterToleranceReached => {
-                ("CONVERGED", "ParameterTolerance")
-            },
-            apex_solver::optimizer::OptimizationStatus::GradientToleranceReached => {
-                ("CONVERGED", "GradientTolerance")
-            },
-            apex_solver::optimizer::OptimizationStatus::TrustRegionRadiusTooSmall => {
-                ("CONVERGED", "TrustRegionRadiusTooSmall")
-            },
-            apex_solver::optimizer::OptimizationStatus::MinCostThresholdReached => {
-                ("CONVERGED", "MinCostThresholdReached")
-            },
-            apex_solver::optimizer::OptimizationStatus::MaxIterationsReached => {
-                ("NOT_CONVERGED", "MaxIterations")
-            },
-            apex_solver::optimizer::OptimizationStatus::Timeout => ("NOT_CONVERGED", "Timeout"),
-            apex_solver::optimizer::OptimizationStatus::NumericalFailure => {
-                ("NOT_CONVERGED", "NumericalFailure")
-            },
-            apex_solver::optimizer::OptimizationStatus::IllConditionedJacobian => {
-                ("NOT_CONVERGED", "IllConditionedJacobian")
-            },
-            apex_solver::optimizer::OptimizationStatus::InvalidNumericalValues => {
-                ("NOT_CONVERGED", "InvalidNumericalValues")
-            },
-            apex_solver::optimizer::OptimizationStatus::UserTerminated => {
-                ("NOT_CONVERGED", "UserTerminated")
-            },
-            apex_solver::optimizer::OptimizationStatus::Failed(_msg) => ("NOT_CONVERGED", "Failed"),
-        };
+        let (status, convergence_reason) =
+            crate::optimization::optimization_status_label(&opt_result.status);
         log::debug!(
             "[SlidingWindow] Optimization status: {}, convergence_reason: {}",
             status,
@@ -717,7 +692,8 @@ impl SlidingWindow {
                     );
                     // Add residual block with Huber loss
                     let huber_loss =
-                        HuberLoss::new(2.0).expect("HuberLoss threshold must be positive");
+                        HuberLoss::new(HUBER_THRESHOLD)
+                            .expect("HuberLoss threshold must be positive");
                     problem.add_residual_block(
                         &[&kf_var],
                         Box::new(factor),
@@ -727,11 +703,11 @@ impl SlidingWindow {
             }
         }
 
-        // Minimum correspondences check: PnP needs at least 6 2D-3D correspondences
+        // Minimum correspondences check: PnP needs at least MIN_RESIDUALS 2D-3D correspondences
         let num_residuals = problem.num_residual_blocks();
-        if num_residuals < 6 {
+        if num_residuals < MIN_RESIDUALS {
             log::warn!(
-                "[SlidingWindow] Motion tracking: too few 2D-3D correspondences ({num_residuals}), need >= 6"
+                "[SlidingWindow] Motion tracking: too few 2D-3D correspondences ({num_residuals}), need >= {MIN_RESIDUALS}"
             );
             return Ok(None);
         }
