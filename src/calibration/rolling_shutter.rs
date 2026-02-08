@@ -9,7 +9,7 @@ use crate::calibration::stereo_calibrator::{RollingShutterDetectionInfo, StereoP
 /// Get detailed rolling shutter detection information.
 ///
 /// Returns `None` if fewer than 3 stereo pairs are available.
-pub fn rolling_shutter_detection_info(
+pub(crate) fn rolling_shutter_detection_info(
     stereo_pairs: &[StereoPair],
     image_height: u32,
 ) -> Option<RollingShutterDetectionInfo> {
@@ -37,7 +37,7 @@ pub fn rolling_shutter_detection_info(
 /// Automatically detect if rolling shutter compensation is needed.
 ///
 /// Uses the provided `log_fn` callback (if any) for diagnostic output.
-pub fn detect_rolling_shutter(
+pub(crate) fn detect_rolling_shutter(
     stereo_pairs: &[StereoPair],
     image_height: u32,
     log_fn: Option<&dyn Fn(&str)>,
@@ -75,7 +75,7 @@ pub fn detect_rolling_shutter(
 }
 
 /// Analyze correlation between vertical position and distortion patterns.
-pub fn analyze_position_distortion(stereo_pairs: &[StereoPair], image_height: u32) -> f64 {
+fn analyze_position_distortion(stereo_pairs: &[StereoPair], image_height: u32) -> f64 {
     let mut position_errors = Vec::new();
 
     for stereo_pair in stereo_pairs {
@@ -137,7 +137,7 @@ pub fn analyze_position_distortion(stereo_pairs: &[StereoPair], image_height: u3
 }
 
 /// Analyze temporal consistency across multiple frames.
-pub fn analyze_temporal_consistency(stereo_pairs: &[StereoPair]) -> f64 {
+fn analyze_temporal_consistency(stereo_pairs: &[StereoPair]) -> f64 {
     if stereo_pairs.len() < 2 {
         return 0.0;
     }
@@ -183,7 +183,7 @@ pub fn analyze_temporal_consistency(stereo_pairs: &[StereoPair]) -> f64 {
 }
 
 /// Analyze geometric distortions that suggest rolling shutter.
-pub fn analyze_geometric_distortions(stereo_pairs: &[StereoPair], image_height: u32) -> f64 {
+fn analyze_geometric_distortions(stereo_pairs: &[StereoPair], image_height: u32) -> f64 {
     let mut distortion_indicators = Vec::new();
 
     for stereo_pair in stereo_pairs {

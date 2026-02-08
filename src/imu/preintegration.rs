@@ -333,7 +333,7 @@ impl PreintegratedImu {
 /// Exponential map for SO(3): exp(ω) = R
 /// Exponential map from so(3) to SO(3) using Rodrigues formula
 /// Converts rotation vector (axis * angle) to unit quaternion
-pub fn exp_map_so3(omega: na::Vector3<f64>) -> na::UnitQuaternion<f64> {
+pub(crate) fn exp_map_so3(omega: na::Vector3<f64>) -> na::UnitQuaternion<f64> {
     let theta = omega.norm();
 
     if theta < 1e-8 {
@@ -355,7 +355,7 @@ pub fn exp_map_so3(omega: na::Vector3<f64>) -> na::UnitQuaternion<f64> {
 /// Right Jacobian of SO(3)
 ///
 /// Jr(ω) = I - (1-cos(θ))/θ² [ω]_× + (θ-sin(θ))/θ³ [ω]_×²
-pub fn right_jacobian_so3(omega: na::Vector3<f64>) -> na::Matrix3<f64> {
+pub(crate) fn right_jacobian_so3(omega: na::Vector3<f64>) -> na::Matrix3<f64> {
     let theta = omega.norm();
 
     if theta < 1e-8 {
@@ -377,7 +377,7 @@ pub fn right_jacobian_so3(omega: na::Vector3<f64>) -> na::Matrix3<f64> {
 }
 
 /// Skew-symmetric matrix from vector: [v]_×
-pub fn skew_symmetric(v: na::Vector3<f64>) -> na::Matrix3<f64> {
+pub(crate) fn skew_symmetric(v: na::Vector3<f64>) -> na::Matrix3<f64> {
     na::Matrix3::new(0.0, -v.z, v.y, v.z, 0.0, -v.x, -v.y, v.x, 0.0)
 }
 

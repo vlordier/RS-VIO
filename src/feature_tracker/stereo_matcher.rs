@@ -789,7 +789,7 @@ impl StereoMatcher {
 
     /// Compute confidence score for a stereo match (0-1, higher is better)
     #[inline]
-    pub fn compute_match_confidence(
+    pub(crate) fn compute_match_confidence(
         &self,
         score: u32,
         epipolar_error: f32,
