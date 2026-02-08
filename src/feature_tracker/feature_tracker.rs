@@ -548,4 +548,70 @@ mod tests {
         assert!(t2.get_track_points()[0].is_empty());
         assert!(t5.get_track_points()[0].is_empty());
     }
+
+    #[test]
+    fn stereo_patch_tracker_process_frame_detects_features() {
+        // Bright 20×20 squares on 40×40 dark grid — corners of each square
+        // produce strong FAST9 responses (≥11 contiguous dark ring pixels).
+        let img = image::GrayImage::from_fn(640, 480, |x, y| {
+            let bx = x % 40;
+            let by = y % 40;
+            if (10..30).contains(&bx) && (10..30).contains(&by) {
+                image::Luma([255u8])
+            } else {
+                image::Luma([0u8])
+            }
+        });
+
+        let mut tracker = StereoPatchTracker::<3>::new(16, 30, 0.01);
+        let mut frame = crate::estimator::Frame::new(1_000_000_000, 0);
+        tracker.process_frame(&img, &img, &mut frame);
+
+        assert!(tracker.has_previous);
+        assert!(!frame.left_features.is_empty());
+        assert!(!frame.right_features.is_empty());
+
+        for f in &frame.left_features {
+            assert!((0.0..640.0).contains(&f.pixel_coord[0]));
+            assert!((0.0..480.0).contains(&f.pixel_coord[1]));
+        }
+
+        assert_eq!(tracker.get_track_points()[0].len(), frame.left_features.len());
+    }
+
+    #[test]
+    fn stereo_patch_tracker_tracks_across_frames() {
+        // Same bright-squares pattern as test 1
+        let img1 = image::GrayImage::from_fn(640, 480, |x, y| {
+            let bx = x % 40;
+            let by = y % 40;
+            if (10..30).contains(&bx) && (10..30).contains(&by) {
+                image::Luma([255u8])
+            } else {
+                image::Luma([0u8])
+            }
+        });
+
+        // Shifted by 2 pixels horizontally
+        let img2 = image::GrayImage::from_fn(640, 480, |x, y| {
+            let bx = (x + 2) % 40;
+            let by = y % 40;
+            if (10..30).contains(&bx) && (10..30).contains(&by) {
+                image::Luma([255u8])
+            } else {
+                image::Luma([0u8])
+            }
+        });
+
+        let mut tracker = StereoPatchTracker::<3>::new(16, 30, 0.01);
+
+        let mut frame0 = crate::estimator::Frame::new(1_000_000_000, 0);
+        tracker.process_frame(&img1, &img1, &mut frame0);
+
+        let mut frame1 = crate::estimator::Frame::new(2_000_000_000, 1);
+        tracker.process_frame(&img2, &img2, &mut frame1);
+
+        assert!(!tracker.get_track_points()[0].is_empty());
+        assert!(!frame1.left_features.is_empty());
+    }
 }

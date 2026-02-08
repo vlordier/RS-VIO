@@ -95,6 +95,25 @@ async fn test_async_estimator_with_synthetic_features() {
         result.err()
     );
 
+    // Verify metrics are updated after processing
+    let metrics = estimator.metrics();
+    assert!(
+        metrics.frames_processed >= 1,
+        "Expected at least 1 frame processed, got {}",
+        metrics.frames_processed
+    );
+    assert!(
+        metrics.avg_latency_ns > 0,
+        "Expected non-zero avg latency, got {}",
+        metrics.avg_latency_ns
+    );
+
+    // Verify status strings are non-empty and accessible
+    let streaming = estimator.streaming_status();
+    let failure = estimator.failure_status();
+    assert!(!streaming.is_empty(), "streaming_status() should return non-empty string");
+    assert!(!failure.is_empty(), "failure_status() should return non-empty string");
+
     estimator.shutdown().await;
 }
 
@@ -135,6 +154,27 @@ async fn test_async_estimator_with_imu_synchronized() {
         result.is_ok(),
         "Frame with IMU data should process successfully: {:?}",
         result.err()
+    );
+
+    // Verify metrics after IMU-synchronized processing
+    let metrics = estimator.metrics();
+    assert!(
+        metrics.frames_processed >= 1,
+        "Expected at least 1 frame processed with IMU, got {}",
+        metrics.frames_processed
+    );
+
+    // Verify no critical failures during IMU integration
+    let failure = estimator.failure_status();
+    assert!(
+        !failure.contains("CRITICAL"),
+        "failure_status() should not contain CRITICAL: {}",
+        failure
+    );
+    assert!(
+        !failure.contains("error"),
+        "failure_status() should not contain error: {}",
+        failure
     );
 
     estimator.shutdown().await;
@@ -192,6 +232,19 @@ async fn test_async_estimator_prefetch_with_features() {
         .join()
         .expect("Prefetch thread panicked unexpectedly");
 
+    // Verify metrics after prefetch pipeline
+    let metrics = estimator.metrics();
+    assert!(
+        metrics.frames_processed >= 1,
+        "Expected at least 1 frame processed in prefetch pattern, got {}",
+        metrics.frames_processed
+    );
+    assert!(
+        metrics.skip_rate() < 100.0,
+        "Skip rate should be less than 100%: {}",
+        metrics.skip_rate()
+    );
+
     estimator.shutdown().await;
 }
 
@@ -227,6 +280,33 @@ async fn test_async_estimator_high_throughput() {
         );
     }
 
+    // Verify metrics after high-throughput processing
+    let metrics = estimator.metrics();
+    assert!(
+        metrics.frames_processed >= 1,
+        "Expected at least 1 frame processed under high throughput, got {}",
+        metrics.frames_processed
+    );
+    assert!(
+        metrics.total_processing_time_ns > 0,
+        "Expected non-zero total processing time, got {}",
+        metrics.total_processing_time_ns
+    );
+    assert!(
+        metrics.avg_fps() > 0.0,
+        "Expected positive avg FPS, got {}",
+        metrics.avg_fps()
+    );
+
+    // Verify latency histogram has at least one non-zero bucket
+    let histogram = estimator.latency_histogram();
+    let has_nonzero_bucket = histogram.buckets.iter().any(|&b| b > 0);
+    assert!(
+        has_nonzero_bucket,
+        "Latency histogram should have at least one non-zero bucket: {:?}",
+        histogram.buckets
+    );
+
     estimator.shutdown().await;
 }
 
@@ -247,6 +327,14 @@ async fn test_async_estimator_graceful_shutdown_with_frames() {
             .process_frame_async(i as i64, left, right, timestamp, None)
             .await;
     }
+
+    // Verify metrics are accessible before shutdown
+    let metrics = estimator.metrics();
+    assert!(
+        metrics.frames_processed >= 1,
+        "Expected at least 1 frame processed before shutdown, got {}",
+        metrics.frames_processed
+    );
 
     // Shutdown should gracefully stop worker thread without panic
     estimator.shutdown().await;
@@ -275,6 +363,14 @@ async fn test_async_estimator_config_variations() {
         result.is_ok(),
         "Different config should process correctly: {:?}",
         result.err()
+    );
+
+    // Verify metrics with different config
+    let metrics = estimator.metrics();
+    assert!(
+        metrics.frames_processed >= 1,
+        "Expected at least 1 frame processed with varied config, got {}",
+        metrics.frames_processed
     );
 
     estimator.shutdown().await;
@@ -327,6 +423,20 @@ async fn test_concurrent_estimator_isolation() {
     assert!(
         r2.is_ok(),
         "Estimator 2 concurrent processing should complete"
+    );
+
+    // Verify both estimators' metrics independently
+    let metrics1 = estimator1.metrics();
+    let metrics2 = estimator2.metrics();
+    assert!(
+        metrics1.frames_processed >= 1,
+        "Estimator 1 should have processed at least 1 frame, got {}",
+        metrics1.frames_processed
+    );
+    assert!(
+        metrics2.frames_processed >= 1,
+        "Estimator 2 should have processed at least 1 frame, got {}",
+        metrics2.frames_processed
     );
 
     // Cleanup happens when Arc is dropped at test end
@@ -386,6 +496,19 @@ async fn test_async_estimator_frame_sequence_with_imu() {
         .await;
 
     assert!(result1.is_ok(), "Frame 1 with IMU should process");
+
+    // Verify metrics after frame sequence with IMU
+    let metrics = estimator.metrics();
+    assert!(
+        metrics.frames_processed >= 1,
+        "Expected at least 1 frame processed in IMU sequence, got {}",
+        metrics.frames_processed
+    );
+
+    // Verify latency histogram is accessible
+    let histogram = estimator.latency_histogram();
+    let _ = histogram.percentile(50.0);
+    let _ = histogram.percentile(99.0);
 
     estimator.shutdown().await;
 }

@@ -226,6 +226,7 @@ impl Config {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 
@@ -299,5 +300,173 @@ mod tests {
         assert_eq!(opt_config.bundle_adjustment_max_iterations, 100);
         assert_eq!(opt_config.pnp_max_iterations, 50);
         assert!(opt_config.bundle_adjustment_max_iterations > opt_config.pnp_max_iterations);
+    }
+
+    #[test]
+    fn test_load_tum_vi_config_has_realistic_intrinsics() {
+        // Validate that the real TUM-VI config loads and has physically reasonable values
+        let config = Config::load("config/tum_vi.yaml").expect("TUM-VI config should load");
+
+        // Image dimensions should be TUM-VI standard (512x512)
+        assert!(
+            config.camera.image_width > 0 && config.camera.image_height > 0,
+            "Image dimensions must be positive"
+        );
+        assert!(
+            config.camera.image_width <= 2048 && config.camera.image_height <= 2048,
+            "Image dimensions must be reasonable for a VIO camera"
+        );
+
+        // Focal lengths should be positive and physically plausible
+        let fx = config.camera.left_intrinsics[0];
+        let fy = config.camera.left_intrinsics[1];
+        assert!(fx > 50.0 && fx < 2000.0, "fx={fx} must be in [50, 2000]");
+        assert!(fy > 50.0 && fy < 2000.0, "fy={fy} must be in [50, 2000]");
+
+        // Principal point should be near the image center
+        let cx = config.camera.left_intrinsics[2];
+        let cy = config.camera.left_intrinsics[3];
+        let half_w = config.camera.image_width as f64 / 2.0;
+        let half_h = config.camera.image_height as f64 / 2.0;
+        assert!(
+            (cx - half_w).abs() < half_w,
+            "cx={cx} should be within image width"
+        );
+        assert!(
+            (cy - half_h).abs() < half_h,
+            "cy={cy} should be within image height"
+        );
+
+        // Extrinsics should be 4x4 matrices (16 elements)
+        assert_eq!(config.camera.T_B_Cl.len(), 16);
+        assert_eq!(config.camera.T_B_Cr.len(), 16);
+
+        // Feature detection should have reasonable grid settings
+        assert!(config.feature_detection.grid_cols > 0);
+        assert!(config.feature_detection.max_features_per_grid > 0);
+        assert!(config.feature_detection.optical_flow_max_iterations > 0);
+    }
+
+    #[test]
+    fn test_config_serde_roundtrip() {
+        // Serialize a Config to YAML and deserialize back — values should survive the roundtrip
+        let original = Config {
+            camera: CameraConfig {
+                image_width: 512,
+                image_height: 512,
+                left_intrinsics: vec![190.0, 190.0, 256.0, 256.0],
+                left_distortion: vec![0.0, 0.0],
+                right_intrinsics: vec![190.0, 190.0, 256.0, 256.0],
+                right_distortion: vec![0.0, 0.0],
+                left_model: Some("EUCM".to_string()),
+                right_model: Some("EUCM".to_string()),
+                T_B_Cl: vec![
+                    1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+                ],
+                T_B_Cr: vec![
+                    1.0, 0.0, 0.0, -0.1, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+                ],
+            },
+            keyframe_management: KeyframeManagementConfig {
+                keyframe_window_size: 8,
+                translation_threshold: 0.2,
+                rotation_threshold: 0.1,
+            },
+            feature_detection: FeatureDetectionConfig {
+                grid_cols: 16,
+                max_features_per_grid: 80,
+                optical_flow_max_iterations: 30,
+                optical_flow_convergence_threshold: 0.01,
+            },
+            optimization: OptimizationConfig {
+                bundle_adjustment_max_iterations: 10,
+                pnp_max_iterations: 5,
+            },
+            calibration: None,
+        };
+
+        let yaml = serde_yaml::to_string(&original).expect("serialize should succeed");
+        let roundtripped: Config = serde_yaml::from_str(&yaml).expect("deserialize should succeed");
+
+        assert_eq!(roundtripped.camera.image_width, original.camera.image_width);
+        assert_eq!(roundtripped.camera.image_height, original.camera.image_height);
+        assert!((roundtripped.camera.left_intrinsics[0] - original.camera.left_intrinsics[0]).abs() < f64::EPSILON);
+        assert_eq!(roundtripped.camera.left_model, original.camera.left_model);
+        assert_eq!(
+            roundtripped.feature_detection.grid_cols,
+            original.feature_detection.grid_cols
+        );
+        assert_eq!(
+            roundtripped.optimization.bundle_adjustment_max_iterations,
+            original.optimization.bundle_adjustment_max_iterations
+        );
+    }
+
+    #[test]
+    fn test_config_validate_rejects_zero_dimensions() {
+        let yaml = r#"
+camera:
+  image_width: 0
+  image_height: 480
+  left_intrinsics: [500.0, 500.0, 320.0, 240.0]
+  left_distortion: [0.0]
+  right_intrinsics: [500.0, 500.0, 320.0, 240.0]
+  right_distortion: [0.0]
+  T_B_Cl: [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]
+  T_B_Cr: [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]
+keyframe_management:
+  keyframe_window_size: 8
+  translation_threshold: 0.2
+  rotation_threshold: 0.1
+feature_detection:
+  grid_size: 16
+  max_features_per_grid: 80
+  optical_flow_max_iterations: 30
+  optical_flow_convergence_threshold: 0.01
+optimization:
+  bundle_adjustment_max_iterations: 5
+  pnp_max_iterations: 5
+"#;
+        let config: Config = serde_yaml::from_str(yaml).expect("YAML parsing should succeed");
+        let result = config.validate();
+        assert!(result.is_err(), "Zero image width should fail validation");
+        assert!(
+            result.unwrap_err().to_string().contains("Invalid image dimensions"),
+            "Error should mention image dimensions"
+        );
+    }
+
+    #[test]
+    fn test_config_validate_rejects_negative_focal_length() {
+        let yaml = r#"
+camera:
+  image_width: 640
+  image_height: 480
+  left_intrinsics: [-500.0, 500.0, 320.0, 240.0]
+  left_distortion: [0.0]
+  right_intrinsics: [500.0, 500.0, 320.0, 240.0]
+  right_distortion: [0.0]
+  T_B_Cl: [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]
+  T_B_Cr: [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]
+keyframe_management:
+  keyframe_window_size: 8
+  translation_threshold: 0.2
+  rotation_threshold: 0.1
+feature_detection:
+  grid_size: 16
+  max_features_per_grid: 80
+  optical_flow_max_iterations: 30
+  optical_flow_convergence_threshold: 0.01
+optimization:
+  bundle_adjustment_max_iterations: 5
+  pnp_max_iterations: 5
+"#;
+        let config: Config = serde_yaml::from_str(yaml).expect("YAML parsing should succeed");
+        let result = config.validate();
+        assert!(result.is_err(), "Negative focal length should fail validation");
+        assert!(
+            result.unwrap_err().to_string().contains("focal length must be positive"),
+            "Error should mention focal length"
+        );
     }
 }
