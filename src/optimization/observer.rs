@@ -37,6 +37,12 @@ impl TerminalObserver {
     }
 }
 
+impl Default for TerminalObserver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl OptObserver for TerminalObserver {
     fn on_step(&self, _values: &HashMap<String, VariableEnum>, iteration: usize) {
         let metrics = self.iteration_metrics.borrow();

@@ -8,6 +8,7 @@ mod tests {
     use apex_solver::linalg::LinearSolverType;
     use apex_solver::manifold::ManifoldType;
     use apex_solver::core::problem::Problem;
+    use apex_solver::JacobianMode;
     use std::collections::HashMap;
     use nalgebra as na;
     use na::DVector;
@@ -20,9 +21,9 @@ mod tests {
         // cam 0: 90 def FoV, origin: point is at (1,1)
         // cam 1: 90 def FoV, 1m on the right: point is at (0, 1)
 
-        
-        let mut problem = Problem::new();
-        
+
+        let mut problem = Problem::new(JacobianMode::Sparse);
+
         let config = LevenbergMarquardtConfig::new()
             .with_linear_solver_type(LinearSolverType::SparseCholesky)
             .with_max_iterations(100)
@@ -30,7 +31,7 @@ mod tests {
             .with_parameter_tolerance(1e-9)
             .with_jacobi_scaling(false);
 
-        let mut solver = LevenbergMarquardt::with_config(config);
+        let _solver = LevenbergMarquardt::with_config(config);
         let mut initial_values = HashMap::new();
 
 
@@ -190,7 +191,7 @@ mod tests {
             problem.add_residual_block(&var_names, Box::new(factor), None);
         }
 
-        let mut problem = Problem::new();
+        let mut problem = Problem::new(JacobianMode::Sparse);
         let mut initial_values = HashMap::new();
         let mut landmarks = Vec::new();
         let mut point_vars = Vec::new();
@@ -198,7 +199,7 @@ mod tests {
         // Generate random 3D landmarks with noisy initial estimates
         use rand::Rng;
         let mut rng = rand::thread_rng();
-        
+
         for i in 0..NUM_LANDMARKS {
             // True landmark position
             let true_point = vec![
@@ -472,7 +473,7 @@ mod tests {
 
 
         // Set up problem
-        let mut problem = Problem::new();
+        let mut problem = Problem::new(JacobianMode::Sparse);
         let mut initial_values = HashMap::new();
         let mut landmarks = Vec::new();
         let mut point_vars = Vec::new();
@@ -558,8 +559,8 @@ mod tests {
                 let cam_data = DVector::from_vec(vec![
                     noisy_translation.x,
                     noisy_translation.y,
-                    noisy_translation.z, // then wijk 
-                    noisy_rotation.w.clone(), noisy_rotation.i.clone(), noisy_rotation.j.clone(), noisy_rotation.k.clone(),
+                    noisy_translation.z, // then wijk
+                    noisy_rotation.w, noisy_rotation.i, noisy_rotation.j, noisy_rotation.k,
                 ]);
                 initial_values.insert(cam_var.clone(), (ManifoldType::SE3, cam_data));
                 pose_vars.push((pose_id, cam_var));
@@ -573,7 +574,7 @@ mod tests {
             let is_fixed = pose_id == 0;
 
             let mut T_B_W = na::Matrix4::identity();
-            T_B_W.fixed_view_mut::<3, 3>(0, 0).copy_from(&R_B_W.to_rotation_matrix().matrix());
+            T_B_W.fixed_view_mut::<3, 3>(0, 0).copy_from(R_B_W.to_rotation_matrix().matrix());
             T_B_W.fixed_view_mut::<3, 1>(0, 3).copy_from(&t_B_W.to_owned());
             println!("pose_id: {}", pose_id);
             println!("T_B_W: {:?}", T_B_W.to_string());

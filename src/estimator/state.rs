@@ -24,8 +24,8 @@ impl State {
     pub fn new(T_B_Cl: Matrix4x4, T_B_Cr: Matrix4x4) -> Self {
         Self {
             T_W_B: Matrix4x4::identity(),
-            T_B_Cl: T_B_Cl,
-            T_B_Cr: T_B_Cr,
+            T_B_Cl,
+            T_B_Cr,
             velocity: [0.0, 0.0, 0.0],
             accel_bias: [0.0, 0.0, 0.0],
             gyro_bias: [0.0, 0.0, 0.0],

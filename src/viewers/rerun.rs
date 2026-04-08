@@ -16,7 +16,13 @@ pub struct RerunViewer {
     initialized: bool,
     frame_id: i64,
     timestamp_ns: i64,
-    first_timestamp_ns: Option<i64>,
+    _first_timestamp_ns: Option<i64>,
+}
+
+impl Default for RerunViewer {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl RerunViewer {
@@ -26,7 +32,7 @@ impl RerunViewer {
             initialized: false,
             frame_id: 0,
             timestamp_ns: 0,
-            first_timestamp_ns: None,
+            _first_timestamp_ns: None,
         }
     }
     
@@ -293,8 +299,7 @@ impl Viewer for RerunViewer {
         if let Some(ref rec) = self.rec {
             rec.set_time_sequence("frame", self.frame_id);
             rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
-            
-            let points_3d: Vec<[f32; 3]> = points.to_vec();
+
             // Exclude points that are further than 300m
             let points_3d: Vec<[f32; 3]> = points
                 .iter()

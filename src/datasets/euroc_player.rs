@@ -1,3 +1,6 @@
+//! EUROC dataset player — runs the VIO pipeline on EUROC MAV dataset.
+#![allow(dead_code, clippy::new_without_default)]
+
 use anyhow::{Context, Result};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -280,7 +283,7 @@ impl EurocPlayer {
         }
         
         // Get IMU data if VIO mode
-        let imu_data = if false && context.processed_frames > 0 { // TODO when implementing IMU data loading
+        let imu_data: Option<Vec<ImuData>> = if false { // TODO when implementing IMU data loading
             Some(Self::get_imu_data_between_frames(
                 context.previous_frame_timestamp,
                 image_data[context.current_idx].timestamp,
@@ -290,7 +293,7 @@ impl EurocPlayer {
         };
 
         // Process frame
-        let imu_slice = imu_data.as_ref().map(|v| v.as_slice());
+        let imu_slice = imu_data.as_deref();
         estimator.process_frame(
             &left_image,
             &right_image,
@@ -323,14 +326,14 @@ impl EurocPlayer {
     }
 
     fn save_statistics(result: &PlayerResult, dataset_path: &str) {
-        let stats_file = Path::new(dataset_path).join(format!("statistics.txt"));
+        let stats_file = Path::new(dataset_path).join("statistics.txt");
 
         if let Ok(mut file) = std::fs::File::create(&stats_file) {
             use std::io::Write;
             writeln!(file, "════════════════════════════════════════════════════════════════════").ok();
             writeln!(file, "                          STATISTICS                                ").ok();
             writeln!(file, "════════════════════════════════════════════════════════════════════").ok();
-            writeln!(file, "").ok();
+            writeln!(file).ok();
 
             // Timing statistics
             writeln!(file, "                          TIMING ANALYSIS                           ").ok();

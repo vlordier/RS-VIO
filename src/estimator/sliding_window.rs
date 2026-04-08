@@ -5,11 +5,11 @@ use apex_solver::linalg::{LinearSolverType, SchurPreconditioner, SchurVariant};
 use apex_solver::manifold::ManifoldType;
 use apex_solver::core::problem::{Problem, VariableEnum};
 use apex_solver::core::loss_functions::HuberLoss;
+use apex_solver::JacobianMode;
 use std::collections::HashMap;
 use nalgebra as na;
 use na::{DVector, UnitQuaternion};
 use crate::optimization::factors::{BundleAdjustmentFactor, PnPFactor};
-use crate::optimization::observer::TerminalObserver;
 use crate::estimator::Frame;
 use crate::types::{Matrix3x3, Matrix4x4, Vector3};
 
@@ -33,7 +33,7 @@ pub struct SlidingWindow {
 impl SlidingWindow {
     #![allow(non_snake_case)]
     /// Create a new sliding window with the specified maximum number of frames.
-    /// 
+    ///
     /// # Arguments
     /// * `max_frames` - Maximum number of keyframes to keep in the window (default: 16)
     pub fn new(max_frames: usize) -> Self {
@@ -43,11 +43,15 @@ impl SlidingWindow {
             map_points: HashMap::new(),
         }
     }
+}
 
-    /// Create a new sliding window with the default size of 16 frames.
-    pub fn default() -> Self {
+impl Default for SlidingWindow {
+    fn default() -> Self {
         Self::new(8)
     }
+}
+
+impl SlidingWindow {
 
     /// Add a keyframe to the sliding window.
     /// 
@@ -137,7 +141,7 @@ impl SlidingWindow {
     fn check_sliding_window_size_for_optimization(&self) -> Result<bool, std::io::Error> {
         if self.keyframes.is_empty() {
             log::warn!("[SlidingWindow] Cannot optimize: window is empty");
-            return Err(std::io::Error::new(std::io::ErrorKind::Other, "Window is empty"));
+            return Err(std::io::Error::other("Window is empty"));
         }
 
         if self.keyframes.len() < self.max_frames {
@@ -145,7 +149,7 @@ impl SlidingWindow {
                 "[SlidingWindow] Cannot optimize: need {} keyframes, have {}",
                 self.max_frames,self.keyframes.len()
             );
-            return Err(std::io::Error::new(std::io::ErrorKind::Other, "Need more keyframes"));
+            return Err(std::io::Error::other("Need more keyframes"));
         }
 
         log::debug!(
@@ -153,7 +157,7 @@ impl SlidingWindow {
             self.keyframes.len()
         );
     
-        return Ok(true);
+        Ok(true)
     }
 
     pub fn optimize(&mut self) -> Result<bool, std::io::Error> {
@@ -166,7 +170,7 @@ impl SlidingWindow {
         let saved_map_points = self.map_points.clone();
 
         // Initialize problem and solver
-        let mut problem = Problem::new();
+        let mut problem = Problem::new(JacobianMode::Sparse);
         let mut solver = LevenbergMarquardt::with_config(self.build_solver_config());
         let mut initial_values = HashMap::new();
         // solver.add_observer(TerminalObserver::new());
@@ -255,7 +259,7 @@ impl SlidingWindow {
                             } else {
                                 // Default initialization if not in map_points
                                 // TODO Triangulate insrtead of assigning depth 4.0 (quick and dirty way to get going)
-                                let p_C = Vector3::new( feat.undistorted_coord[0] as f64, feat.undistorted_coord[1] as f64, 2.0 as f64);
+                                let p_C = Vector3::new( feat.undistorted_coord[0] as f64, feat.undistorted_coord[1] as f64, 2.0_f64);
                                 let (R_W_B, t_W_B) = (
                                     frame.state.T_W_B.fixed_view::<3, 3>(0, 0).into_owned(),
                                     frame.state.T_W_B.fixed_view::<3, 1>(0, 3).into_owned(),
@@ -490,7 +494,7 @@ impl SlidingWindow {
     pub fn track_motion(&mut self, frame: &Frame) -> Result<Option<Matrix4x4>, std::io::Error> {
 
         // Create a new problem and solver
-        let mut problem = Problem::new();
+        let mut problem = Problem::new(JacobianMode::Sparse);
         let mut solver = LevenbergMarquardt::with_config(
             LevenbergMarquardtConfig::new()
                 .with_linear_solver_type(LinearSolverType::SparseCholesky)
@@ -504,7 +508,7 @@ impl SlidingWindow {
 
         // Add variable for the new frame
         // Only the new frame is optimized and it's initialized from the last keyframe
-        let kf_var = format!("F");
+        let kf_var = "F".to_string();
         let T_B_W = self.keyframes.back().unwrap().state.T_W_B.try_inverse().expect("T_W_B should be invertible");
         let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
         let R_B_W = Matrix3x3::from(T_B_W.fixed_view::<3, 3>(0, 0));

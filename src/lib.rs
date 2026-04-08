@@ -1,3 +1,10 @@
+//! RS-VIO: Rust Stereo Visual-Inertial Odometry
+//!
+//! A real-time stereo VIO system built on nalgebra and apex-solver.
+//! Uses SE(3) manifold optimization for bundle adjustment.
+
+#![allow(non_snake_case, clippy::module_inception)]
+
 pub mod datasets;
 pub mod viewers;
 pub mod estimator;
