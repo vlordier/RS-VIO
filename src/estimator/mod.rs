@@ -17,5 +17,5 @@ pub mod state;
 
 pub use estimator::Estimator;
 pub use frame::Frame;
-pub use sliding_window::SlidingWindow;
+pub use sliding_window::{inverse_se3, preintegrate_imu, SlidingWindow};
 pub use state::State;

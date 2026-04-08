@@ -39,6 +39,13 @@ impl TUMVIPlayer {
             }
         };
 
+        // Load IMU data at startup (efficient: one-time parse of csv)
+        let imu_data_all = Self::load_imu_data(&config.dataset_path);
+        log::info!(
+            "[TUMVIPlayer] Loaded {} IMU samples",
+            imu_data_all.len()
+        );
+
         let start_frame_idx = 0;
         let end_frame_idx = image_data.len();
 
@@ -109,6 +116,7 @@ impl TUMVIPlayer {
                     &mut estimator,
                     &mut context,
                     &image_data,
+                    &imu_data_all,
                     &config.dataset_path,
                 ) {
                     Ok(time) => time,
@@ -184,36 +192,36 @@ impl TUMVIPlayer {
     }
 
     fn load_image_timestamps(dataset_path: &str) -> Result<Vec<ImageData>> {
-        let data_file = Path::new(dataset_path).join("mav0/cam0/data.csv");
-        let file = File::open(&data_file)
-            .with_context(|| format!("Cannot open data.csv file: {}", data_file.display()))?;
+        // TUM-VI stores images directly in mav0/cam0/data/ as <timestamp>.png
+        // (unlike EuRoC which uses a data.csv with timestamps + filenames)
+        let data_dir = Path::new(dataset_path).join("mav0/cam0/data");
+        if !data_dir.exists() {
+            anyhow::bail!("Cannot find image directory: {}", data_dir.display());
+        }
 
-        let reader = BufReader::new(file);
         let mut image_data = Vec::new();
-
-        for (line_num, line) in reader.lines().enumerate() {
-            let line = line?;
-
-            // Skip header and empty lines
-            if line_num == 0 || line.trim().is_empty() || line.trim_start().starts_with('#') {
-                continue;
-            }
-
-            let parts: Vec<&str> = line.split(',').collect();
-            if parts.len() >= 2 {
-                let timestamp_str = parts[0].trim();
-                let filename = parts[1].trim().to_string();
-
-                if let Ok(timestamp) = timestamp_str.parse::<i64>() {
-                    image_data.push(ImageData {
-                        timestamp,
-                        filename,
-                    });
+        for entry in std::fs::read_dir(&data_dir)
+            .with_context(|| format!("Cannot read directory: {}", data_dir.display()))?
+        {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().is_some_and(|ext| ext == "png") {
+                // Filename is the timestamp in nanoseconds: <timestamp>.png
+                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                    if let Ok(timestamp) = stem.parse::<i64>() {
+                        image_data.push(ImageData {
+                            timestamp,
+                            filename: format!("{}.png", stem),
+                        });
+                    }
                 }
             }
         }
 
-        log::info!("[EurocPlayer] Loaded {} image timestamps", image_data.len());
+        // Sort by timestamp for chronological order
+        image_data.sort_by_key(|img| img.timestamp);
+
+        log::info!("[TUMVIPlayer] Loaded {} image timestamps", image_data.len());
         Ok(image_data)
     }
 
@@ -244,15 +252,50 @@ impl TUMVIPlayer {
         Ok(pixel_data)
     }
 
-    fn load_imu_data(
-        _dataset_path: &str,
-        _image_data: &[ImageData],
-        _start_frame_idx: usize,
-        _end_frame_idx: usize,
-    ) -> Result<()> {
-        // TODO: Implement IMU data loading
-        log::info!("[TUMVIPlayer] IMU data loading (placeholder)");
-        Ok(())
+    /// Load all IMU samples from mav0/imu0/data.csv at startup.
+    /// TUM-VI IMU CSV format:
+    ///   #timestamp [ns],w_RS_S_x,w_RS_S_y,w_RS_S_z,a_RS_S_x,a_RS_S_y,a_RS_S_z
+    fn load_imu_data(dataset_path: &str) -> Vec<ImuData> {
+        let imu_csv = Path::new(dataset_path).join("mav0/imu0/data.csv");
+        let file = match File::open(&imu_csv) {
+            Ok(f) => f,
+            Err(e) => {
+                log::warn!("[TUMVIPlayer] Cannot open IMU file {}: {}", imu_csv.display(), e);
+                return Vec::new();
+            }
+        };
+        let reader = BufReader::new(file);
+        let mut samples = Vec::new();
+
+        for line in reader.lines().map_while(Result::ok) {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            let parts: Vec<&str> = line.split(',').collect();
+            if parts.len() < 7 {
+                continue;
+            }
+            if let (Ok(ts), Ok(gx), Ok(gy), Ok(gz), Ok(ax), Ok(ay), Ok(az)) = (
+                parts[0].trim().parse::<i64>(),
+                parts[1].trim().parse::<f64>(),
+                parts[2].trim().parse::<f64>(),
+                parts[3].trim().parse::<f64>(),
+                parts[4].trim().parse::<f64>(),
+                parts[5].trim().parse::<f64>(),
+                parts[6].trim().parse::<f64>(),
+            ) {
+                samples.push(ImuData {
+                    timestamp: ts,
+                    gyro: [gx, gy, gz],
+                    accel: [ax, ay, az],
+                });
+            }
+        }
+
+        // IMU data is already sorted by timestamp in the CSV, but ensure it
+        samples.sort_by_key(|s| s.timestamp);
+        samples
     }
 
     /// Create camera models from config using the datasets module helper function
@@ -275,6 +318,7 @@ impl TUMVIPlayer {
         estimator: &mut Estimator<'a>,
         context: &mut FrameContext,
         image_data: &[ImageData],
+        imu_data_all: &[ImuData],
         dataset_path: &str,
     ) -> Result<f64> {
         let frame_start = Instant::now();
@@ -292,19 +336,23 @@ impl TUMVIPlayer {
             anyhow::bail!("Skipping frame {} due to empty image", context.current_idx);
         }
 
-        // Get IMU data if VIO mode
-        let imu_data: Option<Vec<ImuData>> = if false {
-            // TODO when implementing IMU data loading
-            Some(Self::get_imu_data_between_frames(
+        // Get IMU data between previous and current frame timestamps
+        let imu_between = if imu_data_all.is_empty() {
+            &[][..]
+        } else {
+            Self::get_imu_data_between_frames(
+                imu_data_all,
                 context.previous_frame_timestamp,
                 image_data[context.current_idx].timestamp,
-            ))
-        } else {
-            None
+            )
         };
 
-        // Process frame
-        let imu_slice = imu_data.as_deref();
+        let imu_slice: Option<&[ImuData]> = if imu_between.is_empty() {
+            None
+        } else {
+            Some(imu_between)
+        };
+
         estimator.process_frame(
             &left_image,
             &right_image,
@@ -319,12 +367,19 @@ impl TUMVIPlayer {
         Ok(frame_duration.as_secs_f64() * 1000.0) // Return milliseconds
     }
 
+    /// Return IMU samples whose timestamps fall in (prev_ts, curr_ts].
+    /// Uses binary search for O(log N) lookup into the sorted IMU buffer.
     fn get_imu_data_between_frames(
-        _previous_timestamp: i64,
-        _current_timestamp: i64,
-    ) -> Vec<ImuData> {
-        // TODO: Implement IMU data retrieval between timestamps
-        Vec::new()
+        imu_all: &[ImuData],
+        prev_ts: i64,
+        curr_ts: i64,
+    ) -> &[ImuData] {
+        // Find first sample with timestamp > prev_ts
+        let start = imu_all.partition_point(|s| s.timestamp <= prev_ts);
+        // Find first sample with timestamp > curr_ts
+        let end = imu_all[start..]
+            .partition_point(|s| s.timestamp <= curr_ts);
+        &imu_all[start..start + end]
     }
 
     fn save_trajectories(_estimator: &Estimator, _context: &FrameContext, _dataset_path: &str) {

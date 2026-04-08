@@ -1,3 +1,4 @@
+use crate::datasets::ImuData;
 use crate::estimator::Frame;
 use crate::optimization::factors::{BundleAdjustmentFactor, PnPFactor};
 use crate::types::{Matrix3x3, Matrix4x4, Vector3};
@@ -18,13 +19,77 @@ use std::collections::VecDeque;
 /// For `T = [R | t; 0 | 1]`, the inverse is `T⁻¹ = [Rᵀ | -Rᵀ·t; 0 | 1]`.
 /// This is O(n²) vs O(n³) for a full matrix inverse.
 #[inline]
-pub(crate) fn inverse_se3(t: &Matrix4x4) -> Matrix4x4 {
+pub fn inverse_se3(t: &Matrix4x4) -> Matrix4x4 {
     let r_inv = t.fixed_view::<3, 3>(0, 0).transpose();
     let t_part = r_inv * t.fixed_view::<3, 1>(0, 3);
     let mut result = Matrix4x4::identity();
     result.fixed_view_mut::<3, 3>(0, 0).copy_from(&r_inv);
     result.fixed_view_mut::<3, 1>(0, 3).copy_from(&(-t_part));
     result
+}
+
+/// Pre-integrate IMU measurements to get relative SE(3) motion.
+///
+/// Implements discrete pre-integration:
+/// ```text
+/// ΔR_k+1 = ΔR_k · Exp(ω_k · Δt)
+/// Δv_k+1 = Δv_k + ΔR_k · a_k · Δt
+/// Δp_k+1 = Δp_k + Δv_k · Δt + ½ · ΔR_k · a_k · Δt²
+/// ```
+///
+/// Returns the relative transform T_prev_to_curr as a 4x4 matrix.
+/// If fewer than 2 IMU samples, returns identity.
+pub fn preintegrate_imu(imu_samples: &[ImuData]) -> Matrix4x4 {
+    if imu_samples.len() < 2 {
+        return Matrix4x4::identity();
+    }
+
+    let g = Vector3::new(0.0, 0.0, 9.81); // gravity in world z-down frame
+
+    let mut delta_r = na::Matrix3::<f64>::identity(); // relative rotation
+    let mut delta_v = Vector3::zeros(); // relative velocity
+    let mut delta_p = Vector3::zeros(); // relative position
+
+    for i in 0..imu_samples.len() - 1 {
+        let curr = &imu_samples[i];
+        let next = &imu_samples[i + 1];
+        let dt = (next.timestamp - curr.timestamp) as f64 / 1e9; // ns → s
+        if dt <= 0.0 {
+            continue;
+        }
+
+        // Gyroscope: integrate rotation via exponential map (first-order approx)
+        let omega = Vector3::new(curr.gyro[0], curr.gyro[1], curr.gyro[2]);
+        let theta = omega.norm();
+        if theta > 1e-8 {
+            // Rodrigues' rotation formula for Exp(ω·Δt)
+            let axis = omega / theta;
+            let angle = theta * dt;
+            let ca = angle.cos();
+            let sa = angle.sin();
+            let ia = 1.0 - ca;
+            let [x, y, z] = [axis.x, axis.y, axis.z];
+            let r_step = na::Matrix3::new(
+                ca + x * x * ia,     x * y * ia - z * sa,  x * z * ia + y * sa,
+                y * x * ia + z * sa, ca + y * y * ia,      y * z * ia - x * sa,
+                z * x * ia - y * sa, z * y * ia + x * sa,  ca + z * z * ia,
+            );
+            delta_r *= r_step;
+        }
+
+        // Accelerometer: integrate velocity and position (gravity compensated in world frame)
+        let a_body = Vector3::new(curr.accel[0], curr.accel[1], curr.accel[2]);
+        let a_world = delta_r * a_body - g;
+
+        delta_p = delta_p + delta_v * dt + 0.5 * a_world * dt * dt;
+        delta_v += a_world * dt;
+    }
+
+    // Build SE(3) matrix: [delta_r | delta_p; 0 | 1]
+    let mut t_rel = Matrix4x4::identity();
+    t_rel.fixed_view_mut::<3, 3>(0, 0).copy_from(&delta_r);
+    t_rel.fixed_view_mut::<3, 1>(0, 3).copy_from(&delta_p);
+    t_rel
 }
 
 /// Sliding window of keyframes for bundle adjustment optimization.
@@ -248,7 +313,7 @@ impl SlidingWindow {
             for feat in frame.left_features.iter() {
                 map_feature_to_landmark
                     .entry(feat.feature_id)
-                    .or_insert_with(|| format!("LM_{}", feat.feature_id));
+                    .or_insert_with(|| format!("pt_{}", feat.feature_id));
                 *left_obs_count.entry(feat.feature_id).or_insert(0) += 1;
             }
 
@@ -256,12 +321,15 @@ impl SlidingWindow {
             for feat in frame.right_features.iter() {
                 map_feature_to_landmark
                     .entry(feat.feature_id)
-                    .or_insert_with(|| format!("LM_{}", feat.feature_id));
+                    .or_insert_with(|| format!("pt_{}", feat.feature_id));
                 *right_obs_count.entry(feat.feature_id).or_insert(0) += 1;
             }
         }
 
         // Add factors
+        let mut stereo_count = 0usize;
+        let mut mono_count = 0usize;
+        let mut counted_landmarks: std::collections::HashSet<usize> = std::collections::HashSet::new();
         for (id_frame, frame) in self.keyframes.iter().enumerate() {
             // Add KF poses
             let kf_var = format!("KF_{}", id_frame);
@@ -292,11 +360,20 @@ impl SlidingWindow {
                         .get(&feature_id)
                         .expect("feature_id should be in map from counting phase");
 
-                    // Only process landmarks seen in BOTH cameras (stereo constraint)
+                    // Accept landmarks seen in at least one camera.
+                    // Stereo landmarks (both cameras) are preferred but mono is allowed
+                    // to prevent "no landmark variables" errors in the Schur solver.
                     let count_left = left_obs_count.get(&feature_id).copied().unwrap_or(0);
                     let count_right = right_obs_count.get(&feature_id).copied().unwrap_or(0);
+                    let is_stereo = count_left > 0 && count_right > 0;
+                    let has_any = count_left > 0 || count_right > 0;
 
-                    if count_left > 0 && count_right > 0 {
+                    if has_any {
+                        // Count unique landmarks (stereo vs mono)
+                        if counted_landmarks.insert(feature_id) {
+                            if is_stereo { stereo_count += 1; } else { mono_count += 1; }
+                        }
+
                         // Create initial value for landmark if not already present
                         initial_values.entry(lm_var.clone()).or_insert_with(|| {
                             let data = if let Some(&last_pos) = self.map_points.get(&feature_id) {
@@ -370,9 +447,13 @@ impl SlidingWindow {
         let num_variables = initial_values.len();
 
         log::debug!(
-            "Added SE3 and R3 variables, now {} variables total, {} residual blocks",
+            "Added {} variables total ({} SE3 + {} R3), {} residual blocks ({} stereo + {} mono landmarks)",
             num_variables,
-            num_residuals
+            self.keyframes.len(),
+            stereo_count + mono_count,
+            num_residuals,
+            stereo_count,
+            mono_count
         );
 
         // Validate problem before optimization
@@ -565,7 +646,7 @@ impl SlidingWindow {
         self.map_points.clear();
         opt_result.parameters.iter().for_each(|(var_name, value)| {
             // Update map points
-            if let Some(feature_id_str) = var_name.strip_prefix("LM_") {
+            if let Some(feature_id_str) = var_name.strip_prefix("pt_") {
                 if let Ok(feature_id) = feature_id_str.parse::<usize>() {
                     let vec = value.to_vector();
                     // TODO check if points are estimated at obviously wrong locations (negative depths, etc.)
@@ -608,14 +689,25 @@ impl SlidingWindow {
 
         // Add variable for the new frame
         // Only the new frame is optimized.
-        // Initial pose predicted by constant velocity motion model:
-        //   T_W_B_init = T_W_B_last * T_W_B_prev⁻¹ * T_W_B_last
-        // Falls back to last keyframe pose if only one keyframe exists.
+        // Initial pose predicted by IMU pre-integration (preferred) or constant velocity model:
+        //   IMU:  T_W_B_init = T_W_B_last · ΔT_imu
+        //   CV:   T_W_B_init = T_W_B_last · T_W_B_prev⁻¹ · T_W_B_last
         let kf_var = "F".to_string();
-        let init_T_W_B = self.predict_current_pose();
-        let T_B_W = init_T_W_B
-            .try_inverse()
-            .expect("predicted T_W_B should be invertible");
+        let last_kf_pose = self
+            .keyframes
+            .back()
+            .expect("keyframes should not be empty")
+            .state
+            .T_W_B;
+
+        let init_T_W_B = if !frame.imu_from_last_frame.is_empty() {
+            let delta_t = preintegrate_imu(&frame.imu_from_last_frame);
+            last_kf_pose * delta_t
+        } else {
+            self.predict_current_pose()
+        };
+
+        let T_B_W = inverse_se3(&init_T_W_B);
         let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
         let R_B_W = Matrix3x3::from(T_B_W.fixed_view::<3, 3>(0, 0));
         let q_B_W = UnitQuaternion::from_matrix(&R_B_W);
