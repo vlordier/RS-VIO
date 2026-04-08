@@ -207,11 +207,8 @@ impl<'a> Estimator<'a> {
                             .expect("keyframe pose should be invertible");
                     let t_rel = T_rel.fixed_view::<3, 1>(0, 3).into_owned();
                     let R_rel = T_rel.fixed_view::<3, 3>(0, 0).into_owned();
-                    let e_rel = Vector3::from([
-                        UnitQuaternion::from_matrix(&R_rel).euler_angles().0,
-                        UnitQuaternion::from_matrix(&R_rel).euler_angles().1,
-                        UnitQuaternion::from_matrix(&R_rel).euler_angles().2,
-                    ]);
+                    let e_rel = UnitQuaternion::from_matrix(&R_rel).euler_angles();
+                    let e_rel = Vector3::from([e_rel.0, e_rel.1, e_rel.2]);
                     log::debug!("[Estimator] Translation since last keyframe: {:.2?}, Euler angles since last keyframe: {:.2?}", t_rel, e_rel);
 
                     // Check if translation and rotation since last keyframe is large enough to trigger a keyframe

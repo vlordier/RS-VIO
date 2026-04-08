@@ -119,6 +119,21 @@ impl SlidingWindow {
         self.keyframes.iter().map(|f| f.state.T_W_B).collect()
     }
 
+    /// Return the last two keyframe poses without allocating a Vec.
+    ///
+    /// Returns `None` if fewer than 2 keyframes exist.
+    /// This is more efficient than [`get_keyframe_poses`] when only the last
+    /// two poses are needed (e.g., constant velocity prediction).
+    pub fn get_last_two_poses(&self) -> Option<(Matrix4x4, Matrix4x4)> {
+        let len = self.keyframes.len();
+        if len < 2 {
+            return None;
+        }
+        let t_prev = self.keyframes.iter().nth_back(1)?.state.T_W_B;
+        let t_last = self.keyframes.back()?.state.T_W_B;
+        Some((t_prev, t_last))
+    }
+
     /// Predict the current pose using a constant velocity motion model.
     ///
     /// Computes the relative SE(3) motion between the last two keyframes and
@@ -126,16 +141,18 @@ impl SlidingWindow {
     ///
     /// Falls back to the last keyframe pose if fewer than 2 keyframes exist.
     pub fn predict_current_pose(&self) -> Matrix4x4 {
-        let poses: Vec<&Matrix4x4> = self.keyframes.iter().map(|f| &f.state.T_W_B).collect();
-        if poses.len() < 2 {
-            return **poses.first().expect("keyframes should not be empty");
+        if let Some((t_prev, t_last)) = self.get_last_two_poses() {
+            // T_rel = T_prev⁻¹ * T_last  (relative motion in world frame)
+            let t_rel = t_prev.try_inverse().expect("T_W_B should be invertible") * t_last;
+            // Extrapolate: T_init = T_last * T_rel
+            t_last * t_rel
+        } else {
+            let last_kf = self
+                .keyframes
+                .back()
+                .expect("keyframes should not be empty");
+            last_kf.state.T_W_B
         }
-        let t_last = poses[poses.len() - 1];
-        let t_prev = poses[poses.len() - 2];
-        // T_rel = T_prev⁻¹ * T_last  (relative motion in world frame)
-        let t_rel = t_prev.try_inverse().expect("T_W_B should be invertible") * t_last;
-        // Extrapolate: T_init = T_last * T_rel
-        t_last * t_rel
     }
 
     /// Clear all keyframes from the sliding window.
@@ -194,8 +211,9 @@ impl SlidingWindow {
 
         // Initialize maps for tracking and counting observations
         let mut map_feature_to_landmark: HashMap<usize, String> = HashMap::new();
-        let mut landmark_observation_count_left: HashMap<String, usize> = HashMap::new();
-        let mut landmark_observation_count_right: HashMap<String, usize> = HashMap::new();
+        // Count observations per feature_id, separately for left and right cameras
+        let mut left_obs_count: HashMap<usize, usize> = HashMap::new();
+        let mut right_obs_count: HashMap<usize, usize> = HashMap::new();
 
         // Fetch transforms between cameras and body
         let T_Cl_B = self
@@ -219,34 +237,18 @@ impl SlidingWindow {
         for frame in self.keyframes.iter() {
             // Count left camera observations
             for feat in frame.left_features.iter() {
-                let feature_id = feat.feature_id;
-
-                // Get or create landmark variable name
-                let lm_var = map_feature_to_landmark
-                    .entry(feature_id)
-                    .or_insert_with(|| format!("LM_{}", feature_id))
-                    .clone();
-
-                // Increment left camera observation count
-                *landmark_observation_count_left
-                    .entry(lm_var.clone())
-                    .or_insert(0) += 1;
+                map_feature_to_landmark
+                    .entry(feat.feature_id)
+                    .or_insert_with(|| format!("LM_{}", feat.feature_id));
+                *left_obs_count.entry(feat.feature_id).or_insert(0) += 1;
             }
 
             // Count right camera observations
             for feat in frame.right_features.iter() {
-                let feature_id = feat.feature_id;
-
-                // Get or create landmark variable name
-                let lm_var = map_feature_to_landmark
-                    .entry(feature_id)
-                    .or_insert_with(|| format!("LM_{}", feature_id))
-                    .clone();
-
-                // Increment right camera observation count
-                *landmark_observation_count_right
-                    .entry(lm_var.clone())
-                    .or_insert(0) += 1;
+                map_feature_to_landmark
+                    .entry(feat.feature_id)
+                    .or_insert_with(|| format!("LM_{}", feat.feature_id));
+                *right_obs_count.entry(feat.feature_id).or_insert(0) += 1;
             }
         }
 
@@ -279,18 +281,11 @@ impl SlidingWindow {
                     let feature_id = feat.feature_id;
                     let lm_var = map_feature_to_landmark
                         .get(&feature_id)
-                        .cloned()
-                        .unwrap_or_else(|| format!("LM_{}", feature_id));
+                        .expect("feature_id should be in map from counting phase");
 
-                    // Only process landmarks that are seen at least once in BOTH cameras (stereo constraint)
-                    let count_left = landmark_observation_count_left
-                        .get(&lm_var)
-                        .copied()
-                        .unwrap_or(0);
-                    let count_right = landmark_observation_count_right
-                        .get(&lm_var)
-                        .copied()
-                        .unwrap_or(0);
+                    // Only process landmarks seen in BOTH cameras (stereo constraint)
+                    let count_left = left_obs_count.get(&feature_id).copied().unwrap_or(0);
+                    let count_right = right_obs_count.get(&feature_id).copied().unwrap_or(0);
 
                     if count_left > 0 && count_right > 0 {
                         // Create initial value for landmark if not already present
@@ -847,5 +842,155 @@ mod tests {
         // Zero velocity → prediction = last pose
         let predicted = sw.predict_current_pose();
         assert_eq!(predicted, pose);
+    }
+
+    // ========================================================================
+    // Tests for get_last_two_poses (zero-allocation accessor)
+    // ========================================================================
+
+    #[test]
+    fn test_get_last_two_poses_empty() {
+        let sw = SlidingWindow::new(5);
+        assert!(sw.get_last_two_poses().is_none());
+    }
+
+    #[test]
+    fn test_get_last_two_poses_single() {
+        let mut sw = SlidingWindow::new(5);
+        sw.add_frame(make_dummy_frame(0, translation_only(1.0, 0.0, 0.0)));
+        assert!(sw.get_last_two_poses().is_none());
+    }
+
+    #[test]
+    fn test_get_last_two_poses_returns_correct_pair() {
+        let mut sw = SlidingWindow::new(5);
+        let p0 = translation_only(1.0, 2.0, 3.0);
+        let p1 = translation_only(4.0, 5.0, 6.0);
+        sw.add_frame(make_dummy_frame(0, p0));
+        sw.add_frame(make_dummy_frame(1, p1));
+
+        let (prev, last) = sw.get_last_two_poses().expect("should have two poses");
+        assert_eq!(prev, p0);
+        assert_eq!(last, p1);
+    }
+
+    #[test]
+    fn test_get_last_two_poses_after_eviction() {
+        let mut sw = SlidingWindow::new(3);
+        sw.add_frame(make_dummy_frame(0, translation_only(0.0, 0.0, 0.0)));
+        sw.add_frame(make_dummy_frame(1, translation_only(1.0, 0.0, 0.0)));
+        sw.add_frame(make_dummy_frame(2, translation_only(2.0, 0.0, 0.0)));
+
+        // After eviction, last two should be frames 1 and 2
+        let (prev, last) = sw.get_last_two_poses().expect("should have two poses");
+        assert!((prev[(0, 3)] - 1.0).abs() < 1e-10);
+        assert!((last[(0, 3)] - 2.0).abs() < 1e-10);
+    }
+
+    // ========================================================================
+    // Additional SE(3) edge case tests
+    // ========================================================================
+
+    #[test]
+    fn test_predict_pose_combined_se3_motion() {
+        use na::UnitQuaternion;
+
+        let mut sw = SlidingWindow::new(5);
+
+        // Two keyframes with combined translation + rotation
+        let pose_0 = Matrix4x4::identity();
+        let mut pose_1 = Matrix4x4::identity();
+
+        let q1 = UnitQuaternion::from_euler_angles(0.0, 0.05, 0.1);
+        pose_1
+            .fixed_view_mut::<3, 3>(0, 0)
+            .copy_from(q1.to_rotation_matrix().matrix());
+        pose_1[(0, 3)] = 0.5;
+        pose_1[(1, 3)] = 0.1;
+        pose_1[(2, 3)] = -0.2;
+
+        sw.add_frame(make_dummy_frame(0, pose_0));
+        sw.add_frame(make_dummy_frame(1, pose_1));
+
+        let predicted = sw.predict_current_pose();
+
+        // For SE(3) composition: T_pred = T_1 * T_1
+        // The translation is R_1 * t_1 + t_1 (not simply 2*t_1)
+        // The rotation is R_1 * R_1 (double the angle)
+        let r: na::Matrix3<f64> = predicted.fixed_view::<3, 3>(0, 0).into_owned();
+        let predicted_q = UnitQuaternion::from_matrix(&r);
+        let (roll, pitch, yaw) = predicted_q.euler_angles();
+
+        // Rotation should be extrapolated: yaw ≈ 0.2, pitch ≈ 0.1
+        // Note: euler angles are NOT additive under SE(3) composition, so we use relaxed tolerance
+        assert!((yaw - 0.2).abs() < 5e-3, "expected yaw≈0.2, got {}", yaw);
+        assert!(
+            (pitch - 0.1).abs() < 5e-3,
+            "expected pitch≈0.1, got {}",
+            pitch
+        );
+        assert!(roll.abs() < 0.01, "expected roll≈0.0, got {}", roll);
+
+        // Translation is R_1 * t_1 + t_1 — verify it's approximately 2x for small rotations
+        // For yaw=0.1, pitch=0.05, the rotated translation differs from 2*t_1
+        // We verify the general direction and magnitude are reasonable
+        let tx = predicted[(0, 3)];
+        let ty = predicted[(1, 3)];
+        let tz = predicted[(2, 3)];
+
+        // Just verify non-zero motion in the expected direction
+        assert!(tx > 0.5, "expected x>0.5 (got {})", tx);
+        assert!(ty > 0.0, "expected y>0 (got {})", ty);
+        assert!(tz < 0.0, "expected z<0 (got {})", tz);
+    }
+
+    #[test]
+    fn test_predict_pose_reversing_direction() {
+        let mut sw = SlidingWindow::new(5);
+
+        // Three keyframes: moving forward then reversing
+        // (0,0,0) → (2,0,0) → (3,0,0) — velocity slows down
+        sw.add_frame(make_dummy_frame(0, translation_only(0.0, 0.0, 0.0)));
+        sw.add_frame(make_dummy_frame(1, translation_only(2.0, 0.0, 0.0)));
+        sw.add_frame(make_dummy_frame(2, translation_only(3.0, 0.0, 0.0)));
+
+        // Last delta is +1, so prediction = 3 + 1 = 4
+        let predicted = sw.predict_current_pose();
+        assert!(
+            (predicted[(0, 3)] - 4.0).abs() < 1e-10,
+            "expected x=4, got {}",
+            predicted[(0, 3)]
+        );
+    }
+
+    #[test]
+    fn test_predict_pose_consistency_with_get_keyframe_poses() {
+        let mut sw = SlidingWindow::new(5);
+        sw.add_frame(make_dummy_frame(0, translation_only(0.0, 0.0, 0.0)));
+        sw.add_frame(make_dummy_frame(1, translation_only(1.0, 0.0, 0.0)));
+        sw.add_frame(make_dummy_frame(2, translation_only(2.0, 0.0, 0.0)));
+
+        // get_last_two_poses should return the same poses as get_keyframe_poses
+        let all_poses = sw.get_keyframe_poses();
+        let (prev, last) = sw.get_last_two_poses().expect("should have two poses");
+
+        assert_eq!(prev, all_poses[all_poses.len() - 2]);
+        assert_eq!(last, all_poses[all_poses.len() - 1]);
+    }
+
+    #[test]
+    fn test_predict_pose_backward_motion() {
+        let mut sw = SlidingWindow::new(5);
+
+        // Moving in negative direction
+        sw.add_frame(make_dummy_frame(0, translation_only(0.0, 0.0, 0.0)));
+        sw.add_frame(make_dummy_frame(1, translation_only(-1.0, 0.5, -0.3)));
+
+        // Predict: T_rel = I⁻¹ * T(-1, 0.5, -0.3) = T(-1, 0.5, -0.3)
+        // T_pred = T(-1, 0.5, -0.3) * T(-1, 0.5, -0.3) = T(-2, 1.0, -0.6)
+        let predicted = sw.predict_current_pose();
+        assert!((predicted[(0, 3)] + 2.0).abs() < 1e-10);
+        assert!((predicted[(1, 3)] - 1.0).abs() < 1e-10);
+        assert!((predicted[(2, 3)] + 0.6).abs() < 1e-10);
     }
 }
