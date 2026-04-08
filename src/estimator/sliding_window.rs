@@ -13,6 +13,20 @@ use nalgebra as na;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 
+/// Compute the inverse of an SE(3) transform matrix using the closed-form solution.
+///
+/// For `T = [R | t; 0 | 1]`, the inverse is `T⁻¹ = [Rᵀ | -Rᵀ·t; 0 | 1]`.
+/// This is O(n²) vs O(n³) for a full matrix inverse.
+#[inline]
+pub(crate) fn inverse_se3(t: &Matrix4x4) -> Matrix4x4 {
+    let r_inv = t.fixed_view::<3, 3>(0, 0).transpose();
+    let t_part = r_inv * t.fixed_view::<3, 1>(0, 3);
+    let mut result = Matrix4x4::identity();
+    result.fixed_view_mut::<3, 3>(0, 0).copy_from(&r_inv);
+    result.fixed_view_mut::<3, 1>(0, 3).copy_from(&(-t_part));
+    result
+}
+
 /// Sliding window of keyframes for bundle adjustment optimization.
 ///
 /// Maintains a fixed-size window of keyframes and manages the optimization
@@ -143,7 +157,7 @@ impl SlidingWindow {
     pub fn predict_current_pose(&self) -> Matrix4x4 {
         if let Some((t_prev, t_last)) = self.get_last_two_poses() {
             // T_rel = T_prev⁻¹ * T_last  (relative motion in world frame)
-            let t_rel = t_prev.try_inverse().expect("T_W_B should be invertible") * t_last;
+            let t_rel = inverse_se3(&t_prev) * t_last;
             // Extrapolate: T_init = T_last * T_rel
             t_last * t_rel
         } else {
@@ -197,11 +211,6 @@ impl SlidingWindow {
 
     pub fn optimize(&mut self) -> Result<bool, std::io::Error> {
         self.check_sliding_window_size_for_optimization()?;
-
-        // Save current state before optimization for potential rollback
-        let saved_keyframe_poses: Vec<Matrix4x4> =
-            self.keyframes.iter().map(|f| f.state.T_W_B).collect();
-        let saved_map_points = self.map_points.clone();
 
         // Initialize problem and solver
         let mut problem = Problem::new(JacobianMode::Sparse);
@@ -264,7 +273,7 @@ impl SlidingWindow {
             let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
             let R_B_W = Matrix3x3::from(T_B_W.fixed_view::<3, 3>(0, 0));
             let q_B_W = UnitQuaternion::from_matrix(&R_B_W);
-            let se3_data = DVector::from_vec(vec![
+            let se3_data = DVector::from_row_slice(&[
                 t_B_W.x, t_B_W.y, t_B_W.z, q_B_W.w, q_B_W.i, q_B_W.j, q_B_W.k,
             ]);
             // println!("KF_{} initial pose: {:?}", frame.frame_id, se3_data);
@@ -291,7 +300,7 @@ impl SlidingWindow {
                         // Create initial value for landmark if not already present
                         initial_values.entry(lm_var.clone()).or_insert_with(|| {
                             let data = if let Some(&last_pos) = self.map_points.get(&feature_id) {
-                                DVector::from_vec(vec![
+                                DVector::from_row_slice(&[
                                     last_pos[0] as f64,
                                     last_pos[1] as f64,
                                     last_pos[2] as f64,
@@ -315,7 +324,7 @@ impl SlidingWindow {
                                     T_B_C.fixed_view::<3, 1>(0, 3).into_owned(),
                                 );
                                 let p_W = R_W_B * (R_B_C * p_C + t_B_C) + t_W_B;
-                                DVector::from_vec(vec![p_W.x, p_W.y, p_W.z])
+                                DVector::from_row_slice(&[p_W.x, p_W.y, p_W.z])
                             };
                             (ManifoldType::RN, data)
                         });
@@ -381,6 +390,11 @@ impl SlidingWindow {
                       num_residuals, num_variables);
             return Ok(false);
         }
+
+        // Save state for rollback (only after validation passes — skip if early return above)
+        let saved_keyframe_poses: Vec<Matrix4x4> =
+            self.keyframes.iter().map(|f| f.state.T_W_B).collect();
+        let saved_map_points = self.map_points.clone();
 
         // Initialize variables in the problem
         problem.initialize_variables(&initial_values);
@@ -605,7 +619,7 @@ impl SlidingWindow {
         let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
         let R_B_W = Matrix3x3::from(T_B_W.fixed_view::<3, 3>(0, 0));
         let q_B_W = UnitQuaternion::from_matrix(&R_B_W);
-        let se3_data = DVector::from_vec(vec![
+        let se3_data = DVector::from_row_slice(&[
             t_B_W.x, t_B_W.y, t_B_W.z, q_B_W.w, q_B_W.i, q_B_W.j, q_B_W.k,
         ]);
         initial_values.insert(kf_var.clone(), (ManifoldType::SE3, se3_data.cast::<f64>()));

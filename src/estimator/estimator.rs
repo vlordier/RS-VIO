@@ -7,7 +7,7 @@
 use crate::datasets::config::Config;
 use crate::datasets::CameraModelType;
 use crate::datasets::ImuData;
-use crate::estimator::sliding_window::SlidingWindow;
+use crate::estimator::sliding_window::{inverse_se3, SlidingWindow};
 use crate::estimator::Frame;
 use crate::feature_tracker::StereoPatchTracker;
 use crate::types::{Matrix4x4, UnitQuaternion, Vector3};
@@ -196,15 +196,14 @@ impl<'a> Estimator<'a> {
                     current_frame.state.T_W_B = T_W_B;
 
                     // Check if translation and rotation since last keyframe is large enough to trigger a keyframe
-                    let T_W_B_last_kf = *self
+                    // Use get_frame() to avoid allocating a Vec of all poses
+                    let T_W_B_last_kf = self
                         .sliding_window
-                        .get_keyframe_poses()
-                        .last()
-                        .expect("sliding window should have at least one keyframe");
-                    let T_rel = T_W_B
-                        * T_W_B_last_kf
-                            .try_inverse()
-                            .expect("keyframe pose should be invertible");
+                        .get_frame(self.sliding_window.len() - 1)
+                        .expect("sliding window should have at least one keyframe")
+                        .state
+                        .T_W_B;
+                    let T_rel = T_W_B * inverse_se3(&T_W_B_last_kf);
                     let t_rel = T_rel.fixed_view::<3, 1>(0, 3).into_owned();
                     let R_rel = T_rel.fixed_view::<3, 3>(0, 0).into_owned();
                     let e_rel = UnitQuaternion::from_matrix(&R_rel).euler_angles();

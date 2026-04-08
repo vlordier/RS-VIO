@@ -99,7 +99,7 @@ impl Factor for PinholeProjectionFactor {
         let point_camera = R_C_W * point_world + t_C_W;
 
         let proj = project_to_normalized(point_camera);
-        let residuals = DVector::from_vec(vec![
+        let residuals = DVector::from_row_slice(&[
             proj[0] - self.observation[0],
             proj[1] - self.observation[1],
         ]);
@@ -189,7 +189,7 @@ impl Factor for BundleAdjustmentFactorTranslationOnly {
         let p_C = R_C_B * (p_W + t_B_W) + t_C_B;
 
         let proj = project_to_normalized(p_C);
-        let residuals = DVector::from_vec(vec![
+        let residuals = DVector::from_row_slice(&[
             proj[0] - self.observation[0],
             proj[1] - self.observation[1],
         ]);
@@ -293,7 +293,7 @@ impl Factor for BundleAdjustmentFactor {
         let p_C = R_C_B * p_B + t_C_B;
 
         let proj = project_to_normalized(p_C);
-        let residuals = DVector::from_vec(vec![
+        let residuals = DVector::from_row_slice(&[
             proj[0] - self.observation[0],
             proj[1] - self.observation[1],
         ]);
@@ -384,7 +384,7 @@ impl Factor for PnPFactor {
         let p_C = R_C_B * p_B + t_C_B;
 
         let proj = project_to_normalized(p_C);
-        let residuals = DVector::from_vec(vec![
+        let residuals = DVector::from_row_slice(&[
             proj[0] - self.observation[0],
             proj[1] - self.observation[1],
         ]);
