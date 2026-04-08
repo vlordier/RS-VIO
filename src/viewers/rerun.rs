@@ -1,14 +1,14 @@
-use anyhow::Result;
-use rerun::{RecordingStream, RecordingStreamBuilder};
-use rerun::components::Color;
-use rerun::Pinhole;
-use rerun::LineStrips3D;
-use rerun::time::Timestamp;
-use super::Viewer;
 use super::get_feature_color;
-use image::{DynamicImage, ImageBuffer, Luma};
-use std::io::Cursor;
+use super::Viewer;
 use crate::types::{Array3, Float, Matrix3x3, Matrix4x4, ToArray};
+use anyhow::Result;
+use image::{DynamicImage, ImageBuffer, Luma};
+use rerun::components::Color;
+use rerun::time::Timestamp;
+use rerun::LineStrips3D;
+use rerun::Pinhole;
+use rerun::{RecordingStream, RecordingStreamBuilder};
+use std::io::Cursor;
 
 /// Basic RerunViewer implementation
 pub struct RerunViewer {
@@ -35,13 +35,19 @@ impl RerunViewer {
             _first_timestamp_ns: None,
         }
     }
-    
+
     /// Helper function to safely convert raw image data to JPEG bytes
-    fn image_to_jpeg_bytes(&self, image: &[u8], width: u32, height: u32, entity_path: &str) -> Option<Vec<u8>> {
+    fn image_to_jpeg_bytes(
+        &self,
+        image: &[u8],
+        width: u32,
+        height: u32,
+        entity_path: &str,
+    ) -> Option<Vec<u8>> {
         // Validate image dimensions
         let expected_size = (width as usize) * (height as usize);
         let actual_size = image.len();
-        
+
         if actual_size != expected_size {
             log::warn!(
                 "[RerunViewer] Image size mismatch for {}: expected {} bytes ({}x{}), got {} bytes. Skipping.",
@@ -49,9 +55,13 @@ impl RerunViewer {
             );
             return None;
         }
-        
+
         // Convert raw pixel data to DynamicImage
-        let img_buffer = match ImageBuffer::<Luma<u8>, Vec<u8>>::from_raw(width, height, image.to_vec()) {
+        let img_buffer = match ImageBuffer::<Luma<u8>, Vec<u8>>::from_raw(
+            width,
+            height,
+            image.to_vec(),
+        ) {
             Some(buffer) => buffer,
             None => {
                 log::warn!(
@@ -61,16 +71,21 @@ impl RerunViewer {
                 return None;
             }
         };
-        
+
         let dynamic_img = DynamicImage::ImageLuma8(img_buffer);
-        
+
         // Encode as JPEG
         let mut bytes: Vec<u8> = Vec::new();
-        if let Err(e) = dynamic_img.write_to(&mut Cursor::new(&mut bytes), image::ImageFormat::Jpeg) {
-            log::warn!("[RerunViewer] Failed to encode image as JPEG for {}: {}. Skipping.", entity_path, e);
+        if let Err(e) = dynamic_img.write_to(&mut Cursor::new(&mut bytes), image::ImageFormat::Jpeg)
+        {
+            log::warn!(
+                "[RerunViewer] Failed to encode image as JPEG for {}: {}. Skipping.",
+                entity_path,
+                e
+            );
             return None;
         }
-        
+
         Some(bytes)
     }
 }
@@ -86,13 +101,13 @@ impl Viewer for RerunViewer {
                 log::error!("[RerunViewer] Failed to spawn viewer: {}", e);
                 e
             })?;
-        
+
         self.rec = Some(rec);
         self.initialized = true;
-        
+
         // Give the viewer a moment to fully start up
         std::thread::sleep(std::time::Duration::from_millis(500));
-        
+
         // Set up coordinate system
         if let Some(ref rec) = self.rec {
             rec.set_time_sequence("frame", 0);
@@ -103,7 +118,7 @@ impl Viewer for RerunViewer {
                     // Don't fail initialization if this fails
                 }
             }
-        // Log an origin arrow for the coordinate system at the origin
+            // Log an origin arrow for the coordinate system at the origin
             // The colors used are: X - red, Y - green, Z - blue (conventional)
             let origin = [0.0, 0.0, 0.0];
 
@@ -119,9 +134,9 @@ impl Viewer for RerunViewer {
                 [0.0, 0.0, 1.0], // Z axis
             ];
             let colors = vec![
-                rerun::Color::from_rgb(255, 0, 0),    // X - red
-                rerun::Color::from_rgb(0, 255, 0),    // Y - green
-                rerun::Color::from_rgb(0, 0, 255),    // Z - blue
+                rerun::Color::from_rgb(255, 0, 0), // X - red
+                rerun::Color::from_rgb(0, 255, 0), // Y - green
+                rerun::Color::from_rgb(0, 0, 255), // Z - blue
             ];
 
             match rec.log(
@@ -133,27 +148,32 @@ impl Viewer for RerunViewer {
                 Ok(_) => log::debug!("[RerunViewer] Successfully logged axis arrows"),
                 Err(e) => log::warn!("[RerunViewer] Failed to log axis arrows: {}", e),
             }
-        }    
+        }
         log::info!("[RerunViewer] Viewer initialized successfully");
         Ok(())
     }
-    
+
     fn log_pose(&mut self, T_W_B: Matrix4x4, entity_path: &str) {
         if !self.initialized {
             return;
         }
-        
+
         if let Some(ref rec) = self.rec {
             rec.set_time_sequence("frame", self.frame_id);
             rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
-            
+
             let translation = Array3::from(T_W_B.fixed_view::<3, 1>(0, 3));
             let rotation = Matrix3x3::from(T_W_B.fixed_view::<3, 3>(0, 0));
-            
+
             // Convert rotation matrix to quaternion
             let quat = matrix_to_quaternion(Matrix3x3::from(rotation).to_array());
-            let quaternion = rerun::Quaternion::from_xyzw([quat[0] as f32, quat[1] as f32, quat[2] as f32, quat[3] as f32]);
-            
+            let quaternion = rerun::Quaternion::from_xyzw([
+                quat[0] as f32,
+                quat[1] as f32,
+                quat[2] as f32,
+                quat[3] as f32,
+            ]);
+
             if let Err(e) = rec.log(
                 entity_path,
                 &rerun::Transform3D::from_translation_rotation(
@@ -165,29 +185,34 @@ impl Viewer for RerunViewer {
             }
         }
     }
-    
+
     fn log_image_raw(&mut self, image: &[u8], width: u32, height: u32, entity_path: &str) {
         if !self.initialized || image.is_empty() {
             return;
         }
-        
+
         if let Some(ref rec) = self.rec {
             rec.set_time_sequence("frame", self.frame_id);
             rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
-            
+
             // Convert image to JPEG bytes using helper
             let bytes = match self.image_to_jpeg_bytes(image, width, height, entity_path) {
                 Some(b) => b,
                 None => return, // Error already logged in helper
             };
-            
+
             // Log using EncodedImage
             let rr_image = rerun::EncodedImage::from_file_contents(bytes);
             if let Err(e) = rec.log(entity_path, &rr_image) {
                 let err_str = e.to_string();
                 // Only warn if it's not a broken pipe (which can happen during rerun's internal retries)
                 if !err_str.contains("Broken pipe") {
-                    log::warn!("[RerunViewer] Failed to log image to {}: {} (frame: {})", entity_path, e, self.frame_id);
+                    log::warn!(
+                        "[RerunViewer] Failed to log image to {}: {} (frame: {})",
+                        entity_path,
+                        e,
+                        self.frame_id
+                    );
                 }
                 // Check if it's a connection error - if so, mark as not initialized
                 if err_str.contains("Connection refused") {
@@ -197,32 +222,42 @@ impl Viewer for RerunViewer {
             }
         }
     }
-    
+
     fn log_image_equalized(&mut self, image: &[u8], width: u32, height: u32, entity_path: &str) {
         if !self.initialized || image.is_empty() {
             return;
         }
-        
+
         if let Some(ref rec) = self.rec {
             rec.set_time_sequence("frame", self.frame_id);
             rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
-            
+
             // Convert image to JPEG bytes using helper
             let bytes = match self.image_to_jpeg_bytes(image, width, height, entity_path) {
                 Some(b) => b,
                 None => return, // Error already logged in helper
             };
-            
+
             // Log using EncodedImage
             let rr_image = rerun::EncodedImage::from_file_contents(bytes);
             match rec.log(entity_path, &rr_image) {
                 Ok(_) => {
-                    log::debug!("[RerunViewer] Successfully logged equalized image to {}", entity_path);
+                    log::debug!(
+                        "[RerunViewer] Successfully logged equalized image to {}",
+                        entity_path
+                    );
                 }
                 Err(e) => {
-                    log::warn!("[RerunViewer] Failed to log equalized image to {}: {} (frame: {})", entity_path, e, self.frame_id);
+                    log::warn!(
+                        "[RerunViewer] Failed to log equalized image to {}: {} (frame: {})",
+                        entity_path,
+                        e,
+                        self.frame_id
+                    );
                     // Check if it's a connection error - if so, mark as not initialized
-                    if e.to_string().contains("Broken pipe") || e.to_string().contains("Connection refused") {
+                    if e.to_string().contains("Broken pipe")
+                        || e.to_string().contains("Connection refused")
+                    {
                         log::error!("[RerunViewer] Connection lost, viewer may have closed");
                         self.initialized = false;
                     }
@@ -230,24 +265,31 @@ impl Viewer for RerunViewer {
             }
         }
     }
-    
-    fn log_image_with_features(&mut self, image: &[u8], width: u32, height: u32, features: &[[f32; 2]], entity_path: &str) {
+
+    fn log_image_with_features(
+        &mut self,
+        image: &[u8],
+        width: u32,
+        height: u32,
+        features: &[[f32; 2]],
+        entity_path: &str,
+    ) {
         if !self.initialized || image.is_empty() {
             return;
         }
-        
+
         // Log the image first
         self.log_image_raw(image, width, height, entity_path);
-        
+
         // Then log features
         if let Some(ref rec) = self.rec {
             rec.set_time_sequence("frame", self.frame_id);
             rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
-            
+
             // Log features as 2D points
             if !features.is_empty() {
                 let points: Vec<[f32; 2]> = features.to_vec();
-                
+
                 if let Err(e) = rec.log(
                     format!("{}/features", entity_path).as_str(),
                     &rerun::Points2D::new(points),
@@ -257,45 +299,55 @@ impl Viewer for RerunViewer {
             }
         }
     }
-    
-    fn log_image_with_features_colored(&mut self, image: &[u8], width: u32, height: u32, features: &[(usize, [f32; 2])], entity_path: &str) {
+
+    fn log_image_with_features_colored(
+        &mut self,
+        image: &[u8],
+        width: u32,
+        height: u32,
+        features: &[(usize, [f32; 2])],
+        entity_path: &str,
+    ) {
         if !self.initialized || image.is_empty() {
             return;
         }
-        
+
         // Log the image first
         self.log_image_raw(image, width, height, entity_path);
-        
+
         // Then log features with colors
         if let Some(ref rec) = self.rec {
             rec.set_time_sequence("frame", self.frame_id);
             rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
-            
+
             if !features.is_empty() {
                 let points: Vec<[f32; 2]> = features.iter().map(|(_, coord)| *coord).collect();
-                let colors: Vec<rerun::Color> = features.iter()
+                let colors: Vec<rerun::Color> = features
+                    .iter()
                     .map(|(feature_id, _)| {
                         let rgb = get_feature_color(*feature_id);
                         rerun::Color::from_rgb(rgb[0], rgb[1], rgb[2])
                     })
                     .collect();
-                
+
                 let radii: Vec<f32> = vec![3.0; points.len()];
                 if let Err(e) = rec.log(
                     format!("{}/features", entity_path).as_str(),
-                    &rerun::Points2D::new(points).with_colors(colors).with_radii(radii),
+                    &rerun::Points2D::new(points)
+                        .with_colors(colors)
+                        .with_radii(radii),
                 ) {
                     log::warn!("[RerunViewer] Failed to log colored features: {}", e);
                 }
             }
         }
     }
-    
+
     fn log_points(&mut self, points: &[[f32; 3]], entity_path: &str) {
         if !self.initialized || points.is_empty() {
             return;
         }
-        
+
         if let Some(ref rec) = self.rec {
             rec.set_time_sequence("frame", self.frame_id);
             rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
@@ -309,107 +361,124 @@ impl Viewer for RerunViewer {
                     distance <= 300.0
                 })
                 .collect();
-            
-            if let Err(e) = rec.log(
-                entity_path,
-                &rerun::Points3D::new(points_3d),
-            ) {
-                log::warn!("[RerunViewer] Failed to log points to {}: {}", entity_path, e);
+
+            if let Err(e) = rec.log(entity_path, &rerun::Points3D::new(points_3d)) {
+                log::warn!(
+                    "[RerunViewer] Failed to log points to {}: {}",
+                    entity_path,
+                    e
+                );
             }
         }
     }
-    
+
     fn log_points_colored(&mut self, points: &[(usize, [f32; 3])], entity_path: &str) {
         if !self.initialized || points.is_empty() {
             return;
         }
-        
+
         if let Some(ref rec) = self.rec {
             rec.set_time_sequence("frame", self.frame_id);
             rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
-            
+
             let points_3d: Vec<[f32; 3]> = points.iter().map(|(_, coord)| *coord).collect();
-            let colors: Vec<rerun::Color> = points.iter()
+            let colors: Vec<rerun::Color> = points
+                .iter()
                 .map(|(feature_id, _)| {
                     let rgb = get_feature_color(*feature_id);
                     rerun::Color::from_rgb(rgb[0], rgb[1], rgb[2])
                 })
                 .collect();
-            
+
             if let Err(e) = rec.log(
                 entity_path,
                 &rerun::Points3D::new(points_3d).with_colors(colors),
             ) {
-                log::warn!("[RerunViewer] Failed to log colored points to {}: {}", entity_path, e);
+                log::warn!(
+                    "[RerunViewer] Failed to log colored points to {}: {}",
+                    entity_path,
+                    e
+                );
             }
         }
     }
-    
+
     fn set_frame(&mut self, frame_id: i64) {
         self.frame_id = frame_id;
         // Use frame_id as a relative timestamp in nanoseconds (assuming ~30fps = 33ms per frame)
         // This allows rerun to play back at a reasonable speed
         self.timestamp_ns = frame_id * 33_333_333; // ~30 fps
-        
+
         // Set both sequence and time for proper playback
         if let Some(ref rec) = self.rec {
             rec.set_time_sequence("frame", frame_id);
             rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
         }
     }
-    
-    fn log_camera_frustum(&mut self, focal_length: f32, width: u32, height: u32, entity_path: &str, size: f32) {
+
+    fn log_camera_frustum(
+        &mut self,
+        focal_length: f32,
+        width: u32,
+        height: u32,
+        entity_path: &str,
+        size: f32,
+    ) {
         if !self.initialized {
             return;
         }
-        
+
         if let Some(ref rec) = self.rec {
             rec.set_time_sequence("frame", self.frame_id);
             rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
-            
+
             // Create Pinhole camera model with focal length and resolution
             // The frustum will be visualized at the entity_path location
             // API expects Vec2D for focal_length (fx, fy) and resolution (width, height)
             let focal_vec = (focal_length, focal_length); // Use same focal length for fx and fy
             let resolution_vec = (width as f32, height as f32);
-            let pinhole = Pinhole::from_focal_length_and_resolution(focal_vec, resolution_vec).with_image_plane_distance(size);
-            
+            let pinhole = Pinhole::from_focal_length_and_resolution(focal_vec, resolution_vec)
+                .with_image_plane_distance(size);
+
             if let Err(e) = rec.log(entity_path, &pinhole) {
-                log::warn!("[RerunViewer] Failed to log camera frustum to {}: {}", entity_path, e);
+                log::warn!(
+                    "[RerunViewer] Failed to log camera frustum to {}: {}",
+                    entity_path,
+                    e
+                );
             }
         }
     }
-    
+
     fn log_trajectory(&mut self, trajectory: &[Matrix4x4], entity_path: &str) {
         if !self.initialized || trajectory.is_empty() {
             return;
         }
-        
+
         if let Some(ref rec) = self.rec {
             rec.set_time_sequence("frame", self.frame_id);
             rec.set_time("time", Timestamp::from_nanos_since_epoch(self.timestamp_ns));
-            
+
             // Extract translation (position) from each transformation matrix
             // Position is in the last column, rows 0-2
-            let positions: Vec<[Float; 3]> = trajectory.iter()
-                .map(|mat| {
-                        [
-                            mat[(0, 3)],
-                            mat[(1, 3)],
-                            mat[(2, 3)],
-                        ]
-                })
+            let positions: Vec<[Float; 3]> = trajectory
+                .iter()
+                .map(|mat| [mat[(0, 3)], mat[(1, 3)], mat[(2, 3)]])
                 .collect();
-            
+
             // Create a single line strip connecting all trajectory points
             let line_strip = LineStrips3D::new([positions]);
-            
+
             // Use a distinct color for the trajectory (e.g., yellow/orange)
             let trajectory_color = Color::from_rgb(255, 165, 0); // Orange
             let line_strip = line_strip.with_colors([trajectory_color]);
-            
+
             if let Err(e) = rec.log(entity_path, &line_strip) {
-                log::warn!("[RerunViewer] Failed to log trajectory to {}: {}", entity_path, e);
+                log::warn!(
+                    "[RerunViewer] Failed to log trajectory to {}: {}",
+                    entity_path,
+                    e
+                );
             }
         }
     }
@@ -419,7 +488,7 @@ impl Viewer for RerunViewer {
 fn matrix_to_quaternion(rot: [[Float; 3]; 3]) -> [Float; 4] {
     let trace = rot[0][0] + rot[1][1] + rot[2][2];
     let mut quat = [0.0 as Float; 4];
-    
+
     if trace > 0.0 {
         let s = (trace + 1.0).sqrt() * 2.0;
         quat[3] = 0.25 * s;
@@ -445,7 +514,7 @@ fn matrix_to_quaternion(rot: [[Float; 3]; 3]) -> [Float; 4] {
         quat[1] = (rot[1][2] + rot[2][1]) / s;
         quat[2] = 0.25 * s;
     }
-    
+
     quat
 }
 

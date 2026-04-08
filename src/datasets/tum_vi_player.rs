@@ -1,17 +1,18 @@
 //! TUM VI dataset player
 #![allow(dead_code, clippy::new_without_default)]
 
+use crate::datasets::{
+    config::Config, FrameContext, ImageData, ImuData, PlayerConfig, PlayerResult,
+};
+use crate::estimator::Estimator;
+use crate::viewers::{create_viewer, Viewer};
 use anyhow::{Context, Result};
+use image::ImageReader;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::thread;
 use std::time::{Duration, Instant};
-use image::{ImageReader};
-use crate::viewers::{Viewer, create_viewer};
-use crate::estimator::Estimator;
-use crate::datasets::{config::Config, ImageData, ImuData, FrameContext, PlayerConfig, PlayerResult};
-
 
 pub struct TUMVIPlayer;
 
@@ -57,7 +58,8 @@ impl TUMVIPlayer {
         let cfg = match Config::load(&config.config_path) {
             Ok(c) => c,
             Err(e) => {
-                result.error_message = format!("Failed to load config '{}': {}", config.config_path, e);
+                result.error_message =
+                    format!("Failed to load config '{}': {}", config.config_path, e);
                 return result;
             }
         };
@@ -167,14 +169,17 @@ impl TUMVIPlayer {
             log::info!("                          TIMING ANALYSIS                           ");
             log::info!("════════════════════════════════════════════════════════════════════");
             log::info!(" Total Frames Processed: {}", result.processed_frames);
-            log::info!(" Average Processing Time: {:.2}ms", result.average_processing_time_ms);
+            log::info!(
+                " Average Processing Time: {:.2}ms",
+                result.average_processing_time_ms
+            );
             let fps = 1000.0 / result.average_processing_time_ms;
             log::info!(" Average Frame Rate: {:.1}fps", fps);
             log::info!("════════════════════════════════════════════════════════════════════");
         }
-        
+
         log::info!("[TUMVIPlayer] Processing completed! Viewer remains open for inspection.");
-        
+
         result
     }
 
@@ -188,7 +193,7 @@ impl TUMVIPlayer {
 
         for (line_num, line) in reader.lines().enumerate() {
             let line = line?;
-            
+
             // Skip header and empty lines
             if line_num == 0 || line.trim().is_empty() || line.trim_start().starts_with('#') {
                 continue;
@@ -235,7 +240,7 @@ impl TUMVIPlayer {
 
         // Return raw pixel data as Vec<u8>
         let pixel_data = gray_img.as_raw().to_vec();
-        
+
         Ok(pixel_data)
     }
 
@@ -253,7 +258,10 @@ impl TUMVIPlayer {
     /// Create camera models from config using the datasets module helper function
     fn create_camera_models_from_config(
         config: &Config,
-    ) -> Result<(crate::datasets::CameraModelType, crate::datasets::CameraModelType)> {
+    ) -> Result<(
+        crate::datasets::CameraModelType,
+        crate::datasets::CameraModelType,
+    )> {
         Ok(crate::datasets::create_camera_models_from_config(config))
     }
 
@@ -275,15 +283,18 @@ impl TUMVIPlayer {
         estimator.set_viewer_frame(context.current_idx as i64);
 
         // Load stereo images
-        let left_image = Self::load_image(dataset_path, &image_data[context.current_idx].filename, 0)?;
-        let right_image = Self::load_image(dataset_path, &image_data[context.current_idx].filename, 1)?;
+        let left_image =
+            Self::load_image(dataset_path, &image_data[context.current_idx].filename, 0)?;
+        let right_image =
+            Self::load_image(dataset_path, &image_data[context.current_idx].filename, 1)?;
 
         if left_image.is_empty() {
             anyhow::bail!("Skipping frame {} due to empty image", context.current_idx);
         }
-        
+
         // Get IMU data if VIO mode
-        let imu_data: Option<Vec<ImuData>> = if false { // TODO when implementing IMU data loading
+        let imu_data: Option<Vec<ImuData>> = if false {
+            // TODO when implementing IMU data loading
             Some(Self::get_imu_data_between_frames(
                 context.previous_frame_timestamp,
                 image_data[context.current_idx].timestamp,
@@ -316,11 +327,7 @@ impl TUMVIPlayer {
         Vec::new()
     }
 
-    fn save_trajectories(
-        _estimator: &Estimator,
-        _context: &FrameContext,
-        _dataset_path: &str,
-    ) {
+    fn save_trajectories(_estimator: &Estimator, _context: &FrameContext, _dataset_path: &str) {
         // TODO: Implement trajectory saving
         log::debug!("[TUMVIPlayer] Saving trajectories (placeholder)");
     }
@@ -330,21 +337,53 @@ impl TUMVIPlayer {
 
         if let Ok(mut file) = std::fs::File::create(&stats_file) {
             use std::io::Write;
-            writeln!(file, "════════════════════════════════════════════════════════════════════").ok();
-            writeln!(file, "                          STATISTICS                                ").ok();
-            writeln!(file, "════════════════════════════════════════════════════════════════════").ok();
+            writeln!(
+                file,
+                "════════════════════════════════════════════════════════════════════"
+            )
+            .ok();
+            writeln!(
+                file,
+                "                          STATISTICS                                "
+            )
+            .ok();
+            writeln!(
+                file,
+                "════════════════════════════════════════════════════════════════════"
+            )
+            .ok();
             writeln!(file).ok();
 
             // Timing statistics
-            writeln!(file, "                          TIMING ANALYSIS                           ").ok();
-            writeln!(file, "════════════════════════════════════════════════════════════════════").ok();
+            writeln!(
+                file,
+                "                          TIMING ANALYSIS                           "
+            )
+            .ok();
+            writeln!(
+                file,
+                "════════════════════════════════════════════════════════════════════"
+            )
+            .ok();
             writeln!(file, " Total Frames Processed: {}", result.processed_frames).ok();
-            writeln!(file, " Average Processing Time: {:.2}ms", result.average_processing_time_ms).ok();
+            writeln!(
+                file,
+                " Average Processing Time: {:.2}ms",
+                result.average_processing_time_ms
+            )
+            .ok();
             let fps = 1000.0 / result.average_processing_time_ms;
             writeln!(file, " Average Frame Rate: {:.1}fps", fps).ok();
-            writeln!(file, "════════════════════════════════════════════════════════════════════").ok();
+            writeln!(
+                file,
+                "════════════════════════════════════════════════════════════════════"
+            )
+            .ok();
 
-            log::info!("[TUMVIPlayer] Saved statistics to: {}", stats_file.display());
+            log::info!(
+                "[TUMVIPlayer] Saved statistics to: {}",
+                stats_file.display()
+            );
         }
     }
 }

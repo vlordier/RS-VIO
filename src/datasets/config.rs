@@ -10,7 +10,6 @@ pub struct Config {
     pub optimization: OptimizationConfig,
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CameraConfig {
     #[serde(rename = "image_width")]
@@ -52,12 +51,10 @@ pub struct FeatureDetectionConfig {
     #[serde(rename = "max_features_per_grid")]
     pub max_features_per_grid: u32,
     #[serde(rename = "optical_flow_max_iterations")]
-    pub optical_flow_max_iterations: u32,   
+    pub optical_flow_max_iterations: u32,
     #[serde(rename = "optical_flow_convergence_threshold")]
     pub optical_flow_convergence_threshold: f64,
-  
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OptimizationConfig {
@@ -66,7 +63,6 @@ pub struct OptimizationConfig {
     #[serde(rename = "pnp_max_iterations")]
     pub pnp_max_iterations: u32,
 }
-
 
 impl Config {
     pub fn load(path: &str) -> anyhow::Result<Self> {
@@ -84,6 +80,4 @@ impl Config {
         let config: Config = serde_yaml::from_str(&content)?;
         Ok(config)
     }
-
 }
-

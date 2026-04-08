@@ -1,31 +1,54 @@
-pub mod euroc_player;
-pub mod tum_vi_player;
-pub mod fourseasons_player;
-pub mod config;
+//! Dataset players and configuration.
+//!
+//! Provides dataset-specific players that read image timestamps and frames
+//! from disk, feed them into the [`Estimator`](crate::estimator::Estimator),
+//! and collect timing statistics.
+//!
+//! ## Players
+//!
+//! - [`euroc_player::EurocPlayer`] — EUROC MAV dataset
+//! - [`tum_vi_player::TUMVIPlayer`] — TUM VI dataset
+//! - [`fourseasons_player::FourSeasonsPlayer`] — 4Seasons dataset
+//!
+//! ## Data types
+//!
+//! - [`ImageData`] — timestamp and filename path for a single image
+//! - [`ImuData`] — IMU gyroscope and accelerometer measurement
+//! - [`CameraModelType`] — unified enum for all supported camera models
 
+pub mod config;
+pub mod euroc_player;
+pub mod fourseasons_player;
+pub mod tum_vi_player;
+
+use crate::datasets::config::Config;
+use camera_intrinsic_model::generic_model::CameraModel;
 use camera_intrinsic_model::models::opencv5::OpenCVModel5;
 use camera_intrinsic_model::models::EUCM;
-use camera_intrinsic_model::generic_model::CameraModel;
 use nalgebra034; // TODO find a way to avoid this dependency (currently used for camera models)
-use crate::datasets::config::Config;
-
 
 // Image data structure
+/// A single image entry from a dataset with its timestamp and file path.
 #[derive(Debug, Clone)]
 pub struct ImageData {
-    pub timestamp: i64, // nanoseconds
+    /// Timestamp in nanoseconds.
+    pub timestamp: i64,
+    /// Relative or absolute filename path.
     pub filename: String,
 }
 
-// IMU data structure (placeholder - will be implemented when IMU support is added)
+/// IMU gyroscope and accelerometer measurement.
 #[derive(Debug, Clone)]
 pub struct ImuData {
+    /// Timestamp in nanoseconds.
     pub timestamp: i64,
+    /// Angular velocity in rad/s [x, y, z].
     pub gyro: [f64; 3],
+    /// Linear acceleration in m/s² [x, y, z].
     pub accel: [f64; 3],
 }
 
-// Frame context for tracking processing state
+/// Tracks the processing state of a dataset player.
 #[derive(Debug)]
 pub struct FrameContext {
     pub current_idx: usize,
@@ -49,18 +72,17 @@ impl FrameContext {
     }
 }
 
-
-
-// Result structure with statistics
+/// Statistics and result from running a dataset player.
 #[derive(Debug, Default)]
 pub struct PlayerResult {
     pub success: bool,
     pub error_message: String,
     pub processed_frames: usize,
-    pub frame_processing_times: Vec<f64>, // milliseconds
+    pub frame_processing_times: Vec<f64>,
     pub average_processing_time_ms: f64,
 }
 
+/// Configuration for running a dataset player.
 #[derive(Debug)]
 pub struct PlayerConfig {
     pub config_path: String,
@@ -90,9 +112,7 @@ impl CameraModelType {
 /// Create camera models from config
 /// This helper function creates camera models from the configuration
 /// for both left and right cameras. Supports OpenCVModel5 and EUCM models.
-pub fn create_camera_models_from_config(
-    config: &Config,
-) -> (CameraModelType, CameraModelType) {
+pub fn create_camera_models_from_config(config: &Config) -> (CameraModelType, CameraModelType) {
     let cam = &config.camera;
 
     // Determine left camera model type
@@ -103,11 +123,11 @@ pub fn create_camera_models_from_config(
         // EUCM model: [fx, fy, cx, cy, alpha, beta]
         let eucm_params_vec: Vec<f64> = vec![
             cam.left_intrinsics.first().copied().unwrap_or(500.0), // fx
-            cam.left_intrinsics.get(1).copied().unwrap_or(500.0), // fy
-            cam.left_intrinsics.get(2).copied().unwrap_or(320.0), // cx
-            cam.left_intrinsics.get(3).copied().unwrap_or(240.0), // cy
-            cam.left_distortion.first().copied().unwrap_or(0.5),  // alpha
-            cam.left_distortion.get(1).copied().unwrap_or(1.0),  // beta
+            cam.left_intrinsics.get(1).copied().unwrap_or(500.0),  // fy
+            cam.left_intrinsics.get(2).copied().unwrap_or(320.0),  // cx
+            cam.left_intrinsics.get(3).copied().unwrap_or(240.0),  // cy
+            cam.left_distortion.first().copied().unwrap_or(0.5),   // alpha
+            cam.left_distortion.get(1).copied().unwrap_or(1.0),    // beta
         ];
         let eucm_params = nalgebra034::DVector::from_vec(eucm_params_vec);
         CameraModelType::EUCM(EUCM::new(&eucm_params, cam.image_width, cam.image_height))
@@ -119,13 +139,17 @@ pub fn create_camera_models_from_config(
             cam.left_intrinsics.get(2).copied().unwrap_or(320.0),
             cam.left_intrinsics.get(3).copied().unwrap_or(240.0),
             cam.left_distortion.first().copied().unwrap_or(0.0), // k1
-            cam.left_distortion.get(1).copied().unwrap_or(0.0), // k2
-            cam.left_distortion.get(2).copied().unwrap_or(0.0), // p1
-            cam.left_distortion.get(3).copied().unwrap_or(0.0), // p2
-            cam.left_distortion.get(4).copied().unwrap_or(0.0)  // k3
+            cam.left_distortion.get(1).copied().unwrap_or(0.0),  // k2
+            cam.left_distortion.get(2).copied().unwrap_or(0.0),  // p1
+            cam.left_distortion.get(3).copied().unwrap_or(0.0),  // p2
+            cam.left_distortion.get(4).copied().unwrap_or(0.0),  // k3
         ];
         let left_params = nalgebra034::DVector::from_vec(left_params_vec);
-        CameraModelType::OpenCV5(OpenCVModel5::new(&left_params, cam.image_width, cam.image_height))
+        CameraModelType::OpenCV5(OpenCVModel5::new(
+            &left_params,
+            cam.image_width,
+            cam.image_height,
+        ))
     };
 
     // Determine right camera model type
@@ -134,11 +158,11 @@ pub fn create_camera_models_from_config(
         // EUCM model: [fx, fy, cx, cy, alpha, beta]
         let eucm_params_vec: Vec<f64> = vec![
             cam.right_intrinsics.first().copied().unwrap_or(500.0), // fx
-            cam.right_intrinsics.get(1).copied().unwrap_or(500.0), // fy
-            cam.right_intrinsics.get(2).copied().unwrap_or(320.0), // cx
-            cam.right_intrinsics.get(3).copied().unwrap_or(240.0), // cy
-            cam.right_distortion.first().copied().unwrap_or(0.5),  // alpha
-            cam.right_distortion.get(1).copied().unwrap_or(1.0),  // beta
+            cam.right_intrinsics.get(1).copied().unwrap_or(500.0),  // fy
+            cam.right_intrinsics.get(2).copied().unwrap_or(320.0),  // cx
+            cam.right_intrinsics.get(3).copied().unwrap_or(240.0),  // cy
+            cam.right_distortion.first().copied().unwrap_or(0.5),   // alpha
+            cam.right_distortion.get(1).copied().unwrap_or(1.0),    // beta
         ];
         let eucm_params = nalgebra034::DVector::from_vec(eucm_params_vec);
         CameraModelType::EUCM(EUCM::new(&eucm_params, cam.image_width, cam.image_height))
@@ -150,14 +174,18 @@ pub fn create_camera_models_from_config(
             cam.right_intrinsics.get(2).copied().unwrap_or(320.0),
             cam.right_intrinsics.get(3).copied().unwrap_or(240.0),
             cam.right_distortion.first().copied().unwrap_or(0.0), // k1
-            cam.right_distortion.get(1).copied().unwrap_or(0.0), // k2
-            cam.right_distortion.get(2).copied().unwrap_or(0.0), // p1
-            cam.right_distortion.get(3).copied().unwrap_or(0.0), // p2
-            cam.right_distortion.get(4).copied().unwrap_or(0.0)  // k3
+            cam.right_distortion.get(1).copied().unwrap_or(0.0),  // k2
+            cam.right_distortion.get(2).copied().unwrap_or(0.0),  // p1
+            cam.right_distortion.get(3).copied().unwrap_or(0.0),  // p2
+            cam.right_distortion.get(4).copied().unwrap_or(0.0),  // k3
         ];
         let right_params = nalgebra034::DVector::from_vec(right_params_vec);
-        CameraModelType::OpenCV5(OpenCVModel5::new(&right_params, cam.image_width, cam.image_height))
+        CameraModelType::OpenCV5(OpenCVModel5::new(
+            &right_params,
+            cam.image_width,
+            cam.image_height,
+        ))
     };
-    
+
     (left_cam, right_cam)
 }

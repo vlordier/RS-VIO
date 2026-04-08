@@ -1,6 +1,5 @@
 use crate::types::Matrix4x4;
 
-
 #[derive(Debug, Clone)]
 pub struct State {
     /// World-from-body pose as a 4x4 row-major matrix (T_w_b).
@@ -20,7 +19,6 @@ pub struct State {
 }
 
 impl State {
-
     pub fn new(T_B_Cl: Matrix4x4, T_B_Cr: Matrix4x4) -> Self {
         Self {
             T_W_B: Matrix4x4::identity(),
@@ -43,7 +41,4 @@ impl State {
             gyro_bias: [0.0, 0.0, 0.0],
         }
     }
-
 }
-
-
