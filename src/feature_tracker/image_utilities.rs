@@ -5,12 +5,29 @@ use rayon::prelude::*;
 
 /// Bilinear interpolation + Sobel gradient at sub-pixel position (x, y).
 /// Reads a 4×4 neighborhood (16 pixels) and computes value + dx + dy in one pass.
-/// Assumes caller has verified bounds (x >= 1, y >= 1, x < w-2, y < h-2).
+///
+/// # Safety
+/// Caller must ensure `x >= 1`, `y >= 1`, `x < width - 2`, `y < height - 2`.
+/// In debug mode, this is verified with assertions.
 #[inline(always)]
 pub fn image_grad(grayscale_image: &GrayImage, x: f32, y: f32) -> na::SVector<f32, 3> {
     // Truncation == floor for positive floats (saves a function call)
     let ix = x as u32;
     let iy = y as u32;
+
+    // Memory safety: verify we have enough room for the 4×4 neighborhood
+    debug_assert!(
+        ix >= 1 && ix < grayscale_image.width() - 2,
+        "image_grad: x={} out of bounds for width={}",
+        ix,
+        grayscale_image.width()
+    );
+    debug_assert!(
+        iy >= 1 && iy < grayscale_image.height() - 2,
+        "image_grad: y={} out of bounds for height={}",
+        iy,
+        grayscale_image.height()
+    );
     let dx = x - ix as f32;
     let dy = y - iy as f32;
     let ddx = 1.0 - dx;

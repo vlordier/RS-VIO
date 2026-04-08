@@ -24,7 +24,7 @@ const GRAVITY: Vector3 = na::Vector3::new(0.0, 0.0, GRAVITY_MAGNITUDE);
 ///
 /// For `T = [R | t; 0 | 1]`, the inverse is `T⁻¹ = [Rᵀ | -Rᵀ·t; 0 | 1]`.
 /// This is O(n²) vs O(n³) for a full matrix inverse.
-#[inline]
+#[inline(always)]
 pub fn inverse_se3(t: &Matrix4x4) -> Matrix4x4 {
     let r_inv = t.fixed_view::<3, 3>(0, 0).transpose();
     let t_part = r_inv * t.fixed_view::<3, 1>(0, 3);
@@ -55,6 +55,7 @@ pub fn inverse_se3(t: &Matrix4x4) -> Matrix4x4 {
 /// # Returns
 /// Relative transform T_prev_to_curr as a 4x4 SE(3) matrix.
 /// Returns identity if fewer than 2 samples.
+#[inline(always)]
 pub fn preintegrate_imu(
     imu_samples: &[ImuData],
     gyro_bias: &[f64; 3],
@@ -379,6 +380,11 @@ impl SlidingWindow {
         let mut stereo_count = 0usize;
         let mut mono_count = 0usize;
         let mut counted_landmarks: std::collections::HashSet<usize> = std::collections::HashSet::new();
+
+        // **Shared HuberLoss** — create once and clone for every residual.
+        // Avoids calling HuberLoss::new().unwrap() hundreds of times.
+        let shared_loss = HuberLoss::new(2.0).unwrap();
+
         for (id_frame, frame) in self.keyframes.iter().enumerate() {
             // Add KF poses
             let kf_var = format!("KF_{}", id_frame);
@@ -480,12 +486,11 @@ impl SlidingWindow {
                             vec![&lm_var, &kf_var]
                         };
 
-                        // Add residual block with Huber loss
-                        let huber_loss = HuberLoss::new(2.0).unwrap();
+                        // Add residual block with shared Huber loss
                         problem.add_residual_block(
                             &var_names,
                             Box::new(factor),
-                            Some(Box::new(huber_loss)),
+                            Some(Box::new(shared_loss.clone())),
                         );
                     }
                 }
@@ -803,6 +808,10 @@ impl SlidingWindow {
             .T_B_Cr
             .try_inverse()
             .expect("T_B_Cr should be invertible");
+
+        // **Shared HuberLoss** for PnP factors
+        let shared_loss = HuberLoss::new(2.0).unwrap();
+
         let camera_features = [
             (&frame.left_features, T_Cl_B),
             (&frame.right_features, T_Cr_B),
@@ -821,12 +830,11 @@ impl SlidingWindow {
                             *T_C_B,
                             na::Vector3::new(point[0] as f64, point[1] as f64, point[2] as f64),
                         );
-                        // Add residual block with Huber loss
-                        let huber_loss = HuberLoss::new(2.0).unwrap();
+                        // Add residual block with shared Huber loss
                         problem.add_residual_block(
                             &[&kf_var],
                             Box::new(factor),
-                            Some(Box::new(huber_loss)),
+                            Some(Box::new(shared_loss.clone())),
                         );
                     }
                     None => {

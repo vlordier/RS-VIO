@@ -20,7 +20,7 @@ use nalgebra as na;
 // ============================================================================
 
 /// Project a 3D point in camera frame to normalized coordinates: `[x/z, y/z]`.
-#[inline]
+#[inline(always)]
 pub fn project_to_normalized(p_C: Vector3<f64>) -> Vector2<f64> {
     let inv_z = 1.0 / p_C[2];
     Vector2::new(p_C[0] * inv_z, p_C[1] * inv_z)
@@ -32,7 +32,7 @@ pub fn project_to_normalized(p_C: Vector3<f64>) -> Vector2<f64> {
 /// ∂(x/z)/∂x = 1/z    ∂(x/z)/∂y = 0    ∂(x/z)/∂z = -x/z²
 /// ∂(y/z)/∂x = 0      ∂(y/z)/∂y = 1/z  ∂(y/z)/∂z = -y/z²
 /// ```
-#[inline]
+#[inline(always)]
 pub fn jacobian_proj_wrt_p_C(p_C: Vector3<f64>) -> na::Matrix2x3<f64> {
     let x = p_C[0];
     let y = p_C[1];
@@ -44,7 +44,7 @@ pub fn jacobian_proj_wrt_p_C(p_C: Vector3<f64>) -> na::Matrix2x3<f64> {
 }
 
 /// Skew-symmetric matrix of a 3D vector for cross-product: `[v]× * u = v × u`.
-#[inline]
+#[inline(always)]
 pub fn skew_symmetric(v: &Vector3<f64>) -> Matrix3<f64> {
     Matrix3::new(0.0, -v.z, v.y, v.z, 0.0, -v.x, -v.y, v.x, 0.0)
 }
