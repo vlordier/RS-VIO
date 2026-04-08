@@ -1,0 +1,89 @@
+# Clippy configuration for RS-VIO project
+# This enables a good baseline of linting for Rust best practices
+
+# Basic settings
+msrv = "1.65"
+
+# Lint groups - using the standard clippy groups
+[bad_style]
+# Style and readability
+string_add = "warn"
+string_add_assign = "warn"
+clone_on_ref_ptr = "warn"
+inefficient_to_string = "warn"
+eq_op = "warn"
+let_underscore_must_use = "warn"
+unnested_or_patterns = "warn"
+
+[complexity]
+# Code complexity
+too_many_arguments = { limit = 5, level = "warn" }
+fn_params_excessive_bools = { limit = 3, level = "warn" }
+collapsible_if = "warn"
+map_unwrap_or = "warn"
+option_option = "warn"
+result_result = "warn"
+manual_async_fn = "warn"
+single_match = "warn"
+match_same_arms = "warn"
+match_wild = "warn"
+match_wild_err_arm = "warn"
+match_bool = "warn"
+
+[correctness]
+# Correctness and safety
+float_arithmetic = "warn"
+map_entry = "warn"
+uninlined_format_args = "warn"
+mutex_integer = "warn"
+needless_borrow = "warn"
+needless_lifetimes = "warn"
+shadow_reuse = "warn"
+shadow_same = "warn"
+shadow_unrelated = "warn"
+slice_box = "warn"
+mem_forget = "warn"
+rc_mutex = "warn"
+unseparated_literal_suffix = "warn"
+default_trait_access = "warn"
+unnecessary_wraps = "warn"
+duplicated_closures = "warn"
+large_steppable_types = "warn"
+rest_pat_in_fully_bound_structs = "warn"
+needless_collect = "warn"
+option_if_let_else = "warn"
+
+[perf]
+# Performance
+clone_on_ref_ptr = "warn"
+inefficient_to_string = "warn"
+iter_next_loop = "warn"
+iter_skip_next = "warn"
+iter_nth_zero = "warn"
+min_max = "warn"
+manual_clamp = "warn"
+zero_sized_map_values = "warn"
+bytes_buf = "warn"
+iter_count = "warn"
+add_to_literal = "warn"
+
+[restriction]
+# Restrictions (more opinionated)
+exit = "warn"
+panic = "warn"
+expect_used = "warn"
+unwrap_used = "warn"
+implicit_return = "warn"
+dbg_macro = "warn"
+disallowed_methods = "warn"
+disallowed_types = "warn"
+disallowed_names = "warn"
+disallowed_macros = "warn"
+
+[pepper]
+# Pepper lints (fun/educational)
+inherent_to_string = "warn"
+string_add = "warn"
+string_add_assign = "warn"
+todo = "warn"
+unimplemented = "warn"
