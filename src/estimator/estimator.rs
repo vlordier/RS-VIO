@@ -215,8 +215,44 @@ impl<'a> Estimator<'a> {
                         self.config.keyframe_management.translation_threshold;
                     let rotation_threshold = self.config.keyframe_management.rotation_threshold;
 
-                    if t_rel.norm() > translation_threshold || e_rel.norm() > rotation_threshold {
-                        log::debug!("[Estimator] Translation and rotation since last keyframe are large enough to trigger a keyframe");
+                    // IMU-based keyframe criteria: high variance or large predicted displacement
+                    let imu_triggers_keyframe = if let Some(imu) = imu_data {
+                        // High gyro variance → fast rotation → visual tracking unreliable
+                        let gyro_var = imu.iter().fold([0.0_f64; 3], |acc, s| {
+                            [
+                                acc[0] + s.gyro[0] * s.gyro[0],
+                                acc[1] + s.gyro[1] * s.gyro[1],
+                                acc[2] + s.gyro[2] * s.gyro[2],
+                            ]
+                        });
+                        let gyro_rms = (gyro_var[0] + gyro_var[1] + gyro_var[2]).sqrt() / imu.len() as f64;
+                        let imu_rotation_threshold = 0.3; // rad/s RMS
+                        let imu_disp = imu.iter().fold(0.0_f64, |acc, s| {
+                            acc + (s.accel[0].abs() + s.accel[1].abs() + s.accel[2].abs())
+                        }) / imu.len() as f64;
+                        let imu_disp_threshold = 15.0; // m/s² mean magnitude
+                        gyro_rms > imu_rotation_threshold || imu_disp > imu_disp_threshold
+                    } else {
+                        false
+                    };
+
+                    if t_rel.norm() > translation_threshold
+                        || e_rel.norm() > rotation_threshold
+                        || imu_triggers_keyframe
+                    {
+                        let reason = if imu_triggers_keyframe {
+                            "IMU"
+                        } else if t_rel.norm() > translation_threshold {
+                            "translation"
+                        } else {
+                            "rotation"
+                        };
+                        log::debug!(
+                            "[Estimator] Keyframe triggered by {} (t={:.3}, r={:.3})",
+                            reason,
+                            t_rel.norm(),
+                            e_rel.norm()
+                        );
                         current_frame.is_keyframe = true;
                     } else {
                         current_frame.is_keyframe = false;

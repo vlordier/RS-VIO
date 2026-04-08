@@ -1,6 +1,7 @@
 use image::{GenericImageView, GrayImage};
 use imageproc::corners::{corners_fast9, Corner};
 use nalgebra as na;
+use rayon::prelude::*;
 
 pub fn image_grad(grayscale_image: &GrayImage, x: f32, y: f32) -> na::SVector<f32, 3> {
     // inbound
@@ -138,19 +139,32 @@ pub fn detect_key_points(
         }
     }
 
-    for x in (x_start..x_stop).step_by(grid_size as usize) {
-        for y in (y_start..y_stop).step_by(grid_size as usize) {
-            if grids[(
-                ((y - y_start) / grid_size) as usize,
-                ((x - x_start) / grid_size) as usize,
-            )] > 0
-            {
-                continue;
+    // Build list of empty grid cells to process (sequential, then parallelize detection)
+    let cols = (w / grid_size) as usize + 1;
+    let mut cell_flags = vec![false; cols * ((h / grid_size) as usize + 1)];
+    for (idx, val) in grids.iter().enumerate() {
+        if *val == 0 {
+            cell_flags[idx] = true;
+        }
+    }
+    let mut empty_cells: Vec<(u32, u32)> = Vec::new();
+    for (col_idx, x) in (x_start..x_stop).step_by(grid_size as usize).enumerate() {
+        let gx = col_idx;
+        for (row_idx, y) in (y_start..y_stop).step_by(grid_size as usize).enumerate() {
+            if cell_flags[row_idx * cols + gx] {
+                empty_cells.push((x, y));
             }
+        }
+    }
 
+    // **Parallel FAST detection** — each cell is independent
+    let cell_results: Vec<Vec<Corner>> = empty_cells
+        .par_iter()
+        .map(|&(x, y)| {
             let image_view = image.view(x, y, grid_size, grid_size).to_image();
             let mut points_added = 0;
             let mut threshold: u8 = 40;
+            let mut cell_corners = Vec::new();
 
             while points_added < num_points_in_cell && threshold >= 10 {
                 let mut fast_corners = corners_fast9(&image_view, threshold);
@@ -163,13 +177,19 @@ pub fn detect_key_points(
                     point.x += x;
                     point.y += y;
                     if point_in_bound(&point, h, w, EDGE_THRESHOLD) {
-                        all_corners.push(point);
+                        cell_corners.push(point);
                         points_added += 1;
                     }
                 }
                 threshold -= 5;
             }
-        }
+            cell_corners
+        })
+        .collect();
+
+    // Merge results from all cells
+    for mut cell_corners in cell_results {
+        all_corners.append(&mut cell_corners);
     }
     all_corners
 }

@@ -30,59 +30,107 @@ pub fn inverse_se3(t: &Matrix4x4) -> Matrix4x4 {
 
 /// Pre-integrate IMU measurements to get relative SE(3) motion.
 ///
-/// Implements discrete pre-integration:
+/// Implements discrete **midpoint** pre-integration with **bias correction**:
 /// ```text
-/// ΔR_k+1 = ΔR_k · Exp(ω_k · Δt)
-/// Δv_k+1 = Δv_k + ΔR_k · a_k · Δt
-/// Δp_k+1 = Δp_k + Δv_k · Δt + ½ · ΔR_k · a_k · Δt²
+/// ΔR_k+1 = ΔR_k · Exp((ω_k - b_g) · Δt)
+/// Δv_k+1 = Δv_k + ½ · (ΔR_k·(a_k - b_a) + ΔR_k+1·(a_k+1 - b_a)) · Δt
+/// Δp_k+1 = Δp_k + Δv_k · Δt + ½ · ΔR_k·(a_k - b_a) · Δt²
 /// ```
 ///
-/// Returns the relative transform T_prev_to_curr as a 4x4 matrix.
-/// If fewer than 2 IMU samples, returns identity.
-pub fn preintegrate_imu(imu_samples: &[ImuData]) -> Matrix4x4 {
+/// Uses midpoint integration for 2nd-order accuracy (vs 1st-order Euler).
+/// Bias-subtracted IMU readings prevent drift during long integration windows.
+///
+/// # Arguments
+/// * `imu_samples` — raw IMU measurements in chronological order
+/// * `gyro_bias` — estimated gyro bias [x, y, z] in rad/s
+/// * `accel_bias` — estimated accel bias [x, y, z] in m/s²
+///
+/// # Returns
+/// Relative transform T_prev_to_curr as a 4x4 SE(3) matrix.
+/// Returns identity if fewer than 2 samples.
+pub fn preintegrate_imu(
+    imu_samples: &[ImuData],
+    gyro_bias: &[f64; 3],
+    accel_bias: &[f64; 3],
+) -> Matrix4x4 {
     if imu_samples.len() < 2 {
         return Matrix4x4::identity();
     }
 
-    let g = Vector3::new(0.0, 0.0, 9.81); // gravity in world z-down frame
+    // Estimate gravity direction from first few stationary samples.
+    // If the IMU is roughly level at startup, gravity points along -z.
+    // We use the mean accel of the first 10 samples as gravity estimate.
+    let g = {
+        let n = imu_samples.len().min(10);
+        let mean = imu_samples[..n]
+            .iter()
+            .fold(Vector3::zeros(), |acc, s| {
+                acc + Vector3::new(s.accel[0], s.accel[1], s.accel[2])
+            })
+            / n as f64;
+        // Gravity is the direction opposite to the mean accel when stationary
+        (-mean).normalize() * 9.81
+    };
 
-    let mut delta_r = na::Matrix3::<f64>::identity(); // relative rotation
-    let mut delta_v = Vector3::zeros(); // relative velocity
-    let mut delta_p = Vector3::zeros(); // relative position
+    // Bias-subtracted vectors for convenience
+    let bg = Vector3::new(gyro_bias[0], gyro_bias[1], gyro_bias[2]);
+    let ba = Vector3::new(accel_bias[0], accel_bias[1], accel_bias[2]);
+
+    let mut delta_r = na::Matrix3::<f64>::identity();
+    let mut delta_v = Vector3::zeros();
+    let mut delta_p = Vector3::zeros();
 
     for i in 0..imu_samples.len() - 1 {
         let curr = &imu_samples[i];
         let next = &imu_samples[i + 1];
-        let dt = (next.timestamp - curr.timestamp) as f64 / 1e9; // ns → s
-        if dt <= 0.0 {
-            continue;
+        let dt = (next.timestamp - curr.timestamp) as f64 / 1e9;
+        if dt <= 0.0 || dt > 1.0 {
+            continue; // skip invalid or >1s gaps
         }
 
-        // Gyroscope: integrate rotation via exponential map (first-order approx)
-        let omega = Vector3::new(curr.gyro[0], curr.gyro[1], curr.gyro[2]);
+        // Bias-corrected gyro, then Rodrigues' rotation for Exp((ω-b_g)·Δt)
+        let omega = Vector3::new(
+            curr.gyro[0] - bg.x,
+            curr.gyro[1] - bg.y,
+            curr.gyro[2] - bg.z,
+        );
         let theta = omega.norm();
+        let mut r_step = na::Matrix3::<f64>::identity();
         if theta > 1e-8 {
-            // Rodrigues' rotation formula for Exp(ω·Δt)
             let axis = omega / theta;
             let angle = theta * dt;
             let ca = angle.cos();
             let sa = angle.sin();
             let ia = 1.0 - ca;
             let [x, y, z] = [axis.x, axis.y, axis.z];
-            let r_step = na::Matrix3::new(
+            r_step = na::Matrix3::new(
                 ca + x * x * ia,     x * y * ia - z * sa,  x * z * ia + y * sa,
                 y * x * ia + z * sa, ca + y * y * ia,      y * z * ia - x * sa,
                 z * x * ia - y * sa, z * y * ia + x * sa,  ca + z * z * ia,
             );
-            delta_r *= r_step;
         }
+        let delta_r_next = delta_r * r_step;
 
-        // Accelerometer: integrate velocity and position (gravity compensated in world frame)
-        let a_body = Vector3::new(curr.accel[0], curr.accel[1], curr.accel[2]);
-        let a_world = delta_r * a_body - g;
+        // **Midpoint integration** for velocity and position (2nd order)
+        // Acceleration in world frame at current and next steps
+        let a_curr_body = Vector3::new(
+            curr.accel[0] - ba.x,
+            curr.accel[1] - ba.y,
+            curr.accel[2] - ba.z,
+        );
+        let a_next_body = Vector3::new(
+            next.accel[0] - ba.x,
+            next.accel[1] - ba.y,
+            next.accel[2] - ba.z,
+        );
+        let a_curr_world = delta_r * a_curr_body - g;
+        let a_next_world = delta_r_next * a_next_body - g;
+        let a_mid = (a_curr_world + a_next_world) * 0.5;
 
-        delta_p = delta_p + delta_v * dt + 0.5 * a_world * dt * dt;
-        delta_v += a_world * dt;
+        delta_v += a_mid * dt;
+        delta_p += delta_v * dt + 0.5 * a_curr_world * dt * dt;
+
+        delta_r = delta_r_next;
     }
 
     // Build SE(3) matrix: [delta_r | delta_p; 0 | 1]
@@ -701,7 +749,15 @@ impl SlidingWindow {
             .T_W_B;
 
         let init_T_W_B = if !frame.imu_from_last_frame.is_empty() {
-            let delta_t = preintegrate_imu(&frame.imu_from_last_frame);
+            // Use IMU pre-integration with bias correction from last keyframe state
+            let last_state = &self.keyframes.back().unwrap().state;
+            let gyro_bias_f64: [f64; 3] = last_state.gyro_bias.map(|x| x as f64);
+            let accel_bias_f64: [f64; 3] = last_state.accel_bias.map(|x| x as f64);
+            let delta_t = preintegrate_imu(
+                &frame.imu_from_last_frame,
+                &gyro_bias_f64,
+                &accel_bias_f64,
+            );
             last_kf_pose * delta_t
         } else {
             self.predict_current_pose()
