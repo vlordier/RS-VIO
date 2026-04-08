@@ -1,0 +1,2 @@
+warn = ["all"]
+denied = ["clippy::all"]
