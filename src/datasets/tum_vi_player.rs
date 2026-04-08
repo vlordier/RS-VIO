@@ -39,12 +39,20 @@ impl TUMVIPlayer {
             }
         };
 
-        // Load IMU data at startup (efficient: one-time parse of csv)
-        let imu_data_all = Self::load_imu_data(&config.dataset_path);
-        log::info!(
-            "[TUMVIPlayer] Loaded {} IMU samples",
-            imu_data_all.len()
-        );
+        // Load IMU data at startup (only if VIO mode enabled)
+        let imu_data_all = if config.use_imu {
+            Self::load_imu_data(&config.dataset_path)
+        } else {
+            Vec::new()
+        };
+        if config.use_imu {
+            log::info!(
+                "[TUMVIPlayer] Loaded {} IMU samples (VIO mode)",
+                imu_data_all.len()
+            );
+        } else {
+            log::info!("[TUMVIPlayer] IMU disabled 2014 running in VO mode");
+        }
 
         let start_frame_idx = 0;
         let end_frame_idx = image_data.len();

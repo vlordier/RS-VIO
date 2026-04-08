@@ -90,6 +90,8 @@ pub struct PlayerConfig {
     pub enable_statistics: bool,
     pub enable_console_statistics: bool,
     pub step_mode: bool,
+    /// Whether to use IMU data for motion prediction (VIO) or skip it (VO).
+    pub use_imu: bool,
 }
 
 /// Enum to represent different camera model types

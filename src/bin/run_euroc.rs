@@ -44,6 +44,7 @@ fn main() {
         enable_statistics: true,         // File statistics
         enable_console_statistics: true, // Console statistics
         step_mode: false,
+        use_imu: false, // EuRoC IMU not yet implemented
     };
     // Create and run EuRoC player
     let player = EurocPlayer::new();
