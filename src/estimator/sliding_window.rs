@@ -119,6 +119,25 @@ impl SlidingWindow {
         self.keyframes.iter().map(|f| f.state.T_W_B).collect()
     }
 
+    /// Predict the current pose using a constant velocity motion model.
+    ///
+    /// Computes the relative SE(3) motion between the last two keyframes and
+    /// extrapolates: `T_W_B_init = T_last * T_prev⁻¹ * T_last`.
+    ///
+    /// Falls back to the last keyframe pose if fewer than 2 keyframes exist.
+    pub fn predict_current_pose(&self) -> Matrix4x4 {
+        let poses: Vec<&Matrix4x4> = self.keyframes.iter().map(|f| &f.state.T_W_B).collect();
+        if poses.len() < 2 {
+            return **poses.first().expect("keyframes should not be empty");
+        }
+        let t_last = poses[poses.len() - 1];
+        let t_prev = poses[poses.len() - 2];
+        // T_rel = T_prev⁻¹ * T_last  (relative motion in world frame)
+        let t_rel = t_prev.try_inverse().expect("T_W_B should be invertible") * t_last;
+        // Extrapolate: T_init = T_last * T_rel
+        t_last * t_rel
+    }
+
     /// Clear all keyframes from the sliding window.
     pub fn clear(&mut self) {
         self.keyframes.clear();
@@ -579,16 +598,15 @@ impl SlidingWindow {
         // solver.add_observer(TerminalObserver::new());
 
         // Add variable for the new frame
-        // Only the new frame is optimized and it's initialized from the last keyframe
+        // Only the new frame is optimized.
+        // Initial pose predicted by constant velocity motion model:
+        //   T_W_B_init = T_W_B_last * T_W_B_prev⁻¹ * T_W_B_last
+        // Falls back to last keyframe pose if only one keyframe exists.
         let kf_var = "F".to_string();
-        let T_B_W = self
-            .keyframes
-            .back()
-            .expect("keyframes should not be empty during track_motion")
-            .state
-            .T_W_B
+        let init_T_W_B = self.predict_current_pose();
+        let T_B_W = init_T_W_B
             .try_inverse()
-            .expect("T_W_B should be invertible");
+            .expect("predicted T_W_B should be invertible");
         let t_B_W = T_B_W.fixed_view::<3, 1>(0, 3);
         let R_B_W = Matrix3x3::from(T_B_W.fixed_view::<3, 3>(0, 0));
         let q_B_W = UnitQuaternion::from_matrix(&R_B_W);
@@ -688,5 +706,146 @@ impl SlidingWindow {
             );
             Ok(None)
         }
+    }
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::estimator::Frame;
+
+    fn make_dummy_frame(frame_id: i32, pose: Matrix4x4) -> Frame {
+        let mut frame = Frame::new(0, frame_id);
+        frame.state.T_W_B = pose;
+        frame.is_keyframe = true;
+        frame
+    }
+
+    fn translation_only(x: f64, y: f64, z: f64) -> Matrix4x4 {
+        let mut m = Matrix4x4::identity();
+        m[(0, 3)] = x;
+        m[(1, 3)] = y;
+        m[(2, 3)] = z;
+        m
+    }
+
+    #[test]
+    fn test_predict_pose_single_keyframe_fallback() {
+        let mut sw = SlidingWindow::new(5);
+        let pose = translation_only(1.0, 0.0, 0.0);
+        let frame = make_dummy_frame(1, pose);
+        sw.add_frame(frame);
+
+        // With only one keyframe, should return that keyframe's pose
+        let predicted = sw.predict_current_pose();
+        assert_eq!(predicted, pose);
+    }
+
+    #[test]
+    fn test_predict_pose_constant_velocity_translation() {
+        let mut sw = SlidingWindow::new(5);
+
+        // Two keyframes: identity at origin, then translated by (1, 0, 0)
+        let pose_0 = Matrix4x4::identity();
+        let pose_1 = translation_only(1.0, 0.0, 0.0);
+
+        sw.add_frame(make_dummy_frame(0, pose_0));
+        sw.add_frame(make_dummy_frame(1, pose_1));
+
+        // Constant velocity model should predict:
+        // T_rel = T_0⁻¹ * T_1 = I⁻¹ * T(1,0,0) = T(1,0,0)
+        // T_pred = T_1 * T_rel = T(1,0,0) * T(1,0,0) = T(2,0,0)
+        let predicted = sw.predict_current_pose();
+        assert!((predicted[(0, 3)] - 2.0).abs() < 1e-10);
+        assert!((predicted[(1, 3)] - 0.0).abs() < 1e-10);
+        assert!((predicted[(2, 3)] - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_predict_pose_constant_velocity_multi_step() {
+        let mut sw = SlidingWindow::new(5);
+
+        // Three keyframes with uniform translation: (0,0,0) → (1,0,0) → (2,0,0)
+        sw.add_frame(make_dummy_frame(0, translation_only(0.0, 0.0, 0.0)));
+        sw.add_frame(make_dummy_frame(1, translation_only(1.0, 0.0, 0.0)));
+        sw.add_frame(make_dummy_frame(2, translation_only(2.0, 0.0, 0.0)));
+
+        // Should use last two: T_prev=(1,0,0), T_last=(2,0,0)
+        // T_rel = (1,0,0)⁻¹ * (2,0,0) = T(1,0,0)
+        // T_pred = (2,0,0) * T(1,0,0) = T(3,0,0)
+        let predicted = sw.predict_current_pose();
+        assert!((predicted[(0, 3)] - 3.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_predict_pose_with_rotation() {
+        use na::UnitQuaternion;
+
+        let mut sw = SlidingWindow::new(5);
+
+        // Two keyframes with rotation around Z axis
+        let q0 = UnitQuaternion::from_euler_angles(0.0, 0.0, 0.0);
+        let q1 = UnitQuaternion::from_euler_angles(0.0, 0.0, 0.1);
+
+        let mut pose_0 = Matrix4x4::identity();
+        pose_0
+            .fixed_view_mut::<3, 3>(0, 0)
+            .copy_from(q0.to_rotation_matrix().matrix());
+        let mut pose_1 = Matrix4x4::identity();
+        pose_1
+            .fixed_view_mut::<3, 3>(0, 0)
+            .copy_from(q1.to_rotation_matrix().matrix());
+
+        sw.add_frame(make_dummy_frame(0, pose_0));
+        sw.add_frame(make_dummy_frame(1, pose_1));
+
+        let predicted = sw.predict_current_pose();
+
+        // Extract rotation angle from predicted pose
+        let r: na::Matrix3<f64> = predicted.fixed_view::<3, 3>(0, 0).into_owned();
+        let predicted_q = UnitQuaternion::from_matrix(&r);
+        let (_, _, yaw) = predicted_q.euler_angles();
+
+        // Expected: yaw ≈ 0.2 (0.0 + 0.1 + 0.1 extrapolated)
+        assert!((yaw - 0.2).abs() < 1e-6, "expected yaw≈0.2, got {}", yaw);
+    }
+
+    #[test]
+    fn test_predict_pose_window_full_uses_last_two() {
+        let mut sw = SlidingWindow::new(3);
+
+        // Fill the window: poses at x=0, x=1, x=2 (window full at 3)
+        sw.add_frame(make_dummy_frame(0, translation_only(0.0, 0.0, 0.0)));
+        sw.add_frame(make_dummy_frame(1, translation_only(1.0, 0.0, 0.0)));
+        sw.add_frame(make_dummy_frame(2, translation_only(2.0, 0.0, 0.0)));
+
+        // Window is full, should use last two: x=1, x=2 → predict x=3
+        assert_eq!(sw.keyframes.len(), 3);
+        let predicted = sw.predict_current_pose();
+        assert!((predicted[(0, 3)] - 3.0).abs() < 1e-10);
+
+        // Add another frame — oldest gets evicted, still uses last two
+        sw.add_frame(make_dummy_frame(3, translation_only(3.0, 0.0, 0.0)));
+        assert_eq!(sw.keyframes.len(), 3);
+        let predicted = sw.predict_current_pose();
+        assert!((predicted[(0, 3)] - 4.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_predict_pose_stationary() {
+        let mut sw = SlidingWindow::new(5);
+
+        // Two keyframes at same pose (no motion)
+        let pose = translation_only(5.0, 3.0, 1.0);
+        sw.add_frame(make_dummy_frame(0, pose));
+        sw.add_frame(make_dummy_frame(1, pose));
+
+        // Zero velocity → prediction = last pose
+        let predicted = sw.predict_current_pose();
+        assert_eq!(predicted, pose);
     }
 }
