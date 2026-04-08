@@ -3,67 +3,54 @@ use imageproc::corners::{corners_fast9, Corner};
 use nalgebra as na;
 use rayon::prelude::*;
 
+/// Bilinear interpolation + Sobel gradient at sub-pixel position (x, y).
+/// Reads a 4×4 neighborhood (16 pixels) and computes value + dx + dy in one pass.
+/// Assumes caller has verified bounds (x >= 1, y >= 1, x < w-2, y < h-2).
+#[inline(always)]
 pub fn image_grad(grayscale_image: &GrayImage, x: f32, y: f32) -> na::SVector<f32, 3> {
-    // inbound
-    let ix = x.floor() as u32;
-    let iy = y.floor() as u32;
-
+    // Truncation == floor for positive floats (saves a function call)
+    let ix = x as u32;
+    let iy = y as u32;
     let dx = x - ix as f32;
     let dy = y - iy as f32;
-
     let ddx = 1.0 - dx;
     let ddy = 1.0 - dy;
 
-    // Use direct pixel access instead of get_pixel for better performance
     let width = grayscale_image.width();
     let raw_pixels = grayscale_image.as_raw();
 
-    let idx00 = (iy * width + ix) as usize;
-    let idx10 = (iy * width + ix + 1) as usize;
-    let idx01 = ((iy + 1) * width + ix) as usize;
-    let idx11 = ((iy + 1) * width + ix + 1) as usize;
+    // Read 4×4 neighborhood once into a flat array (rows iy-1..=iy+2, cols ix-1..=ix+2)
+    // Only the 11 pixels needed for center value + Sobel gradients are read.
+    let base = ((iy - 1) * width + ix - 1) as usize;
+    let w = width as usize;
+    let p10 = raw_pixels[base + 1] as f32;
+    let p20 = raw_pixels[base + 2] as f32;
+    let p01 = raw_pixels[base + w] as f32;
+    let p11 = raw_pixels[base + w + 1] as f32;
+    let p21 = raw_pixels[base + w + 2] as f32;
+    let p31 = raw_pixels[base + w + 3] as f32;
+    let p02 = raw_pixels[base + 2 * w] as f32;
+    let p12 = raw_pixels[base + 2 * w + 1] as f32;
+    let p22 = raw_pixels[base + 2 * w + 2] as f32;
+    let p32 = raw_pixels[base + 2 * w + 3] as f32;
+    let p13 = raw_pixels[base + 3 * w + 1] as f32;
+    let p23 = raw_pixels[base + 3 * w + 2] as f32;
 
-    let px0y0 = raw_pixels[idx00] as f32;
-    let px1y0 = raw_pixels[idx10] as f32;
-    let px0y1 = raw_pixels[idx01] as f32;
-    let px1y1 = raw_pixels[idx11] as f32;
+    // Value at (x, y): bilinear interpolation of center 2×2 block
+    let val = ddx * ddy * p11 + ddx * dy * p12 + dx * ddy * p21 + dx * dy * p22;
 
-    let res0 = ddx * ddy * px0y0 + ddx * dy * px0y1 + dx * ddy * px1y0 + dx * dy * px1y1;
+    // dx gradient: (interp at x+1, y) - (interp at x-1, y), divided by 2
+    // We use the pre-read pixels to avoid re-interpolation
+    let left = ddx * ddy * p01 + ddx * dy * p02 + dx * ddy * p11 + dx * dy * p12;
+    let right = ddx * ddy * p21 + ddx * dy * p22 + dx * ddy * p31 + dx * dy * p32;
+    let grad_x = 0.5 * (right - left);
 
-    // Direct pixel access for gradient computation
-    let idxm1y0 = (iy * width + ix - 1) as usize;
-    let idxm1y1 = ((iy + 1) * width + ix - 1) as usize;
-    let pxm1y0 = raw_pixels[idxm1y0] as f32;
-    let pxm1y1 = raw_pixels[idxm1y1] as f32;
+    // dy gradient: (interp at x, y+1) - (interp at x, y-1), divided by 2
+    let bottom = ddx * ddy * p12 + ddx * dy * p13 + dx * ddy * p22 + dx * dy * p23;
+    let top = ddx * ddy * p10 + ddx * dy * p11 + dx * ddy * p20 + dx * dy * p21;
+    let grad_y = 0.5 * (bottom - top);
 
-    let res_mx = ddx * ddy * pxm1y0 + ddx * dy * pxm1y1 + dx * ddy * px0y0 + dx * dy * px0y1;
-
-    let idx2y0 = (iy * width + ix + 2) as usize;
-    let idx2y1 = ((iy + 1) * width + ix + 2) as usize;
-    let px2y0 = raw_pixels[idx2y0] as f32;
-    let px2y1 = raw_pixels[idx2y1] as f32;
-
-    let res_px = ddx * ddy * px1y0 + ddx * dy * px1y1 + dx * ddy * px2y0 + dx * dy * px2y1;
-
-    let res1 = 0.5 * (res_px - res_mx);
-
-    let idx0ym1 = ((iy - 1) * width + ix) as usize;
-    let idx1ym1 = ((iy - 1) * width + ix + 1) as usize;
-    let px0ym1 = raw_pixels[idx0ym1] as f32;
-    let px1ym1 = raw_pixels[idx1ym1] as f32;
-
-    let res_my = ddx * ddy * px0ym1 + ddx * dy * px0y0 + dx * ddy * px1ym1 + dx * dy * px1y0;
-
-    let idx0y2 = ((iy + 2) * width + ix) as usize;
-    let idx1y2 = ((iy + 2) * width + ix + 1) as usize;
-    let px0y2 = raw_pixels[idx0y2] as f32;
-    let px1y2 = raw_pixels[idx1y2] as f32;
-
-    let res_py = ddx * ddy * px0y1 + ddx * dy * px0y2 + dx * ddy * px1y1 + dx * dy * px1y2;
-
-    let res2 = 0.5 * (res_py - res_my);
-
-    na::SVector::<f32, 3>::new(res0, res1, res2)
+    na::SVector::<f32, 3>::new(val, grad_x, grad_y)
 }
 
 pub fn point_in_bound(keypoint: &Corner, height: u32, width: u32, radius: u32) -> bool {

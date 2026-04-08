@@ -71,6 +71,19 @@ impl Pattern52 {
         [3.0, -7.0],
     ];
 
+    /// Pre-computed scaled pattern matrix at compile time (PATTERN_RAW / 2.0).
+    /// Avoids 104 floating-point divisions per `Pattern52::new()`.
+    pub const PATTERN_SCALED: [[f32; 2]; PATTERN52_SIZE] = {
+        let mut out = [[0.0f32; 2]; PATTERN52_SIZE];
+        let mut i = 0;
+        while i < PATTERN52_SIZE {
+            out[i][0] = Self::PATTERN_RAW[i][0] / 2.0;
+            out[i][1] = Self::PATTERN_RAW[i][1] / 2.0;
+            i += 1;
+        }
+        out
+    };
+
     // verified
     pub fn set_data_jac_se2(
         &mut self,
@@ -83,7 +96,8 @@ impl Pattern52 {
 
         let mut jw_se2 = na::SMatrix::<f32, 2, 3>::identity();
 
-        for (i, pattern_pos) in Self::PATTERN_RAW.into_iter().enumerate() {
+        // Iterate by reference to avoid copying the 52×2 array
+        for (i, pattern_pos) in Self::PATTERN_RAW.iter().enumerate() {
             let p = self.pos
                 + na::SVector::<f32, 2>::new(
                     pattern_pos[0] / self.pattern_scale_down,
@@ -125,9 +139,9 @@ impl Pattern52 {
         let mut j_se2 = na::SMatrix::<f32, PATTERN52_SIZE, 3>::zeros();
         let pattern_scale_down = 2.0;
 
-        // Pre-compute pattern matrix once (2x52, transposed from 52x2)
+        // Use pre-computed constant scaled pattern matrix — zero runtime cost
         let pattern_matrix = na::SMatrix::<f32, 2, PATTERN52_SIZE>::from_fn(|i, j| {
-            Self::PATTERN_RAW[j][i] / pattern_scale_down
+            Self::PATTERN_SCALED[j][i]
         });
 
         let mut p = Pattern52 {
@@ -174,15 +188,43 @@ impl Pattern52 {
         let height = greyscale_image.height();
         let raw_pixels = greyscale_image.as_raw();
 
+        // **Single bounding-box check** instead of 52 individual bounds checks.
+        // If the entire pattern fits within the safe region, skip per-point checks.
+        let mut min_x = f32::INFINITY;
+        let mut max_x = f32::NEG_INFINITY;
+        let mut min_y = f32::INFINITY;
+        let mut max_y = f32::NEG_INFINITY;
+        for i in 0..PATTERN52_SIZE {
+            let x = transformed_pattern[(0, i)];
+            let y = transformed_pattern[(1, i)];
+            if x < min_x {
+                min_x = x;
+            }
+            if x > max_x {
+                max_x = x;
+            }
+            if y < min_y {
+                min_y = y;
+            }
+            if y > max_y {
+                max_y = y;
+            }
+        }
+        let bbox_safe = min_x >= 2.0
+            && max_x < (width - 2) as f32
+            && min_y >= 2.0
+            && max_y < (height - 2) as f32;
+
         for i in 0..PATTERN52_SIZE {
             let x = transformed_pattern[(0, i)];
             let y = transformed_pattern[(1, i)];
 
-            // Fast bounds check
-            if x >= 2.0 && y >= 2.0 && x < (width - 2) as f32 && y < (height - 2) as f32 {
+            // Bounds check — single per-pattern check if bbox is safe
+            if bbox_safe || (x >= 2.0 && y >= 2.0 && x < (width - 2) as f32 && y < (height - 2) as f32) {
                 // Fast bilinear interpolation
-                let ix = x.floor() as u32;
-                let iy = y.floor() as u32;
+                // For positive floats, truncation == floor (saves a function call)
+                let ix = x as u32;
+                let iy = y as u32;
                 let dx = x - ix as f32;
                 let dy = y - iy as f32;
 

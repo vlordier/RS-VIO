@@ -280,7 +280,9 @@ fn track_points<const LEVELS: u32>(
     optical_flow_max_iterations: usize,
     optical_flow_convergence_threshold: f32,
 ) -> HashMap<usize, na::Affine2<f32>> {
-    let transform_maps1: HashMap<usize, na::Affine2<f32>> = transform_maps0
+    // Parallel tracking with forward-backward consistency check.
+    // `par_iter().filter_map().collect()` correctly handles parallel HashMap construction.
+    transform_maps0
         .par_iter()
         .filter_map(|(k, v)| {
             if let Some(new_v) = track_one_point::<LEVELS>(
@@ -290,7 +292,7 @@ fn track_points<const LEVELS: u32>(
                 optical_flow_max_iterations,
                 optical_flow_convergence_threshold,
             ) {
-                // return Some((k.clone(), new_v));
+                // Forward-backward consistency check
                 if let Some(old_v) = track_one_point::<LEVELS>(
                     image_pyramid1,
                     image_pyramid0,
@@ -309,9 +311,7 @@ fn track_points<const LEVELS: u32>(
             }
             None
         })
-        .collect();
-
-    transform_maps1
+        .collect()
 }
 fn track_one_point<const LEVELS: u32>(
     image_pyramid0: &[GrayImage],

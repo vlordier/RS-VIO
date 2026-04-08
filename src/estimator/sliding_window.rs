@@ -147,6 +147,9 @@ pub struct SlidingWindow {
 
     /// Map points stored by feature ID: HashMap<feature_id, [x, y, z]>
     pub map_points: HashMap<usize, [f32; 3]>,
+
+    /// Last optimized pose from track_motion, used as warm-start for next frame.
+    last_track_pose: Option<Matrix4x4>,
 }
 
 impl SlidingWindow {
@@ -160,6 +163,7 @@ impl SlidingWindow {
             max_frames,
             keyframes: VecDeque::with_capacity(max_frames),
             map_points: HashMap::new(),
+            last_track_pose: None,
         }
     }
 }
@@ -190,6 +194,9 @@ impl SlidingWindow {
             );
             return false;
         }
+
+        // Clear warm-start pose — next track_motion should start from new keyframe
+        self.last_track_pose = None;
 
         // Remove oldest frame if window is full (FIFO - first in, first out)
         if self.keyframes.len() >= self.max_frames {
@@ -742,6 +749,8 @@ impl SlidingWindow {
             .state
             .T_W_B;
 
+        // **Warm-start**: use last optimized pose + IMU delta if available,
+        // otherwise fall back to IMU-only or constant velocity prediction.
         let init_T_W_B = if !frame.imu_from_last_frame.is_empty() {
             // Use IMU pre-integration with bias correction from last keyframe state
             let last_state = &self.keyframes.back().unwrap().state;
@@ -753,7 +762,16 @@ impl SlidingWindow {
                 &accel_bias_f64,
                 &GRAVITY,
             );
-            last_kf_pose * delta_t
+            // If we have a warm-start from the previous frame, use it as base
+            if let Some(last_pose) = self.last_track_pose {
+                last_pose * delta_t
+            } else {
+                last_kf_pose * delta_t
+            }
+        } else if let Some(last_pose) = self.last_track_pose {
+            // No IMU: extrapolate from last tracked pose using constant velocity
+            let cv_delta = last_kf_pose * inverse_se3(&self.predict_current_pose());
+            last_pose * cv_delta
         } else {
             self.predict_current_pose()
         };
@@ -841,6 +859,8 @@ impl SlidingWindow {
                 let T_W_B_opt = T_B_W_opt
                     .try_inverse()
                     .expect("Optimized T_B_W should be invertible");
+                // Store for warm-start of next frame's track_motion
+                self.last_track_pose = Some(T_W_B_opt);
                 log::debug!(
                     "[SlidingWindow] Motion tracking successful. Initial cost: {:.3}, final cost: {:.3}",
                     opt_result.initial_cost,
