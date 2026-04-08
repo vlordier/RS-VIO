@@ -268,9 +268,10 @@ impl Factor for BundleAdjustmentFactor {
     ) -> (DVector<f64>, Option<DMatrix<f64>>) {
         let p_W = Vector3::new(params[0][0], params[0][1], params[0][2]);
 
-        // Extract T_B_W: either from fixed pose or from SE(3) parameters
+        // Extract T_B_W: either from fixed pose (owned matrix) or from SE(3) parameters
         let (R_B_W, t_B_W) = if let Some(T_B_W) = self.fixed_pose {
             assert_eq!(params.len(), 1, "BA with fixed pose requires 1 parameter");
+            // Convert views to owned — needed for type consistency with SE3 branch
             (
                 T_B_W.fixed_view::<3, 3>(0, 0).into_owned(),
                 T_B_W.fixed_view::<3, 1>(0, 3).into_owned(),

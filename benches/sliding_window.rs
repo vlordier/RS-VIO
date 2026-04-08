@@ -85,7 +85,10 @@ fn bench_preintegrate_imu(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}ms_{}samples", duration_ms, n_samples)),
             &samples,
-            |b, samples| b.iter(|| preintegrate_imu(samples, &[0.0; 3], &[0.0; 3])),
+            |b, samples| {
+                let gravity = na::Vector3::<f64>::new(0.0, 0.0, 9.81);
+                b.iter(|| preintegrate_imu(samples, &[0.0; 3], &[0.0; 3], &gravity))
+            },
         );
     }
 

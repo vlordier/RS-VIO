@@ -218,18 +218,21 @@ impl<'a> Estimator<'a> {
                     // IMU-based keyframe criteria: high variance or large predicted displacement
                     let imu_triggers_keyframe = if let Some(imu) = imu_data {
                         // High gyro variance → fast rotation → visual tracking unreliable
-                        let gyro_var = imu.iter().fold([0.0_f64; 3], |acc, s| {
-                            [
-                                acc[0] + s.gyro[0] * s.gyro[0],
-                                acc[1] + s.gyro[1] * s.gyro[1],
-                                acc[2] + s.gyro[2] * s.gyro[2],
-                            ]
-                        });
-                        let gyro_rms = (gyro_var[0] + gyro_var[1] + gyro_var[2]).sqrt() / imu.len() as f64;
+                        // Use mutable accumulators instead of .fold() to avoid per-sample array allocs
+                        let mut gx2 = 0.0f64;
+                        let mut gy2 = 0.0f64;
+                        let mut gz2 = 0.0f64;
+                        let mut accel_sum = 0.0f64;
+                        for s in imu.iter() {
+                            gx2 += s.gyro[0] * s.gyro[0];
+                            gy2 += s.gyro[1] * s.gyro[1];
+                            gz2 += s.gyro[2] * s.gyro[2];
+                            accel_sum += s.accel[0].abs() + s.accel[1].abs() + s.accel[2].abs();
+                        }
+                        let n = imu.len() as f64;
+                        let gyro_rms = (gx2 + gy2 + gz2).sqrt() / n;
                         let imu_rotation_threshold = 0.3; // rad/s RMS
-                        let imu_disp = imu.iter().fold(0.0_f64, |acc, s| {
-                            acc + (s.accel[0].abs() + s.accel[1].abs() + s.accel[2].abs())
-                        }) / imu.len() as f64;
+                        let imu_disp = accel_sum / n;
                         let imu_disp_threshold = 15.0; // m/s² mean magnitude
                         gyro_rms > imu_rotation_threshold || imu_disp > imu_disp_threshold
                     } else {

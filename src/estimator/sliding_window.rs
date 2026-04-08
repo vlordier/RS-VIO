@@ -14,6 +14,12 @@ use nalgebra as na;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 
+/// Standard gravity magnitude (m/s²). Assumes world z-axis points down.
+const GRAVITY_MAGNITUDE: f64 = 9.81;
+
+/// Gravity vector in world frame (z-down convention).
+const GRAVITY: Vector3 = na::Vector3::new(0.0, 0.0, GRAVITY_MAGNITUDE);
+
 /// Compute the inverse of an SE(3) transform matrix using the closed-form solution.
 ///
 /// For `T = [R | t; 0 | 1]`, the inverse is `T⁻¹ = [Rᵀ | -Rᵀ·t; 0 | 1]`.
@@ -44,6 +50,7 @@ pub fn inverse_se3(t: &Matrix4x4) -> Matrix4x4 {
 /// * `imu_samples` — raw IMU measurements in chronological order
 /// * `gyro_bias` — estimated gyro bias [x, y, z] in rad/s
 /// * `accel_bias` — estimated accel bias [x, y, z] in m/s²
+/// * `gravity` — gravity vector in world frame (pre-estimated, ~9.81 m/s²)
 ///
 /// # Returns
 /// Relative transform T_prev_to_curr as a 4x4 SE(3) matrix.
@@ -52,25 +59,11 @@ pub fn preintegrate_imu(
     imu_samples: &[ImuData],
     gyro_bias: &[f64; 3],
     accel_bias: &[f64; 3],
+    gravity: &Vector3,
 ) -> Matrix4x4 {
     if imu_samples.len() < 2 {
         return Matrix4x4::identity();
     }
-
-    // Estimate gravity direction from first few stationary samples.
-    // If the IMU is roughly level at startup, gravity points along -z.
-    // We use the mean accel of the first 10 samples as gravity estimate.
-    let g = {
-        let n = imu_samples.len().min(10);
-        let mean = imu_samples[..n]
-            .iter()
-            .fold(Vector3::zeros(), |acc, s| {
-                acc + Vector3::new(s.accel[0], s.accel[1], s.accel[2])
-            })
-            / n as f64;
-        // Gravity is the direction opposite to the mean accel when stationary
-        (-mean).normalize() * 9.81
-    };
 
     // Bias-subtracted vectors for convenience
     let bg = Vector3::new(gyro_bias[0], gyro_bias[1], gyro_bias[2]);
@@ -123,8 +116,8 @@ pub fn preintegrate_imu(
             next.accel[1] - ba.y,
             next.accel[2] - ba.z,
         );
-        let a_curr_world = delta_r * a_curr_body - g;
-        let a_next_world = delta_r_next * a_next_body - g;
+        let a_curr_world = delta_r * a_curr_body - gravity;
+        let a_next_world = delta_r_next * a_next_body - gravity;
         let a_mid = (a_curr_world + a_next_world) * 0.5;
 
         delta_v += a_mid * dt;
@@ -331,9 +324,7 @@ impl SlidingWindow {
         let mut initial_values = HashMap::new();
         // solver.add_observer(TerminalObserver::new());
 
-        // Initialize maps for tracking and counting observations
-        let mut map_feature_to_landmark: HashMap<usize, String> = HashMap::new();
-        // Count observations per feature_id, separately for left and right cameras
+        // Initialize observation counters (left and right cameras separately)
         let mut left_obs_count: HashMap<usize, usize> = HashMap::new();
         let mut right_obs_count: HashMap<usize, usize> = HashMap::new();
 
@@ -355,23 +346,26 @@ impl SlidingWindow {
             .try_inverse()
             .expect("T_B_Cr should be invertible");
 
-        // Count observations for each landmark across all frames, separately for left and right cameras
+        // Count observations per feature_id (left and right cameras separately).
+        // Then build string names only for unique feature IDs.
         for frame in self.keyframes.iter() {
-            // Count left camera observations
-            for feat in frame.left_features.iter() {
-                map_feature_to_landmark
-                    .entry(feat.feature_id)
-                    .or_insert_with(|| format!("pt_{}", feat.feature_id));
+            for feat in &frame.left_features {
                 *left_obs_count.entry(feat.feature_id).or_insert(0) += 1;
             }
-
-            // Count right camera observations
-            for feat in frame.right_features.iter() {
-                map_feature_to_landmark
-                    .entry(feat.feature_id)
-                    .or_insert_with(|| format!("pt_{}", feat.feature_id));
+            for feat in &frame.right_features {
                 *right_obs_count.entry(feat.feature_id).or_insert(0) += 1;
             }
+        }
+        // Build landmark name strings once per unique feature (not per observation)
+        let all_ids: std::collections::HashSet<usize> = left_obs_count
+            .keys()
+            .chain(right_obs_count.keys())
+            .copied()
+            .collect();
+        let mut map_feature_to_landmark: HashMap<usize, String> =
+            HashMap::with_capacity(all_ids.len());
+        for fid in all_ids {
+            map_feature_to_landmark.insert(fid, format!("pt_{}", fid));
         }
 
         // Add factors
@@ -757,6 +751,7 @@ impl SlidingWindow {
                 &frame.imu_from_last_frame,
                 &gyro_bias_f64,
                 &accel_bias_f64,
+                &GRAVITY,
             );
             last_kf_pose * delta_t
         } else {
