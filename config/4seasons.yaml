@@ -1,0 +1,55 @@
+%YAML:1.0
+---
+
+# Camera Parameters (EuRoC dataset specific)
+# Image dimensions and processing parameters
+camera:
+  image_width: 800            # Image width in pixels (EuRoC standard)
+  image_height: 400           # Image height in pixels (EuRoC standard)  
+  
+  # Left camera (cam0) intrinsics
+  left_intrinsics: [501.475791931, 501.475791931, 421.7953735163109 , 167.65799492501083]
+  left_distortion: [0., 0, 0, 0]  # [alpha, beta]
+  left_model: "pinhole-radtan"
+
+
+  # Right camera (cam1) intrinsics 
+  right_intrinsics: [501.475791931, 501.475791931, 421.7953735163109 , 167.65799492501083  ]  # [fx, fy, cx, cy]
+  right_distortion: [0., 0, 0, 0]  # [alpha, beta]
+  right_model: "pinhole-radtan"
+
+  # Left camera extrinsics (T_BC - camera to body transform)
+  T_B_Cl: [1.0, 0.0, 0.0, 0.0,
+              0.0, 1.0, 0.0, 0.0,
+              0.0, 0.0, 1.0, 0.0,
+              0.0, 0.0, 0.0, 1.0]
+  
+  # Right camera extrinsics (T_BC - camera to body transform)
+  T_B_Cr: [1.0, 0.0, 0.0, 0.3004961618953472,
+              0.0, 1.0, 0.0, 0.0,
+              0.0, 0.0, 1.0, 0.0,
+              0.0, 0.0, 0.0, 1.0]
+# Keyframe and Windowing Parameters
+# Controls keyframe selection and sliding window management
+keyframe_management:
+  keyframe_window_size: 10
+  translation_threshold: 0.5  # Minimum translation (meters) since last keyframe to trigger new keyframe
+  rotation_threshold: 0.25  # Minimum rotation (radians) since last keyframe to trigger new keyframe
+
+# Feature Detection Parameters
+# Controls how corner features are detected using goodFeaturesToTrack
+feature_detection:
+  grid_size: 40
+  max_features_per_grid: 1   # Maximum features allowed per grid cell
+  optical_flow_max_iterations: 10
+  optical_flow_convergence_threshold: 0.01
+
+# Global Depth Parameters
+# Controls depth validation throughout the entire VIO system
+depth:
+  min_depth: 0.1              # Minimum depth for valid 3D points (meters) - used in all depth validation
+  max_depth: 100.0            # Maximum depth for valid 3D points (meters) - used in all depth validation
+
+optimization:
+  pnp_max_iterations: 10
+  bundle_adjustment_max_iterations: 20

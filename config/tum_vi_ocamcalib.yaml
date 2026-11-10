@@ -1,0 +1,86 @@
+%YAML:1.0
+---
+
+# Camera Parameters (TUM-VI dataset)
+# From: dso/camchain.yaml
+camera:
+  image_width: 512            # Image width in pixels
+  image_height: 512           # Image height in pixels
+
+  # Left camera (cam0) - from TUM-VI camchain.yaml
+  left_intrinsics: [190.97847715128717, 190.9733070521226, 254.93170605935475, 256.8974428996504]
+  left_distortion: [0.0034823894022493434, 0.0007150348452162257, -0.0020532361418706202, 0.00020293673591811182]
+  left_model: "equidistant"  # TUM-VI uses equidistant (fisheye) model
+
+  # Right camera (cam1) - from TUM-VI camchain.yaml  
+  right_intrinsics: [190.44236969414825, 190.4344384721956, 252.59949716835982, 254.91723064636983]
+  right_distortion: [0.0034003170790442797, 0.001766278153469831, -0.00266312569781606, 0.0003299517423931039]
+  right_model: "equidistant"  # TUM-VI uses equidistant (fisheye) model
+
+  # Camera extrinsics from TUM-VI camchain.yaml
+  # T_B_Cl: cam0 to body (approximated as cam0 to IMU)
+  T_B_Cl: [-0.9995250378696743, 0.029615343885863205, -0.008522328211654736, 0.04727988224914392,
+           0.0075019185074052044, -0.03439736061393144, -0.9993800792498829, -0.047443232143367084,
+           -0.02989013031643309, -0.998969345370175, 0.03415885127385616, -0.0681999605066297,
+           0.0, 0.0, 0.0, 1.0]
+
+  # T_B_Cr: cam1 to body (approximated as cam1 to IMU)
+  T_B_Cr: [-0.9995110484978581, 0.030299116376600627, -0.0077218830287333565, -0.053697434688869734,
+           0.008104079263822521, 0.012511643720192351, -0.9998888851620987, -0.046131737923635924,
+           -0.030199136245891378, -0.9994625667418545, -0.012751072573940885, -0.07149261284195751,
+           0.0, 0.0, 0.0, 1.0]
+
+# Keyframe and Windowing Parameters
+# Controls keyframe selection and sliding window management
+keyframe_management:
+  keyframe_window_size: 10
+  translation_threshold: 0.4  # Minimum translation (meters) since last keyframe to trigger new keyframe
+  rotation_threshold: 0.25  # Minimum rotation (radians) since last keyframe to trigger new keyframe
+
+# Feature Detection Parameters
+# Controls how corner features are detected using goodFeaturesToTrack
+feature_detection:
+  grid_size: 30
+  max_features_per_grid: 1   # Maximum features allowed per grid cell
+  optical_flow_max_iterations: 10
+  optical_flow_convergence_threshold: 0.01
+
+# Global Depth Parameters
+# Controls depth validation throughout the entire VIO system
+depth:
+  min_depth: 0.1              # Minimum depth for valid 3D points (meters) - used in all depth validation
+  max_depth: 100.0            # Maximum depth for valid 3D points (meters) - used in all depth validation
+
+optimization:
+  pnp_max_iterations: 10
+  bundle_adjustment_max_iterations: 20
+  # Camera–IMU time offset in seconds: t_imu = t_cam + cam_imu_td_s.
+  # TUM-VI cameras and IMU are hardware-synchronized; start from 0 and let
+  # online refinement converge. Range typically ±30ms for uncalibrated setups.
+  cam_imu_td_s: 0.0
+  cam_imu_td_online_refinement: false
+
+# IMU Parameters (TUM-VI dataset)
+# IMU noise parameters for preintegration and IMU factor
+imu:
+  # Gyroscope noise parameters
+  gyro_noise_std: 1.6968e-4      # rad/s (white noise standard deviation)
+  gyro_random_walk_std: 2.5e-5   # rad/s² (bias random walk)
+  
+  # Accelerometer noise parameters  
+  accel_noise_std: 2.6669e-3     # m/s² (white noise standard deviation)
+  accel_random_walk_std: 6.4e-4  # m/s^(5/2) (bias random walk)
+  
+  # Initial bias estimates (optional, can be estimated online)
+  initial_gyro_bias: [0.0, 0.0, 0.0]  # rad/s
+  initial_accel_bias: [0.0, 0.0, 0.0] # m/s²
+  
+  # IMU extrinsics (T_B_I: IMU to body transform)
+  # For TUM-VI, IMU frame is aligned with camera body frame
+  T_B_I: [1.0, 0.0, 0.0, 0.0,
+          0.0, 1.0, 0.0, 0.0,
+          0.0, 0.0, 1.0, 0.0,
+          0.0, 0.0, 0.0, 1.0]
+  
+  # Gravity magnitude
+  gravity_magnitude: 9.81007  # m/s² (Munich, Germany)
